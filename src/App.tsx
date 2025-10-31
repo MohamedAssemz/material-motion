@@ -8,6 +8,7 @@ import { ProtectedRoute } from "./components/ProtectedRoute";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import Orders from "./pages/Orders";
+import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -34,6 +35,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <Orders />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/users" 
+              element={
+                <ProtectedRoute requiredRole="admin">
+                  <Admin />
                 </ProtectedRoute>
               } 
             />
