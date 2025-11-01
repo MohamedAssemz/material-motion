@@ -1,0 +1,283 @@
+import { useEffect, useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import { Button } from '@/components/ui/button';
+import { ArrowLeft, Clock, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { OrderTimeline } from '@/components/OrderTimeline';
+import { UnitCard } from '@/components/UnitCard';
+import { toast } from 'sonner';
+import { format } from 'date-fns';
+
+interface Unit {
+  id: string;
+  serial_no: string | null;
+  state: string;
+  created_at: string;
+  product: {
+    name: string;
+    sku: string;
+    lead_time_days: number;
+  };
+  stage_eta: Array<{
+    stage: string;
+    eta: string;
+    notified: boolean;
+  }>;
+}
+
+interface Order {
+  id: string;
+  order_number: string;
+  status: string;
+  notes: string | null;
+  created_at: string;
+  created_by: string;
+  profile: {
+    full_name: string;
+    email: string;
+  };
+  units: Unit[];
+}
+
+export default function OrderDetail() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const { hasRole } = useAuth();
+  const [order, setOrder] = useState<Order | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [selectedUnits, setSelectedUnits] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    fetchOrder();
+    
+    const channel = supabase
+      .channel(`order-${id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'units',
+          filter: `order_id=eq.${id}`
+        },
+        () => {
+          fetchOrder();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [id]);
+
+  const fetchOrder = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .select(`
+          *,
+          profile:profiles!orders_created_by_fkey(full_name, email),
+          units(
+            id,
+            serial_no,
+            state,
+            created_at,
+            product:products(name, sku, lead_time_days),
+            stage_eta:unit_stage_eta(stage, eta, notified)
+          )
+        `)
+        .eq('id', id)
+        .single();
+
+      if (error) throw error;
+      setOrder(data as any);
+    } catch (error) {
+      console.error('Error fetching order:', error);
+      toast.error('Failed to load order details');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUnitSelect = (unitId: string) => {
+    setSelectedUnits(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(unitId)) {
+        newSet.delete(unitId);
+      } else {
+        newSet.add(unitId);
+      }
+      return newSet;
+    });
+  };
+
+  const handleBulkUpdate = async (newState: string) => {
+    if (selectedUnits.size === 0) {
+      toast.error('Please select at least one unit');
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('units')
+        .update({ state: newState as any })
+        .in('id', Array.from(selectedUnits));
+
+      if (error) throw error;
+
+      toast.success(`Updated ${selectedUnits.size} unit(s)`);
+      setSelectedUnits(new Set());
+      fetchOrder();
+    } catch (error) {
+      console.error('Error updating units:', error);
+      toast.error('Failed to update units');
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    const colors: Record<string, string> = {
+      'waiting_for_rm': 'bg-yellow-500',
+      'manufacturing': 'bg-blue-500',
+      'qc': 'bg-purple-500',
+      'waiting_for_packaging_material': 'bg-orange-500',
+      'packaging': 'bg-indigo-500',
+      'waiting_for_boxing_material': 'bg-orange-500',
+      'boxing': 'bg-cyan-500',
+      'complete': 'bg-green-500',
+    };
+    return colors[status] || 'bg-gray-500';
+  };
+
+  const isUnitLate = (unit: Unit) => {
+    if (!unit.stage_eta || unit.stage_eta.length === 0) return false;
+    
+    const currentStageEta = unit.stage_eta.find(eta => eta.stage === unit.state);
+    if (!currentStageEta) return false;
+    
+    return new Date(currentStageEta.eta) < new Date();
+  };
+
+  const getNextStates = () => {
+    const userRoles = [];
+    if (hasRole('manufacturer')) userRoles.push('manufacturing');
+    if (hasRole('qc')) userRoles.push('qc');
+    if (hasRole('packer')) userRoles.push('packaging');
+    if (hasRole('boxer')) userRoles.push('boxing');
+    if (hasRole('packaging_manager')) userRoles.push('waiting_for_packaging_material');
+    if (hasRole('boxing_manager')) userRoles.push('waiting_for_boxing_material');
+    if (hasRole('admin')) return [
+      'waiting_for_rm',
+      'manufacturing',
+      'qc',
+      'waiting_for_packaging_material',
+      'packaging',
+      'waiting_for_boxing_material',
+      'boxing',
+      'complete'
+    ];
+    return userRoles;
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (!order) {
+    return (
+      <div className="container mx-auto p-6">
+        <p>Order not found</p>
+      </div>
+    );
+  }
+
+  const lateUnits = order.units.filter(isUnitLate).length;
+  const nextStates = getNextStates();
+
+  return (
+    <div className="container mx-auto p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" onClick={() => navigate('/orders')}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Orders
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold">{order.order_number}</h1>
+            <p className="text-muted-foreground">
+              Created by {order.profile.full_name} on {format(new Date(order.created_at), 'PPP')}
+            </p>
+          </div>
+        </div>
+        <Badge className={getStatusColor(order.status)}>
+          {order.status.replace(/_/g, ' ').toUpperCase()}
+        </Badge>
+      </div>
+
+      {lateUnits > 0 && (
+        <Card className="border-destructive bg-destructive/10">
+          <CardContent className="flex items-center gap-2 p-4">
+            <AlertTriangle className="h-5 w-5 text-destructive" />
+            <span className="font-medium">{lateUnits} unit(s) are behind schedule</span>
+          </CardContent>
+        </Card>
+      )}
+
+      <OrderTimeline order={order} />
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle>Units ({order.units.length})</CardTitle>
+            {selectedUnits.size > 0 && nextStates.length > 0 && (
+              <div className="flex gap-2">
+                <span className="text-sm text-muted-foreground">
+                  {selectedUnits.size} selected
+                </span>
+                {nextStates.map(state => (
+                  <Button
+                    key={state}
+                    size="sm"
+                    onClick={() => handleBulkUpdate(state)}
+                  >
+                    Move to {state.replace(/_/g, ' ')}
+                  </Button>
+                ))}
+              </div>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {order.units.map(unit => (
+            <UnitCard
+              key={unit.id}
+              unit={unit}
+              isSelected={selectedUnits.has(unit.id)}
+              onSelect={handleUnitSelect}
+              isLate={isUnitLate(unit)}
+              canUpdate={nextStates.length > 0}
+            />
+          ))}
+        </CardContent>
+      </Card>
+
+      {order.notes && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Notes</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground">{order.notes}</p>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}

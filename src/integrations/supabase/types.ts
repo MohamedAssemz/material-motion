@@ -442,6 +442,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_late_units: { Args: never; Returns: undefined }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -473,6 +474,8 @@ export type Database = {
         | "boxed"
         | "qced"
         | "finished"
+        | "waiting_for_packaging_material"
+        | "waiting_for_boxing_material"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -623,6 +626,8 @@ export const Constants = {
         "boxed",
         "qced",
         "finished",
+        "waiting_for_packaging_material",
+        "waiting_for_boxing_material",
       ],
     },
   },

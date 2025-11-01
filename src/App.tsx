@@ -8,6 +8,7 @@ import { ProtectedRoute } from "./components/ProtectedRoute";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import Orders from "./pages/Orders";
+import OrderDetail from "./pages/OrderDetail";
 import OrderCreate from "./pages/OrderCreate";
 import Products from "./pages/Products";
 import Admin from "./pages/Admin";
@@ -37,6 +38,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <Orders />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/orders/:id" 
+              element={
+                <ProtectedRoute>
+                  <OrderDetail />
                 </ProtectedRoute>
               } 
             />

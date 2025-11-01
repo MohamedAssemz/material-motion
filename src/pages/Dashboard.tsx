@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { NotificationBell } from '@/components/NotificationBell';
 import { 
   Factory, 
   Package, 
@@ -120,6 +121,7 @@ export default function Dashboard() {
           </div>
           
           <div className="flex items-center gap-4">
+            <NotificationBell />
             <div className="text-right">
               <p className="text-sm font-medium">{user?.email}</p>
               <div className="flex gap-1 justify-end mt-1">
