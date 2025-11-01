@@ -80,7 +80,7 @@ export default function OrderDetail() {
         .from('orders')
         .select(`
           *,
-          profile:profiles!orders_created_by_fkey(full_name, email),
+          profile:profiles!created_by(full_name, email),
           units(
             id,
             serial_no,

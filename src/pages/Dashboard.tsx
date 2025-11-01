@@ -255,7 +255,7 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
-                {userRoles.includes('manufacturer') && (
+                {(userRoles.includes('manufacturer') || userRoles.includes('manufacture_lead')) && (
                   <Button variant="outline" className="w-full justify-start" asChild>
                     <Link to="/queues/manufacturing">
                       <Factory className="mr-2 h-4 w-4" />

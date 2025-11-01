@@ -12,6 +12,10 @@ import OrderDetail from "./pages/OrderDetail";
 import OrderCreate from "./pages/OrderCreate";
 import Products from "./pages/Products";
 import Admin from "./pages/Admin";
+import QueueManufacturing from "./pages/QueueManufacturing";
+import QueuePackaging from "./pages/QueuePackaging";
+import QueueBoxing from "./pages/QueueBoxing";
+import QueueQC from "./pages/QueueQC";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -70,6 +74,38 @@ const App = () => (
               element={
                 <ProtectedRoute requiredRole="admin">
                   <Admin />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/queues/manufacturing" 
+              element={
+                <ProtectedRoute>
+                  <QueueManufacturing />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/queues/packaging" 
+              element={
+                <ProtectedRoute>
+                  <QueuePackaging />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/queues/boxing" 
+              element={
+                <ProtectedRoute>
+                  <QueueBoxing />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/queues/qc" 
+              element={
+                <ProtectedRoute>
+                  <QueueQC />
                 </ProtectedRoute>
               } 
             />
