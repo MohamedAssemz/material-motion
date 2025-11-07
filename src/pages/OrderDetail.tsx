@@ -19,12 +19,12 @@ interface Unit {
   product: {
     name: string;
     sku: string;
-    lead_time_days: number;
   };
   stage_eta: Array<{
     stage: string;
     eta: string;
     notified: boolean;
+    lead_time_days: number | null;
   }>;
 }
 
@@ -86,8 +86,8 @@ export default function OrderDetail() {
             serial_no,
             state,
             created_at,
-            product:products(name, sku, lead_time_days),
-            stage_eta:unit_stage_eta(stage, eta, notified)
+            product:products(name, sku),
+            stage_eta:unit_stage_eta(stage, eta, notified, lead_time_days)
           )
         `)
         .eq('id', id)
@@ -142,12 +142,13 @@ export default function OrderDetail() {
     const colors: Record<string, string> = {
       'waiting_for_rm': 'bg-yellow-500',
       'manufacturing': 'bg-blue-500',
-      'qc': 'bg-purple-500',
       'waiting_for_packaging_material': 'bg-orange-500',
       'packaging': 'bg-indigo-500',
       'waiting_for_boxing_material': 'bg-orange-500',
       'boxing': 'bg-cyan-500',
-      'complete': 'bg-green-500',
+      'waiting_for_receiving': 'bg-amber-500',
+      'received': 'bg-teal-500',
+      'finished': 'bg-green-500',
     };
     return colors[status] || 'bg-gray-500';
   };
@@ -164,7 +165,6 @@ export default function OrderDetail() {
   const getNextStates = () => {
     const userRoles = [];
     if (hasRole('manufacturer')) userRoles.push('manufacturing');
-    if (hasRole('qc')) userRoles.push('qc');
     if (hasRole('packer')) userRoles.push('packaging');
     if (hasRole('boxer')) userRoles.push('boxing');
     if (hasRole('packaging_manager')) userRoles.push('waiting_for_packaging_material');
@@ -172,12 +172,13 @@ export default function OrderDetail() {
     if (hasRole('admin')) return [
       'waiting_for_rm',
       'manufacturing',
-      'qc',
       'waiting_for_packaging_material',
       'packaging',
       'waiting_for_boxing_material',
       'boxing',
-      'complete'
+      'waiting_for_receiving',
+      'received',
+      'finished'
     ];
     return userRoles;
   };

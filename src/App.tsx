@@ -15,7 +15,6 @@ import Admin from "./pages/Admin";
 import QueueManufacturing from "./pages/QueueManufacturing";
 import QueuePackaging from "./pages/QueuePackaging";
 import QueueBoxing from "./pages/QueueBoxing";
-import QueueQC from "./pages/QueueQC";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -98,14 +97,6 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <QueueBoxing />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/queues/qc" 
-              element={
-                <ProtectedRoute>
-                  <QueueQC />
                 </ProtectedRoute>
               } 
             />

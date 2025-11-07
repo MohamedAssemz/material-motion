@@ -14,6 +14,38 @@ export type Database = {
   }
   public: {
     Tables: {
+      extra_products: {
+        Row: {
+          created_at: string | null
+          id: string
+          product_id: string
+          quantity: number
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          product_id: string
+          quantity?: number
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          product_id?: string
+          quantity?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "extra_products_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           created_at: string | null
@@ -104,6 +136,7 @@ export type Database = {
           id: string
           notes: string | null
           order_number: string
+          priority: string | null
           status: string
           updated_at: string | null
         }
@@ -113,6 +146,7 @@ export type Database = {
           id?: string
           notes?: string | null
           order_number: string
+          priority?: string | null
           status?: string
           updated_at?: string | null
         }
@@ -122,6 +156,7 @@ export type Database = {
           id?: string
           notes?: string | null
           order_number?: string
+          priority?: string | null
           status?: string
           updated_at?: string | null
         }
@@ -171,7 +206,6 @@ export type Database = {
           created_at: string | null
           description: string | null
           id: string
-          lead_time_days: number | null
           name: string
           sku: string
         }
@@ -179,7 +213,6 @@ export type Database = {
           created_at?: string | null
           description?: string | null
           id?: string
-          lead_time_days?: number | null
           name: string
           sku: string
         }
@@ -187,7 +220,6 @@ export type Database = {
           created_at?: string | null
           description?: string | null
           id?: string
-          lead_time_days?: number | null
           name?: string
           sku?: string
         }
@@ -316,6 +348,7 @@ export type Database = {
           created_at: string | null
           eta: string
           id: string
+          lead_time_days: number | null
           notified: boolean | null
           stage: string
           started_by: string | null
@@ -325,6 +358,7 @@ export type Database = {
           created_at?: string | null
           eta: string
           id?: string
+          lead_time_days?: number | null
           notified?: boolean | null
           stage: string
           started_by?: string | null
@@ -334,6 +368,7 @@ export type Database = {
           created_at?: string | null
           eta?: string
           id?: string
+          lead_time_days?: number | null
           notified?: boolean | null
           stage?: string
           started_by?: string | null
@@ -476,6 +511,8 @@ export type Database = {
         | "finished"
         | "waiting_for_packaging_material"
         | "waiting_for_boxing_material"
+        | "waiting_for_receiving"
+        | "received"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -628,6 +665,8 @@ export const Constants = {
         "finished",
         "waiting_for_packaging_material",
         "waiting_for_boxing_material",
+        "waiting_for_receiving",
+        "received",
       ],
     },
   },

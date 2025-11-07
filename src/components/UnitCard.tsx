@@ -16,6 +16,7 @@ interface Unit {
   stage_eta: Array<{
     stage: string;
     eta: string;
+    lead_time_days: number | null;
   }>;
 }
 
@@ -32,12 +33,13 @@ export function UnitCard({ unit, isSelected, onSelect, isLate, canUpdate }: Unit
     const colors: Record<string, string> = {
       'waiting_for_rm': 'bg-yellow-500',
       'manufacturing': 'bg-blue-500',
-      'qc': 'bg-purple-500',
       'waiting_for_packaging_material': 'bg-orange-500',
       'packaging': 'bg-indigo-500',
       'waiting_for_boxing_material': 'bg-orange-500',
       'boxing': 'bg-cyan-500',
-      'complete': 'bg-green-500',
+      'waiting_for_receiving': 'bg-amber-500',
+      'received': 'bg-teal-500',
+      'finished': 'bg-green-500',
     };
     return colors[status] || 'bg-gray-500';
   };
@@ -74,12 +76,19 @@ export function UnitCard({ unit, isSelected, onSelect, isLate, canUpdate }: Unit
               <p>{unit.product.name} ({unit.product.sku})</p>
               <p>Created: {format(new Date(unit.created_at), 'PPp')}</p>
               {currentEta && (
-                <div className="flex items-center gap-1 mt-1">
-                  <Clock className="h-3 w-3" />
-                  <span className={isLate ? 'text-destructive font-medium' : ''}>
-                    ETA: {format(new Date(currentEta.eta), 'PPp')}
-                    {isLate && ' (LATE)'}
-                  </span>
+                <div className="space-y-1 mt-1">
+                  <div className="flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    <span className={isLate ? 'text-destructive font-medium' : ''}>
+                      ETA: {format(new Date(currentEta.eta), 'PPp')}
+                      {isLate && ' (LATE)'}
+                    </span>
+                  </div>
+                  {currentEta.lead_time_days && (
+                    <div className="text-xs ml-4">
+                      Lead time: {currentEta.lead_time_days} days
+                    </div>
+                  )}
                 </div>
               )}
             </div>

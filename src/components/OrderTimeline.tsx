@@ -6,12 +6,10 @@ interface Unit {
   id: string;
   state: string;
   created_at: string;
-  product: {
-    lead_time_days: number;
-  };
   stage_eta: Array<{
     stage: string;
     eta: string;
+    lead_time_days: number | null;
   }>;
 }
 
@@ -27,12 +25,13 @@ interface OrderTimelineProps {
 const STAGES = [
   { key: 'waiting_for_rm', label: 'Waiting for RM', icon: Clock },
   { key: 'manufacturing', label: 'Manufacturing', icon: Circle },
-  { key: 'qc', label: 'QC', icon: Circle },
-  { key: 'waiting_for_packaging_material', label: 'Waiting for Packaging', icon: Clock },
+  { key: 'waiting_for_packaging_material', label: 'Waiting for PM', icon: Clock },
   { key: 'packaging', label: 'Packaging', icon: Circle },
-  { key: 'waiting_for_boxing_material', label: 'Waiting for Boxing', icon: Clock },
+  { key: 'waiting_for_boxing_material', label: 'Waiting for BM', icon: Clock },
   { key: 'boxing', label: 'Boxing', icon: Circle },
-  { key: 'complete', label: 'Complete', icon: CheckCircle },
+  { key: 'waiting_for_receiving', label: 'Waiting for Receiving', icon: Clock },
+  { key: 'received', label: 'Received', icon: Circle },
+  { key: 'finished', label: 'Finished', icon: CheckCircle },
 ];
 
 export function OrderTimeline({ order }: OrderTimelineProps) {
@@ -99,9 +98,22 @@ export function OrderTimeline({ order }: OrderTimelineProps) {
                           <AlertTriangle className="h-4 w-4 text-destructive" />
                         )}
                       </div>
-                      <span className="text-sm text-muted-foreground">
-                        {status.current}/{status.total} units
-                      </span>
+                      <div className="text-right">
+                        <span className="text-sm text-muted-foreground">
+                          {status.current}/{status.total} units
+                        </span>
+                        {status.inProgress && order.units.some(u => {
+                          const stageEta = u.stage_eta.find(eta => eta.stage === stage.key);
+                          return stageEta?.lead_time_days;
+                        }) && (
+                          <div className="text-xs text-muted-foreground mt-1">
+                            Lead time: {order.units.find(u => {
+                              const stageEta = u.stage_eta.find(eta => eta.stage === stage.key);
+                              return stageEta?.lead_time_days;
+                            })?.stage_eta.find(eta => eta.stage === stage.key)?.lead_time_days} days
+                          </div>
+                        )}
+                      </div>
                     </div>
                     
                     {status.inProgress && (

@@ -17,7 +17,6 @@ interface Product {
   sku: string;
   name: string;
   description: string | null;
-  lead_time_days: number | null;
 }
 
 export default function Products() {
@@ -32,7 +31,6 @@ export default function Products() {
     sku: '',
     name: '',
     description: '',
-    lead_time_days: 7,
   });
 
   const canManage = hasRole('admin') || hasRole('manufacture_lead');
@@ -107,7 +105,6 @@ export default function Products() {
       sku: '',
       name: '',
       description: '',
-      lead_time_days: 7,
     });
     setEditingProduct(null);
   };
@@ -118,7 +115,6 @@ export default function Products() {
       sku: product.sku,
       name: product.name,
       description: product.description || '',
-      lead_time_days: product.lead_time_days || 7,
     });
     setDialogOpen(true);
   };
@@ -191,17 +187,6 @@ export default function Products() {
                       rows={3}
                     />
                   </div>
-                  <div>
-                    <Label htmlFor="lead_time">Lead Time (days)</Label>
-                    <Input
-                      id="lead_time"
-                      type="number"
-                      min="0"
-                      value={formData.lead_time_days}
-                      onChange={(e) => setFormData({ ...formData, lead_time_days: parseInt(e.target.value) })}
-                      required
-                    />
-                  </div>
                   <div className="flex gap-2">
                     <Button type="submit" className="flex-1">
                       {editingProduct ? 'Update' : 'Create'}
@@ -242,12 +227,9 @@ export default function Products() {
                 </div>
               </CardHeader>
               <CardContent>
-                <p className="text-sm text-muted-foreground mb-3">
+                <p className="text-sm text-muted-foreground">
                   {product.description || 'No description available'}
                 </p>
-                <Badge variant="secondary">
-                  Lead time: {product.lead_time_days} days
-                </Badge>
               </CardContent>
             </Card>
           ))}
