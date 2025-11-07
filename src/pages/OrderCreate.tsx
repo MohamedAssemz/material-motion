@@ -26,6 +26,7 @@ interface OrderItem {
 const orderSchema = z.object({
   order_number: z.string().trim().min(1, 'Order number is required').max(50, 'Order number too long'),
   notes: z.string().trim().max(500, 'Notes must be less than 500 characters').optional(),
+  priority: z.enum(['high', 'normal']),
 });
 
 export default function OrderCreate() {
@@ -37,6 +38,7 @@ export default function OrderCreate() {
   const [submitting, setSubmitting] = useState(false);
   const [orderNumber, setOrderNumber] = useState('');
   const [notes, setNotes] = useState('');
+  const [priority, setPriority] = useState<'high' | 'normal'>('normal');
   const [items, setItems] = useState<OrderItem[]>([{ product_id: '', quantity: 1 }]);
 
   useEffect(() => {
@@ -88,7 +90,7 @@ export default function OrderCreate() {
     e.preventDefault();
 
     try {
-      const validation = orderSchema.safeParse({ order_number: orderNumber, notes });
+      const validation = orderSchema.safeParse({ order_number: orderNumber, notes, priority });
       if (!validation.success) {
         toast({
           title: 'Validation Error',
@@ -116,6 +118,7 @@ export default function OrderCreate() {
         .insert({
           order_number: orderNumber.trim(),
           notes: notes.trim() || null,
+          priority: priority,
           created_by: user?.id,
         })
         .select()
@@ -221,6 +224,18 @@ export default function OrderCreate() {
                   required
                   maxLength={50}
                 />
+              </div>
+              <div>
+                <Label htmlFor="priority">Priority *</Label>
+                <Select value={priority} onValueChange={(value: 'high' | 'normal') => setPriority(value)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="normal">Normal</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <Label htmlFor="notes">Notes</Label>

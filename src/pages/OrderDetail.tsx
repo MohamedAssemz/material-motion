@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { OrderTimeline } from '@/components/OrderTimeline';
 import { UnitCard } from '@/components/UnitCard';
+import { LeadTimeDialog } from '@/components/LeadTimeDialog';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 
@@ -32,6 +33,7 @@ interface Order {
   id: string;
   order_number: string;
   status: string;
+  priority: string;
   notes: string | null;
   created_at: string;
   created_by: string;
@@ -49,6 +51,8 @@ export default function OrderDetail() {
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedUnits, setSelectedUnits] = useState<Set<string>>(new Set());
+  const [leadTimeDialogOpen, setLeadTimeDialogOpen] = useState(false);
+  const [pendingStateChange, setPendingStateChange] = useState<string | null>(null);
 
   useEffect(() => {
     fetchOrder();
@@ -121,6 +125,18 @@ export default function OrderDetail() {
       return;
     }
 
+    // States that require lead time input
+    const requiresLeadTime = ['manufacturing', 'packaging', 'boxing'];
+    
+    if (requiresLeadTime.includes(newState)) {
+      setPendingStateChange(newState);
+      setLeadTimeDialogOpen(true);
+    } else {
+      await updateUnitsState(newState);
+    }
+  };
+
+  const updateUnitsState = async (newState: string, leadTimeDays?: number, eta?: Date) => {
     try {
       const { error } = await supabase
         .from('units')
@@ -129,12 +145,38 @@ export default function OrderDetail() {
 
       if (error) throw error;
 
+      // If lead time is provided, create stage ETA records
+      if (leadTimeDays && eta) {
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        const etaRecords = Array.from(selectedUnits).map(unitId => ({
+          unit_id: unitId,
+          stage: newState,
+          eta: eta.toISOString(),
+          lead_time_days: leadTimeDays,
+          started_by: user?.id,
+        }));
+
+        const { error: etaError } = await supabase
+          .from('unit_stage_eta')
+          .insert(etaRecords);
+
+        if (etaError) throw etaError;
+      }
+
       toast.success(`Updated ${selectedUnits.size} unit(s)`);
       setSelectedUnits(new Set());
       fetchOrder();
     } catch (error) {
       console.error('Error updating units:', error);
       toast.error('Failed to update units');
+    }
+  };
+
+  const handleLeadTimeConfirm = async (leadTimeDays: number, eta: Date) => {
+    if (pendingStateChange) {
+      await updateUnitsState(pendingStateChange, leadTimeDays, eta);
+      setPendingStateChange(null);
     }
   };
 
@@ -211,7 +253,14 @@ export default function OrderDetail() {
             Back to Orders
           </Button>
           <div>
-            <h1 className="text-3xl font-bold">{order.order_number}</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-3xl font-bold">{order.order_number}</h1>
+              {order.priority === 'high' && (
+                <Badge variant="destructive" className="text-sm">
+                  High Priority
+                </Badge>
+              )}
+            </div>
             <p className="text-muted-foreground">
               Created by {order.profile.full_name} on {format(new Date(order.created_at), 'PPP')}
             </p>
@@ -279,6 +328,14 @@ export default function OrderDetail() {
           </CardContent>
         </Card>
       )}
+
+      <LeadTimeDialog
+        open={leadTimeDialogOpen}
+        onOpenChange={setLeadTimeDialogOpen}
+        onConfirm={handleLeadTimeConfirm}
+        unitCount={selectedUnits.size}
+        nextState={pendingStateChange || ''}
+      />
     </div>
   );
 }

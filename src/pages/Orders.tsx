@@ -7,13 +7,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ArrowLeft, Plus, Search, Eye } from 'lucide-react';
+import { ArrowLeft, Plus, Search, Eye, AlertCircle } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
 interface Order {
   id: string;
   order_number: string;
   status: string;
+  priority: string;
   notes: string | null;
   created_at: string;
   created_by: string | null;
@@ -149,6 +150,7 @@ export default function Orders() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Order Number</TableHead>
+                    <TableHead>Priority</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Units</TableHead>
                     <TableHead>Created By</TableHead>
@@ -159,14 +161,26 @@ export default function Orders() {
                 <TableBody>
                   {filteredOrders.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center text-muted-foreground">
+                      <TableCell colSpan={7} className="text-center text-muted-foreground">
                         No orders found
                       </TableCell>
                     </TableRow>
                   ) : (
                     filteredOrders.map((order) => (
-                      <TableRow key={order.id}>
-                        <TableCell className="font-medium">{order.order_number}</TableCell>
+                      <TableRow key={order.id} className={order.priority === 'high' ? 'bg-destructive/5' : ''}>
+                        <TableCell className="font-medium">
+                          <div className="flex items-center gap-2">
+                            {order.priority === 'high' && (
+                              <AlertCircle className="h-4 w-4 text-destructive" />
+                            )}
+                            {order.order_number}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={order.priority === 'high' ? 'destructive' : 'secondary'}>
+                            {order.priority}
+                          </Badge>
+                        </TableCell>
                         <TableCell>
                           <Badge variant="secondary">{order.status}</Badge>
                         </TableCell>

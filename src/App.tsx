@@ -15,6 +15,7 @@ import Admin from "./pages/Admin";
 import QueueManufacturing from "./pages/QueueManufacturing";
 import QueuePackaging from "./pages/QueuePackaging";
 import QueueBoxing from "./pages/QueueBoxing";
+import ExtraProducts from "./pages/ExtraProducts";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -97,6 +98,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <QueueBoxing />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/extra-products" 
+              element={
+                <ProtectedRoute>
+                  <ExtraProducts />
                 </ProtectedRoute>
               } 
             />

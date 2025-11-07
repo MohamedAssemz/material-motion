@@ -24,8 +24,13 @@ interface Stats {
   inManufacturing: number;
   inPackaging: number;
   inBoxing: number;
-  inQC: number;
   finished: number;
+}
+
+interface QueueCounts {
+  manufacturing: { waiting: number; inProgress: number };
+  packaging: { waiting: number; inProgress: number };
+  boxing: { waiting: number; inProgress: number };
 }
 
 export default function Dashboard() {
@@ -36,8 +41,12 @@ export default function Dashboard() {
     inManufacturing: 0,
     inPackaging: 0,
     inBoxing: 0,
-    inQC: 0,
     finished: 0,
+  });
+  const [queueCounts, setQueueCounts] = useState<QueueCounts>({
+    manufacturing: { waiting: 0, inProgress: 0 },
+    packaging: { waiting: 0, inProgress: 0 },
+    boxing: { waiting: 0, inProgress: 0 },
   });
   const [loading, setLoading] = useState(true);
 
@@ -80,11 +89,25 @@ export default function Dashboard() {
       setStats({
         totalOrders: ordersRes.count || 0,
         waitingForRM: unitsByState.waiting_for_rm || 0,
-        inManufacturing: (unitsByState.in_manufacturing || 0) + (unitsByState.manufactured || 0),
-        inPackaging: (unitsByState.in_packaging || 0) + (unitsByState.packaged || 0) + (unitsByState.waiting_for_pm || 0),
-        inBoxing: (unitsByState.in_boxing || 0) + (unitsByState.boxed || 0) + (unitsByState.waiting_for_bm || 0),
-        inQC: unitsByState.qced || 0,
+        inManufacturing: unitsByState.manufacturing || 0,
+        inPackaging: unitsByState.packaging || 0,
+        inBoxing: unitsByState.boxing || 0,
         finished: unitsByState.finished || 0,
+      });
+
+      setQueueCounts({
+        manufacturing: {
+          waiting: unitsByState.waiting_for_rm || 0,
+          inProgress: unitsByState.manufacturing || 0,
+        },
+        packaging: {
+          waiting: unitsByState.waiting_for_packaging_material || 0,
+          inProgress: unitsByState.packaging || 0,
+        },
+        boxing: {
+          waiting: unitsByState.waiting_for_boxing_material || 0,
+          inProgress: unitsByState.boxing || 0,
+        },
       });
     } catch (error) {
       console.error('Error fetching stats:', error);
@@ -225,17 +248,6 @@ export default function Dashboard() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Quality Control</CardTitle>
-              <ClipboardCheck className="h-4 w-4 text-in-progress" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-in-progress">{stats.inQC}</div>
-              <p className="text-xs text-muted-foreground">Units in QC</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Finished</CardTitle>
               <ClipboardCheck className="h-4 w-4 text-completed" />
             </CardHeader>
@@ -254,38 +266,78 @@ export default function Dashboard() {
               <CardDescription>Work items assigned to your role</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {(userRoles.includes('manufacturer') || userRoles.includes('manufacture_lead')) && (
-                  <Button variant="outline" className="w-full justify-start" asChild>
-                    <Link to="/queues/manufacturing">
-                      <Factory className="mr-2 h-4 w-4" />
-                      Manufacturing Queue ({stats.inManufacturing})
-                    </Link>
-                  </Button>
+                  <Card className="border-blue-200 bg-blue-50/50 dark:border-blue-800 dark:bg-blue-950/20">
+                    <CardContent className="p-4">
+                      <Link to="/queues/manufacturing" className="block">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <Factory className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                            <span className="font-semibold">Manufacturing Queue</span>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-sm">
+                          <div className="bg-background/80 p-2 rounded">
+                            <p className="text-muted-foreground">Waiting for RM</p>
+                            <p className="text-xl font-bold text-yellow-600">{queueCounts.manufacturing.waiting}</p>
+                          </div>
+                          <div className="bg-background/80 p-2 rounded">
+                            <p className="text-muted-foreground">In Progress</p>
+                            <p className="text-xl font-bold text-blue-600">{queueCounts.manufacturing.inProgress}</p>
+                          </div>
+                        </div>
+                      </Link>
+                    </CardContent>
+                  </Card>
                 )}
                 {(userRoles.includes('packer') || userRoles.includes('packaging_manager')) && (
-                  <Button variant="outline" className="w-full justify-start" asChild>
-                    <Link to="/queues/packaging">
-                      <Package className="mr-2 h-4 w-4" />
-                      Packaging Queue ({stats.inPackaging})
-                    </Link>
-                  </Button>
+                  <Card className="border-indigo-200 bg-indigo-50/50 dark:border-indigo-800 dark:bg-indigo-950/20">
+                    <CardContent className="p-4">
+                      <Link to="/queues/packaging" className="block">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <Package className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                            <span className="font-semibold">Packaging Queue</span>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-sm">
+                          <div className="bg-background/80 p-2 rounded">
+                            <p className="text-muted-foreground">Waiting for PM</p>
+                            <p className="text-xl font-bold text-orange-600">{queueCounts.packaging.waiting}</p>
+                          </div>
+                          <div className="bg-background/80 p-2 rounded">
+                            <p className="text-muted-foreground">In Progress</p>
+                            <p className="text-xl font-bold text-indigo-600">{queueCounts.packaging.inProgress}</p>
+                          </div>
+                        </div>
+                      </Link>
+                    </CardContent>
+                  </Card>
                 )}
                 {(userRoles.includes('boxer') || userRoles.includes('boxing_manager')) && (
-                  <Button variant="outline" className="w-full justify-start" asChild>
-                    <Link to="/queues/boxing">
-                      <Box className="mr-2 h-4 w-4" />
-                      Boxing Queue ({stats.inBoxing})
-                    </Link>
-                  </Button>
-                )}
-                {userRoles.includes('qc') && (
-                  <Button variant="outline" className="w-full justify-start" asChild>
-                    <Link to="/queues/qc">
-                      <ClipboardCheck className="mr-2 h-4 w-4" />
-                      QC Queue ({stats.inQC})
-                    </Link>
-                  </Button>
+                  <Card className="border-cyan-200 bg-cyan-50/50 dark:border-cyan-800 dark:bg-cyan-950/20">
+                    <CardContent className="p-4">
+                      <Link to="/queues/boxing" className="block">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <Box className="h-5 w-5 text-cyan-600 dark:text-cyan-400" />
+                            <span className="font-semibold">Boxing Queue</span>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-sm">
+                          <div className="bg-background/80 p-2 rounded">
+                            <p className="text-muted-foreground">Waiting for BM</p>
+                            <p className="text-xl font-bold text-orange-600">{queueCounts.boxing.waiting}</p>
+                          </div>
+                          <div className="bg-background/80 p-2 rounded">
+                            <p className="text-muted-foreground">In Progress</p>
+                            <p className="text-xl font-bold text-cyan-600">{queueCounts.boxing.inProgress}</p>
+                          </div>
+                        </div>
+                      </Link>
+                    </CardContent>
+                  </Card>
                 )}
               </div>
             </CardContent>
@@ -302,6 +354,12 @@ export default function Dashboard() {
                   <Link to="/products">
                     <Package className="mr-2 h-4 w-4" />
                     Manage Products
+                  </Link>
+                </Button>
+                <Button variant="outline" className="w-full justify-start" asChild>
+                  <Link to="/extra-products">
+                    <Package className="mr-2 h-4 w-4" />
+                    Extra Products Inventory
                   </Link>
                 </Button>
                 {userRoles.includes('admin') && (
