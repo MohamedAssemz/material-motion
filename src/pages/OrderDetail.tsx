@@ -80,11 +80,11 @@ export default function OrderDetail() {
 
   const fetchOrder = async () => {
     try {
-      const { data, error } = await supabase
+      // Fetch order with units
+      const { data: orderData, error: orderError } = await supabase
         .from('orders')
         .select(`
           *,
-          profile:profiles!orders_created_by_fkey(full_name, email),
           units(
             id,
             serial_no,
@@ -97,8 +97,22 @@ export default function OrderDetail() {
         .eq('id', id)
         .single();
 
-      if (error) throw error;
-      setOrder(data as any);
+      if (orderError) throw orderError;
+
+      // Fetch profile separately
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('full_name, email')
+        .eq('id', orderData.created_by)
+        .single();
+
+      if (profileError) throw profileError;
+
+      // Combine the data
+      setOrder({
+        ...orderData,
+        profile: profileData
+      } as any);
     } catch (error) {
       console.error('Error fetching order:', error);
       toast.error('Failed to load order details');
