@@ -3,11 +3,11 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Clock, AlertTriangle, CheckCircle } from 'lucide-react';
+import { ArrowLeft, AlertTriangle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { OrderTimeline } from '@/components/OrderTimeline';
-import { UnitCard } from '@/components/UnitCard';
+import { BatchCard } from '@/components/BatchCard';
 import { LeadTimeDialog } from '@/components/LeadTimeDialog';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -17,6 +17,7 @@ interface Unit {
   serial_no: string | null;
   state: string;
   created_at: string;
+  product_id: string;
   product: {
     name: string;
     sku: string;
@@ -27,6 +28,25 @@ interface Unit {
     notified: boolean;
     lead_time_days: number | null;
   }>;
+}
+
+interface BatchInfo {
+  product_id: string;
+  product_name: string;
+  product_sku: string;
+  state: string;
+  total_quantity: number;
+  unit_ids: string[];
+  earliest_eta?: string;
+  latest_eta?: string;
+  has_late_units: boolean;
+  lead_time_days?: number;
+}
+
+interface BatchSelection {
+  product_id: string;
+  state: string;
+  quantity: number;
 }
 
 interface Order {
@@ -50,7 +70,8 @@ export default function OrderDetail() {
   const { hasRole } = useAuth();
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
-  const [selectedUnits, setSelectedUnits] = useState<Set<string>>(new Set());
+  const [batches, setBatches] = useState<BatchInfo[]>([]);
+  const [batchSelections, setBatchSelections] = useState<Map<string, number>>(new Map());
   const [leadTimeDialogOpen, setLeadTimeDialogOpen] = useState(false);
   const [pendingStateChange, setPendingStateChange] = useState<string | null>(null);
 
@@ -109,10 +130,53 @@ export default function OrderDetail() {
       if (profileError) throw profileError;
 
       // Combine the data
-      setOrder({
+      const combinedOrder = {
         ...orderData,
         profile: profileData
-      } as any);
+      } as any;
+      
+      setOrder(combinedOrder);
+      
+      // Group units into batches
+      const batchMap = new Map<string, BatchInfo>();
+      
+      combinedOrder.units.forEach((unit: Unit) => {
+        const key = `${unit.product_id}-${unit.state}`;
+        
+        if (!batchMap.has(key)) {
+          const currentEta = unit.stage_eta.find(eta => eta.stage === unit.state);
+          const isLate = currentEta ? new Date(currentEta.eta) < new Date() : false;
+          
+          batchMap.set(key, {
+            product_id: unit.product_id,
+            product_name: unit.product.name,
+            product_sku: unit.product.sku,
+            state: unit.state,
+            total_quantity: 0,
+            unit_ids: [],
+            earliest_eta: currentEta?.eta,
+            has_late_units: isLate,
+            lead_time_days: currentEta?.lead_time_days || undefined,
+          });
+        }
+        
+        const batch = batchMap.get(key)!;
+        batch.total_quantity++;
+        batch.unit_ids.push(unit.id);
+        
+        // Update earliest ETA and late status
+        const currentEta = unit.stage_eta.find(eta => eta.stage === unit.state);
+        if (currentEta) {
+          const isLate = new Date(currentEta.eta) < new Date();
+          if (isLate) batch.has_late_units = true;
+          
+          if (!batch.earliest_eta || new Date(currentEta.eta) < new Date(batch.earliest_eta)) {
+            batch.earliest_eta = currentEta.eta;
+          }
+        }
+      });
+      
+      setBatches(Array.from(batchMap.values()));
     } catch (error) {
       console.error('Error fetching order:', error);
       toast.error('Failed to load order details');
@@ -121,20 +185,41 @@ export default function OrderDetail() {
     }
   };
 
-  const handleUnitSelect = (unitId: string) => {
-    setSelectedUnits(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(unitId)) {
-        newSet.delete(unitId);
+  const getBatchKey = (productId: string, state: string) => `${productId}-${state}`;
+
+  const handleBatchQuantityChange = (batch: BatchInfo, quantity: number) => {
+    const key = getBatchKey(batch.product_id, batch.state);
+    setBatchSelections(prev => {
+      const newMap = new Map(prev);
+      if (quantity > 0) {
+        newMap.set(key, quantity);
       } else {
-        newSet.add(unitId);
+        newMap.delete(key);
       }
-      return newSet;
+      return newMap;
     });
   };
 
+  const getSelectedUnitIds = (): string[] => {
+    const selectedIds: string[] = [];
+    
+    batchSelections.forEach((quantity, key) => {
+      const batch = batches.find(b => getBatchKey(b.product_id, b.state) === key);
+      if (batch) {
+        selectedIds.push(...batch.unit_ids.slice(0, quantity));
+      }
+    });
+    
+    return selectedIds;
+  };
+
+  const getTotalSelectedCount = (): number => {
+    return Array.from(batchSelections.values()).reduce((sum, qty) => sum + qty, 0);
+  };
+
   const handleBulkUpdate = async (newState: string) => {
-    if (selectedUnits.size === 0) {
+    const totalSelected = getTotalSelectedCount();
+    if (totalSelected === 0) {
       toast.error('Please select at least one unit');
       return;
     }
@@ -152,10 +237,12 @@ export default function OrderDetail() {
 
   const updateUnitsState = async (newState: string, leadTimeDays?: number, eta?: Date) => {
     try {
+      const selectedUnitIds = getSelectedUnitIds();
+      
       const { error } = await supabase
         .from('units')
         .update({ state: newState as any })
-        .in('id', Array.from(selectedUnits));
+        .in('id', selectedUnitIds);
 
       if (error) throw error;
 
@@ -163,7 +250,7 @@ export default function OrderDetail() {
       if (leadTimeDays && eta) {
         const { data: { user } } = await supabase.auth.getUser();
         
-        const etaRecords = Array.from(selectedUnits).map(unitId => ({
+        const etaRecords = selectedUnitIds.map(unitId => ({
           unit_id: unitId,
           stage: newState,
           eta: eta.toISOString(),
@@ -178,8 +265,8 @@ export default function OrderDetail() {
         if (etaError) throw etaError;
       }
 
-      toast.success(`Updated ${selectedUnits.size} unit(s)`);
-      setSelectedUnits(new Set());
+      toast.success(`Updated ${selectedUnitIds.length} unit(s)`);
+      setBatchSelections(new Map());
       fetchOrder();
     } catch (error) {
       console.error('Error updating units:', error);
@@ -209,14 +296,6 @@ export default function OrderDetail() {
     return colors[status] || 'bg-gray-500';
   };
 
-  const isUnitLate = (unit: Unit) => {
-    if (!unit.stage_eta || unit.stage_eta.length === 0) return false;
-    
-    const currentStageEta = unit.stage_eta.find(eta => eta.stage === unit.state);
-    if (!currentStageEta) return false;
-    
-    return new Date(currentStageEta.eta) < new Date();
-  };
 
   const getNextStates = () => {
     const userRoles = [];
@@ -255,8 +334,10 @@ export default function OrderDetail() {
     );
   }
 
-  const lateUnits = order.units.filter(isUnitLate).length;
+  const lateBatches = batches.filter(b => b.has_late_units).length;
+  const lateUnitsCount = batches.reduce((sum, b) => sum + (b.has_late_units ? b.total_quantity : 0), 0);
   const nextStates = getNextStates();
+  const totalSelected = getTotalSelectedCount();
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -285,11 +366,13 @@ export default function OrderDetail() {
         </Badge>
       </div>
 
-      {lateUnits > 0 && (
+      {lateUnitsCount > 0 && (
         <Card className="border-destructive bg-destructive/10">
           <CardContent className="flex items-center gap-2 p-4">
             <AlertTriangle className="h-5 w-5 text-destructive" />
-            <span className="font-medium">{lateUnits} unit(s) are behind schedule</span>
+            <span className="font-medium">
+              {lateUnitsCount} unit(s) in {lateBatches} batch(es) are behind schedule
+            </span>
           </CardContent>
         </Card>
       )}
@@ -299,11 +382,11 @@ export default function OrderDetail() {
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle>Units ({order.units.length})</CardTitle>
-            {selectedUnits.size > 0 && nextStates.length > 0 && (
-              <div className="flex gap-2">
+            <CardTitle>Batches ({batches.length} batches, {order.units.length} total units)</CardTitle>
+            {totalSelected > 0 && nextStates.length > 0 && (
+              <div className="flex gap-2 items-center">
                 <span className="text-sm text-muted-foreground">
-                  {selectedUnits.size} selected
+                  {totalSelected} unit(s) selected
                 </span>
                 {nextStates.map(state => (
                   <Button
@@ -319,16 +402,18 @@ export default function OrderDetail() {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          {order.units.map(unit => (
-            <UnitCard
-              key={unit.id}
-              unit={unit}
-              isSelected={selectedUnits.has(unit.id)}
-              onSelect={handleUnitSelect}
-              isLate={isUnitLate(unit)}
-              canUpdate={nextStates.length > 0}
-            />
-          ))}
+          {batches.map(batch => {
+            const key = getBatchKey(batch.product_id, batch.state);
+            return (
+              <BatchCard
+                key={key}
+                batch={batch}
+                selectedQuantity={batchSelections.get(key) || 0}
+                onQuantityChange={(qty) => handleBatchQuantityChange(batch, qty)}
+                canUpdate={nextStates.length > 0}
+              />
+            );
+          })}
         </CardContent>
       </Card>
 
@@ -347,7 +432,7 @@ export default function OrderDetail() {
         open={leadTimeDialogOpen}
         onOpenChange={setLeadTimeDialogOpen}
         onConfirm={handleLeadTimeConfirm}
-        unitCount={selectedUnits.size}
+        unitCount={getTotalSelectedCount()}
         nextState={pendingStateChange || ''}
       />
     </div>
