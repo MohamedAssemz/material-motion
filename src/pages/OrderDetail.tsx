@@ -11,6 +11,7 @@ import { BatchCard } from '@/components/BatchCard';
 import { LeadTimeDialog } from '@/components/LeadTimeDialog';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
+import { getNextState, requiresLeadTimeInput, getStateLabel, type UnitState } from '@/lib/stateMachine';
 
 interface Unit {
   id: string;
@@ -34,13 +35,20 @@ interface BatchInfo {
   product_id: string;
   product_name: string;
   product_sku: string;
-  state: string;
+  state: UnitState;
   total_quantity: number;
   unit_ids: string[];
   earliest_eta?: string;
   latest_eta?: string;
   has_late_units: boolean;
   lead_time_days?: number;
+}
+
+interface ProductGroup {
+  product_id: string;
+  product_name: string;
+  product_sku: string;
+  batches: BatchInfo[];
 }
 
 interface BatchSelection {
@@ -70,10 +78,10 @@ export default function OrderDetail() {
   const { hasRole } = useAuth();
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
-  const [batches, setBatches] = useState<BatchInfo[]>([]);
+  const [productGroups, setProductGroups] = useState<ProductGroup[]>([]);
   const [batchSelections, setBatchSelections] = useState<Map<string, number>>(new Map());
   const [leadTimeDialogOpen, setLeadTimeDialogOpen] = useState(false);
-  const [pendingStateChange, setPendingStateChange] = useState<string | null>(null);
+  const [pendingStateChange, setPendingStateChange] = useState<UnitState | null>(null);
 
   useEffect(() => {
     fetchOrder();
@@ -137,30 +145,40 @@ export default function OrderDetail() {
       
       setOrder(combinedOrder);
       
-      // Group units into batches
-      const batchMap = new Map<string, BatchInfo>();
+      // Group units by product first, then by state (batches)
+      const productMap = new Map<string, ProductGroup>();
       
       combinedOrder.units.forEach((unit: Unit) => {
-        const key = `${unit.product_id}-${unit.state}`;
-        
-        if (!batchMap.has(key)) {
-          const currentEta = unit.stage_eta.find(eta => eta.stage === unit.state);
-          const isLate = currentEta ? new Date(currentEta.eta) < new Date() : false;
-          
-          batchMap.set(key, {
+        if (!productMap.has(unit.product_id)) {
+          productMap.set(unit.product_id, {
             product_id: unit.product_id,
             product_name: unit.product.name,
             product_sku: unit.product.sku,
-            state: unit.state,
+            batches: [],
+          });
+        }
+        
+        const productGroup = productMap.get(unit.product_id)!;
+        let batch = productGroup.batches.find(b => b.state === unit.state);
+        
+        if (!batch) {
+          const currentEta = unit.stage_eta.find(eta => eta.stage === unit.state);
+          const isLate = currentEta ? new Date(currentEta.eta) < new Date() : false;
+          
+          batch = {
+            product_id: unit.product_id,
+            product_name: unit.product.name,
+            product_sku: unit.product.sku,
+            state: unit.state as UnitState,
             total_quantity: 0,
             unit_ids: [],
             earliest_eta: currentEta?.eta,
             has_late_units: isLate,
             lead_time_days: currentEta?.lead_time_days || undefined,
-          });
+          };
+          productGroup.batches.push(batch);
         }
         
-        const batch = batchMap.get(key)!;
         batch.total_quantity++;
         batch.unit_ids.push(unit.id);
         
@@ -176,7 +194,7 @@ export default function OrderDetail() {
         }
       });
       
-      setBatches(Array.from(batchMap.values()));
+      setProductGroups(Array.from(productMap.values()));
     } catch (error) {
       console.error('Error fetching order:', error);
       toast.error('Failed to load order details');
@@ -204,7 +222,9 @@ export default function OrderDetail() {
     const selectedIds: string[] = [];
     
     batchSelections.forEach((quantity, key) => {
-      const batch = batches.find(b => getBatchKey(b.product_id, b.state) === key);
+      const batch = productGroups
+        .flatMap(pg => pg.batches)
+        .find(b => getBatchKey(b.product_id, b.state) === key);
       if (batch) {
         selectedIds.push(...batch.unit_ids.slice(0, quantity));
       }
@@ -217,25 +237,40 @@ export default function OrderDetail() {
     return Array.from(batchSelections.values()).reduce((sum, qty) => sum + qty, 0);
   };
 
-  const handleBulkUpdate = async (newState: string) => {
+  const handleBulkUpdate = async () => {
     const totalSelected = getTotalSelectedCount();
     if (totalSelected === 0) {
       toast.error('Please select at least one unit');
       return;
     }
 
-    // States that require lead time input
-    const requiresLeadTime = ['manufacturing', 'packaging', 'boxing'];
+    // Get selected batches and their next states
+    const selectedBatches = productGroups
+      .flatMap(pg => pg.batches)
+      .filter(b => batchSelections.has(getBatchKey(b.product_id, b.state)));
     
-    if (requiresLeadTime.includes(newState)) {
-      setPendingStateChange(newState);
+    // Validate all selected batches have the same next state
+    const nextStates = new Set(selectedBatches.map(b => getNextState(b.state)).filter(Boolean));
+    if (nextStates.size > 1) {
+      toast.error('Selected units must have the same next state');
+      return;
+    }
+    
+    const nextState = Array.from(nextStates)[0];
+    if (!nextState) {
+      toast.error('Selected units are already in final state');
+      return;
+    }
+    
+    if (requiresLeadTimeInput(nextState)) {
+      setPendingStateChange(nextState);
       setLeadTimeDialogOpen(true);
     } else {
-      await updateUnitsState(newState);
+      await updateUnitsState(nextState);
     }
   };
 
-  const updateUnitsState = async (newState: string, leadTimeDays?: number, eta?: Date) => {
+  const updateUnitsState = async (newState: UnitState, leadTimeDays?: number, eta?: Date) => {
     try {
       const selectedUnitIds = getSelectedUnitIds();
       
@@ -297,25 +332,29 @@ export default function OrderDetail() {
   };
 
 
-  const getNextStates = () => {
-    const userRoles = [];
-    if (hasRole('manufacturer')) userRoles.push('manufacturing');
-    if (hasRole('packer')) userRoles.push('packaging');
-    if (hasRole('boxer')) userRoles.push('boxing');
-    if (hasRole('packaging_manager')) userRoles.push('waiting_for_packaging_material');
-    if (hasRole('boxing_manager')) userRoles.push('waiting_for_boxing_material');
-    if (hasRole('admin')) return [
-      'waiting_for_rm',
-      'manufacturing',
-      'waiting_for_packaging_material',
-      'packaging',
-      'waiting_for_boxing_material',
-      'boxing',
-      'waiting_for_receiving',
-      'received',
-      'finished'
-    ];
-    return userRoles;
+  const canUpdateUnits = () => {
+    // Check if user has any role that can update units
+    return hasRole('manufacture_lead') || 
+           hasRole('manufacturer') || 
+           hasRole('packer') || 
+           hasRole('boxer') ||
+           hasRole('packaging_manager') ||
+           hasRole('boxing_manager') ||
+           hasRole('admin');
+  };
+  
+  const getNextStateLabel = (): string | null => {
+    const selectedBatches = productGroups
+      .flatMap(pg => pg.batches)
+      .filter(b => batchSelections.has(getBatchKey(b.product_id, b.state)));
+    
+    if (selectedBatches.length === 0) return null;
+    
+    const nextStates = new Set(selectedBatches.map(b => getNextState(b.state)).filter(Boolean));
+    if (nextStates.size !== 1) return null;
+    
+    const nextState = Array.from(nextStates)[0];
+    return nextState ? getStateLabel(nextState) : null;
   };
 
   if (loading) {
@@ -334,10 +373,12 @@ export default function OrderDetail() {
     );
   }
 
-  const lateBatches = batches.filter(b => b.has_late_units).length;
-  const lateUnitsCount = batches.reduce((sum, b) => sum + (b.has_late_units ? b.total_quantity : 0), 0);
-  const nextStates = getNextStates();
+  const allBatches = productGroups.flatMap(pg => pg.batches);
+  const lateBatches = allBatches.filter(b => b.has_late_units).length;
+  const lateUnitsCount = allBatches.reduce((sum, b) => sum + (b.has_late_units ? b.total_quantity : 0), 0);
   const totalSelected = getTotalSelectedCount();
+  const nextStateLabel = getNextStateLabel();
+  const canUpdate = canUpdateUnits();
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -382,38 +423,51 @@ export default function OrderDetail() {
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle>Batches ({batches.length} batches, {order.units.length} total units)</CardTitle>
-            {totalSelected > 0 && nextStates.length > 0 && (
+            <CardTitle>Order Units ({order.units.length} total units)</CardTitle>
+            {totalSelected > 0 && nextStateLabel && canUpdate && (
               <div className="flex gap-2 items-center">
                 <span className="text-sm text-muted-foreground">
                   {totalSelected} unit(s) selected
                 </span>
-                {nextStates.map(state => (
-                  <Button
-                    key={state}
-                    size="sm"
-                    onClick={() => handleBulkUpdate(state)}
-                  >
-                    Move to {state.replace(/_/g, ' ')}
-                  </Button>
-                ))}
+                <Button
+                  size="sm"
+                  onClick={handleBulkUpdate}
+                >
+                  Move to {nextStateLabel}
+                </Button>
               </div>
             )}
           </div>
         </CardHeader>
-        <CardContent className="space-y-4">
-          {batches.map(batch => {
-            const key = getBatchKey(batch.product_id, batch.state);
-            return (
-              <BatchCard
-                key={key}
-                batch={batch}
-                selectedQuantity={batchSelections.get(key) || 0}
-                onQuantityChange={(qty) => handleBatchQuantityChange(batch, qty)}
-                canUpdate={nextStates.length > 0}
-              />
-            );
-          })}
+        <CardContent>
+          {productGroups.length === 0 ? (
+            <p className="text-center text-muted-foreground py-8">No units in this order</p>
+          ) : (
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+              {productGroups.map(productGroup => (
+                <div key={productGroup.product_id} className="space-y-3">
+                  <div className="border-b pb-2">
+                    <h3 className="font-semibold">{productGroup.product_name}</h3>
+                    <p className="text-sm text-muted-foreground">SKU: {productGroup.product_sku}</p>
+                  </div>
+                  <div className="space-y-2">
+                    {productGroup.batches.map(batch => {
+                      const key = getBatchKey(batch.product_id, batch.state);
+                      return (
+                        <BatchCard
+                          key={key}
+                          batch={batch}
+                          selectedQuantity={batchSelections.get(key) || 0}
+                          onQuantityChange={(qty) => handleBatchQuantityChange(batch, qty)}
+                          canUpdate={canUpdate}
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 

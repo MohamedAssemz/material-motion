@@ -23,6 +23,13 @@ interface OrderItem {
   quantity: number;
 }
 
+interface ExtraProduct {
+  id: string;
+  product_id: string;
+  quantity: number;
+  product: Product;
+}
+
 const orderSchema = z.object({
   order_number: z.string().trim().min(1, 'Order number is required').max(50, 'Order number too long'),
   notes: z.string().trim().max(500, 'Notes must be less than 500 characters').optional(),
@@ -40,6 +47,8 @@ export default function OrderCreate() {
   const [notes, setNotes] = useState('');
   const [priority, setPriority] = useState<'high' | 'normal'>('normal');
   const [items, setItems] = useState<OrderItem[]>([{ product_id: '', quantity: 1 }]);
+  const [extraProducts, setExtraProducts] = useState<ExtraProduct[]>([]);
+  const [extraSelections, setExtraSelections] = useState<Map<string, number>>(new Map());
 
   useEffect(() => {
     if (!hasRole('manufacture_lead') && !hasRole('admin')) {
@@ -52,13 +61,16 @@ export default function OrderCreate() {
 
   const fetchProducts = async () => {
     try {
-      const { data, error } = await supabase
-        .from('products')
-        .select('id, sku, name')
-        .order('sku');
+      const [productsRes, extraProductsRes] = await Promise.all([
+        supabase.from('products').select('id, sku, name').order('sku'),
+        supabase.from('extra_products').select('*, product:products(id, sku, name)'),
+      ]);
 
-      if (error) throw error;
-      setProducts(data || []);
+      if (productsRes.error) throw productsRes.error;
+      if (extraProductsRes.error) throw extraProductsRes.error;
+
+      setProducts(productsRes.data || []);
+      setExtraProducts(extraProductsRes.data as any || []);
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -167,9 +179,52 @@ export default function OrderCreate() {
 
       if (unitsError) throw unitsError;
 
+      // Handle extra products (finished state units)
+      const extraUnits = [];
+      for (const [extraId, quantity] of extraSelections.entries()) {
+        if (quantity > 0) {
+          const extraProduct = extraProducts.find(ep => ep.id === extraId);
+          if (extraProduct) {
+            const { data: orderItem } = await supabase
+              .from('order_items')
+              .select('id')
+              .eq('order_id', order.id)
+              .eq('product_id', extraProduct.product_id)
+              .single();
+
+            if (orderItem) {
+              for (let i = 0; i < quantity; i++) {
+                extraUnits.push({
+                  order_id: order.id,
+                  order_item_id: orderItem.id,
+                  product_id: extraProduct.product_id,
+                  state: 'finished',
+                });
+              }
+            }
+
+            // Deduct from extra_products inventory
+            const { error: deductError } = await supabase
+              .from('extra_products')
+              .update({ quantity: extraProduct.quantity - quantity })
+              .eq('id', extraId);
+
+            if (deductError) throw deductError;
+          }
+        }
+      }
+
+      if (extraUnits.length > 0) {
+        const { error: extraUnitsError } = await supabase
+          .from('units')
+          .insert(extraUnits);
+
+        if (extraUnitsError) throw extraUnitsError;
+      }
+
       toast({
         title: 'Success',
-        description: `Order ${orderNumber} created successfully with ${units.length} units`,
+        description: `Order ${orderNumber} created with ${units.length + extraUnits.length} units`,
       });
 
       navigate('/orders');
@@ -306,6 +361,53 @@ export default function OrderCreate() {
               ))}
             </CardContent>
           </Card>
+
+          {extraProducts.length > 0 && (
+            <Card className="mb-6">
+              <CardHeader>
+                <CardTitle>Extra Products Inventory (Finished Units)</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {extraProducts.filter(ep => ep.quantity > 0).map((extra) => (
+                  <div key={extra.id} className="flex items-center gap-4 p-3 border rounded-lg">
+                    <div className="flex-1">
+                      <p className="font-medium">{extra.product.name}</p>
+                      <p className="text-sm text-muted-foreground">
+                        SKU: {extra.product.sku} • Available: {extra.quantity}
+                      </p>
+                    </div>
+                    <div className="w-32">
+                      <Label htmlFor={`extra-${extra.id}`} className="text-xs">
+                        Use Qty
+                      </Label>
+                      <Input
+                        id={`extra-${extra.id}`}
+                        type="number"
+                        min="0"
+                        max={extra.quantity}
+                        value={extraSelections.get(extra.id) || ''}
+                        onChange={(e) => {
+                          const qty = parseInt(e.target.value) || 0;
+                          const clamped = Math.max(0, Math.min(qty, extra.quantity));
+                          setExtraSelections(prev => {
+                            const newMap = new Map(prev);
+                            if (clamped > 0) {
+                              newMap.set(extra.id, clamped);
+                            } else {
+                              newMap.delete(extra.id);
+                            }
+                            return newMap;
+                          });
+                        }}
+                        placeholder="0"
+                        className="mt-1"
+                      />
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
 
           <div className="flex gap-4">
             <Button type="submit" disabled={submitting} className="flex-1">
