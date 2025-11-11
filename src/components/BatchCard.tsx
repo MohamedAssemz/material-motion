@@ -2,14 +2,15 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { AlertTriangle, Clock, Package } from 'lucide-react';
+import { AlertTriangle, Clock } from 'lucide-react';
 import { format } from 'date-fns';
+import { getStateLabel, type UnitState } from '@/lib/stateMachine';
 
 interface BatchInfo {
   product_id: string;
   product_name: string;
   product_sku: string;
-  state: string;
+  state: UnitState;
   total_quantity: number;
   unit_ids: string[];
   earliest_eta?: string;
@@ -26,14 +27,17 @@ interface BatchCardProps {
 }
 
 export function BatchCard({ batch, selectedQuantity, onQuantityChange, canUpdate }: BatchCardProps) {
-  const getStatusColor = (status: string) => {
+const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
       'waiting_for_rm': 'bg-yellow-500',
-      'manufacturing': 'bg-blue-500',
+      'in_manufacturing': 'bg-blue-500',
+      'manufactured': 'bg-blue-400',
       'waiting_for_packaging_material': 'bg-orange-500',
-      'packaging': 'bg-indigo-500',
+      'in_packaging': 'bg-indigo-500',
+      'packaged': 'bg-indigo-400',
       'waiting_for_boxing_material': 'bg-orange-500',
-      'boxing': 'bg-cyan-500',
+      'in_boxing': 'bg-cyan-500',
+      'boxed': 'bg-cyan-400',
       'waiting_for_receiving': 'bg-amber-500',
       'received': 'bg-teal-500',
       'finished': 'bg-green-500',
@@ -49,52 +53,41 @@ export function BatchCard({ batch, selectedQuantity, onQuantityChange, canUpdate
 
   return (
     <Card className={`transition-all ${selectedQuantity > 0 ? 'ring-2 ring-primary' : ''} ${batch.has_late_units ? 'border-destructive' : ''}`}>
-      <CardContent className="p-4">
-        <div className="flex items-center gap-4">
-          <Package className="h-8 w-8 text-muted-foreground" />
-          
-          <div className="flex-1 space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <h3 className="font-semibold">
-                  {batch.product_name}
-                </h3>
-                {batch.has_late_units && (
-                  <AlertTriangle className="h-4 w-4 text-destructive" />
-                )}
-              </div>
+      <CardContent className="p-3">
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
               <Badge className={getStatusColor(batch.state)}>
-                {batch.state.replace(/_/g, ' ').toUpperCase()}
+                {getStateLabel(batch.state)}
               </Badge>
+              {batch.has_late_units && (
+                <AlertTriangle className="h-3 w-3 text-destructive" />
+              )}
             </div>
-            
-            <div className="flex items-center gap-4 text-sm text-muted-foreground">
-              <p>SKU: {batch.product_sku}</p>
-              <p className="font-medium">Quantity: {batch.total_quantity}</p>
-            </div>
-
-            {(batch.earliest_eta || batch.lead_time_days) && (
-              <div className="text-sm text-muted-foreground space-y-1">
-                {batch.earliest_eta && (
-                  <div className="flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
-                    <span className={batch.has_late_units ? 'text-destructive font-medium' : ''}>
-                      ETA: {format(new Date(batch.earliest_eta), 'PPp')}
-                      {batch.has_late_units && ' (LATE)'}
-                    </span>
-                  </div>
-                )}
-                {batch.lead_time_days && (
-                  <div className="text-xs ml-4">
-                    Lead time: {batch.lead_time_days} days
-                  </div>
-                )}
-              </div>
-            )}
+            <p className="text-sm font-medium">Qty: {batch.total_quantity}</p>
           </div>
 
+          {(batch.earliest_eta || batch.lead_time_days) && (
+            <div className="text-xs text-muted-foreground space-y-1">
+              {batch.earliest_eta && (
+                <div className="flex items-center gap-1">
+                  <Clock className="h-3 w-3" />
+                  <span className={batch.has_late_units ? 'text-destructive font-medium' : ''}>
+                    ETA: {format(new Date(batch.earliest_eta), 'Pp')}
+                    {batch.has_late_units && ' (LATE)'}
+                  </span>
+                </div>
+              )}
+              {batch.lead_time_days && (
+                <div className="ml-4">
+                  Lead time: {batch.lead_time_days} days
+                </div>
+              )}
+            </div>
+          )}
+
           {canUpdate && (
-            <div className="w-32">
+            <div>
               <Label htmlFor={`qty-${batch.product_id}-${batch.state}`} className="text-xs">
                 Select Qty
               </Label>
@@ -106,7 +99,7 @@ export function BatchCard({ batch, selectedQuantity, onQuantityChange, canUpdate
                 value={selectedQuantity || ''}
                 onChange={(e) => handleQuantityChange(e.target.value)}
                 placeholder="0"
-                className="mt-1"
+                className="mt-1 h-8"
               />
             </div>
           )}
