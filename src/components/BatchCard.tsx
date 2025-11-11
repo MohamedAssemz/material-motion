@@ -27,14 +27,17 @@ interface BatchCardProps {
 }
 
 export function BatchCard({ batch, selectedQuantity, onQuantityChange, canUpdate }: BatchCardProps) {
-  const getStatusColor = (status: string) => {
+const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
       'waiting_for_rm': 'bg-yellow-500',
-      'manufacturing': 'bg-blue-500',
+      'in_manufacturing': 'bg-blue-500',
+      'manufactured': 'bg-blue-400',
       'waiting_for_packaging_material': 'bg-orange-500',
-      'packaging': 'bg-indigo-500',
+      'in_packaging': 'bg-indigo-500',
+      'packaged': 'bg-indigo-400',
       'waiting_for_boxing_material': 'bg-orange-500',
-      'boxing': 'bg-cyan-500',
+      'in_boxing': 'bg-cyan-500',
+      'boxed': 'bg-cyan-400',
       'waiting_for_receiving': 'bg-amber-500',
       'received': 'bg-teal-500',
       'finished': 'bg-green-500',

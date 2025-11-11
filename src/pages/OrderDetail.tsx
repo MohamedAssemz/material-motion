@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { OrderTimeline } from '@/components/OrderTimeline';
 import { BatchCard } from '@/components/BatchCard';
 import { LeadTimeDialog } from '@/components/LeadTimeDialog';
+import { ProductProgress } from '@/components/ProductProgress';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { getNextState, requiresLeadTimeInput, getStateLabel, type UnitState } from '@/lib/stateMachine';
@@ -16,7 +17,7 @@ import { getNextState, requiresLeadTimeInput, getStateLabel, type UnitState } fr
 interface Unit {
   id: string;
   serial_no: string | null;
-  state: string;
+  state: UnitState;
   created_at: string;
   product_id: string;
   product: {
@@ -148,12 +149,12 @@ export default function OrderDetail() {
       // Group units by product first, then by state (batches)
       const productMap = new Map<string, ProductGroup>();
       
-      combinedOrder.units.forEach((unit: Unit) => {
+      (combinedOrder.units || []).forEach((unit: Unit) => {
         if (!productMap.has(unit.product_id)) {
           productMap.set(unit.product_id, {
             product_id: unit.product_id,
-            product_name: unit.product.name,
-            product_sku: unit.product.sku,
+            product_name: unit.product?.name || 'Unknown Product',
+            product_sku: unit.product?.sku || 'N/A',
             batches: [],
           });
         }
@@ -162,14 +163,14 @@ export default function OrderDetail() {
         let batch = productGroup.batches.find(b => b.state === unit.state);
         
         if (!batch) {
-          const currentEta = unit.stage_eta.find(eta => eta.stage === unit.state);
+          const currentEta = unit.stage_eta?.find(eta => eta.stage === unit.state);
           const isLate = currentEta ? new Date(currentEta.eta) < new Date() : false;
           
           batch = {
             product_id: unit.product_id,
-            product_name: unit.product.name,
-            product_sku: unit.product.sku,
-            state: unit.state as UnitState,
+            product_name: unit.product?.name || 'Unknown Product',
+            product_sku: unit.product?.sku || 'N/A',
+            state: unit.state,
             total_quantity: 0,
             unit_ids: [],
             earliest_eta: currentEta?.eta,
@@ -183,7 +184,7 @@ export default function OrderDetail() {
         batch.unit_ids.push(unit.id);
         
         // Update earliest ETA and late status
-        const currentEta = unit.stage_eta.find(eta => eta.stage === unit.state);
+        const currentEta = unit.stage_eta?.find(eta => eta.stage === unit.state);
         if (currentEta) {
           const isLate = new Date(currentEta.eta) < new Date();
           if (isLate) batch.has_late_units = true;
@@ -444,28 +445,40 @@ export default function OrderDetail() {
             <p className="text-center text-muted-foreground py-8">No units in this order</p>
           ) : (
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {productGroups.map(productGroup => (
-                <div key={productGroup.product_id} className="space-y-3">
-                  <div className="border-b pb-2">
-                    <h3 className="font-semibold">{productGroup.product_name}</h3>
-                    <p className="text-sm text-muted-foreground">SKU: {productGroup.product_sku}</p>
+              {productGroups.map(productGroup => {
+                const totalUnits = productGroup.batches.reduce((sum, b) => sum + b.total_quantity, 0);
+                const stateCounts = productGroup.batches.map(b => ({
+                  state: b.state,
+                  count: b.total_quantity,
+                }));
+                
+                return (
+                  <div key={productGroup.product_id} className="space-y-3 border rounded-lg p-4">
+                    <div className="space-y-2 pb-3 border-b">
+                      <div className="flex items-center justify-between">
+                        <h3 className="font-semibold">{productGroup.product_name}</h3>
+                        <span className="text-sm font-medium text-muted-foreground">{totalUnits} units</span>
+                      </div>
+                      <p className="text-sm text-muted-foreground">SKU: {productGroup.product_sku}</p>
+                      <ProductProgress totalUnits={totalUnits} stateCounts={stateCounts} />
+                    </div>
+                    <div className="space-y-2">
+                      {productGroup.batches.map(batch => {
+                        const key = getBatchKey(batch.product_id, batch.state);
+                        return (
+                          <BatchCard
+                            key={key}
+                            batch={batch}
+                            selectedQuantity={batchSelections.get(key) || 0}
+                            onQuantityChange={(qty) => handleBatchQuantityChange(batch, qty)}
+                            canUpdate={canUpdate}
+                          />
+                        );
+                      })}
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    {productGroup.batches.map(batch => {
-                      const key = getBatchKey(batch.product_id, batch.state);
-                      return (
-                        <BatchCard
-                          key={key}
-                          batch={batch}
-                          selectedQuantity={batchSelections.get(key) || 0}
-                          onQuantityChange={(qty) => handleBatchQuantityChange(batch, qty)}
-                          canUpdate={canUpdate}
-                        />
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>
