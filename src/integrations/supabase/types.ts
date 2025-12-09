@@ -14,6 +14,100 @@ export type Database = {
   }
   public: {
     Tables: {
+      batches: {
+        Row: {
+          batch_code: string
+          created_at: string
+          created_by: string | null
+          current_state: string
+          eta: string | null
+          id: string
+          lead_time_days: number | null
+          order_id: string
+          parent_batch_id: string | null
+          product_id: string
+          qr_code_data: string | null
+          updated_at: string
+        }
+        Insert: {
+          batch_code: string
+          created_at?: string
+          created_by?: string | null
+          current_state?: string
+          eta?: string | null
+          id?: string
+          lead_time_days?: number | null
+          order_id: string
+          parent_batch_id?: string | null
+          product_id: string
+          qr_code_data?: string | null
+          updated_at?: string
+        }
+        Update: {
+          batch_code?: string
+          created_at?: string
+          created_by?: string | null
+          current_state?: string
+          eta?: string | null
+          id?: string
+          lead_time_days?: number | null
+          order_id?: string
+          parent_batch_id?: string | null
+          product_id?: string
+          qr_code_data?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "batches_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batches_parent_batch_id_fkey"
+            columns: ["parent_batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batches_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customers: {
+        Row: {
+          code: string | null
+          country: string | null
+          created_at: string
+          id: string
+          is_domestic: boolean | null
+          name: string
+        }
+        Insert: {
+          code?: string | null
+          country?: string | null
+          created_at?: string
+          id?: string
+          is_domestic?: boolean | null
+          name: string
+        }
+        Update: {
+          code?: string | null
+          country?: string | null
+          created_at?: string
+          id?: string
+          is_domestic?: boolean | null
+          name?: string
+        }
+        Relationships: []
+      }
       extra_products: {
         Row: {
           created_at: string | null
@@ -45,6 +139,82 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      machine_production: {
+        Row: {
+          batch_id: string | null
+          created_at: string
+          id: string
+          machine_id: string
+          recorded_by: string | null
+          state_transition: string
+          unit_id: string
+        }
+        Insert: {
+          batch_id?: string | null
+          created_at?: string
+          id?: string
+          machine_id: string
+          recorded_by?: string | null
+          state_transition: string
+          unit_id: string
+        }
+        Update: {
+          batch_id?: string | null
+          created_at?: string
+          id?: string
+          machine_id?: string
+          recorded_by?: string | null
+          state_transition?: string
+          unit_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "machine_production_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "machine_production_machine_id_fkey"
+            columns: ["machine_id"]
+            isOneToOne: false
+            referencedRelation: "machines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "machine_production_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      machines: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean | null
+          name: string
+          type: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          name: string
+          type: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          type?: string
+        }
+        Relationships: []
       }
       notifications: {
         Row: {
@@ -133,6 +303,7 @@ export type Database = {
         Row: {
           created_at: string | null
           created_by: string | null
+          customer_id: string | null
           id: string
           notes: string | null
           order_number: string
@@ -143,6 +314,7 @@ export type Database = {
         Insert: {
           created_at?: string | null
           created_by?: string | null
+          customer_id?: string | null
           id?: string
           notes?: string | null
           order_number: string
@@ -153,6 +325,7 @@ export type Database = {
         Update: {
           created_at?: string | null
           created_by?: string | null
+          customer_id?: string | null
           id?: string
           notes?: string | null
           order_number?: string
@@ -160,7 +333,15 @@ export type Database = {
           status?: string
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "orders_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       product_bom: {
         Row: {
@@ -387,11 +568,18 @@ export type Database = {
       units: {
         Row: {
           assigned_to: string | null
+          batch_id: string | null
           created_at: string | null
+          damage_action: string | null
+          damage_reason: string | null
+          damaged_at: string | null
+          damaged_by: string | null
           id: string
+          is_damaged: boolean | null
           metadata: Json | null
           order_id: string
           order_item_id: string
+          original_state: string | null
           product_id: string
           qr_code_data: string | null
           serial_no: string | null
@@ -401,11 +589,18 @@ export type Database = {
         }
         Insert: {
           assigned_to?: string | null
+          batch_id?: string | null
           created_at?: string | null
+          damage_action?: string | null
+          damage_reason?: string | null
+          damaged_at?: string | null
+          damaged_by?: string | null
           id?: string
+          is_damaged?: boolean | null
           metadata?: Json | null
           order_id: string
           order_item_id: string
+          original_state?: string | null
           product_id: string
           qr_code_data?: string | null
           serial_no?: string | null
@@ -415,11 +610,18 @@ export type Database = {
         }
         Update: {
           assigned_to?: string | null
+          batch_id?: string | null
           created_at?: string | null
+          damage_action?: string | null
+          damage_reason?: string | null
+          damaged_at?: string | null
+          damaged_by?: string | null
           id?: string
+          is_damaged?: boolean | null
           metadata?: Json | null
           order_id?: string
           order_item_id?: string
+          original_state?: string | null
           product_id?: string
           qr_code_data?: string | null
           serial_no?: string | null
@@ -428,6 +630,13 @@ export type Database = {
           version?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "units_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "units_order_id_fkey"
             columns: ["order_id"]
@@ -478,6 +687,7 @@ export type Database = {
     }
     Functions: {
       check_late_units: { Args: never; Returns: undefined }
+      generate_batch_code: { Args: never; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
