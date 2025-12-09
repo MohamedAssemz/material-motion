@@ -362,13 +362,33 @@ export default function Dashboard() {
                     Extra Products Inventory
                   </Link>
                 </Button>
+                <Button variant="outline" className="w-full justify-start" asChild>
+                  <Link to="/customers">
+                    <Users className="mr-2 h-4 w-4" />
+                    Manage Customers
+                  </Link>
+                </Button>
+                <Button variant="outline" className="w-full justify-start" asChild>
+                  <Link to="/batch">
+                    <ClipboardCheck className="mr-2 h-4 w-4" />
+                    Batch Lookup
+                  </Link>
+                </Button>
                 {userRoles.includes('admin') && (
-                  <Button variant="outline" className="w-full justify-start" asChild>
-                    <Link to="/users">
-                      <Users className="mr-2 h-4 w-4" />
-                      Manage Users & Roles
-                    </Link>
-                  </Button>
+                  <>
+                    <Button variant="outline" className="w-full justify-start" asChild>
+                      <Link to="/users">
+                        <Users className="mr-2 h-4 w-4" />
+                        Manage Users & Roles
+                      </Link>
+                    </Button>
+                    <Button variant="outline" className="w-full justify-start" asChild>
+                      <Link to="/machines">
+                        <Factory className="mr-2 h-4 w-4" />
+                        Manage Machines
+                      </Link>
+                    </Button>
+                  </>
                 )}
               </CardContent>
             </Card>

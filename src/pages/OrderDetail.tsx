@@ -3,13 +3,16 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, AlertTriangle, Ban } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { OrderTimeline } from '@/components/OrderTimeline';
 import { BatchCard } from '@/components/BatchCard';
 import { LeadTimeDialog } from '@/components/LeadTimeDialog';
 import { ProductProgress } from '@/components/ProductProgress';
+import { DamagedUnitDialog } from '@/components/DamagedUnitDialog';
+import { MachineSelectionDialog } from '@/components/MachineSelectionDialog';
+import { BatchQRCode } from '@/components/BatchQRCode';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { getNextState, requiresLeadTimeInput, getStateLabel, type UnitState } from '@/lib/stateMachine';
@@ -20,6 +23,9 @@ interface Unit {
   state: UnitState;
   created_at: string;
   product_id: string;
+  batch_id: string | null;
+  is_damaged: boolean;
+  damage_reason: string | null;
   product: {
     name: string;
     sku: string;
@@ -43,6 +49,7 @@ interface BatchInfo {
   latest_eta?: string;
   has_late_units: boolean;
   lead_time_days?: number;
+  batch_code?: string;
 }
 
 interface ProductGroup {
@@ -66,9 +73,14 @@ interface Order {
   notes: string | null;
   created_at: string;
   created_by: string;
+  customer_id: string | null;
   profile: {
     full_name: string;
     email: string;
+  };
+  customer?: {
+    name: string;
+    code: string | null;
   };
   units: Unit[];
 }
@@ -76,13 +88,17 @@ interface Order {
 export default function OrderDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { hasRole } = useAuth();
+  const { hasRole, user } = useAuth();
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [productGroups, setProductGroups] = useState<ProductGroup[]>([]);
   const [batchSelections, setBatchSelections] = useState<Map<string, number>>(new Map());
   const [leadTimeDialogOpen, setLeadTimeDialogOpen] = useState(false);
   const [pendingStateChange, setPendingStateChange] = useState<UnitState | null>(null);
+  const [damagedDialogOpen, setDamagedDialogOpen] = useState(false);
+  const [machineDialogOpen, setMachineDialogOpen] = useState(false);
+  const [pendingMachineType, setPendingMachineType] = useState<'manufacturing' | 'packaging' | null>(null);
+  const [pendingUpdateData, setPendingUpdateData] = useState<{ newState: UnitState; leadTimeDays?: number; eta?: Date } | null>(null);
 
   useEffect(() => {
     fetchOrder();
@@ -110,16 +126,19 @@ export default function OrderDetail() {
 
   const fetchOrder = async () => {
     try {
-      // Fetch order with units
       const { data: orderData, error: orderError } = await supabase
         .from('orders')
         .select(`
           *,
+          customer:customers(name, code),
           units(
             id,
             serial_no,
             state,
             created_at,
+            batch_id,
+            is_damaged,
+            damage_reason,
             product:products(name, sku),
             stage_eta:unit_stage_eta(stage, eta, notified, lead_time_days)
           )
@@ -129,7 +148,6 @@ export default function OrderDetail() {
 
       if (orderError) throw orderError;
 
-      // Fetch profile separately
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('full_name, email')
@@ -138,7 +156,6 @@ export default function OrderDetail() {
 
       if (profileError) throw profileError;
 
-      // Combine the data
       const combinedOrder = {
         ...orderData,
         profile: profileData
@@ -150,6 +167,8 @@ export default function OrderDetail() {
       const productMap = new Map<string, ProductGroup>();
       
       (combinedOrder.units || []).forEach((unit: Unit) => {
+        if (unit.is_damaged) return; // Skip damaged units from main display
+        
         if (!productMap.has(unit.product_id)) {
           productMap.set(unit.product_id, {
             product_id: unit.product_id,
@@ -183,7 +202,6 @@ export default function OrderDetail() {
         batch.total_quantity++;
         batch.unit_ids.push(unit.id);
         
-        // Update earliest ETA and late status
         const currentEta = unit.stage_eta?.find(eta => eta.stage === unit.state);
         if (currentEta) {
           const isLate = new Date(currentEta.eta) < new Date();
@@ -238,6 +256,19 @@ export default function OrderDetail() {
     return Array.from(batchSelections.values()).reduce((sum, qty) => sum + qty, 0);
   };
 
+  const getSelectedBatchState = (): UnitState | null => {
+    const selectedBatches = productGroups
+      .flatMap(pg => pg.batches)
+      .filter(b => batchSelections.has(getBatchKey(b.product_id, b.state)));
+    
+    if (selectedBatches.length === 0) return null;
+    
+    const states = new Set(selectedBatches.map(b => b.state));
+    if (states.size !== 1) return null;
+    
+    return Array.from(states)[0];
+  };
+
   const handleBulkUpdate = async () => {
     const totalSelected = getTotalSelectedCount();
     if (totalSelected === 0) {
@@ -245,12 +276,10 @@ export default function OrderDetail() {
       return;
     }
 
-    // Get selected batches and their next states
     const selectedBatches = productGroups
       .flatMap(pg => pg.batches)
       .filter(b => batchSelections.has(getBatchKey(b.product_id, b.state)));
     
-    // Validate all selected batches have the same next state
     const nextStates = new Set(selectedBatches.map(b => getNextState(b.state)).filter(Boolean));
     if (nextStates.size > 1) {
       toast.error('Selected units must have the same next state');
@@ -274,18 +303,76 @@ export default function OrderDetail() {
   const updateUnitsState = async (newState: UnitState, leadTimeDays?: number, eta?: Date) => {
     try {
       const selectedUnitIds = getSelectedUnitIds();
+      const currentState = getSelectedBatchState();
+      
+      // Check if machine tracking is needed (transitioning from manufacturing or packaging states)
+      if (currentState === 'in_manufacturing' || currentState === 'in_packaging') {
+        setPendingUpdateData({ newState, leadTimeDays, eta });
+        setPendingMachineType(currentState === 'in_manufacturing' ? 'manufacturing' : 'packaging');
+        setMachineDialogOpen(true);
+        return;
+      }
+      
+      await performUpdate(selectedUnitIds, newState, leadTimeDays, eta);
+    } catch (error) {
+      console.error('Error updating units:', error);
+      toast.error('Failed to update units');
+    }
+  };
+
+  const performUpdate = async (
+    selectedUnitIds: string[], 
+    newState: UnitState, 
+    leadTimeDays?: number, 
+    eta?: Date,
+    machineSelections?: Array<{ machineId: string; quantity: number }>
+  ) => {
+    try {
+      // Create batch record for the transition
+      const { data: batchData, error: batchError } = await supabase
+        .rpc('generate_batch_code');
+      
+      let batchId: string | null = null;
+      
+      if (!batchError && batchData) {
+        const batchCode = batchData as string;
+        
+        // Get product from first unit
+        const firstUnit = order?.units.find(u => selectedUnitIds.includes(u.id));
+        
+        if (firstUnit) {
+          const { data: newBatch, error: insertError } = await supabase
+            .from('batches')
+            .insert({
+              batch_code: batchCode,
+              order_id: order!.id,
+              product_id: firstUnit.product_id,
+              current_state: newState,
+              eta: eta?.toISOString(),
+              lead_time_days: leadTimeDays,
+              created_by: user?.id,
+            })
+            .select()
+            .single();
+          
+          if (!insertError && newBatch) {
+            batchId = newBatch.id;
+          }
+        }
+      }
       
       const { error } = await supabase
         .from('units')
-        .update({ state: newState as any })
+        .update({ 
+          state: newState as any,
+          batch_id: batchId
+        })
         .in('id', selectedUnitIds);
 
       if (error) throw error;
 
       // If lead time is provided, create stage ETA records
       if (leadTimeDays && eta) {
-        const { data: { user } } = await supabase.auth.getUser();
-        
         const etaRecords = selectedUnitIds.map(unitId => ({
           unit_id: unitId,
           stage: newState,
@@ -301,12 +388,46 @@ export default function OrderDetail() {
         if (etaError) throw etaError;
       }
 
+      // Record machine production if provided
+      if (machineSelections && machineSelections.length > 0) {
+        let unitIndex = 0;
+        for (const selection of machineSelections) {
+          for (let i = 0; i < selection.quantity && unitIndex < selectedUnitIds.length; i++) {
+            await supabase
+              .from('machine_production')
+              .insert({
+                machine_id: selection.machineId,
+                unit_id: selectedUnitIds[unitIndex],
+                batch_id: batchId,
+                state_transition: newState,
+                recorded_by: user?.id,
+              });
+            unitIndex++;
+          }
+        }
+      }
+
       toast.success(`Updated ${selectedUnitIds.length} unit(s)`);
       setBatchSelections(new Map());
       fetchOrder();
     } catch (error) {
       console.error('Error updating units:', error);
       toast.error('Failed to update units');
+    }
+  };
+
+  const handleMachineConfirm = async (selections: Array<{ machineId: string; quantity: number }>) => {
+    if (pendingUpdateData) {
+      const selectedUnitIds = getSelectedUnitIds();
+      await performUpdate(
+        selectedUnitIds, 
+        pendingUpdateData.newState, 
+        pendingUpdateData.leadTimeDays, 
+        pendingUpdateData.eta,
+        selections
+      );
+      setPendingUpdateData(null);
+      setPendingMachineType(null);
     }
   };
 
@@ -317,14 +438,71 @@ export default function OrderDetail() {
     }
   };
 
+  const handleMarkDamaged = () => {
+    const totalSelected = getTotalSelectedCount();
+    if (totalSelected === 0) {
+      toast.error('Please select at least one unit');
+      return;
+    }
+    setDamagedDialogOpen(true);
+  };
+
+  const handleDamagedConfirm = async (action: 'redo' | 'terminated', reason: string) => {
+    try {
+      const selectedUnitIds = getSelectedUnitIds();
+      const currentState = getSelectedBatchState();
+      
+      // Update units as damaged
+      const { error } = await supabase
+        .from('units')
+        .update({
+          is_damaged: true,
+          damage_reason: reason,
+          damage_action: action,
+          damaged_at: new Date().toISOString(),
+          damaged_by: user?.id,
+          original_state: currentState,
+          state: 'waiting_for_rm' as any, // Return to phase 1
+        })
+        .in('id', selectedUnitIds);
+
+      if (error) throw error;
+
+      // If terminated, create new replacement units
+      if (action === 'terminated') {
+        const firstUnit = order?.units.find(u => selectedUnitIds.includes(u.id));
+        if (firstUnit) {
+          const newUnits = selectedUnitIds.map(() => ({
+            order_id: order!.id,
+            order_item_id: order!.units.find(u => u.id === selectedUnitIds[0])?.id || firstUnit.id,
+            product_id: firstUnit.product_id,
+            state: 'waiting_for_rm' as any,
+          }));
+
+          // Note: We'd need order_item_id from the unit, for now we're just resetting the damaged ones
+        }
+      }
+
+      toast.success(`${selectedUnitIds.length} unit(s) marked as damaged and returned to Phase 1`);
+      setBatchSelections(new Map());
+      fetchOrder();
+    } catch (error) {
+      console.error('Error marking units as damaged:', error);
+      toast.error('Failed to mark units as damaged');
+    }
+  };
+
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
       'waiting_for_rm': 'bg-yellow-500',
-      'manufacturing': 'bg-blue-500',
+      'in_manufacturing': 'bg-blue-500',
+      'manufactured': 'bg-blue-300',
       'waiting_for_packaging_material': 'bg-orange-500',
-      'packaging': 'bg-indigo-500',
+      'in_packaging': 'bg-indigo-500',
+      'packaged': 'bg-indigo-300',
       'waiting_for_boxing_material': 'bg-orange-500',
-      'boxing': 'bg-cyan-500',
+      'in_boxing': 'bg-cyan-500',
+      'boxed': 'bg-cyan-300',
       'waiting_for_receiving': 'bg-amber-500',
       'received': 'bg-teal-500',
       'finished': 'bg-green-500',
@@ -332,9 +510,7 @@ export default function OrderDetail() {
     return colors[status] || 'bg-gray-500';
   };
 
-
   const canUpdateUnits = () => {
-    // Check if user has any role that can update units
     return hasRole('manufacture_lead') || 
            hasRole('manufacturer') || 
            hasRole('packer') || 
@@ -377,6 +553,7 @@ export default function OrderDetail() {
   const allBatches = productGroups.flatMap(pg => pg.batches);
   const lateBatches = allBatches.filter(b => b.has_late_units).length;
   const lateUnitsCount = allBatches.reduce((sum, b) => sum + (b.has_late_units ? b.total_quantity : 0), 0);
+  const damagedUnits = order.units.filter(u => u.is_damaged);
   const totalSelected = getTotalSelectedCount();
   const nextStateLabel = getNextStateLabel();
   const canUpdate = canUpdateUnits();
@@ -401,6 +578,11 @@ export default function OrderDetail() {
             <p className="text-muted-foreground">
               Created by {order.profile.full_name} on {format(new Date(order.created_at), 'PPP')}
             </p>
+            {order.customer && (
+              <p className="text-sm text-muted-foreground">
+                Customer: {order.customer.name} {order.customer.code && `(${order.customer.code})`}
+              </p>
+            )}
           </div>
         </div>
         <Badge className={getStatusColor(order.status)}>
@@ -419,23 +601,44 @@ export default function OrderDetail() {
         </Card>
       )}
 
+      {damagedUnits.length > 0 && (
+        <Card className="border-orange-500 bg-orange-500/10">
+          <CardContent className="flex items-center gap-2 p-4">
+            <Ban className="h-5 w-5 text-orange-500" />
+            <span className="font-medium">
+              {damagedUnits.length} damaged unit(s) returned to Phase 1
+            </span>
+          </CardContent>
+        </Card>
+      )}
+
       <OrderTimeline order={order} />
 
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle>Order Units ({order.units.length} total units)</CardTitle>
-            {totalSelected > 0 && nextStateLabel && canUpdate && (
+            <CardTitle>Order Units ({order.units.filter(u => !u.is_damaged).length} active units)</CardTitle>
+            {totalSelected > 0 && canUpdate && (
               <div className="flex gap-2 items-center">
                 <span className="text-sm text-muted-foreground">
                   {totalSelected} unit(s) selected
                 </span>
                 <Button
                   size="sm"
-                  onClick={handleBulkUpdate}
+                  variant="destructive"
+                  onClick={handleMarkDamaged}
                 >
-                  Move to {nextStateLabel}
+                  <Ban className="h-4 w-4 mr-1" />
+                  Mark Damaged
                 </Button>
+                {nextStateLabel && (
+                  <Button
+                    size="sm"
+                    onClick={handleBulkUpdate}
+                  >
+                    Move to {nextStateLabel}
+                  </Button>
+                )}
               </div>
             )}
           </div>
@@ -466,13 +669,26 @@ export default function OrderDetail() {
                       {productGroup.batches.map(batch => {
                         const key = getBatchKey(batch.product_id, batch.state);
                         return (
-                          <BatchCard
-                            key={key}
-                            batch={batch}
-                            selectedQuantity={batchSelections.get(key) || 0}
-                            onQuantityChange={(qty) => handleBatchQuantityChange(batch, qty)}
-                            canUpdate={canUpdate}
-                          />
+                          <div key={key} className="relative">
+                            <BatchCard
+                              batch={batch}
+                              selectedQuantity={batchSelections.get(key) || 0}
+                              onQuantityChange={(qty) => handleBatchQuantityChange(batch, qty)}
+                              canUpdate={canUpdate}
+                            />
+                            {batch.batch_code && (
+                              <div className="absolute top-2 right-2">
+                                <BatchQRCode
+                                  batchCode={batch.batch_code}
+                                  orderNumber={order.order_number}
+                                  productName={batch.product_name}
+                                  state={batch.state}
+                                  quantity={batch.total_quantity}
+                                  eta={batch.earliest_eta}
+                                />
+                              </div>
+                            )}
+                          </div>
                         );
                       })}
                     </div>
@@ -502,6 +718,23 @@ export default function OrderDetail() {
         unitCount={getTotalSelectedCount()}
         nextState={pendingStateChange || ''}
       />
+
+      <DamagedUnitDialog
+        open={damagedDialogOpen}
+        onOpenChange={setDamagedDialogOpen}
+        onConfirm={handleDamagedConfirm}
+        unitCount={getTotalSelectedCount()}
+      />
+
+      {pendingMachineType && (
+        <MachineSelectionDialog
+          open={machineDialogOpen}
+          onOpenChange={setMachineDialogOpen}
+          onConfirm={handleMachineConfirm}
+          totalUnits={getTotalSelectedCount()}
+          machineType={pendingMachineType}
+        />
+      )}
     </div>
   );
 }

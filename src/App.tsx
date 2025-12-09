@@ -16,6 +16,9 @@ import QueueManufacturing from "./pages/QueueManufacturing";
 import QueuePackaging from "./pages/QueuePackaging";
 import QueueBoxing from "./pages/QueueBoxing";
 import ExtraProducts from "./pages/ExtraProducts";
+import Machines from "./pages/Machines";
+import Customers from "./pages/Customers";
+import BatchLookup from "./pages/BatchLookup";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -108,6 +111,30 @@ const App = () => (
                   <ExtraProducts />
                 </ProtectedRoute>
               } 
+            />
+            <Route 
+              path="/machines" 
+              element={
+                <ProtectedRoute requiredRole="admin">
+                  <Machines />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/customers" 
+              element={
+                <ProtectedRoute>
+                  <Customers />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/batch/:code" 
+              element={<BatchLookup />} 
+            />
+            <Route 
+              path="/batch" 
+              element={<BatchLookup />} 
             />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
