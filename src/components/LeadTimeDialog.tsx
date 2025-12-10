@@ -59,11 +59,15 @@ export function LeadTimeDialog({ open, onOpenChange, onConfirm, unitCount, nextS
   };
 
   const stateLabels: Record<string, string> = {
-    manufacturing: 'Manufacturing',
-    packaging: 'Packaging',
-    boxing: 'Boxing',
-    waiting_for_receiving: 'Waiting for Receiving',
-    received: 'Received',
+    in_manufacturing: 'Manufacturing',
+    manufactured: 'Manufactured',
+    waiting_for_pm: 'Waiting for PM',
+    in_packaging: 'Packaging',
+    packaged: 'Packaged',
+    waiting_for_bm: 'Waiting for BM',
+    in_boxing: 'Boxing',
+    boxed: 'Boxed',
+    qced: 'QC Complete',
     finished: 'Finished',
   };
 

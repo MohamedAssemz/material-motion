@@ -8,14 +8,23 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Plus, Trash2, ClipboardList, Loader2 } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, ClipboardList, Loader2, Check, ChevronsUpDown } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { z } from 'zod';
 
 interface Product {
   id: string;
   sku: string;
   name: string;
+}
+
+interface Customer {
+  id: string;
+  name: string;
+  code: string | null;
 }
 
 interface OrderItem {
@@ -41,11 +50,14 @@ export default function OrderCreate() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [products, setProducts] = useState<Product[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [orderNumber, setOrderNumber] = useState('');
   const [notes, setNotes] = useState('');
   const [priority, setPriority] = useState<'high' | 'normal'>('normal');
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
+  const [customerOpen, setCustomerOpen] = useState(false);
   const [items, setItems] = useState<OrderItem[]>([{ product_id: '', quantity: 1 }]);
   const [extraProducts, setExtraProducts] = useState<ExtraProduct[]>([]);
   const [extraSelections, setExtraSelections] = useState<Map<string, number>>(new Map());
@@ -56,21 +68,24 @@ export default function OrderCreate() {
       return;
     }
 
-    fetchProducts();
+    fetchData();
   }, [hasRole, navigate]);
 
-  const fetchProducts = async () => {
+  const fetchData = async () => {
     try {
-      const [productsRes, extraProductsRes] = await Promise.all([
+      const [productsRes, extraProductsRes, customersRes] = await Promise.all([
         supabase.from('products').select('id, sku, name').order('sku'),
         supabase.from('extra_products').select('*, product:products(id, sku, name)'),
+        supabase.from('customers').select('id, name, code').order('name'),
       ]);
 
       if (productsRes.error) throw productsRes.error;
       if (extraProductsRes.error) throw extraProductsRes.error;
+      if (customersRes.error) throw customersRes.error;
 
       setProducts(productsRes.data || []);
       setExtraProducts(extraProductsRes.data as any || []);
+      setCustomers(customersRes.data || []);
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -113,7 +128,10 @@ export default function OrderCreate() {
       }
 
       const validItems = items.filter(item => item.product_id && item.quantity > 0);
-      if (validItems.length === 0) {
+      
+      // Check if we have at least order items OR extra selections
+      const hasExtraSelections = Array.from(extraSelections.values()).some(qty => qty > 0);
+      if (validItems.length === 0 && !hasExtraSelections) {
         toast({
           title: 'Validation Error',
           description: 'Please add at least one product with valid quantity',
@@ -132,35 +150,54 @@ export default function OrderCreate() {
           notes: notes.trim() || null,
           priority: priority,
           created_by: user?.id,
+          customer_id: selectedCustomerId,
         })
         .select()
         .single();
 
       if (orderError) throw orderError;
 
-      // Create order items
-      const orderItems = validItems.map(item => ({
-        order_id: order.id,
-        product_id: item.product_id,
-        quantity: item.quantity,
-      }));
+      // Collect all product IDs we need order items for (from both items and extra selections)
+      const allProductIds = new Set<string>();
+      validItems.forEach(item => allProductIds.add(item.product_id));
+      
+      for (const [extraId, quantity] of extraSelections.entries()) {
+        if (quantity > 0) {
+          const extraProduct = extraProducts.find(ep => ep.id === extraId);
+          if (extraProduct) {
+            allProductIds.add(extraProduct.product_id);
+          }
+        }
+      }
+
+      // Create order items for all products
+      const orderItemsToCreate = Array.from(allProductIds).map(productId => {
+        const regularItem = validItems.find(item => item.product_id === productId);
+        return {
+          order_id: order.id,
+          product_id: productId,
+          quantity: regularItem?.quantity || 0, // 0 for extra-only products
+        };
+      });
 
       const { error: itemsError } = await supabase
         .from('order_items')
-        .insert(orderItems);
+        .insert(orderItemsToCreate);
 
       if (itemsError) throw itemsError;
 
-      // Create units for each order item
+      // Fetch created order items
+      const { data: createdOrderItems, error: fetchItemsError } = await supabase
+        .from('order_items')
+        .select('id, product_id')
+        .eq('order_id', order.id);
+
+      if (fetchItemsError) throw fetchItemsError;
+
+      // Create units for regular order items
       const units = [];
       for (const item of validItems) {
-        const { data: orderItem } = await supabase
-          .from('order_items')
-          .select('id')
-          .eq('order_id', order.id)
-          .eq('product_id', item.product_id)
-          .single();
-
+        const orderItem = createdOrderItems?.find(oi => oi.product_id === item.product_id);
         if (orderItem) {
           for (let i = 0; i < item.quantity; i++) {
             units.push({
@@ -173,11 +210,13 @@ export default function OrderCreate() {
         }
       }
 
-      const { error: unitsError } = await supabase
-        .from('units')
-        .insert(units);
+      if (units.length > 0) {
+        const { error: unitsError } = await supabase
+          .from('units')
+          .insert(units);
 
-      if (unitsError) throw unitsError;
+        if (unitsError) throw unitsError;
+      }
 
       // Handle extra products (finished state units)
       const extraUnits = [];
@@ -185,13 +224,8 @@ export default function OrderCreate() {
         if (quantity > 0) {
           const extraProduct = extraProducts.find(ep => ep.id === extraId);
           if (extraProduct) {
-            const { data: orderItem } = await supabase
-              .from('order_items')
-              .select('id')
-              .eq('order_id', order.id)
-              .eq('product_id', extraProduct.product_id)
-              .single();
-
+            const orderItem = createdOrderItems?.find(oi => oi.product_id === extraProduct.product_id);
+            
             if (orderItem) {
               for (let i = 0; i < quantity; i++) {
                 extraUnits.push({
@@ -201,15 +235,15 @@ export default function OrderCreate() {
                   state: 'finished',
                 });
               }
+
+              // Deduct from extra_products inventory
+              const { error: deductError } = await supabase
+                .from('extra_products')
+                .update({ quantity: extraProduct.quantity - quantity })
+                .eq('id', extraId);
+
+              if (deductError) throw deductError;
             }
-
-            // Deduct from extra_products inventory
-            const { error: deductError } = await supabase
-              .from('extra_products')
-              .update({ quantity: extraProduct.quantity - quantity })
-              .eq('id', extraId);
-
-            if (deductError) throw deductError;
           }
         }
       }
@@ -238,6 +272,8 @@ export default function OrderCreate() {
       setSubmitting(false);
     }
   };
+
+  const selectedCustomer = customers.find(c => c.id === selectedCustomerId);
 
   if (loading) {
     return (
@@ -279,6 +315,70 @@ export default function OrderCreate() {
                   required
                   maxLength={50}
                 />
+              </div>
+              <div>
+                <Label>Customer</Label>
+                <Popover open={customerOpen} onOpenChange={setCustomerOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={customerOpen}
+                      className="w-full justify-between"
+                    >
+                      {selectedCustomer
+                        ? `${selectedCustomer.name}${selectedCustomer.code ? ` (${selectedCustomer.code})` : ''}`
+                        : "Select customer..."}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-full p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder="Search customers..." />
+                      <CommandList>
+                        <CommandEmpty>No customer found.</CommandEmpty>
+                        <CommandGroup>
+                          <CommandItem
+                            value=""
+                            onSelect={() => {
+                              setSelectedCustomerId(null);
+                              setCustomerOpen(false);
+                            }}
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                !selectedCustomerId ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                            No customer
+                          </CommandItem>
+                          {customers.map((customer) => (
+                            <CommandItem
+                              key={customer.id}
+                              value={`${customer.name} ${customer.code || ''}`}
+                              onSelect={() => {
+                                setSelectedCustomerId(customer.id);
+                                setCustomerOpen(false);
+                              }}
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4",
+                                  selectedCustomerId === customer.id ? "opacity-100" : "opacity-0"
+                                )}
+                              />
+                              {customer.name}
+                              {customer.code && (
+                                <span className="ml-2 text-muted-foreground">({customer.code})</span>
+                              )}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
               <div>
                 <Label htmlFor="priority">Priority *</Label>
@@ -324,7 +424,6 @@ export default function OrderCreate() {
                     <Select
                       value={item.product_id}
                       onValueChange={(value) => updateItem(index, 'product_id', value)}
-                      required
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Select product" />
@@ -345,7 +444,6 @@ export default function OrderCreate() {
                       min="1"
                       value={item.quantity}
                       onChange={(e) => updateItem(index, 'quantity', parseInt(e.target.value) || 1)}
-                      required
                     />
                   </div>
                   <Button
