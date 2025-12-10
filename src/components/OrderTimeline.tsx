@@ -24,13 +24,15 @@ interface OrderTimelineProps {
 
 const STAGES = [
   { key: 'waiting_for_rm', label: 'Waiting for RM', icon: Clock },
-  { key: 'manufacturing', label: 'Manufacturing', icon: Circle },
-  { key: 'waiting_for_packaging_material', label: 'Waiting for PM', icon: Clock },
-  { key: 'packaging', label: 'Packaging', icon: Circle },
-  { key: 'waiting_for_boxing_material', label: 'Waiting for BM', icon: Clock },
-  { key: 'boxing', label: 'Boxing', icon: Circle },
-  { key: 'waiting_for_receiving', label: 'Waiting for Receiving', icon: Clock },
-  { key: 'received', label: 'Received', icon: Circle },
+  { key: 'in_manufacturing', label: 'Manufacturing', icon: Circle },
+  { key: 'manufactured', label: 'Manufactured', icon: CheckCircle },
+  { key: 'waiting_for_pm', label: 'Waiting for PM', icon: Clock },
+  { key: 'in_packaging', label: 'Packaging', icon: Circle },
+  { key: 'packaged', label: 'Packaged', icon: CheckCircle },
+  { key: 'waiting_for_bm', label: 'Waiting for BM', icon: Clock },
+  { key: 'in_boxing', label: 'Boxing', icon: Circle },
+  { key: 'boxed', label: 'Boxed', icon: CheckCircle },
+  { key: 'qced', label: 'QC Complete', icon: CheckCircle },
   { key: 'finished', label: 'Finished', icon: CheckCircle },
 ];
 

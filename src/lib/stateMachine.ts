@@ -3,29 +3,27 @@ export type UnitState =
   | 'waiting_for_rm'
   | 'in_manufacturing'
   | 'manufactured'
-  | 'waiting_for_packaging_material'
+  | 'waiting_for_pm'
   | 'in_packaging'
   | 'packaged'
-  | 'waiting_for_boxing_material'
+  | 'waiting_for_bm'
   | 'in_boxing'
   | 'boxed'
-  | 'waiting_for_receiving'
-  | 'received'
+  | 'qced'
   | 'finished';
 
 // Define the next state for each current state
 const stateTransitions: Record<UnitState, UnitState | null> = {
   'waiting_for_rm': 'in_manufacturing',
   'in_manufacturing': 'manufactured',
-  'manufactured': 'waiting_for_packaging_material',
-  'waiting_for_packaging_material': 'in_packaging',
+  'manufactured': 'waiting_for_pm',
+  'waiting_for_pm': 'in_packaging',
   'in_packaging': 'packaged',
-  'packaged': 'waiting_for_boxing_material',
-  'waiting_for_boxing_material': 'in_boxing',
+  'packaged': 'waiting_for_bm',
+  'waiting_for_bm': 'in_boxing',
   'in_boxing': 'boxed',
-  'boxed': 'waiting_for_receiving',
-  'waiting_for_receiving': 'received',
-  'received': 'finished',
+  'boxed': 'qced',
+  'qced': 'finished',
   'finished': null, // No next state
 };
 

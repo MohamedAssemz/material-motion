@@ -101,11 +101,11 @@ export default function Dashboard() {
           inProgress: unitsByState.in_manufacturing || 0,
         },
         packaging: {
-          waiting: unitsByState.waiting_for_packaging_material || 0,
+          waiting: unitsByState.waiting_for_pm || 0,
           inProgress: unitsByState.in_packaging || 0,
         },
         boxing: {
-          waiting: unitsByState.waiting_for_boxing_material || 0,
+          waiting: unitsByState.waiting_for_bm || 0,
           inProgress: unitsByState.in_boxing || 0,
         },
       });
