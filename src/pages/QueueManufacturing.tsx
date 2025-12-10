@@ -53,7 +53,7 @@ export default function QueueManufacturing() {
           created_at,
           units!inner(state)
         `)
-        .or('state.eq.waiting_for_rm,state.eq.manufacturing', { foreignTable: 'units' });
+        .or('state.eq.waiting_for_rm,state.eq.in_manufacturing', { foreignTable: 'units' });
 
       if (error) throw error;
 
@@ -62,7 +62,7 @@ export default function QueueManufacturing() {
         order_number: order.order_number,
         created_at: order.created_at,
         waiting_for_rm_count: order.units.filter((u: any) => u.state === 'waiting_for_rm').length,
-        manufacturing_count: order.units.filter((u: any) => u.state === 'manufacturing').length,
+        manufacturing_count: order.units.filter((u: any) => u.state === 'in_manufacturing').length,
       })).filter((order: Order) => 
         order.waiting_for_rm_count > 0 || order.manufacturing_count > 0
       );

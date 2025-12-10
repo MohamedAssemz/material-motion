@@ -3,7 +3,18 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, AlertTriangle, Ban } from 'lucide-react';
+import { ArrowLeft, AlertTriangle, Ban, Trash2 } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { OrderTimeline } from '@/components/OrderTimeline';
@@ -519,6 +530,32 @@ export default function OrderDetail() {
            hasRole('boxing_manager') ||
            hasRole('admin');
   };
+
+  const canDeleteOrder = () => {
+    return hasRole('manufacture_lead') || hasRole('admin');
+  };
+
+  const handleDeleteOrder = async () => {
+    try {
+      // First delete related records
+      await supabase.from('unit_stage_eta').delete().in('unit_id', order?.units.map(u => u.id) || []);
+      await supabase.from('unit_history').delete().in('unit_id', order?.units.map(u => u.id) || []);
+      await supabase.from('machine_production').delete().in('unit_id', order?.units.map(u => u.id) || []);
+      await supabase.from('units').delete().eq('order_id', id);
+      await supabase.from('batches').delete().eq('order_id', id);
+      await supabase.from('order_items').delete().eq('order_id', id);
+      await supabase.from('notifications').delete().eq('order_id', id);
+      
+      const { error } = await supabase.from('orders').delete().eq('id', id);
+      if (error) throw error;
+      
+      toast.success('Order deleted successfully');
+      navigate('/orders');
+    } catch (error) {
+      console.error('Error deleting order:', error);
+      toast.error('Failed to delete order');
+    }
+  };
   
   const getNextStateLabel = (): string | null => {
     const selectedBatches = productGroups
@@ -585,9 +622,35 @@ export default function OrderDetail() {
             )}
           </div>
         </div>
-        <Badge className={getStatusColor(order.status)}>
-          {order.status.replace(/_/g, ' ').toUpperCase()}
-        </Badge>
+        <div className="flex items-center gap-2">
+          <Badge className={getStatusColor(order.status)}>
+            {order.status.replace(/_/g, ' ').toUpperCase()}
+          </Badge>
+          {canDeleteOrder() && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" size="sm">
+                  <Trash2 className="h-4 w-4 mr-1" />
+                  Delete
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete Order</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Are you sure you want to delete order {order.order_number}? This action cannot be undone and will remove all units, batches, and related data.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleDeleteOrder} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                    Delete Order
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+        </div>
       </div>
 
       {lateUnitsCount > 0 && (
