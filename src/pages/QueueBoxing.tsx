@@ -53,7 +53,7 @@ export default function QueueBoxing() {
           created_at,
           units!inner(state)
         `)
-        .or('state.eq.waiting_for_boxing_material,state.eq.boxing', { foreignTable: 'units' });
+        .or('state.eq.waiting_for_boxing_material,state.eq.in_boxing', { foreignTable: 'units' });
 
       if (error) throw error;
 
@@ -62,7 +62,7 @@ export default function QueueBoxing() {
         order_number: order.order_number,
         created_at: order.created_at,
         waiting_for_bm_count: order.units.filter((u: any) => u.state === 'waiting_for_boxing_material').length,
-        boxing_count: order.units.filter((u: any) => u.state === 'boxing').length,
+        boxing_count: order.units.filter((u: any) => u.state === 'in_boxing').length,
       })).filter((order: Order) => 
         order.waiting_for_bm_count > 0 || order.boxing_count > 0
       );

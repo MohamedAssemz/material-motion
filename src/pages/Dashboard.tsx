@@ -89,24 +89,24 @@ export default function Dashboard() {
       setStats({
         totalOrders: ordersRes.count || 0,
         waitingForRM: unitsByState.waiting_for_rm || 0,
-        inManufacturing: unitsByState.manufacturing || 0,
-        inPackaging: unitsByState.packaging || 0,
-        inBoxing: unitsByState.boxing || 0,
+        inManufacturing: unitsByState.in_manufacturing || 0,
+        inPackaging: unitsByState.in_packaging || 0,
+        inBoxing: unitsByState.in_boxing || 0,
         finished: unitsByState.finished || 0,
       });
 
       setQueueCounts({
         manufacturing: {
           waiting: unitsByState.waiting_for_rm || 0,
-          inProgress: unitsByState.manufacturing || 0,
+          inProgress: unitsByState.in_manufacturing || 0,
         },
         packaging: {
           waiting: unitsByState.waiting_for_packaging_material || 0,
-          inProgress: unitsByState.packaging || 0,
+          inProgress: unitsByState.in_packaging || 0,
         },
         boxing: {
           waiting: unitsByState.waiting_for_boxing_material || 0,
-          inProgress: unitsByState.boxing || 0,
+          inProgress: unitsByState.in_boxing || 0,
         },
       });
     } catch (error) {

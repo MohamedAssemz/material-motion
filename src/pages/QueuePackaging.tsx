@@ -53,7 +53,7 @@ export default function QueuePackaging() {
           created_at,
           units!inner(state)
         `)
-        .or('state.eq.waiting_for_packaging_material,state.eq.packaging', { foreignTable: 'units' });
+        .or('state.eq.waiting_for_packaging_material,state.eq.in_packaging', { foreignTable: 'units' });
 
       if (error) throw error;
 
@@ -62,7 +62,7 @@ export default function QueuePackaging() {
         order_number: order.order_number,
         created_at: order.created_at,
         waiting_for_pm_count: order.units.filter((u: any) => u.state === 'waiting_for_packaging_material').length,
-        packaging_count: order.units.filter((u: any) => u.state === 'packaging').length,
+        packaging_count: order.units.filter((u: any) => u.state === 'in_packaging').length,
       })).filter((order: Order) => 
         order.waiting_for_pm_count > 0 || order.packaging_count > 0
       );
