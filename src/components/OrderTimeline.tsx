@@ -1,25 +1,9 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { CheckCircle, Circle, Clock, AlertTriangle } from 'lucide-react';
-import { format } from 'date-fns';
-
-interface Unit {
-  id: string;
-  state: string;
-  created_at: string;
-  stage_eta: Array<{
-    stage: string;
-    eta: string;
-    lead_time_days: number | null;
-  }>;
-}
-
-interface Order {
-  created_at: string;
-  units: Unit[];
-}
+import type { BatchInfo } from './BatchCard';
 
 interface OrderTimelineProps {
-  order: Order;
+  batches: BatchInfo[];
 }
 
 const STAGES = [
@@ -36,27 +20,33 @@ const STAGES = [
   { key: 'finished', label: 'Finished', icon: CheckCircle },
 ];
 
-export function OrderTimeline({ order }: OrderTimelineProps) {
-  const getStageStatus = (stageKey: string) => {
-    const unitsInStage = order.units.filter(u => u.state === stageKey).length;
-    const unitsPassedStage = order.units.filter(u => {
-      const stageIndex = STAGES.findIndex(s => s.key === stageKey);
-      const unitStageIndex = STAGES.findIndex(s => s.key === u.state);
-      return unitStageIndex > stageIndex;
-    }).length;
+export function OrderTimeline({ batches }: OrderTimelineProps) {
+  const totalItems = batches.reduce((sum, b) => sum + b.total_quantity, 0);
 
-    const totalPassed = unitsInStage + unitsPassedStage;
-    const isLate = order.units.some(u => {
-      const stageEta = u.stage_eta.find(eta => eta.stage === stageKey);
-      return stageEta && new Date(stageEta.eta) < new Date() && u.state === stageKey;
-    });
+  const getStageStatus = (stageKey: string) => {
+    const itemsInStage = batches
+      .filter(b => b.state === stageKey)
+      .reduce((sum, b) => sum + b.total_quantity, 0);
+    
+    const itemsPassedStage = batches
+      .filter(b => {
+        const stageIndex = STAGES.findIndex(s => s.key === stageKey);
+        const batchStageIndex = STAGES.findIndex(s => s.key === b.state);
+        return batchStageIndex > stageIndex;
+      })
+      .reduce((sum, b) => sum + b.total_quantity, 0);
+
+    const totalPassed = itemsInStage + itemsPassedStage;
+    const isLate = batches.some(b => b.state === stageKey && b.has_late_units);
+    const leadTimeDays = batches.find(b => b.state === stageKey)?.lead_time_days;
 
     return {
-      inProgress: unitsInStage > 0,
-      completed: totalPassed === order.units.length && unitsInStage === 0,
-      total: order.units.length,
+      inProgress: itemsInStage > 0,
+      completed: totalPassed === totalItems && itemsInStage === 0,
+      total: totalItems,
       current: totalPassed,
-      isLate
+      isLate,
+      leadTimeDays
     };
   };
 
@@ -69,7 +59,7 @@ export function OrderTimeline({ order }: OrderTimelineProps) {
         <div className="relative">
           <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-border" />
           <div className="space-y-6">
-            {STAGES.map((stage, index) => {
+            {STAGES.map((stage) => {
               const status = getStageStatus(stage.key);
               const Icon = stage.icon;
               
@@ -102,17 +92,11 @@ export function OrderTimeline({ order }: OrderTimelineProps) {
                       </div>
                       <div className="text-right">
                         <span className="text-sm text-muted-foreground">
-                          {status.current}/{status.total} units
+                          {status.current}/{status.total} items
                         </span>
-                        {status.inProgress && order.units.some(u => {
-                          const stageEta = u.stage_eta.find(eta => eta.stage === stage.key);
-                          return stageEta?.lead_time_days;
-                        }) && (
+                        {status.inProgress && status.leadTimeDays && (
                           <div className="text-xs text-muted-foreground mt-1">
-                            Lead time: {order.units.find(u => {
-                              const stageEta = u.stage_eta.find(eta => eta.stage === stage.key);
-                              return stageEta?.lead_time_days;
-                            })?.stage_eta.find(eta => eta.stage === stage.key)?.lead_time_days} days
+                            Lead time: {status.leadTimeDays} days
                           </div>
                         )}
                       </div>

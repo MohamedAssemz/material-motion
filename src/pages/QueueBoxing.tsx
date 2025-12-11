@@ -33,7 +33,7 @@ export default function QueueBoxing() {
 
     const channel = supabase
       .channel('boxing-queue')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'units' }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'batches' }, () => {
         fetchOrders();
       })
       .subscribe();
@@ -51,9 +51,9 @@ export default function QueueBoxing() {
           id,
           order_number,
           created_at,
-          units!inner(state)
+          batches!inner(current_state, quantity)
         `)
-        .or('state.eq.waiting_for_bm,state.eq.in_boxing', { foreignTable: 'units' });
+        .or('current_state.eq.waiting_for_bm,current_state.eq.in_boxing', { foreignTable: 'batches' });
 
       if (error) throw error;
 
@@ -61,8 +61,12 @@ export default function QueueBoxing() {
         id: order.id,
         order_number: order.order_number,
         created_at: order.created_at,
-        waiting_for_bm_count: order.units.filter((u: any) => u.state === 'waiting_for_bm').length,
-        boxing_count: order.units.filter((u: any) => u.state === 'in_boxing').length,
+        waiting_for_bm_count: order.batches
+          .filter((b: any) => b.current_state === 'waiting_for_bm')
+          .reduce((sum: number, b: any) => sum + b.quantity, 0),
+        boxing_count: order.batches
+          .filter((b: any) => b.current_state === 'in_boxing')
+          .reduce((sum: number, b: any) => sum + b.quantity, 0),
       })).filter((order: Order) => 
         order.waiting_for_bm_count > 0 || order.boxing_count > 0
       );
@@ -121,12 +125,12 @@ export default function QueueBoxing() {
                     <TableCell className="font-medium">{order.order_number}</TableCell>
                     <TableCell>
                       {order.waiting_for_bm_count > 0 && (
-                        <Badge className="bg-orange-500">{order.waiting_for_bm_count} units</Badge>
+                        <Badge className="bg-orange-500">{order.waiting_for_bm_count} items</Badge>
                       )}
                     </TableCell>
                     <TableCell>
                       {order.boxing_count > 0 && (
-                        <Badge className="bg-cyan-500">{order.boxing_count} units</Badge>
+                        <Badge className="bg-cyan-500">{order.boxing_count} items</Badge>
                       )}
                     </TableCell>
                     <TableCell>{format(new Date(order.created_at), 'PPP')}</TableCell>

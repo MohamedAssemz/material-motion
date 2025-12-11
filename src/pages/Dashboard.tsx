@@ -61,52 +61,52 @@ export default function Dashboard() {
       })
       .subscribe();
 
-    const unitsChannel = supabase
-      .channel('dashboard-units')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'units' }, () => {
+    const batchesChannel = supabase
+      .channel('dashboard-batches')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'batches' }, () => {
         fetchStats();
       })
       .subscribe();
 
     return () => {
       supabase.removeChannel(ordersChannel);
-      supabase.removeChannel(unitsChannel);
+      supabase.removeChannel(batchesChannel);
     };
   }, []);
 
   const fetchStats = async () => {
     try {
-      const [ordersRes, unitsRes] = await Promise.all([
+      const [ordersRes, batchesRes] = await Promise.all([
         supabase.from('orders').select('id', { count: 'exact', head: true }),
-        supabase.from('units').select('state'),
+        supabase.from('batches').select('current_state, quantity'),
       ]);
 
-      const unitsByState = unitsRes.data?.reduce((acc, unit) => {
-        acc[unit.state] = (acc[unit.state] || 0) + 1;
+      const batchesByState = batchesRes.data?.reduce((acc, batch) => {
+        acc[batch.current_state] = (acc[batch.current_state] || 0) + batch.quantity;
         return acc;
       }, {} as Record<string, number>) || {};
 
       setStats({
         totalOrders: ordersRes.count || 0,
-        waitingForRM: unitsByState.waiting_for_rm || 0,
-        inManufacturing: unitsByState.in_manufacturing || 0,
-        inPackaging: unitsByState.in_packaging || 0,
-        inBoxing: unitsByState.in_boxing || 0,
-        finished: unitsByState.finished || 0,
+        waitingForRM: batchesByState.waiting_for_rm || 0,
+        inManufacturing: batchesByState.in_manufacturing || 0,
+        inPackaging: batchesByState.in_packaging || 0,
+        inBoxing: batchesByState.in_boxing || 0,
+        finished: batchesByState.finished || 0,
       });
 
       setQueueCounts({
         manufacturing: {
-          waiting: unitsByState.waiting_for_rm || 0,
-          inProgress: unitsByState.in_manufacturing || 0,
+          waiting: batchesByState.waiting_for_rm || 0,
+          inProgress: batchesByState.in_manufacturing || 0,
         },
         packaging: {
-          waiting: unitsByState.waiting_for_pm || 0,
-          inProgress: unitsByState.in_packaging || 0,
+          waiting: batchesByState.waiting_for_pm || 0,
+          inProgress: batchesByState.in_packaging || 0,
         },
         boxing: {
-          waiting: unitsByState.waiting_for_bm || 0,
-          inProgress: unitsByState.in_boxing || 0,
+          waiting: batchesByState.waiting_for_bm || 0,
+          inProgress: batchesByState.in_boxing || 0,
         },
       });
     } catch (error) {
@@ -209,7 +209,7 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-attention">{stats.waitingForRM}</div>
-              <p className="text-xs text-muted-foreground">Units awaiting materials</p>
+              <p className="text-xs text-muted-foreground">Items awaiting materials</p>
             </CardContent>
           </Card>
 
@@ -220,7 +220,7 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-in-progress">{stats.inManufacturing}</div>
-              <p className="text-xs text-muted-foreground">Units in production</p>
+              <p className="text-xs text-muted-foreground">Items in production</p>
             </CardContent>
           </Card>
 
@@ -231,7 +231,7 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-in-progress">{stats.inPackaging}</div>
-              <p className="text-xs text-muted-foreground">Units being packaged</p>
+              <p className="text-xs text-muted-foreground">Items being packaged</p>
             </CardContent>
           </Card>
 
@@ -242,7 +242,7 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-in-progress">{stats.inBoxing}</div>
-              <p className="text-xs text-muted-foreground">Units being boxed</p>
+              <p className="text-xs text-muted-foreground">Items being boxed</p>
             </CardContent>
           </Card>
 
@@ -253,7 +253,7 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-completed">{stats.finished}</div>
-              <p className="text-xs text-muted-foreground">Completed units</p>
+              <p className="text-xs text-muted-foreground">Completed items</p>
             </CardContent>
           </Card>
         </div>

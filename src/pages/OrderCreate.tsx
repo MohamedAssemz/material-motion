@@ -157,28 +157,35 @@ export default function OrderCreate() {
 
       if (orderError) throw orderError;
 
-      // Collect all product IDs we need order items for (from both items and extra selections)
-      const allProductIds = new Set<string>();
-      validItems.forEach(item => allProductIds.add(item.product_id));
+      // Collect all products with their total quantities (merging regular items + extra)
+      const productQuantities = new Map<string, { regular: number; extra: number; extraProductId?: string }>();
       
+      // Add regular items
+      validItems.forEach(item => {
+        const existing = productQuantities.get(item.product_id) || { regular: 0, extra: 0 };
+        existing.regular += item.quantity;
+        productQuantities.set(item.product_id, existing);
+      });
+      
+      // Add extra selections
       for (const [extraId, quantity] of extraSelections.entries()) {
         if (quantity > 0) {
           const extraProduct = extraProducts.find(ep => ep.id === extraId);
           if (extraProduct) {
-            allProductIds.add(extraProduct.product_id);
+            const existing = productQuantities.get(extraProduct.product_id) || { regular: 0, extra: 0 };
+            existing.extra += quantity;
+            existing.extraProductId = extraId;
+            productQuantities.set(extraProduct.product_id, existing);
           }
         }
       }
 
-      // Create order items for all products
-      const orderItemsToCreate = Array.from(allProductIds).map(productId => {
-        const regularItem = validItems.find(item => item.product_id === productId);
-        return {
-          order_id: order.id,
-          product_id: productId,
-          quantity: regularItem?.quantity || 0, // 0 for extra-only products
-        };
-      });
+      // Create order items for all products (quantity = total for order tracking)
+      const orderItemsToCreate = Array.from(productQuantities.entries()).map(([productId, quantities]) => ({
+        order_id: order.id,
+        product_id: productId,
+        quantity: quantities.regular + quantities.extra,
+      }));
 
       const { error: itemsError } = await supabase
         .from('order_items')
@@ -186,61 +193,46 @@ export default function OrderCreate() {
 
       if (itemsError) throw itemsError;
 
-      // Fetch created order items
-      const { data: createdOrderItems, error: fetchItemsError } = await supabase
-        .from('order_items')
-        .select('id, product_id')
-        .eq('order_id', order.id);
-
-      if (fetchItemsError) throw fetchItemsError;
-
-      // Create units for regular order items
-      const units = [];
-      for (const item of validItems) {
-        const orderItem = createdOrderItems?.find(oi => oi.product_id === item.product_id);
-        if (orderItem) {
-          for (let i = 0; i < item.quantity; i++) {
-            units.push({
-              order_id: order.id,
-              order_item_id: orderItem.id,
-              product_id: item.product_id,
-              state: 'waiting_for_rm',
-            });
-          }
+      // Create batches instead of individual units
+      const batchesToCreate = [];
+      let totalBatchQuantity = 0;
+      
+      for (const [productId, quantities] of productQuantities.entries()) {
+        // Create batch for regular items (starts at waiting_for_rm)
+        if (quantities.regular > 0) {
+          const { data: batchCode } = await supabase.rpc('generate_batch_code');
+          batchesToCreate.push({
+            batch_code: batchCode || `B-${Date.now()}`,
+            order_id: order.id,
+            product_id: productId,
+            current_state: 'waiting_for_rm',
+            quantity: quantities.regular,
+            created_by: user?.id,
+          });
+          totalBatchQuantity += quantities.regular;
         }
-      }
-
-      if (units.length > 0) {
-        const { error: unitsError } = await supabase
-          .from('units')
-          .insert(units);
-
-        if (unitsError) throw unitsError;
-      }
-
-      // Handle extra products (finished state units)
-      const extraUnits = [];
-      for (const [extraId, quantity] of extraSelections.entries()) {
-        if (quantity > 0) {
-          const extraProduct = extraProducts.find(ep => ep.id === extraId);
-          if (extraProduct) {
-            const orderItem = createdOrderItems?.find(oi => oi.product_id === extraProduct.product_id);
-            
-            if (orderItem) {
-              for (let i = 0; i < quantity; i++) {
-                extraUnits.push({
-                  order_id: order.id,
-                  order_item_id: orderItem.id,
-                  product_id: extraProduct.product_id,
-                  state: 'finished',
-                });
-              }
-
-              // Deduct from extra_products inventory
+        
+        // Create batch for extra items (starts at finished)
+        if (quantities.extra > 0) {
+          const { data: batchCode } = await supabase.rpc('generate_batch_code');
+          batchesToCreate.push({
+            batch_code: batchCode || `B-${Date.now()}`,
+            order_id: order.id,
+            product_id: productId,
+            current_state: 'finished',
+            quantity: quantities.extra,
+            created_by: user?.id,
+          });
+          totalBatchQuantity += quantities.extra;
+          
+          // Deduct from extra_products inventory
+          if (quantities.extraProductId) {
+            const extraProduct = extraProducts.find(ep => ep.id === quantities.extraProductId);
+            if (extraProduct) {
               const { error: deductError } = await supabase
                 .from('extra_products')
-                .update({ quantity: extraProduct.quantity - quantity })
-                .eq('id', extraId);
+                .update({ quantity: extraProduct.quantity - quantities.extra })
+                .eq('id', quantities.extraProductId);
 
               if (deductError) throw deductError;
             }
@@ -248,17 +240,17 @@ export default function OrderCreate() {
         }
       }
 
-      if (extraUnits.length > 0) {
-        const { error: extraUnitsError } = await supabase
-          .from('units')
-          .insert(extraUnits);
+      if (batchesToCreate.length > 0) {
+        const { error: batchesError } = await supabase
+          .from('batches')
+          .insert(batchesToCreate);
 
-        if (extraUnitsError) throw extraUnitsError;
+        if (batchesError) throw batchesError;
       }
 
       toast({
         title: 'Success',
-        description: `Order ${orderNumber} created with ${units.length + extraUnits.length} units`,
+        description: `Order ${orderNumber} created with ${totalBatchQuantity} items in ${batchesToCreate.length} batch(es)`,
       });
 
       navigate('/orders');
