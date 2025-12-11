@@ -27,6 +27,7 @@ export type Database = {
           parent_batch_id: string | null
           product_id: string
           qr_code_data: string | null
+          quantity: number
           updated_at: string
         }
         Insert: {
@@ -41,6 +42,7 @@ export type Database = {
           parent_batch_id?: string | null
           product_id: string
           qr_code_data?: string | null
+          quantity?: number
           updated_at?: string
         }
         Update: {
@@ -55,6 +57,7 @@ export type Database = {
           parent_batch_id?: string | null
           product_id?: string
           qr_code_data?: string | null
+          quantity?: number
           updated_at?: string
         }
         Relationships: [

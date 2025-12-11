@@ -6,15 +6,15 @@ import { AlertTriangle, Clock } from 'lucide-react';
 import { format } from 'date-fns';
 import { getStateLabel, type UnitState } from '@/lib/stateMachine';
 
-interface BatchInfo {
+export interface BatchInfo {
+  id: string;
+  batch_code: string;
   product_id: string;
   product_name: string;
   product_sku: string;
   state: UnitState;
   total_quantity: number;
-  unit_ids: string[];
   earliest_eta?: string;
-  latest_eta?: string;
   has_late_units: boolean;
   lead_time_days?: number;
 }
@@ -66,6 +66,8 @@ const getStatusColor = (status: string) => {
             <p className="text-sm font-medium">Qty: {batch.total_quantity}</p>
           </div>
 
+          <p className="text-xs text-muted-foreground font-mono">{batch.batch_code}</p>
+
           {(batch.earliest_eta || batch.lead_time_days) && (
             <div className="text-xs text-muted-foreground space-y-1">
               {batch.earliest_eta && (
@@ -87,11 +89,11 @@ const getStatusColor = (status: string) => {
 
           {canUpdate && (
             <div>
-              <Label htmlFor={`qty-${batch.product_id}-${batch.state}`} className="text-xs">
+              <Label htmlFor={`qty-${batch.id}`} className="text-xs">
                 Select Qty
               </Label>
               <Input
-                id={`qty-${batch.product_id}-${batch.state}`}
+                id={`qty-${batch.id}`}
                 type="number"
                 min="0"
                 max={batch.total_quantity}

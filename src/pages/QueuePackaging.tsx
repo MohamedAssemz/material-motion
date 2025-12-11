@@ -33,7 +33,7 @@ export default function QueuePackaging() {
 
     const channel = supabase
       .channel('packaging-queue')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'units' }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'batches' }, () => {
         fetchOrders();
       })
       .subscribe();
@@ -51,9 +51,9 @@ export default function QueuePackaging() {
           id,
           order_number,
           created_at,
-          units!inner(state)
+          batches!inner(current_state, quantity)
         `)
-        .or('state.eq.waiting_for_pm,state.eq.in_packaging', { foreignTable: 'units' });
+        .or('current_state.eq.waiting_for_pm,current_state.eq.in_packaging', { foreignTable: 'batches' });
 
       if (error) throw error;
 
@@ -61,8 +61,12 @@ export default function QueuePackaging() {
         id: order.id,
         order_number: order.order_number,
         created_at: order.created_at,
-        waiting_for_pm_count: order.units.filter((u: any) => u.state === 'waiting_for_pm').length,
-        packaging_count: order.units.filter((u: any) => u.state === 'in_packaging').length,
+        waiting_for_pm_count: order.batches
+          .filter((b: any) => b.current_state === 'waiting_for_pm')
+          .reduce((sum: number, b: any) => sum + b.quantity, 0),
+        packaging_count: order.batches
+          .filter((b: any) => b.current_state === 'in_packaging')
+          .reduce((sum: number, b: any) => sum + b.quantity, 0),
       })).filter((order: Order) => 
         order.waiting_for_pm_count > 0 || order.packaging_count > 0
       );
@@ -121,12 +125,12 @@ export default function QueuePackaging() {
                     <TableCell className="font-medium">{order.order_number}</TableCell>
                     <TableCell>
                       {order.waiting_for_pm_count > 0 && (
-                        <Badge className="bg-orange-500">{order.waiting_for_pm_count} units</Badge>
+                        <Badge className="bg-orange-500">{order.waiting_for_pm_count} items</Badge>
                       )}
                     </TableCell>
                     <TableCell>
                       {order.packaging_count > 0 && (
-                        <Badge className="bg-indigo-500">{order.packaging_count} units</Badge>
+                        <Badge className="bg-indigo-500">{order.packaging_count} items</Badge>
                       )}
                     </TableCell>
                     <TableCell>{format(new Date(order.created_at), 'PPP')}</TableCell>
