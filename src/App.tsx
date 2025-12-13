@@ -19,6 +19,7 @@ import ExtraProducts from "./pages/ExtraProducts";
 import Machines from "./pages/Machines";
 import Customers from "./pages/Customers";
 import BatchLookup from "./pages/BatchLookup";
+import Analytics from "./pages/Analytics";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -135,6 +136,14 @@ const App = () => (
             <Route 
               path="/batch" 
               element={<BatchLookup />} 
+            />
+            <Route 
+              path="/analytics" 
+              element={
+                <ProtectedRoute>
+                  <Analytics />
+                </ProtectedRoute>
+              } 
             />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />

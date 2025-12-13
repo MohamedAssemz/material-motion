@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { Package, Plus, Edit, ArrowLeft, Loader2 } from 'lucide-react';
@@ -17,6 +18,7 @@ interface Product {
   sku: string;
   name: string;
   description: string | null;
+  needs_packing: boolean;
 }
 
 export default function Products() {
@@ -31,6 +33,7 @@ export default function Products() {
     sku: '',
     name: '',
     description: '',
+    needs_packing: true,
   });
 
   const canManage = hasRole('admin') || hasRole('manufacture_lead');
@@ -105,6 +108,7 @@ export default function Products() {
       sku: '',
       name: '',
       description: '',
+      needs_packing: true,
     });
     setEditingProduct(null);
   };
@@ -115,6 +119,7 @@ export default function Products() {
       sku: product.sku,
       name: product.name,
       description: product.description || '',
+      needs_packing: product.needs_packing ?? true,
     });
     setDialogOpen(true);
   };
@@ -187,6 +192,19 @@ export default function Products() {
                       rows={3}
                     />
                   </div>
+                  <div className="flex items-center justify-between p-3 rounded-lg border">
+                    <div>
+                      <Label htmlFor="needs_packing" className="font-medium">Needs Packing</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Enable if this product requires packing phase
+                      </p>
+                    </div>
+                    <Switch
+                      id="needs_packing"
+                      checked={formData.needs_packing}
+                      onCheckedChange={(checked) => setFormData({ ...formData, needs_packing: checked })}
+                    />
+                  </div>
                   <div className="flex gap-2">
                     <Button type="submit" className="flex-1">
                       {editingProduct ? 'Update' : 'Create'}
@@ -227,9 +245,16 @@ export default function Products() {
                 </div>
               </CardHeader>
               <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  {product.description || 'No description available'}
-                </p>
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-muted-foreground flex-1">
+                    {product.description || 'No description available'}
+                  </p>
+                  {product.needs_packing ? (
+                    <Badge variant="secondary" className="ml-2">Packing</Badge>
+                  ) : (
+                    <Badge variant="outline" className="ml-2">No Packing</Badge>
+                  )}
+                </div>
               </CardContent>
             </Card>
           ))}
