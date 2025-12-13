@@ -351,6 +351,12 @@ export default function Dashboard() {
               </CardHeader>
               <CardContent className="space-y-2">
                 <Button variant="outline" className="w-full justify-start" asChild>
+                  <Link to="/analytics">
+                    <TrendingUp className="mr-2 h-4 w-4" />
+                    Analytics & Timelines
+                  </Link>
+                </Button>
+                <Button variant="outline" className="w-full justify-start" asChild>
                   <Link to="/products">
                     <Package className="mr-2 h-4 w-4" />
                     Manage Products

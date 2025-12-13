@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, AlertTriangle, Trash2 } from 'lucide-react';
+import { ArrowLeft, AlertTriangle, Trash2, XCircle, RotateCcw } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,6 +23,7 @@ import { LeadTimeDialog } from '@/components/LeadTimeDialog';
 import { ProductProgress } from '@/components/ProductProgress';
 import { MachineSelectionDialog } from '@/components/MachineSelectionDialog';
 import { BatchQRCode } from '@/components/BatchQRCode';
+import { BatchActionDialog, type BatchActionType } from '@/components/BatchActionDialog';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { getNextState, requiresLeadTimeInput, getStateLabel, type UnitState } from '@/lib/stateMachine';
@@ -81,6 +82,7 @@ export default function OrderDetail() {
   const [machineDialogOpen, setMachineDialogOpen] = useState(false);
   const [pendingMachineType, setPendingMachineType] = useState<'manufacturing' | 'packaging' | null>(null);
   const [pendingUpdateData, setPendingUpdateData] = useState<{ newState: UnitState; leadTimeDays?: number; eta?: Date } | null>(null);
+  const [batchActionDialogOpen, setBatchActionDialogOpen] = useState(false);
 
   useEffect(() => {
     fetchOrder();
@@ -372,6 +374,138 @@ export default function OrderDetail() {
     }
   };
 
+  const canShowBatchActions = (): boolean => {
+    const currentState = getSelectedBatchState();
+    if (!currentState) return false;
+    // Terminate/Redo only in manufacturing/finishing/packaging states
+    return ['in_manufacturing', 'manufactured', 'in_packaging', 'packaged'].includes(currentState);
+  };
+
+  const handleBatchAction = async (action: BatchActionType, reason: string) => {
+    try {
+      const selectedBatches = getSelectedBatches();
+      let totalAffected = 0;
+      
+      for (const { batch, quantity } of selectedBatches) {
+        let targetState: UnitState = 'waiting_for_rm';
+        let isRedo = false;
+        let isTerminated = false;
+        
+        if (action === 'terminate') {
+          targetState = 'waiting_for_rm';
+          isTerminated = true;
+        } else if (action === 'flag_terminate') {
+          targetState = 'in_manufacturing';
+          isTerminated = false;
+        } else if (action === 'redo') {
+          targetState = 'in_manufacturing';
+          isRedo = true;
+        }
+
+        if (quantity === batch.total_quantity) {
+          // Update entire batch
+          const { error } = await supabase
+            .from('batches')
+            .update({ 
+              current_state: targetState,
+              is_redo: isRedo,
+              is_terminated: isTerminated,
+              redo_reason: isRedo ? reason : null,
+              terminated_reason: isTerminated ? reason : null,
+              redo_by: isRedo ? user?.id : null,
+              terminated_by: isTerminated ? user?.id : null,
+              eta: null,
+              lead_time_days: null,
+            })
+            .eq('id', batch.id);
+
+          if (error) throw error;
+          
+          // If terminated, create replacement batch
+          if (action === 'terminate') {
+            const { data: batchCode } = await supabase.rpc('generate_batch_code');
+            await supabase.from('batches').insert({
+              batch_code: batchCode || `B-${Date.now()}`,
+              order_id: order!.id,
+              product_id: batch.product_id,
+              current_state: 'waiting_for_rm',
+              quantity: quantity,
+              created_by: user?.id,
+            });
+          }
+          
+          totalAffected += quantity;
+        } else {
+          // Split batch
+          const { error: updateError } = await supabase
+            .from('batches')
+            .update({ quantity: batch.total_quantity - quantity })
+            .eq('id', batch.id);
+
+          if (updateError) throw updateError;
+
+          // Create new batch for affected items
+          const { data: batchCode } = await supabase.rpc('generate_batch_code');
+          
+          await supabase.from('batches').insert({
+            batch_code: batchCode || `B-${Date.now()}`,
+            order_id: order!.id,
+            product_id: batch.product_id,
+            current_state: targetState,
+            quantity: quantity,
+            is_redo: isRedo,
+            is_terminated: isTerminated,
+            redo_reason: isRedo ? reason : null,
+            terminated_reason: isTerminated ? reason : null,
+            redo_by: isRedo ? user?.id : null,
+            terminated_by: isTerminated ? user?.id : null,
+            created_by: user?.id,
+          });
+
+          // If terminated, create replacement batch
+          if (action === 'terminate') {
+            const { data: replacementCode } = await supabase.rpc('generate_batch_code');
+            await supabase.from('batches').insert({
+              batch_code: replacementCode || `B-${Date.now()}`,
+              order_id: order!.id,
+              product_id: batch.product_id,
+              current_state: 'waiting_for_rm',
+              quantity: quantity,
+              created_by: user?.id,
+            });
+          }
+          
+          totalAffected += quantity;
+        }
+      }
+
+      // Update order counters - fetch current values first then update
+      const { data: currentOrder } = await supabase
+        .from('orders')
+        .select('termination_counter, redo_counter')
+        .eq('id', order!.id)
+        .single();
+
+      if (action === 'terminate' && currentOrder) {
+        await supabase.from('orders').update({
+          termination_counter: (currentOrder.termination_counter || 0) + totalAffected
+        }).eq('id', order!.id);
+      } else if (action === 'redo' && currentOrder) {
+        await supabase.from('orders').update({
+          redo_counter: (currentOrder.redo_counter || 0) + totalAffected
+        }).eq('id', order!.id);
+      }
+
+      const actionLabel = action === 'terminate' ? 'terminated' : action === 'flag_terminate' ? 'flagged' : 'sent for redo';
+      toast.success(`${totalAffected} item(s) ${actionLabel}`);
+      setBatchSelections(new Map());
+      fetchOrder();
+    } catch (error) {
+      console.error('Error performing batch action:', error);
+      toast.error('Failed to perform action');
+    }
+  };
+
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
       'waiting_for_rm': 'bg-yellow-500',
@@ -535,6 +669,19 @@ export default function OrderDetail() {
                 <span className="text-sm text-muted-foreground">
                   {totalSelected} item(s) selected
                 </span>
+                {canShowBatchActions() && (
+                  <>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-warning border-warning hover:bg-warning/10"
+                      onClick={() => setBatchActionDialogOpen(true)}
+                    >
+                      <RotateCcw className="h-4 w-4 mr-1" />
+                      Actions
+                    </Button>
+                  </>
+                )}
                 {nextStateLabel && (
                   <Button
                     size="sm"
@@ -627,6 +774,14 @@ export default function OrderDetail() {
           machineType={pendingMachineType}
         />
       )}
+
+      <BatchActionDialog
+        open={batchActionDialogOpen}
+        onOpenChange={setBatchActionDialogOpen}
+        onConfirm={handleBatchAction}
+        itemCount={getTotalSelectedCount()}
+        currentState={getSelectedBatchState() || ''}
+      />
     </div>
   );
 }

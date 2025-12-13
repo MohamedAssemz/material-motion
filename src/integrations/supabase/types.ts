@@ -22,12 +22,18 @@ export type Database = {
           current_state: string
           eta: string | null
           id: string
+          is_redo: boolean | null
+          is_terminated: boolean | null
           lead_time_days: number | null
           order_id: string
           parent_batch_id: string | null
           product_id: string
           qr_code_data: string | null
           quantity: number
+          redo_by: string | null
+          redo_reason: string | null
+          terminated_by: string | null
+          terminated_reason: string | null
           updated_at: string
         }
         Insert: {
@@ -37,12 +43,18 @@ export type Database = {
           current_state?: string
           eta?: string | null
           id?: string
+          is_redo?: boolean | null
+          is_terminated?: boolean | null
           lead_time_days?: number | null
           order_id: string
           parent_batch_id?: string | null
           product_id: string
           qr_code_data?: string | null
           quantity?: number
+          redo_by?: string | null
+          redo_reason?: string | null
+          terminated_by?: string | null
+          terminated_reason?: string | null
           updated_at?: string
         }
         Update: {
@@ -52,12 +64,18 @@ export type Database = {
           current_state?: string
           eta?: string | null
           id?: string
+          is_redo?: boolean | null
+          is_terminated?: boolean | null
           lead_time_days?: number | null
           order_id?: string
           parent_batch_id?: string | null
           product_id?: string
           qr_code_data?: string | null
           quantity?: number
+          redo_by?: string | null
+          redo_reason?: string | null
+          terminated_by?: string | null
+          terminated_reason?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -311,7 +329,9 @@ export type Database = {
           notes: string | null
           order_number: string
           priority: string | null
+          redo_counter: number | null
           status: string
+          termination_counter: number | null
           updated_at: string | null
         }
         Insert: {
@@ -322,7 +342,9 @@ export type Database = {
           notes?: string | null
           order_number: string
           priority?: string | null
+          redo_counter?: number | null
           status?: string
+          termination_counter?: number | null
           updated_at?: string | null
         }
         Update: {
@@ -333,7 +355,9 @@ export type Database = {
           notes?: string | null
           order_number?: string
           priority?: string | null
+          redo_counter?: number | null
           status?: string
+          termination_counter?: number | null
           updated_at?: string | null
         }
         Relationships: [
@@ -391,6 +415,7 @@ export type Database = {
           description: string | null
           id: string
           name: string
+          needs_packing: boolean | null
           sku: string
         }
         Insert: {
@@ -398,6 +423,7 @@ export type Database = {
           description?: string | null
           id?: string
           name: string
+          needs_packing?: boolean | null
           sku: string
         }
         Update: {
@@ -405,6 +431,7 @@ export type Database = {
           description?: string | null
           id?: string
           name?: string
+          needs_packing?: boolean | null
           sku?: string
         }
         Relationships: []
