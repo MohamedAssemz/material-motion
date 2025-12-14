@@ -73,18 +73,28 @@ export default function OrderCreate() {
 
   const fetchData = async () => {
     try {
-      const [productsRes, extraProductsRes, customersRes] = await Promise.all([
+      const [productsRes, extraBatchesRes, customersRes] = await Promise.all([
         supabase.from('products').select('id, sku, name').order('sku'),
-        supabase.from('extra_products').select('*, product:products(id, sku, name)'),
+        supabase
+          .from('batches')
+          .select('id, batch_code, product_id, quantity, current_state, product:products(id, sku, name)')
+          .eq('batch_type', 'EXTRA')
+          .eq('inventory_state', 'AVAILABLE')
+          .eq('is_terminated', false),
         supabase.from('customers').select('id, name, code').order('name'),
       ]);
 
       if (productsRes.error) throw productsRes.error;
-      if (extraProductsRes.error) throw extraProductsRes.error;
+      if (extraBatchesRes.error) throw extraBatchesRes.error;
       if (customersRes.error) throw customersRes.error;
 
       setProducts(productsRes.data || []);
-      setExtraProducts(extraProductsRes.data as any || []);
+      setExtraProducts(extraBatchesRes.data?.map(b => ({
+        id: b.id,
+        product_id: b.product_id,
+        quantity: b.quantity,
+        product: b.product as any,
+      })) || []);
       setCustomers(customersRes.data || []);
     } catch (error: any) {
       toast({
@@ -225,16 +235,23 @@ export default function OrderCreate() {
           });
           totalBatchQuantity += quantities.extra;
           
-          // Deduct from extra_products inventory
+          // Mark extra batch as consumed (or split if partial)
           if (quantities.extraProductId) {
-            const extraProduct = extraProducts.find(ep => ep.id === quantities.extraProductId);
-            if (extraProduct) {
-              const { error: deductError } = await supabase
-                .from('extra_products')
-                .update({ quantity: extraProduct.quantity - quantities.extra })
-                .eq('id', quantities.extraProductId);
-
-              if (deductError) throw deductError;
+            const extraBatch = extraProducts.find(ep => ep.id === quantities.extraProductId);
+            if (extraBatch) {
+              if (quantities.extra === extraBatch.quantity) {
+                // Full consumption
+                await supabase
+                  .from('batches')
+                  .update({ inventory_state: 'CONSUMED' })
+                  .eq('id', quantities.extraProductId);
+              } else {
+                // Partial consumption - reduce quantity
+                await supabase
+                  .from('batches')
+                  .update({ quantity: extraBatch.quantity - quantities.extra })
+                  .eq('id', quantities.extraProductId);
+              }
             }
           }
         }

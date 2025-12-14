@@ -17,16 +17,21 @@ export type Database = {
       batches: {
         Row: {
           batch_code: string
+          batch_type: string
+          box_id: string | null
           created_at: string
           created_by: string | null
           current_state: string
           eta: string | null
           id: string
+          inventory_state: string | null
           is_redo: boolean | null
           is_terminated: boolean | null
           lead_time_days: number | null
           order_id: string
+          origin_state: string | null
           parent_batch_id: string | null
+          parent_batch_id_split: string | null
           product_id: string
           qr_code_data: string | null
           quantity: number
@@ -38,16 +43,21 @@ export type Database = {
         }
         Insert: {
           batch_code: string
+          batch_type?: string
+          box_id?: string | null
           created_at?: string
           created_by?: string | null
           current_state?: string
           eta?: string | null
           id?: string
+          inventory_state?: string | null
           is_redo?: boolean | null
           is_terminated?: boolean | null
           lead_time_days?: number | null
           order_id: string
+          origin_state?: string | null
           parent_batch_id?: string | null
+          parent_batch_id_split?: string | null
           product_id: string
           qr_code_data?: string | null
           quantity?: number
@@ -59,16 +69,21 @@ export type Database = {
         }
         Update: {
           batch_code?: string
+          batch_type?: string
+          box_id?: string | null
           created_at?: string
           created_by?: string | null
           current_state?: string
           eta?: string | null
           id?: string
+          inventory_state?: string | null
           is_redo?: boolean | null
           is_terminated?: boolean | null
           lead_time_days?: number | null
           order_id?: string
+          origin_state?: string | null
           parent_batch_id?: string | null
+          parent_batch_id_split?: string | null
           product_id?: string
           qr_code_data?: string | null
           quantity?: number
@@ -79,6 +94,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "batches_box_id_fkey"
+            columns: ["box_id"]
+            isOneToOne: false
+            referencedRelation: "boxes"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "batches_order_id_fkey"
             columns: ["order_id"]
@@ -94,6 +116,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "batches_parent_batch_id_split_fkey"
+            columns: ["parent_batch_id_split"]
+            isOneToOne: false
+            referencedRelation: "batches"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "batches_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
@@ -101,6 +130,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      boxes: {
+        Row: {
+          box_code: string
+          created_at: string
+          id: string
+          is_active: boolean
+        }
+        Insert: {
+          box_code: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+        }
+        Update: {
+          box_code?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+        }
+        Relationships: []
       }
       customers: {
         Row: {
@@ -718,6 +768,7 @@ export type Database = {
     Functions: {
       check_late_units: { Args: never; Returns: undefined }
       generate_batch_code: { Args: never; Returns: string }
+      generate_box_code: { Args: never; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -737,6 +788,8 @@ export type Database = {
         | "qc"
         | "admin"
         | "viewer"
+      batch_type: "ORDER" | "EXTRA"
+      inventory_state: "AVAILABLE" | "RESERVED" | "CONSUMED"
       unit_state:
         | "waiting_for_rm"
         | "in_manufacturing"
@@ -891,6 +944,8 @@ export const Constants = {
         "admin",
         "viewer",
       ],
+      batch_type: ["ORDER", "EXTRA"],
+      inventory_state: ["AVAILABLE", "RESERVED", "CONSUMED"],
       unit_state: [
         "waiting_for_rm",
         "in_manufacturing",
