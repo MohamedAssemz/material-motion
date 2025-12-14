@@ -15,7 +15,8 @@ import Admin from "./pages/Admin";
 import QueueManufacturing from "./pages/QueueManufacturing";
 import QueuePackaging from "./pages/QueuePackaging";
 import QueueBoxing from "./pages/QueueBoxing";
-import ExtraProducts from "./pages/ExtraProducts";
+import ExtraInventory from "./pages/ExtraInventory";
+import Boxes from "./pages/Boxes";
 import Machines from "./pages/Machines";
 import Customers from "./pages/Customers";
 import BatchLookup from "./pages/BatchLookup";
@@ -106,10 +107,18 @@ const App = () => (
               } 
             />
             <Route 
-              path="/extra-products" 
+              path="/extra-inventory" 
               element={
                 <ProtectedRoute>
-                  <ExtraProducts />
+                  <ExtraInventory />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/boxes" 
+              element={
+                <ProtectedRoute>
+                  <Boxes />
                 </ProtectedRoute>
               } 
             />

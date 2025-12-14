@@ -363,9 +363,15 @@ export default function Dashboard() {
                   </Link>
                 </Button>
                 <Button variant="outline" className="w-full justify-start" asChild>
-                  <Link to="/extra-products">
+                  <Link to="/extra-inventory">
                     <Package className="mr-2 h-4 w-4" />
-                    Extra Products Inventory
+                    Extra Inventory
+                  </Link>
+                </Button>
+                <Button variant="outline" className="w-full justify-start" asChild>
+                  <Link to="/boxes">
+                    <Box className="mr-2 h-4 w-4" />
+                    Box Management
                   </Link>
                 </Button>
                 <Button variant="outline" className="w-full justify-start" asChild>
