@@ -7,17 +7,16 @@ interface OrderTimelineProps {
 }
 
 const STAGES = [
-  { key: 'waiting_for_rm', label: 'Waiting for RM', icon: Clock },
-  { key: 'in_manufacturing', label: 'Manufacturing', icon: Circle },
-  { key: 'manufactured', label: 'Manufactured', icon: CheckCircle },
-  { key: 'waiting_for_pm', label: 'Waiting for PM', icon: Clock },
-  { key: 'in_packaging', label: 'Packaging', icon: Circle },
-  { key: 'packaged', label: 'Packaged', icon: CheckCircle },
-  { key: 'waiting_for_bm', label: 'Waiting for BM', icon: Clock },
-  { key: 'in_boxing', label: 'Boxing', icon: Circle },
-  { key: 'boxed', label: 'Boxed', icon: CheckCircle },
-  { key: 'qced', label: 'QC Complete', icon: CheckCircle },
-  { key: 'finished', label: 'Finished', icon: CheckCircle },
+  { key: 'pending_rm', label: 'Pending RM', icon: Clock },
+  { key: 'in_manufacturing', label: 'In Manufacturing', icon: Circle },
+  { key: 'ready_for_finishing', label: 'Ready for Finishing', icon: CheckCircle },
+  { key: 'in_finishing', label: 'In Finishing', icon: Circle },
+  { key: 'ready_for_packaging', label: 'Ready for Packaging', icon: CheckCircle },
+  { key: 'in_packaging', label: 'In Packaging', icon: Circle },
+  { key: 'ready_for_boxing', label: 'Ready for Boxing', icon: CheckCircle },
+  { key: 'in_boxing', label: 'In Boxing', icon: Circle },
+  { key: 'ready_for_receiving', label: 'Ready for Receiving', icon: CheckCircle },
+  { key: 'received', label: 'Received', icon: CheckCircle },
 ];
 
 export function OrderTimeline({ batches }: OrderTimelineProps) {

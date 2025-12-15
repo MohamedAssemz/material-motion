@@ -19,7 +19,7 @@ interface Order {
   id: string;
   order_number: string;
   created_at: string;
-  waiting_for_pm_count: number;
+  ready_for_packaging_count: number;
   packaging_count: number;
 }
 
@@ -53,7 +53,7 @@ export default function QueuePackaging() {
           created_at,
           batches!inner(current_state, quantity)
         `)
-        .or('current_state.eq.waiting_for_pm,current_state.eq.in_packaging', { foreignTable: 'batches' });
+        .or('current_state.eq.ready_for_packaging,current_state.eq.in_packaging', { foreignTable: 'batches' });
 
       if (error) throw error;
 
@@ -61,14 +61,14 @@ export default function QueuePackaging() {
         id: order.id,
         order_number: order.order_number,
         created_at: order.created_at,
-        waiting_for_pm_count: order.batches
-          .filter((b: any) => b.current_state === 'waiting_for_pm')
+        ready_for_packaging_count: order.batches
+          .filter((b: any) => b.current_state === 'ready_for_packaging')
           .reduce((sum: number, b: any) => sum + b.quantity, 0),
         packaging_count: order.batches
           .filter((b: any) => b.current_state === 'in_packaging')
           .reduce((sum: number, b: any) => sum + b.quantity, 0),
       })).filter((order: Order) => 
-        order.waiting_for_pm_count > 0 || order.packaging_count > 0
+        order.ready_for_packaging_count > 0 || order.packaging_count > 0
       );
 
       setOrders(ordersWithCounts);
@@ -113,7 +113,7 @@ export default function QueuePackaging() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Order Number</TableHead>
-                  <TableHead>Waiting for Materials</TableHead>
+                  <TableHead>Ready for Packaging</TableHead>
                   <TableHead>In Packaging</TableHead>
                   <TableHead>Created Date</TableHead>
                   <TableHead>Actions</TableHead>
@@ -124,8 +124,8 @@ export default function QueuePackaging() {
                   <TableRow key={order.id}>
                     <TableCell className="font-medium">{order.order_number}</TableCell>
                     <TableCell>
-                      {order.waiting_for_pm_count > 0 && (
-                        <Badge className="bg-orange-500">{order.waiting_for_pm_count} items</Badge>
+                      {order.ready_for_packaging_count > 0 && (
+                        <Badge className="bg-orange-500">{order.ready_for_packaging_count} items</Badge>
                       )}
                     </TableCell>
                     <TableCell>

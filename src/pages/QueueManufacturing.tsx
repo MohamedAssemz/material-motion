@@ -53,7 +53,7 @@ export default function QueueManufacturing() {
           created_at,
           batches!inner(current_state, quantity)
         `)
-        .or('current_state.eq.waiting_for_rm,current_state.eq.in_manufacturing', { foreignTable: 'batches' });
+        .or('current_state.eq.pending_rm,current_state.eq.in_manufacturing', { foreignTable: 'batches' });
 
       if (error) throw error;
 
@@ -62,7 +62,7 @@ export default function QueueManufacturing() {
         order_number: order.order_number,
         created_at: order.created_at,
         waiting_for_rm_count: order.batches
-          .filter((b: any) => b.current_state === 'waiting_for_rm')
+          .filter((b: any) => b.current_state === 'pending_rm')
           .reduce((sum: number, b: any) => sum + b.quantity, 0),
         manufacturing_count: order.batches
           .filter((b: any) => b.current_state === 'in_manufacturing')
@@ -113,8 +113,8 @@ export default function QueueManufacturing() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Order Number</TableHead>
-                  <TableHead>Waiting for RM</TableHead>
-                  <TableHead>Manufacturing</TableHead>
+                  <TableHead>Pending RM</TableHead>
+                  <TableHead>In Manufacturing</TableHead>
                   <TableHead>Created Date</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
