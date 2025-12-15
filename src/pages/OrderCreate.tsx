@@ -208,28 +208,28 @@ export default function OrderCreate() {
       let totalBatchQuantity = 0;
       
       for (const [productId, quantities] of productQuantities.entries()) {
-        // Create batch for regular items (starts at waiting_for_rm)
+        // Create batch for regular items (starts at pending_rm)
         if (quantities.regular > 0) {
           const { data: batchCode } = await supabase.rpc('generate_batch_code');
           batchesToCreate.push({
             batch_code: batchCode || `B-${Date.now()}`,
             order_id: order.id,
             product_id: productId,
-            current_state: 'waiting_for_rm',
+            current_state: 'pending_rm',
             quantity: quantities.regular,
             created_by: user?.id,
           });
           totalBatchQuantity += quantities.regular;
         }
         
-        // Create batch for extra items (starts at finished)
+        // Create batch for extra items (starts at received)
         if (quantities.extra > 0) {
           const { data: batchCode } = await supabase.rpc('generate_batch_code');
           batchesToCreate.push({
             batch_code: batchCode || `B-${Date.now()}`,
             order_id: order.id,
             product_id: productId,
-            current_state: 'finished',
+            current_state: 'received',
             quantity: quantities.extra,
             created_by: user?.id,
           });
@@ -430,21 +430,48 @@ export default function OrderCreate() {
                 <div key={index} className="flex gap-4 items-end">
                   <div className="flex-1">
                     <Label>Product *</Label>
-                    <Select
-                      value={item.product_id}
-                      onValueChange={(value) => updateItem(index, 'product_id', value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select product" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {products.map((product) => (
-                          <SelectItem key={product.id} value={product.id}>
-                            {product.sku} - {product.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          className="w-full justify-between"
+                        >
+                          {item.product_id
+                            ? products.find(p => p.id === item.product_id)
+                              ? `${products.find(p => p.id === item.product_id)?.sku} - ${products.find(p => p.id === item.product_id)?.name}`
+                              : "Select product..."
+                            : "Select product..."}
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[400px] p-0" align="start">
+                        <Command>
+                          <CommandInput placeholder="Search products by SKU or name..." />
+                          <CommandList>
+                            <CommandEmpty>No product found.</CommandEmpty>
+                            <CommandGroup>
+                              {products.map((product) => (
+                                <CommandItem
+                                  key={product.id}
+                                  value={`${product.sku} ${product.name}`}
+                                  onSelect={() => updateItem(index, 'product_id', product.id)}
+                                >
+                                  <Check
+                                    className={cn(
+                                      "mr-2 h-4 w-4",
+                                      item.product_id === product.id ? "opacity-100" : "opacity-0"
+                                    )}
+                                  />
+                                  <span className="font-mono mr-2">{product.sku}</span>
+                                  <span className="text-muted-foreground">{product.name}</span>
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
                   </div>
                   <div className="w-32">
                     <Label>Quantity *</Label>

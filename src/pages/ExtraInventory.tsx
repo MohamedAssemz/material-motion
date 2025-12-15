@@ -53,7 +53,7 @@ export default function ExtraInventory() {
   const [formData, setFormData] = useState({
     product_id: '',
     quantity: 1,
-    origin_state: 'manufactured' as UnitState,
+    origin_state: 'ready_for_finishing' as UnitState,
   });
 
   const canManage = hasRole('manufacture_lead') || hasRole('admin');
@@ -170,7 +170,7 @@ export default function ExtraInventory() {
       });
 
       setDialogOpen(false);
-      setFormData({ product_id: '', quantity: 1, origin_state: 'manufactured' });
+      setFormData({ product_id: '', quantity: 1, origin_state: 'ready_for_finishing' });
       fetchData();
     } catch (error: any) {
       toast({
@@ -209,17 +209,16 @@ export default function ExtraInventory() {
 
   const getStateColor = (state: string) => {
     const colors: Record<string, string> = {
-      'waiting_for_rm': 'bg-yellow-500',
+      'pending_rm': 'bg-yellow-500',
       'in_manufacturing': 'bg-blue-500',
-      'manufactured': 'bg-blue-300',
-      'waiting_for_pm': 'bg-orange-500',
+      'ready_for_finishing': 'bg-blue-300',
+      'in_finishing': 'bg-purple-500',
+      'ready_for_packaging': 'bg-orange-500',
       'in_packaging': 'bg-indigo-500',
-      'packaged': 'bg-indigo-300',
-      'waiting_for_bm': 'bg-orange-500',
+      'ready_for_boxing': 'bg-cyan-300',
       'in_boxing': 'bg-cyan-500',
-      'boxed': 'bg-cyan-300',
-      'qced': 'bg-teal-500',
-      'finished': 'bg-green-500',
+      'ready_for_receiving': 'bg-teal-300',
+      'received': 'bg-green-500',
     };
     return colors[state] || 'bg-gray-500';
   };
@@ -312,10 +311,10 @@ export default function ExtraInventory() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="manufactured">Manufactured</SelectItem>
-                      <SelectItem value="packaged">Packaged</SelectItem>
-                      <SelectItem value="boxed">Boxed</SelectItem>
-                      <SelectItem value="finished">Finished</SelectItem>
+                      <SelectItem value="ready_for_finishing">Ready for Finishing</SelectItem>
+                      <SelectItem value="ready_for_packaging">Ready for Packaging</SelectItem>
+                      <SelectItem value="ready_for_boxing">Ready for Boxing</SelectItem>
+                      <SelectItem value="received">Received</SelectItem>
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-muted-foreground mt-1">

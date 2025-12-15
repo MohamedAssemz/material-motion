@@ -28,7 +28,7 @@ export type Database = {
           is_redo: boolean | null
           is_terminated: boolean | null
           lead_time_days: number | null
-          order_id: string
+          order_id: string | null
           origin_state: string | null
           parent_batch_id: string | null
           parent_batch_id_split: string | null
@@ -54,7 +54,7 @@ export type Database = {
           is_redo?: boolean | null
           is_terminated?: boolean | null
           lead_time_days?: number | null
-          order_id: string
+          order_id?: string | null
           origin_state?: string | null
           parent_batch_id?: string | null
           parent_batch_id_split?: string | null
@@ -80,7 +80,7 @@ export type Database = {
           is_redo?: boolean | null
           is_terminated?: boolean | null
           lead_time_days?: number | null
-          order_id?: string
+          order_id?: string | null
           origin_state?: string | null
           parent_batch_id?: string | null
           parent_batch_id_split?: string | null

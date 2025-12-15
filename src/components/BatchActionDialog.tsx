@@ -26,9 +26,9 @@ export function BatchActionDialog({
   const [action, setAction] = useState<BatchActionType>('terminate');
   const [reason, setReason] = useState('');
 
-  const canTerminate = ['in_manufacturing', 'manufactured', 'in_packaging'].includes(currentState);
-  const canRedo = ['manufactured', 'in_packaging', 'packaged'].includes(currentState);
-  const canFlagTerminate = ['in_manufacturing', 'manufactured', 'in_packaging'].includes(currentState);
+  const canTerminate = ['in_manufacturing', 'ready_for_finishing', 'in_finishing', 'in_packaging'].includes(currentState);
+  const canRedo = ['ready_for_finishing', 'in_finishing', 'in_packaging', 'ready_for_packaging'].includes(currentState);
+  const canFlagTerminate = ['in_manufacturing', 'ready_for_finishing', 'in_finishing', 'in_packaging'].includes(currentState);
 
   const handleConfirm = () => {
     if (!reason.trim()) return;
@@ -41,7 +41,7 @@ export function BatchActionDialog({
   const getActionDescription = () => {
     switch (action) {
       case 'terminate':
-        return 'Items will be marked as terminated. The termination counter will increase and replacement items will be created in "Waiting for RM" state.';
+        return 'Items will be marked as terminated. The termination counter will increase and replacement items will be created in "Pending RM" state.';
       case 'flag_terminate':
         return 'Items will be flagged and returned to "In Manufacturing" state for review and possible repair.';
       case 'redo':
