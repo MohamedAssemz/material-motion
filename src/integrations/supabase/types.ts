@@ -23,8 +23,12 @@ export type Database = {
           created_by: string | null
           current_state: string
           eta: string | null
+          flagged_at: string | null
+          flagged_by: string | null
+          flagged_reason: string | null
           id: string
           inventory_state: string | null
+          is_flagged: boolean | null
           is_redo: boolean | null
           is_terminated: boolean | null
           lead_time_days: number | null
@@ -49,8 +53,12 @@ export type Database = {
           created_by?: string | null
           current_state?: string
           eta?: string | null
+          flagged_at?: string | null
+          flagged_by?: string | null
+          flagged_reason?: string | null
           id?: string
           inventory_state?: string | null
+          is_flagged?: boolean | null
           is_redo?: boolean | null
           is_terminated?: boolean | null
           lead_time_days?: number | null
@@ -75,8 +83,12 @@ export type Database = {
           created_by?: string | null
           current_state?: string
           eta?: string | null
+          flagged_at?: string | null
+          flagged_by?: string | null
+          flagged_reason?: string | null
           id?: string
           inventory_state?: string | null
+          is_flagged?: boolean | null
           is_redo?: boolean | null
           is_terminated?: boolean | null
           lead_time_days?: number | null
@@ -375,11 +387,13 @@ export type Database = {
           created_at: string | null
           created_by: string | null
           customer_id: string | null
+          estimated_fulfillment_time: string | null
           id: string
           notes: string | null
           order_number: string
           priority: string | null
           redo_counter: number | null
+          shipping_type: string | null
           status: string
           termination_counter: number | null
           updated_at: string | null
@@ -388,11 +402,13 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           customer_id?: string | null
+          estimated_fulfillment_time?: string | null
           id?: string
           notes?: string | null
           order_number: string
           priority?: string | null
           redo_counter?: number | null
+          shipping_type?: string | null
           status?: string
           termination_counter?: number | null
           updated_at?: string | null
@@ -401,11 +417,13 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           customer_id?: string | null
+          estimated_fulfillment_time?: string | null
           id?: string
           notes?: string | null
           order_number?: string
           priority?: string | null
           redo_counter?: number | null
+          shipping_type?: string | null
           status?: string
           termination_counter?: number | null
           updated_at?: string | null
@@ -539,6 +557,41 @@ export type Database = {
           },
         ]
       }
+      raw_material_versions: {
+        Row: {
+          content: string
+          created_at: string
+          created_by: string | null
+          id: string
+          order_id: string
+          version_number: number
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          order_id: string
+          version_number?: number
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          order_id?: string
+          version_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "raw_material_versions_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       raw_materials: {
         Row: {
           code: string
@@ -562,6 +615,92 @@ export type Database = {
           unit?: string | null
         }
         Relationships: []
+      }
+      shipment_items: {
+        Row: {
+          batch_id: string
+          created_at: string
+          id: string
+          quantity: number
+          shipment_id: string
+        }
+        Insert: {
+          batch_id: string
+          created_at?: string
+          id?: string
+          quantity: number
+          shipment_id: string
+        }
+        Update: {
+          batch_id?: string
+          created_at?: string
+          id?: string
+          quantity?: number
+          shipment_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shipment_items_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shipment_items_shipment_id_fkey"
+            columns: ["shipment_id"]
+            isOneToOne: false
+            referencedRelation: "shipments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shipments: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          notes: string | null
+          order_id: string
+          sealed_at: string | null
+          sealed_by: string | null
+          shipment_code: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          order_id: string
+          sealed_at?: string | null
+          sealed_by?: string | null
+          shipment_code: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          order_id?: string
+          sealed_at?: string | null
+          sealed_by?: string | null
+          shipment_code?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shipments_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       unit_history: {
         Row: {
@@ -769,6 +908,7 @@ export type Database = {
       check_late_units: { Args: never; Returns: undefined }
       generate_batch_code: { Args: never; Returns: string }
       generate_box_code: { Args: never; Returns: string }
+      generate_shipment_code: { Args: never; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
