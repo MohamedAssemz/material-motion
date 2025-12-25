@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, AlertTriangle, Trash2 } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -15,15 +18,29 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { OrderTimeline } from '@/components/OrderTimeline';
-import { LeadTimeDialog } from '@/components/LeadTimeDialog';
-import { MachineSelectionDialog } from '@/components/MachineSelectionDialog';
+import { RawMaterialsDialog } from '@/components/RawMaterialsDialog';
+import { FlaggedItemsDialog } from '@/components/FlaggedItemsDialog';
+import { ShipmentDialog } from '@/components/ShipmentDialog';
 import { BoxAssignmentDialog } from '@/components/BoxAssignmentDialog';
-import { BoxReceiveDialog } from '@/components/BoxReceiveDialog';
+import { LeadTimeDialog } from '@/components/LeadTimeDialog';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
+import { 
+  ArrowLeft, 
+  AlertTriangle, 
+  Trash2, 
+  Printer, 
+  FileText, 
+  Factory, 
+  Sparkles, 
+  Package, 
+  Box, 
+  CheckCircle,
+  Clock,
+  RotateCcw,
+  Truck,
+  Plane
+} from 'lucide-react';
 import { getNextState, getStateLabel, getAllStates, isInState, isReadyForState, type UnitState } from '@/lib/stateMachine';
 
 interface Batch {
@@ -36,6 +53,8 @@ interface Batch {
   lead_time_days: number | null;
   box_id: string | null;
   is_terminated?: boolean;
+  is_redo?: boolean;
+  is_flagged?: boolean;
   product: {
     id: string;
     name: string;
@@ -54,6 +73,8 @@ interface Order {
   status: string;
   priority: string;
   notes: string | null;
+  shipping_type: string | null;
+  estimated_fulfillment_time: string | null;
   created_at: string;
   created_by: string;
   customer_id: string | null;
@@ -68,42 +89,10 @@ interface Order {
   batches: Batch[];
 }
 
-interface ProductItem {
-  product_id: string;
-  product_name: string;
-  product_sku: string;
-  needs_packing: boolean;
-  quantity: number;
-  batches: Array<{ id: string; batch_code: string; quantity: number }>;
-}
-
-interface BoxItem {
-  box_id: string;
-  box_code: string;
-  batches: Array<{
-    id: string;
-    batch_code: string;
-    product_id: string;
-    product_name: string;
-    product_sku: string;
-    quantity: number;
-  }>;
-  total_quantity: number;
-}
-
-interface StateGroup {
-  state: UnitState;
-  products: ProductItem[];
-  boxes: BoxItem[];
-}
-
-interface ProductSelection {
-  product_id: string;
-  product_name: string;
-  product_sku: string;
-  quantity: number;
-  needs_packing: boolean;
-  batches: Array<{ id: string; quantity: number }>;
+interface PhaseStats {
+  waiting: number;
+  inProgress: number;
+  completed: number;
 }
 
 export default function OrderDetail() {
@@ -112,40 +101,27 @@ export default function OrderDetail() {
   const { hasRole, user } = useAuth();
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
-  const [stateGroups, setStateGroups] = useState<StateGroup[]>([]);
-  
+
   // Dialog states
+  const [rawMaterialsOpen, setRawMaterialsOpen] = useState(false);
+  const [flaggedItemsOpen, setFlaggedItemsOpen] = useState(false);
+  const [shipmentDialogOpen, setShipmentDialogOpen] = useState(false);
   const [boxAssignDialogOpen, setBoxAssignDialogOpen] = useState(false);
-  const [boxReceiveDialogOpen, setBoxReceiveDialogOpen] = useState(false);
   const [leadTimeDialogOpen, setLeadTimeDialogOpen] = useState(false);
-  const [machineDialogOpen, setMachineDialogOpen] = useState(false);
-  
-  // Pending operation states
-  const [pendingProductSelections, setPendingProductSelections] = useState<ProductSelection[]>([]);
-  const [pendingSourceState, setPendingSourceState] = useState<UnitState | null>(null);
-  const [pendingBoxes, setPendingBoxes] = useState<Array<{ id: string; box_code: string; batches: Array<{ id: string; quantity: number }> }>>([]);
-  const [pendingLeadTimeDays, setPendingLeadTimeDays] = useState<number | undefined>();
-  const [pendingEta, setPendingEta] = useState<Date | undefined>();
-  const [pendingMachineType, setPendingMachineType] = useState<'manufacturing' | 'packaging' | null>(null);
-  const [pendingBoxingOption, setPendingBoxingOption] = useState<'needs_boxing' | 'skip_boxing' | undefined>();
+
+  // Selection states for inline actions
+  const [productSelections, setProductSelections] = useState<Map<string, number>>(new Map());
+  const [selectedBoxes, setSelectedBoxes] = useState<Set<string>>(new Set());
+  const [activePhase, setActivePhase] = useState<string | null>(null);
 
   useEffect(() => {
     fetchOrder();
-    
+
     const channel = supabase
       .channel(`order-${id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'batches',
-          filter: `order_id=eq.${id}`
-        },
-        () => {
-          fetchOrder();
-        }
-      )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'batches', filter: `order_id=eq.${id}` }, () => {
+        fetchOrder();
+      })
       .subscribe();
 
     return () => {
@@ -161,60 +137,48 @@ export default function OrderDetail() {
           *,
           customer:customers(name, code),
           batches(
-            id,
-            batch_code,
-            current_state,
-            quantity,
-            product_id,
-            eta,
-            lead_time_days,
-            box_id,
+            id, batch_code, current_state, quantity, product_id, eta, lead_time_days, box_id, is_terminated, is_redo, is_flagged,
             product:products(id, name, sku, needs_packing)
           )
         `)
         .eq('id', id)
-        .single();
+        .maybeSingle();
 
       if (orderError) throw orderError;
+      if (!orderData) {
+        setLoading(false);
+        return;
+      }
 
       // Fetch box info for batches with box_id
       const boxIds = orderData.batches?.filter((b: any) => b.box_id).map((b: any) => b.box_id) || [];
       let boxMap = new Map();
-      
+
       if (boxIds.length > 0) {
         const { data: boxesData } = await supabase
           .from('boxes')
           .select('id, box_code')
           .in('id', boxIds);
-        
         boxesData?.forEach(box => boxMap.set(box.id, box));
       }
 
       const batchesWithBoxes = orderData.batches?.map((batch: any) => ({
         ...batch,
-        product: batch.product as any,
+        product: batch.product,
         box: batch.box_id ? boxMap.get(batch.box_id) : null,
       })) || [];
 
-      const { data: profileData, error: profileError } = await supabase
+      const { data: profileData } = await supabase
         .from('profiles')
         .select('full_name, email')
         .eq('id', orderData.created_by)
-        .single();
+        .maybeSingle();
 
-      if (profileError) throw profileError;
-
-      const combinedOrder = {
+      setOrder({
         ...orderData,
         batches: batchesWithBoxes,
-        profile: profileData
-      } as Order;
-      
-      setOrder(combinedOrder);
-      
-      // Group batches by state
-      const groups = groupBatchesByState(batchesWithBoxes);
-      setStateGroups(groups);
+        profile: profileData || { full_name: 'Unknown', email: '' }
+      } as Order);
     } catch (error) {
       console.error('Error fetching order:', error);
       toast.error('Failed to load order details');
@@ -223,430 +187,11 @@ export default function OrderDetail() {
     }
   };
 
-  const groupBatchesByState = (batches: Batch[]): StateGroup[] => {
-    const allStates = getAllStates();
-    const groups: StateGroup[] = [];
-
-    for (const state of allStates) {
-      const stateBatches = batches.filter(b => b.current_state === state && !b.is_terminated);
-      
-      if (stateBatches.length === 0) continue;
-
-      const isIn = isInState(state as UnitState);
-      const isReady = isReadyForState(state as UnitState);
-      const isPendingOrReceived = state === 'pending_rm' || state === 'received';
-
-      // For "In" states and special states: group by product
-      const products: ProductItem[] = [];
-      const productMap = new Map<string, ProductItem>();
-      
-      if (isIn || isPendingOrReceived) {
-        stateBatches.forEach(batch => {
-          if (!productMap.has(batch.product_id)) {
-            productMap.set(batch.product_id, {
-              product_id: batch.product_id,
-              product_name: batch.product?.name || 'Unknown',
-              product_sku: batch.product?.sku || 'N/A',
-              needs_packing: batch.product?.needs_packing ?? true,
-              quantity: 0,
-              batches: [],
-            });
-          }
-          const item = productMap.get(batch.product_id)!;
-          item.quantity += batch.quantity;
-          item.batches.push({
-            id: batch.id,
-            batch_code: batch.batch_code,
-            quantity: batch.quantity,
-          });
-        });
-        products.push(...productMap.values());
-      }
-
-      // For "Ready" states: group by box
-      const boxes: BoxItem[] = [];
-      const boxMap = new Map<string, BoxItem>();
-      
-      if (isReady) {
-        stateBatches.forEach(batch => {
-          if (!batch.box_id || !batch.box) return;
-          
-          if (!boxMap.has(batch.box_id)) {
-            boxMap.set(batch.box_id, {
-              box_id: batch.box_id,
-              box_code: batch.box.box_code,
-              batches: [],
-              total_quantity: 0,
-            });
-          }
-          const item = boxMap.get(batch.box_id)!;
-          item.batches.push({
-            id: batch.id,
-            batch_code: batch.batch_code,
-            product_id: batch.product_id,
-            product_name: batch.product?.name || 'Unknown',
-            product_sku: batch.product?.sku || 'N/A',
-            quantity: batch.quantity,
-          });
-          item.total_quantity += batch.quantity;
-        });
-        boxes.push(...boxMap.values());
-        
-        // Also include products without boxes (shouldn't happen normally but for safety)
-        const unboxedBatches = stateBatches.filter(b => !b.box_id);
-        if (unboxedBatches.length > 0) {
-          unboxedBatches.forEach(batch => {
-            if (!productMap.has(batch.product_id)) {
-              productMap.set(batch.product_id, {
-                product_id: batch.product_id,
-                product_name: batch.product?.name || 'Unknown',
-                product_sku: batch.product?.sku || 'N/A',
-                needs_packing: batch.product?.needs_packing ?? true,
-                quantity: 0,
-                batches: [],
-              });
-            }
-            const item = productMap.get(batch.product_id)!;
-            item.quantity += batch.quantity;
-            item.batches.push({
-              id: batch.id,
-              batch_code: batch.batch_code,
-              quantity: batch.quantity,
-            });
-          });
-          products.push(...productMap.values());
-        }
-      }
-
-      groups.push({ state: state as UnitState, products, boxes });
-    }
-
-    return groups;
-  };
-
-  const handleSelectProducts = (
-    selections: Array<{ product_id: string; quantity: number; needs_packing: boolean; batches: Array<{ id: string; quantity: number }> }>,
-    sourceState: UnitState
-  ) => {
-    // Find full product info
-    const productSelections: ProductSelection[] = selections.map(sel => {
-      const stateGroup = stateGroups.find(g => g.state === sourceState);
-      const product = stateGroup?.products.find(p => p.product_id === sel.product_id);
-      return {
-        product_id: sel.product_id,
-        product_name: product?.product_name || 'Unknown',
-        product_sku: product?.product_sku || 'N/A',
-        quantity: sel.quantity,
-        needs_packing: sel.needs_packing,
-        batches: sel.batches,
-      };
-    });
-    
-    setPendingProductSelections(productSelections);
-    setPendingSourceState(sourceState);
-    
-    // Determine next action
-    const nextState = getNextState(sourceState);
-    
-    if (!nextState) {
-      toast.error('Cannot transition from this state');
-      return;
-    }
-
-    // If transitioning FROM "In" state TO "Ready" state, need box assignment
-    if (isInState(sourceState) && isReadyForState(nextState)) {
-      setBoxAssignDialogOpen(true);
-    } else if (sourceState === 'pending_rm') {
-      // Starting manufacturing - need lead time
-      setLeadTimeDialogOpen(true);
-    }
-  };
-
-  const handleSelectBoxes = (boxIds: string[], sourceState: UnitState) => {
-    const stateGroup = stateGroups.find(g => g.state === sourceState);
-    if (!stateGroup) return;
-
-    const selectedBoxes = stateGroup.boxes.filter(b => boxIds.includes(b.box_id));
-    const pending = selectedBoxes.map(box => ({
-      id: box.box_id,
-      box_code: box.box_code,
-      batches: box.batches.map(b => ({ id: b.id, quantity: b.quantity })),
-    }));
-    
-    setPendingBoxes(pending);
-    setPendingSourceState(sourceState);
-    setBoxReceiveDialogOpen(true);
-  };
-
-  const handleBoxAssignment = async (boxId: string, boxCode: string, boxingOption?: 'needs_boxing' | 'skip_boxing') => {
-    if (!pendingSourceState || pendingProductSelections.length === 0) return;
-    
-    let targetState = getNextState(pendingSourceState);
-    if (!targetState) return;
-    
-    // Handle packaging special case
-    if (pendingSourceState === 'in_packaging' && boxingOption === 'skip_boxing') {
-      targetState = 'ready_for_receiving';
-    }
-    
-    setPendingBoxingOption(boxingOption);
-
-    // Check if machine tracking needed (coming from manufacturing or packaging)
-    if (pendingSourceState === 'in_manufacturing' || pendingSourceState === 'in_packaging') {
-      setPendingMachineType(pendingSourceState === 'in_manufacturing' ? 'manufacturing' : 'packaging');
-      setMachineDialogOpen(true);
-      // Store box info for later
-      setPendingBoxes([{ id: boxId, box_code: boxCode, batches: [] }]);
-      return;
-    }
-
-    await performBoxAssignment(boxId, targetState);
-  };
-
-  const performBoxAssignment = async (boxId: string, targetState: UnitState, machineSelections?: Array<{ machineId: string; quantity: number }>) => {
-    try {
-      for (const selection of pendingProductSelections) {
-        for (const batchAlloc of selection.batches) {
-          const batch = order?.batches.find(b => b.id === batchAlloc.id);
-          if (!batch) continue;
-
-          if (batchAlloc.quantity === batch.quantity) {
-            // Update entire batch
-            await supabase
-              .from('batches')
-              .update({
-                current_state: targetState,
-                box_id: boxId,
-              })
-              .eq('id', batch.id);
-          } else {
-            // Split batch
-            await supabase
-              .from('batches')
-              .update({ quantity: batch.quantity - batchAlloc.quantity })
-              .eq('id', batch.id);
-
-            const { data: batchCode } = await supabase.rpc('generate_batch_code');
-            
-            await supabase.from('batches').insert({
-              batch_code: batchCode || `B-${Date.now()}`,
-              order_id: order!.id,
-              product_id: selection.product_id,
-              current_state: targetState,
-              quantity: batchAlloc.quantity,
-              box_id: boxId,
-              created_by: user?.id,
-            });
-          }
-        }
-      }
-
-      // Record machine production if provided
-      if (machineSelections?.length) {
-        for (const ms of machineSelections) {
-          await supabase.from('machine_production').insert({
-            machine_id: ms.machineId,
-            unit_id: pendingProductSelections[0].batches[0].id,
-            batch_id: pendingProductSelections[0].batches[0].id,
-            state_transition: targetState,
-            recorded_by: user?.id,
-          });
-        }
-      }
-
-      const totalQty = pendingProductSelections.reduce((sum, p) => sum + p.quantity, 0);
-      toast.success(`${totalQty} item(s) assigned to box and moved to ${getStateLabel(targetState)}`);
-      
-      resetPendingState();
-      fetchOrder();
-    } catch (error) {
-      console.error('Error assigning to box:', error);
-      toast.error('Failed to assign to box');
-    }
-  };
-
-  const handleBoxReceive = async (boxes: Array<{ id: string; box_code: string; batches: Array<{ id: string; quantity: number }> }>) => {
-    if (!pendingSourceState) return;
-    
-    const nextState = getNextState(pendingSourceState);
-    if (!nextState) return;
-
-    // Check if lead time needed
-    if (['in_manufacturing', 'in_finishing', 'in_packaging', 'in_boxing'].includes(nextState)) {
-      setPendingBoxes(boxes);
-      setLeadTimeDialogOpen(true);
-      return;
-    }
-
-    await performReceive(boxes, nextState);
-  };
-
-  const performReceive = async (
-    boxes: Array<{ id: string; box_code: string; batches: Array<{ id: string; quantity: number }> }>,
-    targetState: UnitState,
-    leadTimeDays?: number,
-    eta?: Date
-  ) => {
-    try {
-      let totalItems = 0;
-      
-      for (const box of boxes) {
-        for (const batchRef of box.batches) {
-          await supabase
-            .from('batches')
-            .update({
-              current_state: targetState,
-              box_id: null, // Remove from box when entering "In" state
-              lead_time_days: leadTimeDays || null,
-              eta: eta?.toISOString() || null,
-            })
-            .eq('id', batchRef.id);
-          
-          totalItems += batchRef.quantity;
-        }
-      }
-
-      toast.success(`${totalItems} item(s) received and moved to ${getStateLabel(targetState)}`);
-      
-      resetPendingState();
-      fetchOrder();
-    } catch (error) {
-      console.error('Error receiving boxes:', error);
-      toast.error('Failed to receive boxes');
-    }
-  };
-
-  const handleLeadTimeConfirm = async (leadTimeDays: number, eta: Date) => {
-    setPendingLeadTimeDays(leadTimeDays);
-    setPendingEta(eta);
-
-    // If receiving boxes
-    if (pendingBoxes.length > 0 && pendingSourceState) {
-      const nextState = getNextState(pendingSourceState);
-      if (nextState) {
-        await performReceive(pendingBoxes, nextState, leadTimeDays, eta);
-      }
-      return;
-    }
-
-    // If starting from pending_rm
-    if (pendingSourceState === 'pending_rm' && pendingProductSelections.length > 0) {
-      await performStartManufacturing(leadTimeDays, eta);
-    }
-  };
-
-  const performStartManufacturing = async (leadTimeDays: number, eta: Date) => {
-    try {
-      for (const selection of pendingProductSelections) {
-        for (const batchAlloc of selection.batches) {
-          const batch = order?.batches.find(b => b.id === batchAlloc.id);
-          if (!batch) continue;
-
-          if (batchAlloc.quantity === batch.quantity) {
-            await supabase
-              .from('batches')
-              .update({
-                current_state: 'in_manufacturing',
-                lead_time_days: leadTimeDays,
-                eta: eta.toISOString(),
-              })
-              .eq('id', batch.id);
-          } else {
-            await supabase
-              .from('batches')
-              .update({ quantity: batch.quantity - batchAlloc.quantity })
-              .eq('id', batch.id);
-
-            const { data: batchCode } = await supabase.rpc('generate_batch_code');
-            
-            await supabase.from('batches').insert({
-              batch_code: batchCode || `B-${Date.now()}`,
-              order_id: order!.id,
-              product_id: selection.product_id,
-              current_state: 'in_manufacturing',
-              quantity: batchAlloc.quantity,
-              lead_time_days: leadTimeDays,
-              eta: eta.toISOString(),
-              created_by: user?.id,
-            });
-          }
-        }
-      }
-
-      const totalQty = pendingProductSelections.reduce((sum, p) => sum + p.quantity, 0);
-      toast.success(`${totalQty} item(s) started manufacturing`);
-      
-      resetPendingState();
-      fetchOrder();
-    } catch (error) {
-      console.error('Error starting manufacturing:', error);
-      toast.error('Failed to start manufacturing');
-    }
-  };
-
-  const handleMachineConfirm = async (selections: Array<{ machineId: string; quantity: number }>) => {
-    if (!pendingSourceState) return;
-    
-    let targetState = getNextState(pendingSourceState);
-    if (!targetState) return;
-
-    // Handle packaging skip boxing
-    if (pendingSourceState === 'in_packaging' && pendingBoxingOption === 'skip_boxing') {
-      targetState = 'ready_for_receiving';
-    }
-
-    const boxId = pendingBoxes[0]?.id;
-    if (boxId) {
-      await performBoxAssignment(boxId, targetState, selections);
-    }
-  };
-
-  const handleCreateNewBox = async (): Promise<{ id: string; box_code: string } | null> => {
-    try {
-      const { data: boxCode } = await supabase.rpc('generate_box_code');
-      
-      const { data: newBox, error } = await supabase
-        .from('boxes')
-        .insert({ box_code: boxCode || `BOX-${Date.now()}` })
-        .select('id, box_code')
-        .single();
-
-      if (error) throw error;
-      return newBox;
-    } catch (error) {
-      console.error('Error creating box:', error);
-      return null;
-    }
-  };
-
-  const resetPendingState = () => {
-    setPendingProductSelections([]);
-    setPendingSourceState(null);
-    setPendingBoxes([]);
-    setPendingLeadTimeDays(undefined);
-    setPendingEta(undefined);
-    setPendingMachineType(null);
-    setPendingBoxingOption(undefined);
-  };
-
-  const canUpdateBatches = () => {
-    return hasRole('manufacture_lead') || 
-           hasRole('manufacturer') || 
-           hasRole('packer') || 
-           hasRole('boxer') ||
-           hasRole('packaging_manager') ||
-           hasRole('boxing_manager') ||
-           hasRole('admin');
-  };
-
-  const canDeleteOrder = () => {
-    return hasRole('manufacture_lead') || hasRole('admin');
-  };
-
   const handleDeleteOrder = async () => {
     try {
       await supabase.from('batches').delete().eq('order_id', id);
       await supabase.from('order_items').delete().eq('order_id', id);
+      await supabase.from('raw_material_versions').delete().eq('order_id', id);
       await supabase.from('notifications').delete().eq('order_id', id);
       
       const { error } = await supabase.from('orders').delete().eq('id', id);
@@ -660,329 +205,66 @@ export default function OrderDetail() {
     }
   };
 
-  const getStatusColor = (status: string) => {
-    const colors: Record<string, string> = {
-      'pending_rm': 'bg-yellow-500',
-      'in_manufacturing': 'bg-blue-500',
-      'ready_for_finishing': 'bg-blue-300',
-      'in_finishing': 'bg-purple-500',
-      'ready_for_packaging': 'bg-orange-500',
-      'in_packaging': 'bg-indigo-500',
-      'ready_for_boxing': 'bg-cyan-300',
-      'in_boxing': 'bg-cyan-500',
-      'ready_for_receiving': 'bg-teal-300',
-      'received': 'bg-green-500',
-    };
-    return colors[status] || 'bg-gray-500';
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
-
-  if (!order) {
-    return (
-      <div className="container mx-auto p-6">
-        <p>Order not found</p>
-      </div>
-    );
-  }
-
-  const allBatches = order.batches || [];
-  const lateBatches = allBatches.filter(b => b.eta && new Date(b.eta) < new Date());
-  const lateItemsCount = lateBatches.reduce((sum, b) => sum + b.quantity, 0);
-  const totalItems = allBatches.reduce((sum, b) => sum + b.quantity, 0);
-  const canUpdate = canUpdateBatches();
-  const totalSelectedQty = pendingProductSelections.reduce((sum, p) => sum + p.quantity, 0);
-
-  // Build timeline batches
-  const timelineBatches = allBatches.map(b => ({
-    id: b.id,
-    batch_code: b.batch_code,
-    product_id: b.product_id,
-    product_name: b.product?.name || 'Unknown',
-    product_sku: b.product?.sku || 'N/A',
-    state: b.current_state as UnitState,
-    total_quantity: b.quantity,
-    earliest_eta: b.eta || undefined,
-    has_late_units: b.eta ? new Date(b.eta) < new Date() : false,
-    lead_time_days: b.lead_time_days || undefined,
-  }));
-
-  return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" onClick={() => navigate('/orders')}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Orders
-          </Button>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-3xl font-bold">{order.order_number}</h1>
-              {order.priority === 'high' && (
-                <Badge variant="destructive" className="text-sm">
-                  High Priority
-                </Badge>
-              )}
-            </div>
-            <p className="text-muted-foreground">
-              Created by {order.profile.full_name} on {format(new Date(order.created_at), 'PPP')}
-            </p>
-            {order.customer && (
-              <p className="text-sm text-muted-foreground">
-                Customer: {order.customer.name} {order.customer.code && `(${order.customer.code})`}
-              </p>
-            )}
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Badge className={getStatusColor(order.status)}>
-            {getStateLabel(order.status as UnitState)}
-          </Badge>
-          {canDeleteOrder() && (
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="destructive" size="sm">
-                  <Trash2 className="h-4 w-4 mr-1" />
-                  Delete
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Delete Order</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Are you sure you want to delete order {order.order_number}? This action cannot be undone and will remove all batches and related data.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleDeleteOrder} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                    Delete Order
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          )}
-        </div>
-      </div>
-
-      {lateItemsCount > 0 && (
-        <Card className="border-destructive bg-destructive/10">
-          <CardContent className="flex items-center gap-2 p-4">
-            <AlertTriangle className="h-5 w-5 text-destructive" />
-            <span className="font-medium">
-              {lateItemsCount} item(s) in {lateBatches.length} batch(es) are behind schedule
-            </span>
-          </CardContent>
-        </Card>
-      )}
-
-      <OrderTimeline batches={timelineBatches} />
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Order Progress ({totalItems} total items)</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {stateGroups.length === 0 ? (
-            <p className="text-center text-muted-foreground py-8">No items in this order</p>
-          ) : (
-            stateGroups.map((group) => (
-              <StateGroupCard
-                key={group.state}
-                group={group}
-                canUpdate={canUpdate}
-                onSelectProducts={(selections) => handleSelectProducts(selections, group.state)}
-                onSelectBoxes={(boxIds) => handleSelectBoxes(boxIds, group.state)}
-              />
-            ))
-          )}
-        </CardContent>
-      </Card>
-
-      {order.notes && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Notes</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-muted-foreground">{order.notes}</p>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Dialogs */}
-      <BoxAssignmentDialog
-        open={boxAssignDialogOpen}
-        onOpenChange={(open) => {
-          setBoxAssignDialogOpen(open);
-          if (!open) resetPendingState();
-        }}
-        onConfirm={handleBoxAssignment}
-        onCreateNewBox={handleCreateNewBox}
-        products={pendingProductSelections}
-        currentState={pendingSourceState || 'pending_rm'}
-        title={`Assign ${totalSelectedQty} item(s) to Box`}
-      />
-
-      <BoxReceiveDialog
-        open={boxReceiveDialogOpen}
-        onOpenChange={(open) => {
-          setBoxReceiveDialogOpen(open);
-          if (!open) resetPendingState();
-        }}
-        onConfirm={handleBoxReceive}
-        orderId={order.id}
-        filterState={pendingSourceState || 'ready_for_finishing'}
-        title={pendingSourceState ? `Receive from ${getStateLabel(pendingSourceState)}` : 'Receive'}
-      />
-
-      <LeadTimeDialog
-        open={leadTimeDialogOpen}
-        onOpenChange={(open) => {
-          setLeadTimeDialogOpen(open);
-          if (!open) resetPendingState();
-        }}
-        onConfirm={handleLeadTimeConfirm}
-        unitCount={totalSelectedQty || pendingBoxes.reduce((sum, b) => sum + b.batches.reduce((s, bb) => s + bb.quantity, 0), 0)}
-        nextState={pendingSourceState ? getNextState(pendingSourceState) || '' : ''}
-      />
-
-      {pendingMachineType && (
-        <MachineSelectionDialog
-          open={machineDialogOpen}
-          onOpenChange={(open) => {
-            setMachineDialogOpen(open);
-            if (!open) resetPendingState();
-          }}
-          onConfirm={handleMachineConfirm}
-          totalUnits={totalSelectedQty}
-          machineType={pendingMachineType}
-        />
-      )}
-    </div>
-  );
-}
-
-// State Group Card Component
-interface StateGroupCardProps {
-  group: StateGroup;
-  canUpdate: boolean;
-  onSelectProducts: (selections: Array<{ product_id: string; quantity: number; needs_packing: boolean; batches: Array<{ id: string; quantity: number }> }>) => void;
-  onSelectBoxes: (boxIds: string[]) => void;
-}
-
-function StateGroupCard({ group, canUpdate, onSelectProducts, onSelectBoxes }: StateGroupCardProps) {
-  const [expanded, setExpanded] = useState(true);
-  const [productSelections, setProductSelections] = useState<Map<string, number>>(new Map());
-  const [selectedBoxes, setSelectedBoxes] = useState<Set<string>>(new Set());
-
-  const isIn = isInState(group.state) || group.state === 'pending_rm';
-  const isReady = isReadyForState(group.state);
-  const isReceived = group.state === 'received';
-  
-  const totalItems = isIn || isReceived
-    ? group.products.reduce((sum, p) => sum + p.quantity, 0)
-    : group.boxes.reduce((sum, b) => sum + b.total_quantity, 0);
-
-  if (totalItems === 0) return null;
-
-  const handleProductQuantityChange = (productId: string, qty: number, maxQty: number) => {
-    setProductSelections(prev => {
-      const newMap = new Map(prev);
-      if (qty > 0 && qty <= maxQty) {
-        newMap.set(productId, qty);
-      } else if (qty <= 0) {
-        newMap.delete(productId);
-      }
-      return newMap;
-    });
-  };
-
-  const handleBoxToggle = (boxId: string) => {
-    setSelectedBoxes(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(boxId)) {
-        newSet.delete(boxId);
-      } else {
-        newSet.add(boxId);
-      }
-      return newSet;
-    });
-  };
-
-  const handleConfirmProductSelection = () => {
-    const selections: Array<{ product_id: string; quantity: number; needs_packing: boolean; batches: Array<{ id: string; quantity: number }> }> = [];
-    
-    productSelections.forEach((qty, productId) => {
-      const product = group.products.find(p => p.product_id === productId);
-      if (product && qty > 0) {
-        let remaining = qty;
-        const batchAllocs: Array<{ id: string; quantity: number }> = [];
-        
-        for (const batch of product.batches) {
-          if (remaining <= 0) break;
-          const take = Math.min(remaining, batch.quantity);
-          batchAllocs.push({ id: batch.id, quantity: take });
-          remaining -= take;
-        }
-        
-        selections.push({
-          product_id: productId,
-          quantity: qty,
-          needs_packing: product.needs_packing,
-          batches: batchAllocs,
-        });
-      }
-    });
-    
-    if (selections.length > 0) {
-      onSelectProducts(selections);
-      setProductSelections(new Map());
-    }
-  };
-
-  const handleConfirmBoxSelection = () => {
-    if (selectedBoxes.size > 0) {
-      onSelectBoxes(Array.from(selectedBoxes));
-      setSelectedBoxes(new Set());
-    }
-  };
-
-  const handlePrintBoxIds = () => {
-    const selectedBoxCodes = group.boxes
-      .filter(b => selectedBoxes.has(b.box_id))
-      .map(b => b.box_code);
-    
-    if (selectedBoxCodes.length === 0) return;
-    
+  const handlePrintOrder = () => {
+    if (!order) return;
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
+
+    const itemsByProduct = new Map<string, { name: string; sku: string; quantity: number }>();
+    order.batches.filter(b => !b.is_terminated).forEach(batch => {
+      const existing = itemsByProduct.get(batch.product_id) || { 
+        name: batch.product?.name || 'Unknown', 
+        sku: batch.product?.sku || 'N/A', 
+        quantity: 0 
+      };
+      existing.quantity += batch.quantity;
+      itemsByProduct.set(batch.product_id, existing);
+    });
 
     const html = `
       <!DOCTYPE html>
       <html>
         <head>
-          <title>Box IDs</title>
+          <title>Order ${order.order_number}</title>
           <style>
-            body { font-family: monospace; padding: 20px; }
-            .box-id { 
-              font-size: 32px; 
-              font-weight: bold; 
-              padding: 15px 30px;
-              margin: 15px 0;
-              border: 3px solid black;
-              display: inline-block;
-            }
+            body { font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; }
+            .header { border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 20px; }
+            .order-number { font-size: 28px; font-weight: bold; }
+            .meta { color: #666; margin-top: 5px; }
+            .section { margin: 20px 0; }
+            .section-title { font-weight: bold; font-size: 16px; margin-bottom: 10px; border-bottom: 1px solid #ddd; padding-bottom: 5px; }
+            table { width: 100%; border-collapse: collapse; }
+            th, td { text-align: left; padding: 8px; border-bottom: 1px solid #ddd; }
+            th { background: #f5f5f5; }
+            .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 12px; }
+            .high { background: #fee2e2; color: #991b1b; }
+            .normal { background: #e0e7ff; color: #3730a3; }
           </style>
         </head>
         <body>
-          ${selectedBoxCodes.map(code => `<div class="box-id">${code}</div>`).join('')}
+          <div class="header">
+            <div class="order-number">${order.order_number}</div>
+            <div class="meta">
+              Customer: ${order.customer?.name || 'N/A'} | 
+              Priority: <span class="badge ${order.priority}">${order.priority}</span> |
+              Shipping: ${order.shipping_type === 'international' ? 'International' : 'Domestic'}
+            </div>
+            <div class="meta">Created: ${format(new Date(order.created_at), 'PPP')}</div>
+            ${order.estimated_fulfillment_time ? `<div class="meta">EFT: ${format(new Date(order.estimated_fulfillment_time), 'PPP')}</div>` : ''}
+          </div>
+
+          <div class="section">
+            <div class="section-title">Order Items</div>
+            <table>
+              <tr><th>Product</th><th>SKU</th><th>Quantity</th></tr>
+              ${Array.from(itemsByProduct.values()).map(item => `
+                <tr><td>${item.name}</td><td>${item.sku}</td><td>${item.quantity}</td></tr>
+              `).join('')}
+            </table>
+          </div>
+
+          ${order.notes ? `<div class="section"><div class="section-title">Notes</div><p>${order.notes}</p></div>` : ''}
+
           <script>window.print(); window.close();</script>
         </body>
       </html>
@@ -991,186 +273,454 @@ function StateGroupCard({ group, canUpdate, onSelectProducts, onSelectBoxes }: S
     printWindow.document.close();
   };
 
-  const totalSelectedProducts = Array.from(productSelections.values()).reduce((sum, qty) => sum + qty, 0);
-  const totalSelectedBoxItems = group.boxes
-    .filter(b => selectedBoxes.has(b.box_id))
-    .reduce((sum, b) => sum + b.total_quantity, 0);
+  const canUpdate = hasRole('manufacture_lead') || hasRole('manufacturer') || hasRole('packer') || hasRole('boxer') || hasRole('admin');
+  const canDelete = hasRole('manufacture_lead') || hasRole('admin');
 
-  const stateColors: Record<string, string> = {
-    'pending_rm': 'bg-yellow-500',
-    'in_manufacturing': 'bg-blue-500',
-    'ready_for_finishing': 'bg-blue-300',
-    'in_finishing': 'bg-purple-500',
-    'ready_for_packaging': 'bg-orange-500',
-    'in_packaging': 'bg-indigo-500',
-    'ready_for_boxing': 'bg-cyan-300',
-    'in_boxing': 'bg-cyan-500',
-    'ready_for_receiving': 'bg-teal-300',
-    'received': 'bg-green-500',
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (!order) {
+    return (
+      <div className="p-6">
+        <Button variant="ghost" onClick={() => navigate('/orders')}>
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back to Orders
+        </Button>
+        <p className="text-center text-muted-foreground mt-8">Order not found</p>
+      </div>
+    );
+  }
+
+  const activeBatches = order.batches.filter(b => !b.is_terminated);
+  const totalItems = activeBatches.reduce((sum, b) => sum + b.quantity, 0);
+  const receivedItems = activeBatches.filter(b => b.current_state === 'received').reduce((sum, b) => sum + b.quantity, 0);
+  const flaggedCount = activeBatches.filter(b => b.is_flagged).reduce((sum, b) => sum + b.quantity, 0);
+  const redoCount = activeBatches.filter(b => b.is_redo).reduce((sum, b) => sum + b.quantity, 0);
+
+  // Calculate phase stats
+  const getPhaseStats = (inState: string, readyState?: string): PhaseStats => {
+    const waiting = readyState ? activeBatches.filter(b => b.current_state === readyState).reduce((sum, b) => sum + b.quantity, 0) : 0;
+    const inProgress = activeBatches.filter(b => b.current_state === inState).reduce((sum, b) => sum + b.quantity, 0);
+    const stateIndex = getAllStates().indexOf(inState as UnitState);
+    const completed = activeBatches
+      .filter(b => getAllStates().indexOf(b.current_state as UnitState) > stateIndex)
+      .reduce((sum, b) => sum + b.quantity, 0);
+    return { waiting, inProgress, completed };
   };
 
+  const manufacturingStats = getPhaseStats('in_manufacturing', 'pending_rm');
+  const finishingStats = getPhaseStats('in_finishing', 'ready_for_finishing');
+  const packagingStats = getPhaseStats('in_packaging', 'ready_for_packaging');
+  const boxingStats = getPhaseStats('in_boxing', 'ready_for_boxing');
+
+  // Items grouped by product for each state
+  const getProductsByState = (state: string) => {
+    const stateData = new Map<string, { name: string; sku: string; needsPacking: boolean; quantity: number; batches: Batch[] }>();
+    activeBatches.filter(b => b.current_state === state).forEach(batch => {
+      if (!stateData.has(batch.product_id)) {
+        stateData.set(batch.product_id, {
+          name: batch.product?.name || 'Unknown',
+          sku: batch.product?.sku || 'N/A',
+          needsPacking: batch.product?.needs_packing ?? true,
+          quantity: 0,
+          batches: [],
+        });
+      }
+      const item = stateData.get(batch.product_id)!;
+      item.quantity += batch.quantity;
+      item.batches.push(batch);
+    });
+    return Array.from(stateData.entries());
+  };
+
+  // Boxes by state
+  const getBoxesByState = (state: string) => {
+    const boxData = new Map<string, { code: string; quantity: number; batches: Batch[] }>();
+    activeBatches.filter(b => b.current_state === state && b.box_id && b.box).forEach(batch => {
+      if (!boxData.has(batch.box_id!)) {
+        boxData.set(batch.box_id!, {
+          code: batch.box?.box_code || 'Unknown',
+          quantity: 0,
+          batches: [],
+        });
+      }
+      const item = boxData.get(batch.box_id!)!;
+      item.quantity += batch.quantity;
+      item.batches.push(batch);
+    });
+    return Array.from(boxData.entries());
+  };
+
+  const receivedBatches = activeBatches.filter(b => b.current_state === 'received').map(b => ({
+    id: b.id,
+    batch_code: b.batch_code,
+    product_id: b.product_id,
+    product_name: b.product?.name || 'Unknown',
+    product_sku: b.product?.sku || 'N/A',
+    quantity: b.quantity,
+  }));
+
+  // Order state
+  const orderState = receivedItems === totalItems && totalItems > 0 
+    ? 'Fulfilled' 
+    : receivedItems > 0 
+      ? 'In Progress' 
+      : 'Pending';
+
   return (
-    <div className="border rounded-lg">
-      <div 
-        className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/50"
-        onClick={() => setExpanded(!expanded)}
-      >
-        <div className="flex items-center gap-3">
-          <Badge className={stateColors[group.state] || 'bg-gray-500'}>
-            {getStateLabel(group.state)}
-          </Badge>
-          <span className="text-muted-foreground">
-            {totalItems} item{totalItems !== 1 ? 's' : ''}
-            {isReady && group.boxes.length > 0 && ` in ${group.boxes.length} box${group.boxes.length !== 1 ? 'es' : ''}`}
-          </span>
+    <div className="p-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-start justify-between">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" onClick={() => navigate('/orders')}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div>
+            <div className="flex items-center gap-3">
+              <h1 className="text-3xl font-bold">{order.order_number}</h1>
+              {order.priority === 'high' && <Badge variant="destructive">High Priority</Badge>}
+              <Badge variant={orderState === 'Fulfilled' ? 'default' : 'secondary'}>{orderState}</Badge>
+            </div>
+            <p className="text-muted-foreground">
+              {order.customer?.name || 'No Customer'} · Created {format(new Date(order.created_at), 'PPP')}
+            </p>
+          </div>
         </div>
-        <span className="text-muted-foreground">{expanded ? '▼' : '▶'}</span>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={handlePrintOrder}>
+            <Printer className="h-4 w-4 mr-1" />
+            Print
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setRawMaterialsOpen(true)}>
+            <FileText className="h-4 w-4 mr-1" />
+            Raw Materials
+          </Button>
+          {canDelete && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" size="sm">
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete Order?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will permanently delete {order.order_number} and all related data.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleDeleteOrder} className="bg-destructive">Delete</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+        </div>
       </div>
-      
-      {expanded && (
-        <div className="p-4 pt-0 space-y-3">
-          {/* "In" states and pending_rm - show products by quantity */}
-          {(isIn || group.state === 'pending_rm') && group.products.length > 0 && (
-            <>
-              <div className="space-y-2">
-                {group.products.map((product) => (
-                  <div 
-                    key={product.product_id}
-                    className="flex items-center justify-between p-3 border rounded-lg bg-muted/30"
-                  >
-                    <div className="flex-1">
-                      <p className="font-medium">{product.product_name}</p>
-                      <p className="text-sm text-muted-foreground">
-                        SKU: {product.product_sku}
-                        {!product.needs_packing && (
-                          <Badge variant="outline" className="ml-2 text-xs">No Packing</Badge>
-                        )}
-                      </p>
-                      <p className="text-sm font-medium mt-1">Available: {product.quantity}</p>
-                    </div>
-                    {canUpdate && group.state !== 'received' && (
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="number"
-                          min="0"
-                          max={product.quantity}
-                          value={productSelections.get(product.product_id) || ''}
-                          onChange={(e) => handleProductQuantityChange(
-                            product.product_id, 
-                            parseInt(e.target.value) || 0,
-                            product.quantity
-                          )}
-                          placeholder="0"
-                          className="w-20 text-center px-2 py-1 border rounded"
-                        />
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleProductQuantityChange(
-                              product.product_id,
-                              product.quantity,
-                              product.quantity
-                            );
-                          }}
-                        >
-                          All
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                ))}
+
+      {/* Three Column Layout */}
+      <div className="grid gap-6 lg:grid-cols-12">
+        {/* Left Column - Order Summary */}
+        <div className="lg:col-span-3 space-y-4">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg">Order Summary</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Order #</span>
+                <span className="font-mono font-medium">{order.order_number}</span>
               </div>
-              
-              {canUpdate && totalSelectedProducts > 0 && group.state !== 'received' && (
-                <div className="flex items-center justify-between pt-3 border-t">
-                  <span className="text-sm text-muted-foreground">
-                    {totalSelectedProducts} item{totalSelectedProducts !== 1 ? 's' : ''} selected
-                  </span>
-                  <Button onClick={handleConfirmProductSelection}>
-                    {group.state === 'pending_rm' ? 'Start Manufacturing' : 'Assign to Box'}
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Customer</span>
+                <span>{order.customer?.name || 'N/A'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Priority</span>
+                <Badge variant={order.priority === 'high' ? 'destructive' : 'secondary'} className="text-xs">
+                  {order.priority}
+                </Badge>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Shipping</span>
+                <span className="flex items-center gap-1">
+                  {order.shipping_type === 'international' ? <Plane className="h-3 w-3" /> : <Truck className="h-3 w-3" />}
+                  {order.shipping_type === 'international' ? 'International' : 'Domestic'}
+                </span>
+              </div>
+              {order.estimated_fulfillment_time && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">EFT</span>
+                  <span>{format(new Date(order.estimated_fulfillment_time), 'PP')}</span>
+                </div>
+              )}
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Created</span>
+                <span>{format(new Date(order.created_at), 'PP')}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Created by</span>
+                <span className="truncate max-w-[120px]">{order.profile.full_name}</span>
+              </div>
+            </CardContent>
+          </Card>
+
+          {order.notes && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg">Notes</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground">{order.notes}</p>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Alert Cards */}
+          {(flaggedCount > 0 || redoCount > 0) && (
+            <Card 
+              className="border-warning/50 bg-warning/5 cursor-pointer hover:bg-warning/10 transition-colors"
+              onClick={() => setFlaggedItemsOpen(true)}
+            >
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <AlertTriangle className="h-5 w-5 text-warning" />
+                  <div>
+                    {flaggedCount > 0 && <p className="font-medium">{flaggedCount} Flagged Items</p>}
+                    {redoCount > 0 && <p className="font-medium">{redoCount} Redo Required</p>}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+
+        {/* Center Column - Order Items & Timeline */}
+        <div className="lg:col-span-5 space-y-4">
+          {/* Order Items Table */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg flex items-center justify-between">
+                Order Items
+                <Badge variant="secondary">{totalItems} total</Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-muted-foreground">
+                    <th className="text-left py-2">Product</th>
+                    <th className="text-center py-2">Qty</th>
+                    <th className="text-center py-2">Packing</th>
+                    <th className="text-right py-2">Progress</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Array.from(new Map(activeBatches.map(b => [b.product_id, b])).values()).map(batch => {
+                    const productBatches = activeBatches.filter(b => b.product_id === batch.product_id);
+                    const totalQty = productBatches.reduce((sum, b) => sum + b.quantity, 0);
+                    const receivedQty = productBatches.filter(b => b.current_state === 'received').reduce((sum, b) => sum + b.quantity, 0);
+                    const stateBreakdown = getAllStates().map(s => ({
+                      state: s,
+                      qty: productBatches.filter(b => b.current_state === s).reduce((sum, b) => sum + b.quantity, 0)
+                    })).filter(s => s.qty > 0);
+
+                    return (
+                      <tr key={batch.product_id} className="border-b last:border-0">
+                        <td className="py-3">
+                          <p className="font-medium">{batch.product?.name}</p>
+                          <p className="text-xs text-muted-foreground">{batch.product?.sku}</p>
+                        </td>
+                        <td className="text-center">{totalQty}</td>
+                        <td className="text-center">
+                          {batch.product?.needs_packing ? (
+                            <Badge variant="outline" className="text-xs">Yes</Badge>
+                          ) : (
+                            <span className="text-muted-foreground text-xs">No</span>
+                          )}
+                        </td>
+                        <td className="text-right">
+                          <div className="text-xs text-muted-foreground">
+                            {stateBreakdown.map((s, i) => (
+                              <span key={s.state}>
+                                {i > 0 && ', '}
+                                {s.qty} {getStateLabel(s.state as UnitState).split(' ').slice(0, 2).join(' ')}
+                              </span>
+                            ))}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </CardContent>
+          </Card>
+
+          {/* Visual Timeline */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg">Production Timeline</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {[
+                  { label: 'Manufacturing', in: 'in_manufacturing', ready: 'pending_rm', stats: manufacturingStats, icon: Factory, color: 'blue' },
+                  { label: 'Finishing', in: 'in_finishing', ready: 'ready_for_finishing', stats: finishingStats, icon: Sparkles, color: 'purple' },
+                  { label: 'Packaging', in: 'in_packaging', ready: 'ready_for_packaging', stats: packagingStats, icon: Package, color: 'indigo' },
+                  { label: 'Boxing', in: 'in_boxing', ready: 'ready_for_boxing', stats: boxingStats, icon: Box, color: 'cyan' },
+                ].map((phase, idx) => {
+                  const Icon = phase.icon;
+                  const total = phase.stats.waiting + phase.stats.inProgress + phase.stats.completed;
+                  const progress = totalItems > 0 ? (phase.stats.completed / totalItems) * 100 : 0;
+
+                  return (
+                    <div key={phase.label} className="flex items-center gap-3">
+                      <div className={`flex items-center justify-center w-8 h-8 rounded-full bg-${phase.color}-100 dark:bg-${phase.color}-900/30`}>
+                        <Icon className={`h-4 w-4 text-${phase.color}-600 dark:text-${phase.color}-400`} />
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="font-medium">{phase.label}</span>
+                          <span className="text-muted-foreground">
+                            {phase.stats.waiting > 0 && <span className="text-warning">{phase.stats.waiting} waiting · </span>}
+                            {phase.stats.inProgress > 0 && <span className="text-primary">{phase.stats.inProgress} active · </span>}
+                            {phase.stats.completed}/{totalItems} done
+                          </span>
+                        </div>
+                        <div className="h-1.5 bg-secondary rounded-full mt-1 overflow-hidden">
+                          <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${progress}%` }} />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+                
+                {/* Fulfilled */}
+                <div className="flex items-center gap-3 pt-2 border-t">
+                  <div className="flex items-center justify-center w-8 h-8 rounded-full bg-green-100 dark:bg-green-900/30">
+                    <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-medium">Fulfilled</span>
+                      <span className="text-green-600 font-medium">{receivedItems}/{totalItems}</span>
+                    </div>
+                    <div className="h-1.5 bg-secondary rounded-full mt-1 overflow-hidden">
+                      <div className="h-full bg-green-500 rounded-full transition-all" style={{ width: `${(receivedItems / totalItems) * 100}%` }} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Right Column - Phase Cards */}
+        <div className="lg:col-span-4 space-y-4">
+          <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Production Phases</h3>
+          
+          {[
+            { label: 'Manufacturing', href: '/queues/manufacturing', in: 'in_manufacturing', ready: 'pending_rm', icon: Factory, color: 'blue' },
+            { label: 'Finishing', href: '/queues/finishing', in: 'in_finishing', ready: 'ready_for_finishing', icon: Sparkles, color: 'purple' },
+            { label: 'Packaging', href: '/queues/packaging', in: 'in_packaging', ready: 'ready_for_packaging', icon: Package, color: 'indigo' },
+            { label: 'Boxing', href: '/queues/boxing', in: 'in_boxing', ready: 'ready_for_boxing', icon: Box, color: 'cyan' },
+          ].map(phase => {
+            const Icon = phase.icon;
+            const waiting = activeBatches.filter(b => b.current_state === phase.ready).reduce((sum, b) => sum + b.quantity, 0);
+            const inProgress = activeBatches.filter(b => b.current_state === phase.in).reduce((sum, b) => sum + b.quantity, 0);
+
+            if (waiting === 0 && inProgress === 0) return null;
+
+            return (
+              <Card 
+                key={phase.label} 
+                className="cursor-pointer hover:border-primary/50 transition-colors"
+                onClick={() => navigate(`${phase.href}?order=${id}`)}
+              >
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className={`p-2 rounded-lg bg-${phase.color}-100 dark:bg-${phase.color}-900/30`}>
+                      <Icon className={`h-5 w-5 text-${phase.color}-600 dark:text-${phase.color}-400`} />
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-medium">{phase.label}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {waiting > 0 && <span className="text-warning">{waiting} waiting</span>}
+                        {waiting > 0 && inProgress > 0 && ' · '}
+                        {inProgress > 0 && <span className="text-primary">{inProgress} in progress</span>}
+                      </p>
+                    </div>
+                    <ArrowLeft className="h-4 w-4 rotate-180 text-muted-foreground" />
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+
+          {/* Received / Create Shipment */}
+          {receivedItems > 0 && (
+            <Card className="border-green-200 dark:border-green-800">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-green-100 dark:bg-green-900/30">
+                      <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
+                    </div>
+                    <div>
+                      <p className="font-medium">Ready for Shipment</p>
+                      <p className="text-sm text-muted-foreground">{receivedItems} items received</p>
+                    </div>
+                  </div>
+                  <Button size="sm" onClick={() => setShipmentDialogOpen(true)}>
+                    <Truck className="h-4 w-4 mr-1" />
+                    Create Kartona
                   </Button>
                 </div>
-              )}
-            </>
-          )}
-
-          {/* "Ready" states - show boxes */}
-          {isReady && group.boxes.length > 0 && (
-            <>
-              <div className="space-y-2">
-                {group.boxes.map((box) => (
-                  <div 
-                    key={box.box_id}
-                    className={`flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition-colors ${
-                      selectedBoxes.has(box.box_id) 
-                        ? 'border-primary bg-primary/5' 
-                        : 'hover:bg-muted/50'
-                    }`}
-                    onClick={() => canUpdate && handleBoxToggle(box.box_id)}
-                  >
-                    {canUpdate && (
-                      <input
-                        type="checkbox"
-                        checked={selectedBoxes.has(box.box_id)}
-                        onChange={() => handleBoxToggle(box.box_id)}
-                        className="h-4 w-4"
-                      />
-                    )}
-                    <div className="flex-1">
-                      <p className="font-mono font-bold">{box.box_code}</p>
-                      <div className="text-sm text-muted-foreground">
-                        {box.batches.map((b, i) => (
-                          <span key={b.id}>
-                            {i > 0 && ', '}
-                            {b.product_sku} × {b.quantity}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                    <Badge variant="secondary">{box.total_quantity} items</Badge>
-                  </div>
-                ))}
-              </div>
-              
-              {canUpdate && selectedBoxes.size > 0 && (
-                <div className="flex items-center justify-between pt-3 border-t">
-                  <span className="text-sm text-muted-foreground">
-                    {selectedBoxes.size} box{selectedBoxes.size !== 1 ? 'es' : ''} selected ({totalSelectedBoxItems} items)
-                  </span>
-                  <div className="flex gap-2">
-                    <Button variant="outline" onClick={handlePrintBoxIds}>
-                      Print IDs
-                    </Button>
-                    <Button onClick={handleConfirmBoxSelection}>
-                      Receive Selected
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-
-          {/* Received state */}
-          {isReceived && group.products.length > 0 && (
-            <div className="space-y-2">
-              {group.products.map((product) => (
-                <div 
-                  key={product.product_id}
-                  className="flex items-center justify-between p-3 border rounded-lg bg-green-50 dark:bg-green-950/20"
-                >
-                  <div>
-                    <p className="font-medium">{product.product_name}</p>
-                    <p className="text-sm text-muted-foreground">SKU: {product.product_sku}</p>
-                  </div>
-                  <Badge className="bg-green-500">{product.quantity} received</Badge>
-                </div>
-              ))}
-            </div>
+              </CardContent>
+            </Card>
           )}
         </div>
-      )}
+      </div>
+
+      {/* Dialogs */}
+      <RawMaterialsDialog
+        open={rawMaterialsOpen}
+        onOpenChange={setRawMaterialsOpen}
+        orderId={id!}
+      />
+
+      <FlaggedItemsDialog
+        open={flaggedItemsOpen}
+        onOpenChange={setFlaggedItemsOpen}
+        orderId={id!}
+        batches={activeBatches.filter(b => b.is_flagged || b.is_redo).map(b => ({
+          id: b.id,
+          batch_code: b.batch_code,
+          product_name: b.product?.name || 'Unknown',
+          product_sku: b.product?.sku || 'N/A',
+          quantity: b.quantity,
+          current_state: b.current_state,
+          is_flagged: b.is_flagged || false,
+          is_redo: b.is_redo || false,
+        }))}
+        onRefresh={fetchOrder}
+      />
+
+      <ShipmentDialog
+        open={shipmentDialogOpen}
+        onOpenChange={setShipmentDialogOpen}
+        orderId={id!}
+        orderNumber={order.order_number}
+        receivedBatches={receivedBatches}
+        onRefresh={fetchOrder}
+      />
     </div>
   );
 }
