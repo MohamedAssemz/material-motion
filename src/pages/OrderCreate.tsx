@@ -33,6 +33,7 @@ interface Customer {
 interface OrderItem {
   product_id: string;
   quantity: number;
+  needs_boxing: boolean;
 }
 
 interface ExtraProduct {
@@ -67,7 +68,7 @@ export default function OrderCreate() {
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const [customerOpen, setCustomerOpen] = useState(false);
   const [eftOpen, setEftOpen] = useState(false);
-  const [items, setItems] = useState<OrderItem[]>([{ product_id: '', quantity: 1 }]);
+  const [items, setItems] = useState<OrderItem[]>([{ product_id: '', quantity: 1, needs_boxing: true }]);
   const [extraProducts, setExtraProducts] = useState<ExtraProduct[]>([]);
   const [extraSelections, setExtraSelections] = useState<Map<string, number>>(new Map());
 
@@ -117,7 +118,7 @@ export default function OrderCreate() {
   };
 
   const addItem = () => {
-    setItems([...items, { product_id: '', quantity: 1 }]);
+    setItems([...items, { product_id: '', quantity: 1, needs_boxing: true }]);
   };
 
   const removeItem = (index: number) => {
@@ -126,7 +127,7 @@ export default function OrderCreate() {
     }
   };
 
-  const updateItem = (index: number, field: keyof OrderItem, value: string | number) => {
+  const updateItem = (index: number, field: keyof OrderItem, value: string | number | boolean) => {
     const newItems = [...items];
     newItems[index] = { ...newItems[index], [field]: value };
     setItems(newItems);
@@ -212,11 +213,15 @@ export default function OrderCreate() {
       }
 
       // Create order items for all products (quantity = total for order tracking)
-      const orderItemsToCreate = Array.from(productQuantities.entries()).map(([productId, quantities]) => ({
-        order_id: order.id,
-        product_id: productId,
-        quantity: quantities.regular + quantities.extra,
-      }));
+      const orderItemsToCreate = Array.from(productQuantities.entries()).map(([productId, quantities]) => {
+        const item = validItems.find(i => i.product_id === productId);
+        return {
+          order_id: order.id,
+          product_id: productId,
+          quantity: quantities.regular + quantities.extra,
+          needs_boxing: item?.needs_boxing ?? true,
+        };
+      });
 
       const { error: itemsError } = await supabase
         .from('order_items')
@@ -564,6 +569,14 @@ export default function OrderCreate() {
                       value={item.quantity}
                       onChange={(e) => updateItem(index, 'quantity', parseInt(e.target.value) || 1)}
                     />
+                  </div>
+                  <div className="flex items-center gap-2 pb-1">
+                    <Checkbox
+                      id={`needs_boxing_${index}`}
+                      checked={item.needs_boxing}
+                      onCheckedChange={(checked) => updateItem(index, 'needs_boxing', !!checked)}
+                    />
+                    <Label htmlFor={`needs_boxing_${index}`} className="text-xs cursor-pointer">Boxing</Label>
                   </div>
                   <Button
                     type="button"

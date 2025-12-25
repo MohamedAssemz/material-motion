@@ -1,0 +1,537 @@
+import { useEffect, useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { toast } from 'sonner';
+import { 
+  ArrowLeft, 
+  Package, 
+  Box, 
+  Loader2, 
+  QrCode, 
+  Plus,
+  Search,
+  CheckSquare,
+  Zap
+} from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+
+interface Batch {
+  id: string;
+  batch_code: string;
+  current_state: string;
+  quantity: number;
+  product_id: string;
+  box_id: string | null;
+  product: {
+    id: string;
+    name: string;
+    sku: string;
+  };
+  box?: { id: string; box_code: string } | null;
+}
+
+interface Order {
+  id: string;
+  order_number: string;
+  priority: string;
+  customer?: { name: string };
+}
+
+interface BoxGroup {
+  box_id: string;
+  box_code: string;
+  batches: Batch[];
+  totalQty: number;
+}
+
+interface ProductGroup {
+  product_id: string;
+  product_name: string;
+  product_sku: string;
+  quantity: number;
+  batches: Batch[];
+}
+
+export default function OrderPackaging() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const { hasRole, user } = useAuth();
+  const [order, setOrder] = useState<Order | null>(null);
+  const [batches, setBatches] = useState<Batch[]>([]);
+  const [loading, setLoading] = useState(true);
+  
+  const [selectedBoxes, setSelectedBoxes] = useState<Set<string>>(new Set());
+  const [productSelections, setProductSelections] = useState<Map<string, number>>(new Map());
+  const [etaDays, setEtaDays] = useState('1');
+  
+  const [acceptDialogOpen, setAcceptDialogOpen] = useState(false);
+  const [boxAssignDialogOpen, setBoxAssignDialogOpen] = useState(false);
+  const [boxDirectlyDialogOpen, setBoxDirectlyDialogOpen] = useState(false);
+  const [boxSearchCode, setBoxSearchCode] = useState('');
+  const [selectedBox, setSelectedBox] = useState<{ id: string; box_code: string } | null>(null);
+  const [availableBoxes, setAvailableBoxes] = useState<Array<{ id: string; box_code: string }>>([]);
+  const [loadingBoxes, setLoadingBoxes] = useState(false);
+  const [creatingBox, setCreatingBox] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  const canManage = hasRole('packaging_manager') || hasRole('packer') || hasRole('admin');
+
+  useEffect(() => {
+    fetchData();
+    const channel = supabase
+      .channel(`order-packaging-${id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'batches', filter: `order_id=eq.${id}` }, () => {
+        fetchData();
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [id]);
+
+  const fetchData = async () => {
+    try {
+      const [orderRes, batchesRes] = await Promise.all([
+        supabase.from('orders').select('id, order_number, priority, customer:customers(name)').eq('id', id).single(),
+        supabase.from('batches')
+          .select('id, batch_code, current_state, quantity, product_id, box_id, product:products(id, name, sku)')
+          .eq('order_id', id)
+          .eq('is_terminated', false)
+          .in('current_state', ['ready_for_packaging', 'in_packaging'])
+      ]);
+      
+      if (orderRes.error) throw orderRes.error;
+      if (batchesRes.error) throw batchesRes.error;
+      
+      const boxIds = batchesRes.data?.filter((b: any) => b.box_id).map((b: any) => b.box_id) || [];
+      let boxMap = new Map();
+      if (boxIds.length > 0) {
+        const { data: boxesData } = await supabase.from('boxes').select('id, box_code').in('id', boxIds);
+        boxesData?.forEach(box => boxMap.set(box.id, box));
+      }
+      
+      const batchesWithBoxes = batchesRes.data?.map((batch: any) => ({
+        ...batch,
+        box: batch.box_id ? boxMap.get(batch.box_id) : null,
+      })) || [];
+      
+      setOrder(orderRes.data as Order);
+      setBatches(batchesWithBoxes as Batch[]);
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchEmptyBoxes = async () => {
+    setLoadingBoxes(true);
+    try {
+      const { data: allBoxes } = await supabase.from('boxes').select('id, box_code').eq('is_active', true).order('box_code');
+      const { data: occupiedBatches } = await supabase.from('batches').select('box_id').not('box_id', 'is', null).eq('is_terminated', false);
+      const occupiedIds = new Set(occupiedBatches?.map(b => b.box_id) || []);
+      setAvailableBoxes(allBoxes?.filter(box => !occupiedIds.has(box.id)) || []);
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setLoadingBoxes(false);
+    }
+  };
+
+  const searchBox = async () => {
+    if (!boxSearchCode.trim()) return;
+    try {
+      const { data: box } = await supabase.from('boxes').select('id, box_code').eq('box_code', boxSearchCode.trim().toUpperCase()).eq('is_active', true).single();
+      if (!box) { toast.error(`Box ${boxSearchCode} not found`); return; }
+      const { data: existingBatch } = await supabase.from('batches').select('id').eq('box_id', box.id).eq('is_terminated', false).maybeSingle();
+      if (existingBatch) { toast.error(`Box ${box.box_code} is already occupied`); return; }
+      setSelectedBox(box);
+      setBoxSearchCode('');
+    } catch (error: any) { toast.error(error.message); }
+  };
+
+  const createNewBox = async () => {
+    setCreatingBox(true);
+    try {
+      const { data: code } = await supabase.rpc('generate_box_code');
+      const { data: newBox, error } = await supabase.from('boxes').insert({ box_code: code || `BOX-${Date.now()}` }).select().single();
+      if (error) throw error;
+      setSelectedBox(newBox);
+      await fetchEmptyBoxes();
+      toast.success(`Created box ${newBox.box_code}`);
+    } catch (error: any) { toast.error(error.message); } 
+    finally { setCreatingBox(false); }
+  };
+
+  // Group ready_for_packaging by box
+  const readyBoxGroups: BoxGroup[] = [];
+  const boxGroupMap = new Map<string, BoxGroup>();
+  batches.filter(b => b.current_state === 'ready_for_packaging' && b.box_id).forEach(batch => {
+    if (!boxGroupMap.has(batch.box_id!)) {
+      boxGroupMap.set(batch.box_id!, { box_id: batch.box_id!, box_code: batch.box?.box_code || 'Unknown', batches: [], totalQty: 0 });
+    }
+    const group = boxGroupMap.get(batch.box_id!)!;
+    group.batches.push(batch);
+    group.totalQty += batch.quantity;
+  });
+  boxGroupMap.forEach(g => readyBoxGroups.push(g));
+
+  // Group in_packaging by product
+  const inPackagingGroups: ProductGroup[] = [];
+  const productMap = new Map<string, ProductGroup>();
+  batches.filter(b => b.current_state === 'in_packaging').forEach(batch => {
+    if (!productMap.has(batch.product_id)) {
+      productMap.set(batch.product_id, { product_id: batch.product_id, product_name: batch.product?.name || 'Unknown', product_sku: batch.product?.sku || 'N/A', quantity: 0, batches: [] });
+    }
+    const group = productMap.get(batch.product_id)!;
+    group.batches.push(batch);
+    group.quantity += batch.quantity;
+  });
+  productMap.forEach(g => inPackagingGroups.push(g));
+
+  const totalReadyForPackaging = readyBoxGroups.reduce((sum, g) => sum + g.totalQty, 0);
+  const totalInPackaging = inPackagingGroups.reduce((sum, g) => sum + g.quantity, 0);
+  const totalSelected = Array.from(productSelections.values()).reduce((a, b) => a + b, 0);
+
+  const handleSelectAllBoxes = () => {
+    if (selectedBoxes.size === readyBoxGroups.length) setSelectedBoxes(new Set());
+    else setSelectedBoxes(new Set(readyBoxGroups.map(g => g.box_id)));
+  };
+
+  const handleAcceptBoxes = async () => {
+    if (selectedBoxes.size === 0) return;
+    setSubmitting(true);
+    try {
+      const etaDate = new Date();
+      etaDate.setDate(etaDate.getDate() + parseInt(etaDays) || 1);
+      const batchIds = batches.filter(b => b.current_state === 'ready_for_packaging' && b.box_id && selectedBoxes.has(b.box_id)).map(b => b.id);
+      await supabase.from('batches').update({ current_state: 'in_packaging', eta: etaDate.toISOString(), lead_time_days: parseInt(etaDays) || 1 }).in('id', batchIds);
+      toast.success(`Accepted ${selectedBoxes.size} box(es) into packaging`);
+      setSelectedBoxes(new Set());
+      setAcceptDialogOpen(false);
+      fetchData();
+    } catch (error: any) { toast.error(error.message); } 
+    finally { setSubmitting(false); }
+  };
+
+  const handleOpenAssignDialog = () => {
+    if (totalSelected === 0) { toast.error('Please select items first'); return; }
+    setSelectedBox(null);
+    setBoxSearchCode('');
+    fetchEmptyBoxes();
+    setBoxAssignDialogOpen(true);
+  };
+
+  const handleAssignToBox = async () => {
+    if (!selectedBox || totalSelected === 0) return;
+    setSubmitting(true);
+    try {
+      for (const [productId, quantity] of productSelections.entries()) {
+        if (quantity <= 0) continue;
+        const group = inPackagingGroups.find(g => g.product_id === productId);
+        if (!group) continue;
+        let remainingQty = quantity;
+        for (const batch of group.batches) {
+          if (remainingQty <= 0) break;
+          const useQty = Math.min(batch.quantity, remainingQty);
+          remainingQty -= useQty;
+          if (useQty === batch.quantity) {
+            await supabase.from('batches').update({ current_state: 'ready_for_boxing', box_id: selectedBox.id }).eq('id', batch.id);
+          } else {
+            const { data: batchCode } = await supabase.rpc('generate_batch_code');
+            await supabase.from('batches').insert({ batch_code: batchCode, order_id: id, product_id: batch.product_id, current_state: 'ready_for_boxing', quantity: useQty, box_id: selectedBox.id, created_by: user?.id, parent_batch_id_split: batch.id });
+            await supabase.from('batches').update({ quantity: batch.quantity - useQty }).eq('id', batch.id);
+          }
+        }
+      }
+      toast.success(`Assigned ${totalSelected} items to ${selectedBox.box_code}`);
+      setBoxAssignDialogOpen(false);
+      setProductSelections(new Map());
+      fetchData();
+    } catch (error: any) { toast.error(error.message); } 
+    finally { setSubmitting(false); }
+  };
+
+  const handleBoxDirectly = async () => {
+    if (totalSelected === 0) return;
+    setSubmitting(true);
+    try {
+      const etaDate = new Date();
+      etaDate.setDate(etaDate.getDate() + parseInt(etaDays) || 1);
+      
+      for (const [productId, quantity] of productSelections.entries()) {
+        if (quantity <= 0) continue;
+        const group = inPackagingGroups.find(g => g.product_id === productId);
+        if (!group) continue;
+        let remainingQty = quantity;
+        for (const batch of group.batches) {
+          if (remainingQty <= 0) break;
+          const useQty = Math.min(batch.quantity, remainingQty);
+          remainingQty -= useQty;
+          if (useQty === batch.quantity) {
+            await supabase.from('batches').update({ current_state: 'in_boxing', eta: etaDate.toISOString(), lead_time_days: parseInt(etaDays) || 1 }).eq('id', batch.id);
+          } else {
+            const { data: batchCode } = await supabase.rpc('generate_batch_code');
+            await supabase.from('batches').insert({ batch_code: batchCode, order_id: id, product_id: batch.product_id, current_state: 'in_boxing', quantity: useQty, eta: etaDate.toISOString(), lead_time_days: parseInt(etaDays) || 1, created_by: user?.id, parent_batch_id_split: batch.id });
+            await supabase.from('batches').update({ quantity: batch.quantity - useQty }).eq('id', batch.id);
+          }
+        }
+      }
+      toast.success(`Moved ${totalSelected} items directly to boxing`);
+      setBoxDirectlyDialogOpen(false);
+      setProductSelections(new Map());
+      fetchData();
+    } catch (error: any) { toast.error(error.message); } 
+    finally { setSubmitting(false); }
+  };
+
+  if (loading) {
+    return <div className="flex items-center justify-center min-h-[400px]"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
+  }
+
+  if (!order) {
+    return (
+      <div className="p-6">
+        <Button variant="ghost" onClick={() => navigate('/orders')}><ArrowLeft className="h-4 w-4 mr-2" />Back</Button>
+        <p className="text-center text-muted-foreground mt-8">Order not found</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" onClick={() => navigate(`/orders/${id}`)}><ArrowLeft className="h-4 w-4" /></Button>
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-indigo-100 dark:bg-indigo-900/30">
+              <Package className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold">Packaging</h1>
+              <p className="text-muted-foreground">
+                {order.order_number} {order.customer?.name && `· ${order.customer.name}`}
+                {order.priority === 'high' && <Badge variant="destructive" className="ml-2">High Priority</Badge>}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Ready for Packaging</p><p className="text-2xl font-bold text-warning">{totalReadyForPackaging}</p></CardContent></Card>
+        <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">In Packaging</p><p className="text-2xl font-bold text-primary">{totalInPackaging}</p></CardContent></Card>
+        <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Boxes Waiting</p><p className="text-2xl font-bold">{readyBoxGroups.length}</p></CardContent></Card>
+        <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Products</p><p className="text-2xl font-bold">{inPackagingGroups.length}</p></CardContent></Card>
+      </div>
+
+      <Tabs defaultValue="receive" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="receive">Receive Boxes ({readyBoxGroups.length})</TabsTrigger>
+          <TabsTrigger value="process">Process Items ({totalInPackaging})</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="receive" className="space-y-4">
+          {canManage && readyBoxGroups.length > 0 && (
+            <Card>
+              <CardContent className="p-4 flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <Button variant="outline" size="sm" onClick={handleSelectAllBoxes}>
+                    <CheckSquare className="h-4 w-4 mr-2" />
+                    {selectedBoxes.size === readyBoxGroups.length ? 'Deselect All' : 'Select All'}
+                  </Button>
+                  <div>
+                    <Label className="text-xs text-muted-foreground">ETA (days)</Label>
+                    <Select value={etaDays} onValueChange={setEtaDays}>
+                      <SelectTrigger className="w-20 h-8"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {[1, 2, 3, 5, 7, 10, 14].map(d => <SelectItem key={d} value={d.toString()}>{d}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <Button onClick={() => setAcceptDialogOpen(true)} disabled={selectedBoxes.size === 0}>Accept {selectedBoxes.size} Box(es)</Button>
+              </CardContent>
+            </Card>
+          )}
+
+          <Card>
+            <CardContent className="p-4">
+              <Label>Search or Scan Box</Label>
+              <div className="flex gap-2 mt-2">
+                <div className="flex-1 relative">
+                  <QrCode className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input placeholder="Enter box code..." className="pl-10" onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      const code = (e.target as HTMLInputElement).value.toUpperCase();
+                      const found = readyBoxGroups.find(g => g.box_code === code);
+                      if (found) { setSelectedBoxes(prev => new Set(prev).add(found.box_id)); (e.target as HTMLInputElement).value = ''; toast.success(`Added ${code}`); }
+                      else toast.error(`Box ${code} not found`);
+                    }
+                  }} />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="space-y-3">
+            {readyBoxGroups.length === 0 ? (
+              <Card><CardContent className="p-8 text-center text-muted-foreground">No boxes ready for packaging</CardContent></Card>
+            ) : readyBoxGroups.map(group => (
+              <Card key={group.box_id} className={selectedBoxes.has(group.box_id) ? 'border-primary' : ''}>
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-4">
+                    {canManage && (
+                      <Checkbox checked={selectedBoxes.has(group.box_id)} onCheckedChange={(checked) => {
+                        setSelectedBoxes(prev => { const next = new Set(prev); if (checked) next.add(group.box_id); else next.delete(group.box_id); return next; });
+                      }} />
+                    )}
+                    <Box className="h-5 w-5 text-muted-foreground" />
+                    <span className="font-mono font-bold">{group.box_code}</span>
+                    <Badge variant="secondary">{group.totalQty} items</Badge>
+                    <div className="flex-1 text-sm text-muted-foreground">{group.batches.map(b => `${b.product?.sku} (${b.quantity})`).join(', ')}</div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="process" className="space-y-4">
+          {canManage && totalSelected > 0 && (
+            <Card>
+              <CardContent className="p-4 flex items-center justify-between flex-wrap gap-3">
+                <Badge variant="secondary" className="text-lg px-3 py-1">{totalSelected} selected</Badge>
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={handleOpenAssignDialog}><Box className="h-4 w-4 mr-2" />Assign to Box</Button>
+                  <Button onClick={() => setBoxDirectlyDialogOpen(true)}><Zap className="h-4 w-4 mr-2" />Box Directly</Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          <div className="space-y-3">
+            {inPackagingGroups.length === 0 ? (
+              <Card><CardContent className="p-8 text-center text-muted-foreground">No items in packaging</CardContent></Card>
+            ) : inPackagingGroups.map(group => (
+              <Card key={group.product_id}>
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium">{group.product_name}</p>
+                      <p className="text-sm text-muted-foreground">{group.product_sku}</p>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <div className="text-center"><p className="text-lg font-semibold">{group.quantity}</p><p className="text-xs text-muted-foreground">In Packaging</p></div>
+                      {canManage && (
+                        <div className="w-24">
+                          <Label className="text-xs">Select Qty</Label>
+                          <Input type="number" min={0} max={group.quantity} value={productSelections.get(group.product_id) || ''} onChange={(e) => {
+                            const qty = Math.max(0, Math.min(parseInt(e.target.value) || 0, group.quantity));
+                            setProductSelections(prev => { const next = new Map(prev); if (qty > 0) next.set(group.product_id, qty); else next.delete(group.product_id); return next; });
+                          }} placeholder="0" />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </TabsContent>
+      </Tabs>
+
+      {/* Accept Dialog */}
+      <Dialog open={acceptDialogOpen} onOpenChange={setAcceptDialogOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Accept Boxes into Packaging</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <p>Accept {selectedBoxes.size} box(es) into packaging with ETA of {etaDays} day(s)?</p>
+            <div className="max-h-[200px] overflow-y-auto space-y-2">
+              {Array.from(selectedBoxes).map(boxId => {
+                const group = readyBoxGroups.find(g => g.box_id === boxId);
+                return group ? <div key={boxId} className="flex items-center justify-between p-2 bg-muted rounded"><span className="font-mono">{group.box_code}</span><span className="text-sm text-muted-foreground">{group.totalQty} items</span></div> : null;
+              })}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAcceptDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleAcceptBoxes} disabled={submitting}>{submitting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}Accept</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Box Assignment Dialog */}
+      <Dialog open={boxAssignDialogOpen} onOpenChange={setBoxAssignDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader><DialogTitle className="flex items-center gap-2"><Box className="h-5 w-5" />Assign to Box</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div className="p-3 bg-muted/50 rounded-lg"><p className="text-sm font-medium">Items to assign: {totalSelected}</p></div>
+            <div className="space-y-2">
+              <Label>Scan or Enter Box Code</Label>
+              <div className="flex gap-2">
+                <div className="flex-1 relative">
+                  <QrCode className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input value={boxSearchCode} onChange={(e) => setBoxSearchCode(e.target.value.toUpperCase())} placeholder="e.g., BOX-0001" className="pl-10" onKeyDown={(e) => e.key === 'Enter' && searchBox()} />
+                </div>
+                <Button onClick={searchBox} disabled={!boxSearchCode.trim()}><Search className="h-4 w-4" /></Button>
+              </div>
+            </div>
+            <Button variant="outline" onClick={createNewBox} disabled={creatingBox} className="w-full">{creatingBox ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Plus className="h-4 w-4 mr-2" />}Create New Box</Button>
+            {selectedBox && <Card className="border-primary bg-primary/5"><CardContent className="p-3 flex items-center justify-between"><div className="flex items-center gap-3"><Box className="h-5 w-5 text-primary" /><span className="font-mono font-bold text-lg">{selectedBox.box_code}</span></div><Badge className="bg-primary">Selected</Badge></CardContent></Card>}
+            {!selectedBox && !loadingBoxes && availableBoxes.length > 0 && (
+              <div className="space-y-2"><Label>Available Boxes ({availableBoxes.length})</Label><div className="grid grid-cols-3 gap-2 max-h-[120px] overflow-y-auto">{availableBoxes.slice(0, 9).map(box => <Button key={box.id} variant="outline" size="sm" className="font-mono" onClick={() => setSelectedBox(box)}>{box.box_code}</Button>)}</div></div>
+            )}
+            {loadingBoxes && <div className="flex justify-center py-4"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBoxAssignDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleAssignToBox} disabled={!selectedBox || submitting}>{submitting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}Assign to {selectedBox?.box_code || 'Box'}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Box Directly Dialog */}
+      <Dialog open={boxDirectlyDialogOpen} onOpenChange={setBoxDirectlyDialogOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle className="flex items-center gap-2"><Zap className="h-5 w-5" />Box Directly</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">This will move {totalSelected} items directly to "In Boxing" state, skipping the "Ready for Boxing" step.</p>
+            <div>
+              <Label>ETA (days)</Label>
+              <Select value={etaDays} onValueChange={setEtaDays}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>{[1, 2, 3, 5, 7, 10, 14].map(d => <SelectItem key={d} value={d.toString()}>{d} day{d > 1 ? 's' : ''}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBoxDirectlyDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleBoxDirectly} disabled={submitting}>{submitting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}Move to Boxing</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
