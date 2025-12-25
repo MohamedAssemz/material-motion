@@ -1,67 +1,66 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { NotificationBell } from '@/components/NotificationBell';
 import { 
   Factory, 
   Package, 
   Box, 
-  ClipboardCheck, 
   TrendingUp, 
-  Users, 
-  LogOut,
   Plus,
-  AlertCircle
+  AlertCircle,
+  Sparkles,
+  CheckCircle,
+  Clock
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
 
-interface Stats {
-  totalOrders: number;
-  waitingForRM: number;
-  inManufacturing: number;
-  inPackaging: number;
-  inBoxing: number;
-  finished: number;
+interface StateStats {
+  pending_rm: number;
+  in_manufacturing: number;
+  ready_for_finishing: number;
+  in_finishing: number;
+  ready_for_packaging: number;
+  in_packaging: number;
+  ready_for_boxing: number;
+  in_boxing: number;
+  ready_for_receiving: number;
+  received: number;
 }
 
-interface QueueCounts {
-  manufacturing: { waiting: number; inProgress: number };
-  packaging: { waiting: number; inProgress: number };
-  boxing: { waiting: number; inProgress: number };
+interface QueueData {
+  name: string;
+  href: string;
+  icon: React.ElementType;
+  color: string;
+  waiting: number;
+  inProgress: number;
+  waitingLabel: string;
 }
 
 export default function Dashboard() {
-  const { user, userRoles, signOut } = useAuth();
-  const [stats, setStats] = useState<Stats>({
-    totalOrders: 0,
-    waitingForRM: 0,
-    inManufacturing: 0,
-    inPackaging: 0,
-    inBoxing: 0,
-    finished: 0,
+  const { userRoles, hasRole } = useAuth();
+  const [stats, setStats] = useState<StateStats>({
+    pending_rm: 0,
+    in_manufacturing: 0,
+    ready_for_finishing: 0,
+    in_finishing: 0,
+    ready_for_packaging: 0,
+    in_packaging: 0,
+    ready_for_boxing: 0,
+    in_boxing: 0,
+    ready_for_receiving: 0,
+    received: 0,
   });
-  const [queueCounts, setQueueCounts] = useState<QueueCounts>({
-    manufacturing: { waiting: 0, inProgress: 0 },
-    packaging: { waiting: 0, inProgress: 0 },
-    boxing: { waiting: 0, inProgress: 0 },
-  });
+  const [orderCount, setOrderCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchStats();
 
-    // Subscribe to realtime updates
-    const ordersChannel = supabase
-      .channel('dashboard-orders')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
-        fetchStats();
-      })
-      .subscribe();
-
-    const batchesChannel = supabase
+    const channel = supabase
       .channel('dashboard-batches')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'batches' }, () => {
         fetchStats();
@@ -69,8 +68,7 @@ export default function Dashboard() {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(ordersChannel);
-      supabase.removeChannel(batchesChannel);
+      supabase.removeChannel(channel);
     };
   }, []);
 
@@ -78,7 +76,7 @@ export default function Dashboard() {
     try {
       const [ordersRes, batchesRes] = await Promise.all([
         supabase.from('orders').select('id', { count: 'exact', head: true }),
-        supabase.from('batches').select('current_state, quantity'),
+        supabase.from('batches').select('current_state, quantity').eq('is_terminated', false),
       ]);
 
       const batchesByState = batchesRes.data?.reduce((acc, batch) => {
@@ -87,28 +85,18 @@ export default function Dashboard() {
       }, {} as Record<string, number>) || {};
 
       setStats({
-        totalOrders: ordersRes.count || 0,
-        waitingForRM: batchesByState.waiting_for_rm || 0,
-        inManufacturing: batchesByState.in_manufacturing || 0,
-        inPackaging: batchesByState.in_packaging || 0,
-        inBoxing: batchesByState.in_boxing || 0,
-        finished: batchesByState.finished || 0,
+        pending_rm: batchesByState.pending_rm || 0,
+        in_manufacturing: batchesByState.in_manufacturing || 0,
+        ready_for_finishing: batchesByState.ready_for_finishing || 0,
+        in_finishing: batchesByState.in_finishing || 0,
+        ready_for_packaging: batchesByState.ready_for_packaging || 0,
+        in_packaging: batchesByState.in_packaging || 0,
+        ready_for_boxing: batchesByState.ready_for_boxing || 0,
+        in_boxing: batchesByState.in_boxing || 0,
+        ready_for_receiving: batchesByState.ready_for_receiving || 0,
+        received: batchesByState.received || 0,
       });
-
-      setQueueCounts({
-        manufacturing: {
-          waiting: batchesByState.waiting_for_rm || 0,
-          inProgress: batchesByState.in_manufacturing || 0,
-        },
-        packaging: {
-          waiting: batchesByState.waiting_for_pm || 0,
-          inProgress: batchesByState.in_packaging || 0,
-        },
-        boxing: {
-          waiting: batchesByState.waiting_for_bm || 0,
-          inProgress: batchesByState.in_boxing || 0,
-        },
-      });
+      setOrderCount(ordersRes.count || 0);
     } catch (error) {
       console.error('Error fetching stats:', error);
     } finally {
@@ -116,297 +104,221 @@ export default function Dashboard() {
     }
   };
 
-  const roleDisplayNames: Record<string, string> = {
-    manufacture_lead: 'Manufacturing Lead',
-    manufacturer: 'Manufacturer',
-    packaging_manager: 'Packaging Manager',
-    packer: 'Packer',
-    boxing_manager: 'Boxing Manager',
-    boxer: 'Boxer',
-    qc: 'Quality Control',
-    admin: 'Administrator',
-    viewer: 'Viewer',
-  };
+  const totalInProgress = stats.in_manufacturing + stats.in_finishing + stats.in_packaging + stats.in_boxing;
+  const totalWaiting = stats.pending_rm + stats.ready_for_finishing + stats.ready_for_packaging + stats.ready_for_boxing + stats.ready_for_receiving;
+
+  const queues: QueueData[] = [
+    {
+      name: 'Manufacturing',
+      href: '/queues/manufacturing',
+      icon: Factory,
+      color: 'blue',
+      waiting: stats.pending_rm,
+      inProgress: stats.in_manufacturing,
+      waitingLabel: 'Pending RM',
+    },
+    {
+      name: 'Finishing',
+      href: '/queues/finishing',
+      icon: Sparkles,
+      color: 'purple',
+      waiting: stats.ready_for_finishing,
+      inProgress: stats.in_finishing,
+      waitingLabel: 'Ready',
+    },
+    {
+      name: 'Packaging',
+      href: '/queues/packaging',
+      icon: Package,
+      color: 'indigo',
+      waiting: stats.ready_for_packaging,
+      inProgress: stats.in_packaging,
+      waitingLabel: 'Ready',
+    },
+    {
+      name: 'Boxing',
+      href: '/queues/boxing',
+      icon: Box,
+      color: 'cyan',
+      waiting: stats.ready_for_boxing,
+      inProgress: stats.in_boxing,
+      waitingLabel: 'Ready',
+    },
+  ];
+
+  const canCreateOrders = hasRole('manufacture_lead') || hasRole('admin');
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border bg-card">
-        <div className="container mx-auto flex items-center justify-between px-4 py-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-              <Factory className="h-6 w-6 text-primary" />
+    <div className="p-6 space-y-6">
+      {/* Quick Actions */}
+      {canCreateOrders && (
+        <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2">
+              <Plus className="h-5 w-5" />
+              Quick Actions
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-3">
+              <Button asChild>
+                <Link to="/orders/create">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Create Order
+                </Link>
+              </Button>
+              <Button variant="outline" asChild>
+                <Link to="/orders">View Orders</Link>
+              </Button>
             </div>
-            <div>
-              <h1 className="text-xl font-bold">Manufacturing Fulfillment</h1>
-              <p className="text-sm text-muted-foreground">Production Dashboard</p>
-            </div>
-          </div>
-          
-          <div className="flex items-center gap-4">
-            <NotificationBell />
-            <div className="text-right">
-              <p className="text-sm font-medium">{user?.email}</p>
-              <div className="flex gap-1 justify-end mt-1">
-                {userRoles.map((role) => (
-                  <Badge key={role} variant="secondary" className="text-xs">
-                    {roleDisplayNames[role] || role}
-                  </Badge>
-                ))}
-              </div>
-            </div>
-            <Button variant="outline" size="icon" onClick={signOut}>
-              <LogOut className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      </header>
+          </CardContent>
+        </Card>
+      )}
 
-      <div className="container mx-auto p-6 space-y-6">
-        {/* Quick Actions */}
-        {userRoles.includes('manufacture_lead') || userRoles.includes('admin') ? (
-          <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Plus className="h-5 w-5" />
-                Quick Actions
-              </CardTitle>
-              <CardDescription>Create and manage orders</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex gap-4">
-                <Button asChild>
-                  <Link to="/orders/create">
-                    <Plus className="mr-2 h-4 w-4" />
-                    Create New Order
-                  </Link>
-                </Button>
-                <Button variant="outline" asChild>
-                  <Link to="/orders">View All Orders</Link>
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ) : null}
+      {/* Overview Stats */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Total Orders</CardTitle>
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">{orderCount}</div>
+            <p className="text-xs text-muted-foreground">Active production orders</p>
+          </CardContent>
+        </Card>
 
-        {/* Stats Grid */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Waiting</CardTitle>
+            <Clock className="h-4 w-4 text-warning" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-warning">{totalWaiting}</div>
+            <p className="text-xs text-muted-foreground">Items awaiting processing</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">In Progress</CardTitle>
+            <AlertCircle className="h-4 w-4 text-primary" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-primary">{totalInProgress}</div>
+            <p className="text-xs text-muted-foreground">Items being processed</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Fulfilled</CardTitle>
+            <CheckCircle className="h-4 w-4 text-green-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-green-500">{stats.received}</div>
+            <p className="text-xs text-muted-foreground">Completed items</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Production Queues */}
+      <div>
+        <h2 className="text-lg font-semibold mb-4">Production Queues</h2>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Orders</CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.totalOrders}</div>
-              <p className="text-xs text-muted-foreground">Active production orders</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Waiting for RM</CardTitle>
-              <AlertCircle className="h-4 w-4 text-attention" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-attention">{stats.waitingForRM}</div>
-              <p className="text-xs text-muted-foreground">Items awaiting materials</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Manufacturing</CardTitle>
-              <Factory className="h-4 w-4 text-in-progress" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-in-progress">{stats.inManufacturing}</div>
-              <p className="text-xs text-muted-foreground">Items in production</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Packaging</CardTitle>
-              <Package className="h-4 w-4 text-in-progress" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-in-progress">{stats.inPackaging}</div>
-              <p className="text-xs text-muted-foreground">Items being packaged</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Boxing</CardTitle>
-              <Box className="h-4 w-4 text-in-progress" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-in-progress">{stats.inBoxing}</div>
-              <p className="text-xs text-muted-foreground">Items being boxed</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Finished</CardTitle>
-              <ClipboardCheck className="h-4 w-4 text-completed" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-completed">{stats.finished}</div>
-              <p className="text-xs text-muted-foreground">Completed items</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Role-specific sections */}
-        <div className="grid gap-4 md:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>My Queues</CardTitle>
-              <CardDescription>Work items assigned to your role</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {(userRoles.includes('manufacturer') || userRoles.includes('manufacture_lead')) && (
-                  <Card className="border-blue-200 bg-blue-50/50 dark:border-blue-800 dark:bg-blue-950/20">
-                    <CardContent className="p-4">
-                      <Link to="/queues/manufacturing" className="block">
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center gap-2">
-                            <Factory className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                            <span className="font-semibold">Manufacturing Queue</span>
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-2 text-sm">
-                          <div className="bg-background/80 p-2 rounded">
-                            <p className="text-muted-foreground">Waiting for RM</p>
-                            <p className="text-xl font-bold text-yellow-600">{queueCounts.manufacturing.waiting}</p>
-                          </div>
-                          <div className="bg-background/80 p-2 rounded">
-                            <p className="text-muted-foreground">In Progress</p>
-                            <p className="text-xl font-bold text-blue-600">{queueCounts.manufacturing.inProgress}</p>
-                          </div>
-                        </div>
-                      </Link>
-                    </CardContent>
-                  </Card>
-                )}
-                {(userRoles.includes('packer') || userRoles.includes('packaging_manager')) && (
-                  <Card className="border-indigo-200 bg-indigo-50/50 dark:border-indigo-800 dark:bg-indigo-950/20">
-                    <CardContent className="p-4">
-                      <Link to="/queues/packaging" className="block">
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center gap-2">
-                            <Package className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
-                            <span className="font-semibold">Packaging Queue</span>
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-2 text-sm">
-                          <div className="bg-background/80 p-2 rounded">
-                            <p className="text-muted-foreground">Waiting for PM</p>
-                            <p className="text-xl font-bold text-orange-600">{queueCounts.packaging.waiting}</p>
-                          </div>
-                          <div className="bg-background/80 p-2 rounded">
-                            <p className="text-muted-foreground">In Progress</p>
-                            <p className="text-xl font-bold text-indigo-600">{queueCounts.packaging.inProgress}</p>
-                          </div>
-                        </div>
-                      </Link>
-                    </CardContent>
-                  </Card>
-                )}
-                {(userRoles.includes('boxer') || userRoles.includes('boxing_manager')) && (
-                  <Card className="border-cyan-200 bg-cyan-50/50 dark:border-cyan-800 dark:bg-cyan-950/20">
-                    <CardContent className="p-4">
-                      <Link to="/queues/boxing" className="block">
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center gap-2">
-                            <Box className="h-5 w-5 text-cyan-600 dark:text-cyan-400" />
-                            <span className="font-semibold">Boxing Queue</span>
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-2 text-sm">
-                          <div className="bg-background/80 p-2 rounded">
-                            <p className="text-muted-foreground">Waiting for BM</p>
-                            <p className="text-xl font-bold text-orange-600">{queueCounts.boxing.waiting}</p>
-                          </div>
-                          <div className="bg-background/80 p-2 rounded">
-                            <p className="text-muted-foreground">In Progress</p>
-                            <p className="text-xl font-bold text-cyan-600">{queueCounts.boxing.inProgress}</p>
-                          </div>
-                        </div>
-                      </Link>
-                    </CardContent>
-                  </Card>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          {(userRoles.includes('admin') || userRoles.includes('manufacture_lead')) && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Management</CardTitle>
-                <CardDescription>Administrative functions</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <Button variant="outline" className="w-full justify-start" asChild>
-                  <Link to="/analytics">
-                    <TrendingUp className="mr-2 h-4 w-4" />
-                    Analytics & Timelines
-                  </Link>
-                </Button>
-                <Button variant="outline" className="w-full justify-start" asChild>
-                  <Link to="/products">
-                    <Package className="mr-2 h-4 w-4" />
-                    Manage Products
-                  </Link>
-                </Button>
-                <Button variant="outline" className="w-full justify-start" asChild>
-                  <Link to="/extra-inventory">
-                    <Package className="mr-2 h-4 w-4" />
-                    Extra Inventory
-                  </Link>
-                </Button>
-                <Button variant="outline" className="w-full justify-start" asChild>
-                  <Link to="/boxes">
-                    <Box className="mr-2 h-4 w-4" />
-                    Box Management
-                  </Link>
-                </Button>
-                <Button variant="outline" className="w-full justify-start" asChild>
-                  <Link to="/customers">
-                    <Users className="mr-2 h-4 w-4" />
-                    Manage Customers
-                  </Link>
-                </Button>
-                <Button variant="outline" className="w-full justify-start" asChild>
-                  <Link to="/batch">
-                    <ClipboardCheck className="mr-2 h-4 w-4" />
-                    Batch Lookup
-                  </Link>
-                </Button>
-                {userRoles.includes('admin') && (
-                  <>
-                    <Button variant="outline" className="w-full justify-start" asChild>
-                      <Link to="/users">
-                        <Users className="mr-2 h-4 w-4" />
-                        Manage Users & Roles
-                      </Link>
-                    </Button>
-                    <Button variant="outline" className="w-full justify-start" asChild>
-                      <Link to="/machines">
-                        <Factory className="mr-2 h-4 w-4" />
-                        Manage Machines
-                      </Link>
-                    </Button>
-                  </>
-                )}
-              </CardContent>
-            </Card>
-          )}
+          {queues.map((queue) => {
+            const Icon = queue.icon;
+            const total = queue.waiting + queue.inProgress;
+            
+            return (
+              <Link key={queue.name} to={queue.href}>
+                <Card className="hover:border-primary/50 transition-colors cursor-pointer h-full">
+                  <CardHeader className="pb-2">
+                    <div className="flex items-center justify-between">
+                      <div className={`p-2 rounded-lg bg-${queue.color}-100 dark:bg-${queue.color}-900/30`}>
+                        <Icon className={`h-5 w-5 text-${queue.color}-600 dark:text-${queue.color}-400`} />
+                      </div>
+                      {total > 0 && (
+                        <Badge variant="secondary">{total}</Badge>
+                      )}
+                    </div>
+                    <CardTitle className="text-base">{queue.name}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div className="p-2 rounded bg-muted/50">
+                        <p className="text-muted-foreground text-xs">{queue.waitingLabel}</p>
+                        <p className="text-lg font-semibold text-warning">{queue.waiting}</p>
+                      </div>
+                      <div className="p-2 rounded bg-muted/50">
+                        <p className="text-muted-foreground text-xs">In Progress</p>
+                        <p className="text-lg font-semibold text-primary">{queue.inProgress}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+            );
+          })}
         </div>
       </div>
+
+      {/* Ready for Receiving */}
+      {stats.ready_for_receiving > 0 && (
+        <Card className="border-teal-200 dark:border-teal-800 bg-teal-50/50 dark:bg-teal-900/10">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base flex items-center gap-2">
+                <CheckCircle className="h-5 w-5 text-teal-600" />
+                Ready for Receiving
+              </CardTitle>
+              <Badge className="bg-teal-100 text-teal-700 dark:bg-teal-900 dark:text-teal-300">
+                {stats.ready_for_receiving} items
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              Items waiting to be received from boxing into final inventory
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* State Breakdown */}
+      <Card>
+        <CardHeader>
+          <CardTitle>State Breakdown</CardTitle>
+          <CardDescription>Current distribution of items across all production states</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-5">
+            {[
+              { state: 'pending_rm', label: 'Pending RM', count: stats.pending_rm, color: 'bg-yellow-500' },
+              { state: 'in_manufacturing', label: 'Manufacturing', count: stats.in_manufacturing, color: 'bg-blue-500' },
+              { state: 'ready_for_finishing', label: 'Ready Finishing', count: stats.ready_for_finishing, color: 'bg-blue-300' },
+              { state: 'in_finishing', label: 'Finishing', count: stats.in_finishing, color: 'bg-purple-500' },
+              { state: 'ready_for_packaging', label: 'Ready Packaging', count: stats.ready_for_packaging, color: 'bg-orange-500' },
+              { state: 'in_packaging', label: 'Packaging', count: stats.in_packaging, color: 'bg-indigo-500' },
+              { state: 'ready_for_boxing', label: 'Ready Boxing', count: stats.ready_for_boxing, color: 'bg-cyan-300' },
+              { state: 'in_boxing', label: 'Boxing', count: stats.in_boxing, color: 'bg-cyan-500' },
+              { state: 'ready_for_receiving', label: 'Ready Receiving', count: stats.ready_for_receiving, color: 'bg-teal-300' },
+              { state: 'received', label: 'Received', count: stats.received, color: 'bg-green-500' },
+            ].map((item) => (
+              <div 
+                key={item.state}
+                className="flex items-center gap-2 p-2 rounded border"
+              >
+                <div className={`w-3 h-3 rounded-full ${item.color}`} />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-muted-foreground truncate">{item.label}</p>
+                  <p className="font-semibold">{item.count}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

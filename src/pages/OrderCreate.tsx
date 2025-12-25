@@ -10,10 +10,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Plus, Trash2, ClipboardList, Loader2, Check, ChevronsUpDown } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, ClipboardList, Loader2, Check, ChevronsUpDown, CalendarIcon, Plane, Truck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { z } from 'zod';
+import { format } from 'date-fns';
 
 interface Product {
   id: string;
@@ -25,6 +27,7 @@ interface Customer {
   id: string;
   name: string;
   code: string | null;
+  is_domestic: boolean | null;
 }
 
 interface OrderItem {
@@ -43,6 +46,8 @@ const orderSchema = z.object({
   order_number: z.string().trim().min(1, 'Order number is required').max(50, 'Order number too long'),
   notes: z.string().trim().max(500, 'Notes must be less than 500 characters').optional(),
   priority: z.enum(['high', 'normal']),
+  shipping_type: z.enum(['domestic', 'international']),
+  raw_materials: z.string().optional(),
 });
 
 export default function OrderCreate() {
@@ -56,8 +61,12 @@ export default function OrderCreate() {
   const [orderNumber, setOrderNumber] = useState('');
   const [notes, setNotes] = useState('');
   const [priority, setPriority] = useState<'high' | 'normal'>('normal');
+  const [shippingType, setShippingType] = useState<'domestic' | 'international'>('domestic');
+  const [estimatedFulfillment, setEstimatedFulfillment] = useState<Date | undefined>();
+  const [rawMaterials, setRawMaterials] = useState('');
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const [customerOpen, setCustomerOpen] = useState(false);
+  const [eftOpen, setEftOpen] = useState(false);
   const [items, setItems] = useState<OrderItem[]>([{ product_id: '', quantity: 1 }]);
   const [extraProducts, setExtraProducts] = useState<ExtraProduct[]>([]);
   const [extraSelections, setExtraSelections] = useState<Map<string, number>>(new Map());
@@ -81,7 +90,7 @@ export default function OrderCreate() {
           .eq('batch_type', 'EXTRA')
           .eq('inventory_state', 'AVAILABLE')
           .eq('is_terminated', false),
-        supabase.from('customers').select('id, name, code').order('name'),
+        supabase.from('customers').select('id, name, code, is_domestic').order('name'),
       ]);
 
       if (productsRes.error) throw productsRes.error;
@@ -127,7 +136,7 @@ export default function OrderCreate() {
     e.preventDefault();
 
     try {
-      const validation = orderSchema.safeParse({ order_number: orderNumber, notes, priority });
+      const validation = orderSchema.safeParse({ order_number: orderNumber, notes, priority, shipping_type: shippingType, raw_materials: rawMaterials });
       if (!validation.success) {
         toast({
           title: 'Validation Error',
@@ -159,6 +168,8 @@ export default function OrderCreate() {
           order_number: orderNumber.trim(),
           notes: notes.trim() || null,
           priority: priority,
+          shipping_type: shippingType,
+          estimated_fulfillment_time: estimatedFulfillment?.toISOString() || null,
           created_by: user?.id,
           customer_id: selectedCustomerId,
         })
@@ -166,6 +177,16 @@ export default function OrderCreate() {
         .single();
 
       if (orderError) throw orderError;
+
+      // Save raw materials version if provided
+      if (rawMaterials.trim()) {
+        await supabase.from('raw_material_versions').insert({
+          order_id: order.id,
+          version_number: 1,
+          content: rawMaterials.trim(),
+          created_by: user?.id,
+        });
+      }
 
       // Collect all products with their total quantities (merging regular items + extra)
       const productQuantities = new Map<string, { regular: number; extra: number; extraProductId?: string }>();
@@ -389,17 +410,79 @@ export default function OrderCreate() {
                   </PopoverContent>
                 </Popover>
               </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="priority">Priority *</Label>
+                  <Select value={priority} onValueChange={(value: 'high' | 'normal') => setPriority(value)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="normal">Normal</SelectItem>
+                      <SelectItem value="high">High</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Shipping Type *</Label>
+                  <Select value={shippingType} onValueChange={(value: 'domestic' | 'international') => setShippingType(value)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="domestic">
+                        <span className="flex items-center gap-2">
+                          <Truck className="h-4 w-4" />
+                          Domestic
+                        </span>
+                      </SelectItem>
+                      <SelectItem value="international">
+                        <span className="flex items-center gap-2">
+                          <Plane className="h-4 w-4" />
+                          International
+                        </span>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
               <div>
-                <Label htmlFor="priority">Priority *</Label>
-                <Select value={priority} onValueChange={(value: 'high' | 'normal') => setPriority(value)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="normal">Normal</SelectItem>
-                    <SelectItem value="high">High</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Label>Estimated Fulfillment Time</Label>
+                <Popover open={eftOpen} onOpenChange={setEftOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !estimatedFulfillment && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {estimatedFulfillment ? format(estimatedFulfillment, 'PPP') : 'Select date'}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={estimatedFulfillment}
+                      onSelect={(date) => {
+                        setEstimatedFulfillment(date);
+                        setEftOpen(false);
+                      }}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+              <div>
+                <Label htmlFor="raw_materials">Raw Materials (mandatory info)</Label>
+                <Textarea
+                  id="raw_materials"
+                  value={rawMaterials}
+                  onChange={(e) => setRawMaterials(e.target.value)}
+                  placeholder="Enter raw material details for this order..."
+                  rows={3}
+                />
               </div>
               <div>
                 <Label htmlFor="notes">Notes</Label>
@@ -408,7 +491,7 @@ export default function OrderCreate() {
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="Optional order notes..."
-                  rows={3}
+                  rows={2}
                   maxLength={500}
                 />
               </div>
