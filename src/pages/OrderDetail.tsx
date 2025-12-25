@@ -627,10 +627,10 @@ export default function OrderDetail() {
           <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Production Phases</h3>
           
           {[
-            { label: 'Manufacturing', href: '/queues/manufacturing', in: 'in_manufacturing', ready: 'pending_rm', icon: Factory, color: 'blue' },
-            { label: 'Finishing', href: '/queues/finishing', in: 'in_finishing', ready: 'ready_for_finishing', icon: Sparkles, color: 'purple' },
-            { label: 'Packaging', href: '/queues/packaging', in: 'in_packaging', ready: 'ready_for_packaging', icon: Package, color: 'indigo' },
-            { label: 'Boxing', href: '/queues/boxing', in: 'in_boxing', ready: 'ready_for_boxing', icon: Box, color: 'cyan' },
+            { label: 'Manufacturing', href: `/orders/${id}/manufacturing`, in: 'in_manufacturing', ready: 'pending_rm', icon: Factory, color: 'blue' },
+            { label: 'Finishing', href: `/orders/${id}/finishing`, in: 'in_finishing', ready: 'ready_for_finishing', icon: Sparkles, color: 'purple' },
+            { label: 'Packaging', href: `/orders/${id}/packaging`, in: 'in_packaging', ready: 'ready_for_packaging', icon: Package, color: 'indigo' },
+            { label: 'Boxing', href: `/orders/${id}/boxing`, in: 'in_boxing', ready: 'ready_for_boxing', icon: Box, color: 'cyan' },
           ].map(phase => {
             const Icon = phase.icon;
             const waiting = activeBatches.filter(b => b.current_state === phase.ready).reduce((sum, b) => sum + b.quantity, 0);
@@ -642,7 +642,7 @@ export default function OrderDetail() {
               <Card 
                 key={phase.label} 
                 className="cursor-pointer hover:border-primary/50 transition-colors"
-                onClick={() => navigate(`${phase.href}?order=${id}`)}
+                onClick={() => navigate(phase.href)}
               >
                 <CardContent className="p-4">
                   <div className="flex items-center gap-3">

@@ -347,6 +347,7 @@ export type Database = {
         Row: {
           created_at: string | null
           id: string
+          needs_boxing: boolean
           order_id: string
           product_id: string
           quantity: number
@@ -354,6 +355,7 @@ export type Database = {
         Insert: {
           created_at?: string | null
           id?: string
+          needs_boxing?: boolean
           order_id: string
           product_id: string
           quantity: number
@@ -361,6 +363,7 @@ export type Database = {
         Update: {
           created_at?: string | null
           id?: string
+          needs_boxing?: boolean
           order_id?: string
           product_id?: string
           quantity?: number

@@ -11,6 +11,10 @@ import Dashboard from "./pages/Dashboard";
 import Orders from "./pages/Orders";
 import OrderDetail from "./pages/OrderDetail";
 import OrderCreate from "./pages/OrderCreate";
+import OrderManufacturing from "./pages/OrderManufacturing";
+import OrderFinishing from "./pages/OrderFinishing";
+import OrderPackaging from "./pages/OrderPackaging";
+import OrderBoxing from "./pages/OrderBoxing";
 import Products from "./pages/Products";
 import Admin from "./pages/Admin";
 import QueueManufacturing from "./pages/QueueManufacturing";
@@ -45,6 +49,10 @@ const App = () => (
             <Route path="/" element={<ProtectedPage><Dashboard /></ProtectedPage>} />
             <Route path="/orders" element={<ProtectedPage><Orders /></ProtectedPage>} />
             <Route path="/orders/:id" element={<ProtectedPage><OrderDetail /></ProtectedPage>} />
+            <Route path="/orders/:id/manufacturing" element={<ProtectedPage><OrderManufacturing /></ProtectedPage>} />
+            <Route path="/orders/:id/finishing" element={<ProtectedPage><OrderFinishing /></ProtectedPage>} />
+            <Route path="/orders/:id/packaging" element={<ProtectedPage><OrderPackaging /></ProtectedPage>} />
+            <Route path="/orders/:id/boxing" element={<ProtectedPage><OrderBoxing /></ProtectedPage>} />
             <Route path="/orders/create" element={<ProtectedPage><OrderCreate /></ProtectedPage>} />
             <Route path="/products" element={<ProtectedPage><Products /></ProtectedPage>} />
             <Route path="/users" element={<ProtectedRoute requiredRole="admin"><AppLayout><Admin /></AppLayout></ProtectedRoute>} />
