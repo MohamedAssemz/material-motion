@@ -542,22 +542,12 @@ export default function OrderManufacturing() {
         </Card>
       </div>
 
-      {/* Action Buttons */}
+      {/* Action Buttons - ETA moved to box dialog */}
       {canManage && (
         <Card>
           <CardContent className="p-4 flex flex-wrap items-center gap-3">
-            <div className="flex-1">
-              <Label className="text-sm text-muted-foreground">ETA (days)</Label>
-              <Select value={etaDays} onValueChange={setEtaDays}>
-                <SelectTrigger className="w-24">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {[1, 2, 3, 5, 7, 10, 14].map(d => (
-                    <SelectItem key={d} value={d.toString()}>{d} day{d > 1 ? 's' : ''}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="flex-1 text-sm text-muted-foreground">
+              Select quantities below, then choose an action
             </div>
             <Button onClick={handleOpenBoxDialog} disabled={totalSelected === 0}>
               <Box className="h-4 w-4 mr-2" />
@@ -655,7 +645,21 @@ export default function OrderManufacturing() {
           <div className="space-y-4">
             <div className="p-3 bg-muted/50 rounded-lg">
               <p className="text-sm font-medium">Items to assign: {totalSelected}</p>
-              <p className="text-xs text-muted-foreground">ETA: {etaDays} day(s)</p>
+            </div>
+
+            {/* ETA Selection inside dialog */}
+            <div className="space-y-2">
+              <Label>ETA (Lead Time)</Label>
+              <Select value={etaDays} onValueChange={setEtaDays}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {[1, 2, 3, 5, 7, 10, 14, 21, 30].map(d => (
+                    <SelectItem key={d} value={d.toString()}>{d} day{d > 1 ? 's' : ''}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">
