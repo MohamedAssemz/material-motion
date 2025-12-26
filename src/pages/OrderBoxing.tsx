@@ -320,6 +320,14 @@ export default function OrderBoxing() {
     if (totalSelectedForShipment === 0) return;
     setSubmitting(true);
     
+    // Capture print data BEFORE clearing state
+    const printData = Array.from(readyForShipmentSelections.entries()).map(([key, qty]) => {
+      const group = readyForShipmentGroups.find(g => (g.order_item_id || g.product_id) === key);
+      return group ? { sku: group.product_sku, name: group.product_name, qty, needsBoxing: group.needs_boxing } : null;
+    }).filter(Boolean);
+    const printTotal = totalSelectedForShipment;
+    const printNotes = shipmentNotes.trim();
+    
     try {
       // Generate shipment code
       const { data: shipmentCode } = await supabase.rpc('generate_shipment_code');
@@ -330,7 +338,7 @@ export default function OrderBoxing() {
         .insert({
           shipment_code: shipmentCode || `SHP-${Date.now()}`,
           order_id: id,
-          notes: shipmentNotes.trim() || null,
+          notes: printNotes || null,
           created_by: user?.id,
           status: 'sealed',
           sealed_at: new Date().toISOString(),
@@ -389,10 +397,10 @@ export default function OrderBoxing() {
       setKartonaDialogOpen(false);
       setReadyForShipmentSelections(new Map());
       setShipmentNotes('');
-      setSubmitting(false); // Reset submitting before print to prevent stuck state
+      setSubmitting(false);
       
-      // Print label (non-blocking)
-      printKartonaLabel(shipment.shipment_code);
+      // Print label with captured data (non-blocking)
+      printKartonaLabel(shipment.shipment_code, printData, printTotal, printNotes);
       
       fetchData();
     } catch (error: any) {
@@ -401,14 +409,9 @@ export default function OrderBoxing() {
     }
   };
 
-  const printKartonaLabel = (shipmentCode: string) => {
+  const printKartonaLabel = (shipmentCode: string, items: any[], total: number, notes: string) => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
-
-    const selectedItems = Array.from(readyForShipmentSelections.entries()).map(([key, qty]) => {
-      const group = readyForShipmentGroups.find(g => (g.order_item_id || g.product_id) === key);
-      return group ? { sku: group.product_sku, name: group.product_name, qty, needsBoxing: group.needs_boxing } : null;
-    }).filter(Boolean);
 
     const html = `
       <!DOCTYPE html>
@@ -439,11 +442,11 @@ export default function OrderBoxing() {
           <div class="section">
             <div class="label">CONTENTS:</div>
             <table>
-              ${selectedItems.map((item: any) => `<tr><td>${item.sku}</td><td>${item.name}<br><span class="boxing">${item.needsBoxing ? 'Boxed' : 'Not Boxed'}</span></td><td style="text-align:right">${item.qty}</td></tr>`).join('')}
-              <tr class="total"><td colspan="2">Total Items</td><td style="text-align:right">${totalSelectedForShipment}</td></tr>
+              ${items.map((item: any) => `<tr><td>${item.sku}</td><td>${item.name}<br><span class="boxing">${item.needsBoxing ? 'Boxed' : 'Not Boxed'}</span></td><td style="text-align:right">${item.qty}</td></tr>`).join('')}
+              <tr class="total"><td colspan="2">Total Items</td><td style="text-align:right">${total}</td></tr>
             </table>
           </div>
-          ${shipmentNotes ? `<div class="section"><div class="label">NOTES:</div><p>${shipmentNotes}</p></div>` : ''}
+          ${notes ? `<div class="section"><div class="label">NOTES:</div><p>${notes}</p></div>` : ''}
           <div class="date">Created: ${format(new Date(), 'PPP p')}</div>
           <script>window.print(); window.close();</script>
         </body>
