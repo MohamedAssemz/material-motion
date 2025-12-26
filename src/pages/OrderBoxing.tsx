@@ -339,11 +339,11 @@ export default function OrderBoxing() {
       
       if (shipmentError) throw shipmentError;
       
-      // Process each product selection
+      // Process each order item selection (key is order_item_id or product_id)
       const shipmentItems = [];
-      for (const [productId, quantity] of readyForShipmentSelections.entries()) {
+      for (const [key, quantity] of readyForShipmentSelections.entries()) {
         if (quantity <= 0) continue;
-        const group = readyForShipmentGroups.find(g => g.product_id === productId);
+        const group = readyForShipmentGroups.find(g => (g.order_item_id || g.product_id) === key);
         if (!group) continue;
         
         let remainingQty = quantity;
@@ -366,6 +366,7 @@ export default function OrderBoxing() {
               batch_code: batchCode,
               order_id: id,
               product_id: batch.product_id,
+              order_item_id: batch.order_item_id,
               current_state: 'received',
               quantity: useQty,
               created_by: user?.id,
@@ -400,8 +401,8 @@ export default function OrderBoxing() {
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
 
-    const selectedItems = Array.from(readyForShipmentSelections.entries()).map(([pid, qty]) => {
-      const group = readyForShipmentGroups.find(g => g.product_id === pid);
+    const selectedItems = Array.from(readyForShipmentSelections.entries()).map(([key, qty]) => {
+      const group = readyForShipmentGroups.find(g => (g.order_item_id || g.product_id) === key);
       return group ? { sku: group.product_sku, name: group.product_name, qty, needsBoxing: group.needs_boxing } : null;
     }).filter(Boolean);
 

@@ -41,6 +41,7 @@ interface Batch {
   current_state: string;
   quantity: number;
   product_id: string;
+  order_item_id: string | null;
   box_id: string | null;
   product: {
     id: string;
@@ -52,6 +53,7 @@ interface Batch {
     id: string;
     box_code: string;
   } | null;
+  order_item?: { id: string; needs_boxing: boolean } | null;
 }
 
 interface Order {
@@ -68,11 +70,14 @@ interface BoxGroup {
   totalQty: number;
 }
 
-interface ProductGroup {
+// Group by order_item_id to preserve order item identity
+interface OrderItemGroup {
+  order_item_id: string;
   product_id: string;
   product_name: string;
   product_sku: string;
   needs_packing: boolean;
+  needs_boxing: boolean;
   quantity: number;
   batches: Batch[];
 }
@@ -118,7 +123,7 @@ export default function OrderFinishing() {
       const [orderRes, batchesRes] = await Promise.all([
         supabase.from('orders').select('id, order_number, priority, customer:customers(name)').eq('id', id).single(),
         supabase.from('batches')
-          .select('id, batch_code, current_state, quantity, product_id, box_id, product:products(id, name, sku, needs_packing)')
+          .select('id, batch_code, current_state, quantity, product_id, order_item_id, box_id, product:products(id, name, sku, needs_packing)')
           .eq('order_id', id)
           .eq('is_terminated', false)
           .in('current_state', ['ready_for_finishing', 'in_finishing'])
@@ -135,13 +140,22 @@ export default function OrderFinishing() {
         boxesData?.forEach(box => boxMap.set(box.id, box));
       }
       
-      const batchesWithBoxes = batchesRes.data?.map((batch: any) => ({
+      // Fetch order_item info for needs_boxing
+      const orderItemIds = batchesRes.data?.filter((b: any) => b.order_item_id).map((b: any) => b.order_item_id) || [];
+      let orderItemMap = new Map();
+      if (orderItemIds.length > 0) {
+        const { data: orderItemsData } = await supabase.from('order_items').select('id, needs_boxing').in('id', orderItemIds);
+        orderItemsData?.forEach(oi => orderItemMap.set(oi.id, oi));
+      }
+      
+      const batchesWithData = batchesRes.data?.map((batch: any) => ({
         ...batch,
         box: batch.box_id ? boxMap.get(batch.box_id) : null,
+        order_item: batch.order_item_id ? orderItemMap.get(batch.order_item_id) : null,
       })) || [];
       
       setOrder(orderRes.data as Order);
-      setBatches(batchesWithBoxes as Batch[]);
+      setBatches(batchesWithData as Batch[]);
     } catch (error: any) {
       toast.error(error.message);
     } finally {
@@ -231,25 +245,28 @@ export default function OrderFinishing() {
   });
   boxMap.forEach(g => readyBoxGroups.push(g));
 
-  // Group in_finishing by product
-  const inFinishingGroups: ProductGroup[] = [];
-  const productMap = new Map<string, ProductGroup>();
+  // Group in_finishing by order_item_id to preserve identity
+  const inFinishingGroups: OrderItemGroup[] = [];
+  const orderItemGroupMap = new Map<string, OrderItemGroup>();
   batches.filter(b => b.current_state === 'in_finishing').forEach(batch => {
-    if (!productMap.has(batch.product_id)) {
-      productMap.set(batch.product_id, {
+    const key = batch.order_item_id || batch.product_id;
+    if (!orderItemGroupMap.has(key)) {
+      orderItemGroupMap.set(key, {
+        order_item_id: batch.order_item_id || '',
         product_id: batch.product_id,
         product_name: batch.product?.name || 'Unknown',
         product_sku: batch.product?.sku || 'N/A',
         needs_packing: batch.product?.needs_packing ?? true,
+        needs_boxing: batch.order_item?.needs_boxing ?? true,
         quantity: 0,
         batches: [],
       });
     }
-    const group = productMap.get(batch.product_id)!;
+    const group = orderItemGroupMap.get(key)!;
     group.batches.push(batch);
     group.quantity += batch.quantity;
   });
-  productMap.forEach(g => inFinishingGroups.push(g));
+  orderItemGroupMap.forEach(g => inFinishingGroups.push(g));
 
   const totalReadyForFinishing = readyBoxGroups.reduce((sum, g) => sum + g.totalQty, 0);
   const totalInFinishing = inFinishingGroups.reduce((sum, g) => sum + g.quantity, 0);
@@ -323,12 +340,13 @@ export default function OrderFinishing() {
         quantity: number;
         batch_id: string;
         batch_type: string;
+        needs_boxing: boolean;
       }> = [];
 
-      for (const [productId, quantity] of productSelections.entries()) {
+      for (const [key, quantity] of productSelections.entries()) {
         if (quantity <= 0) continue;
         
-        const group = inFinishingGroups.find(g => g.product_id === productId);
+        const group = inFinishingGroups.find(g => (g.order_item_id || g.product_id) === key);
         if (!group) continue;
         
         // Determine next state based on needs_packing
@@ -354,6 +372,7 @@ export default function OrderFinishing() {
               quantity: useQty,
               batch_id: batch.id,
               batch_type: 'ORDER',
+              needs_boxing: group.needs_boxing,
             });
           } else {
             const { data: batchCode } = await supabase.rpc('generate_batch_code');
@@ -361,6 +380,7 @@ export default function OrderFinishing() {
               batch_code: batchCode,
               order_id: id,
               product_id: batch.product_id,
+              order_item_id: batch.order_item_id,
               current_state: nextState,
               quantity: useQty,
               box_id: selectedBox.id,
@@ -377,6 +397,7 @@ export default function OrderFinishing() {
               quantity: useQty,
               batch_id: newBatch?.id || batch.id,
               batch_type: 'ORDER',
+              needs_boxing: group.needs_boxing,
             });
           }
         }
@@ -594,8 +615,10 @@ export default function OrderFinishing() {
             {inFinishingGroups.length === 0 ? (
               <Card><CardContent className="p-8 text-center text-muted-foreground">No items in finishing</CardContent></Card>
             ) : (
-              inFinishingGroups.map(group => (
-                <Card key={group.product_id}>
+              inFinishingGroups.map(group => {
+                const key = group.order_item_id || group.product_id;
+                return (
+                <Card key={key}>
                   <CardContent className="p-4">
                     <div className="flex items-center justify-between">
                       <div>
@@ -604,6 +627,9 @@ export default function OrderFinishing() {
                           {group.product_sku}
                           <Badge variant="outline" className="ml-2 text-xs">
                             {group.needs_packing ? '→ Packaging' : '→ Boxing'}
+                          </Badge>
+                          <Badge variant={group.needs_boxing ? 'default' : 'secondary'} className="ml-1 text-xs">
+                            {group.needs_boxing ? 'Boxing' : 'No Boxing'}
                           </Badge>
                         </p>
                       </div>
@@ -619,13 +645,13 @@ export default function OrderFinishing() {
                               type="number"
                               min={0}
                               max={group.quantity}
-                              value={productSelections.get(group.product_id) || ''}
+                              value={productSelections.get(key) || ''}
                               onChange={(e) => {
                                 const qty = Math.max(0, Math.min(parseInt(e.target.value) || 0, group.quantity));
                                 setProductSelections(prev => {
                                   const next = new Map(prev);
-                                  if (qty > 0) next.set(group.product_id, qty);
-                                  else next.delete(group.product_id);
+                                  if (qty > 0) next.set(key, qty);
+                                  else next.delete(key);
                                   return next;
                                 });
                               }}
@@ -637,7 +663,7 @@ export default function OrderFinishing() {
                     </div>
                   </CardContent>
                 </Card>
-              ))
+              )})
             )}
           </div>
         </TabsContent>
@@ -687,11 +713,11 @@ export default function OrderFinishing() {
             <div className="p-3 bg-muted/50 rounded-lg">
               <p className="text-sm font-medium">Items to assign: {totalSelected}</p>
               <div className="text-xs text-muted-foreground mt-1">
-                {Array.from(productSelections.entries()).map(([pid, qty]) => {
-                  const group = inFinishingGroups.find(g => g.product_id === pid);
+                {Array.from(productSelections.entries()).map(([key, qty]) => {
+                  const group = inFinishingGroups.find(g => (g.order_item_id || g.product_id) === key);
                   return group ? (
-                    <div key={pid}>
-                      {group.product_sku}: {qty} → {group.needs_packing ? 'Packaging' : 'Boxing'}
+                    <div key={key}>
+                      {group.product_sku}: {qty} → {group.needs_packing ? 'Packaging' : 'Boxing'} ({group.needs_boxing ? 'Boxing' : 'No Boxing'})
                     </div>
                   ) : null;
                 })}
