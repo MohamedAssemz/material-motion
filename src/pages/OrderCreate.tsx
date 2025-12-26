@@ -220,111 +220,114 @@ export default function OrderCreate() {
         });
       }
 
-      // Collect all products with their total quantities (merging regular items + extra)
-      const productQuantities = new Map<string, { regular: number; extra: number; extraProductId?: string }>();
+      // Create order items for each item row separately (preserving identity)
+      // Items with same product but different needs_boxing stay separate
+      const createdOrderItems: Array<{
+        id: string;
+        product_id: string;
+        quantity: number;
+        needs_boxing: boolean;
+        isExtra?: boolean;
+        extraProductId?: string;
+      }> = [];
       
-      // Add regular items
-      validItems.forEach(item => {
-        const existing = productQuantities.get(item.product_id) || { regular: 0, extra: 0 };
-        existing.regular += item.quantity;
-        productQuantities.set(item.product_id, existing);
-      });
+      // Create order items for regular items
+      for (const item of validItems) {
+        const { data: orderItem, error: itemError } = await supabase
+          .from('order_items')
+          .insert({
+            order_id: order.id,
+            product_id: item.product_id,
+            quantity: item.quantity,
+            needs_boxing: item.needs_boxing,
+          })
+          .select()
+          .single();
+        
+        if (itemError) throw itemError;
+        createdOrderItems.push({
+          id: orderItem.id,
+          product_id: item.product_id,
+          quantity: item.quantity,
+          needs_boxing: item.needs_boxing,
+        });
+      }
       
-      // Add extra selections
+      // Create order items for extra selections
       for (const [extraId, quantity] of extraSelections.entries()) {
         if (quantity > 0) {
           const extraProduct = extraProducts.find(ep => ep.id === extraId);
           if (extraProduct) {
-            const existing = productQuantities.get(extraProduct.product_id) || { regular: 0, extra: 0 };
-            existing.extra += quantity;
-            existing.extraProductId = extraId;
-            productQuantities.set(extraProduct.product_id, existing);
+            const { data: orderItem, error: itemError } = await supabase
+              .from('order_items')
+              .insert({
+                order_id: order.id,
+                product_id: extraProduct.product_id,
+                quantity: quantity,
+                needs_boxing: true, // Extra products default to needing boxing
+              })
+              .select()
+              .single();
+            
+            if (itemError) throw itemError;
+            createdOrderItems.push({
+              id: orderItem.id,
+              product_id: extraProduct.product_id,
+              quantity: quantity,
+              needs_boxing: true,
+              isExtra: true,
+              extraProductId: extraId,
+            });
           }
         }
       }
 
-      // Create order items for all products (quantity = total for order tracking)
-      const orderItemsToCreate = Array.from(productQuantities.entries()).map(([productId, quantities]) => {
-        const item = validItems.find(i => i.product_id === productId);
-        return {
-          order_id: order.id,
-          product_id: productId,
-          quantity: quantities.regular + quantities.extra,
-          needs_boxing: item?.needs_boxing ?? true,
-        };
-      });
-
-      const { error: itemsError } = await supabase
-        .from('order_items')
-        .insert(orderItemsToCreate);
-
-      if (itemsError) throw itemsError;
-
-      // Create batches instead of individual units
-      const batchesToCreate = [];
+      // Create batches linked to each order item
       let totalBatchQuantity = 0;
       
-      for (const [productId, quantities] of productQuantities.entries()) {
-        // Create batch for regular items (starts at pending_rm)
-        if (quantities.regular > 0) {
-          const { data: batchCode } = await supabase.rpc('generate_batch_code');
-          batchesToCreate.push({
-            batch_code: batchCode || `B-${Date.now()}`,
-            order_id: order.id,
-            product_id: productId,
-            current_state: 'pending_rm',
-            quantity: quantities.regular,
-            created_by: user?.id,
-          });
-          totalBatchQuantity += quantities.regular;
-        }
+      for (const orderItem of createdOrderItems) {
+        const { data: batchCode } = await supabase.rpc('generate_batch_code');
         
-        // Create batch for extra items (starts at received)
-        if (quantities.extra > 0) {
-          const { data: batchCode } = await supabase.rpc('generate_batch_code');
-          batchesToCreate.push({
-            batch_code: batchCode || `B-${Date.now()}`,
-            order_id: order.id,
-            product_id: productId,
-            current_state: 'received',
-            quantity: quantities.extra,
-            created_by: user?.id,
-          });
-          totalBatchQuantity += quantities.extra;
-          
-          // Mark extra batch as consumed (or split if partial)
-          if (quantities.extraProductId) {
-            const extraBatch = extraProducts.find(ep => ep.id === quantities.extraProductId);
-            if (extraBatch) {
-              if (quantities.extra === extraBatch.quantity) {
-                // Full consumption
-                await supabase
-                  .from('batches')
-                  .update({ inventory_state: 'CONSUMED' })
-                  .eq('id', quantities.extraProductId);
-              } else {
-                // Partial consumption - reduce quantity
-                await supabase
-                  .from('batches')
-                  .update({ quantity: extraBatch.quantity - quantities.extra })
-                  .eq('id', quantities.extraProductId);
-              }
+        // Determine initial state
+        const initialState = orderItem.isExtra ? 'received' : 'pending_rm';
+        
+        const { error: batchError } = await supabase.from('batches').insert({
+          batch_code: batchCode || `B-${Date.now()}`,
+          order_id: order.id,
+          order_item_id: orderItem.id,
+          product_id: orderItem.product_id,
+          current_state: initialState,
+          quantity: orderItem.quantity,
+          created_by: user?.id,
+        });
+        
+        if (batchError) throw batchError;
+        totalBatchQuantity += orderItem.quantity;
+        
+        // Handle extra product consumption
+        if (orderItem.isExtra && orderItem.extraProductId) {
+          const extraBatch = extraProducts.find(ep => ep.id === orderItem.extraProductId);
+          if (extraBatch) {
+            if (orderItem.quantity === extraBatch.quantity) {
+              // Full consumption
+              await supabase
+                .from('batches')
+                .update({ inventory_state: 'CONSUMED' })
+                .eq('id', orderItem.extraProductId);
+            } else {
+              // Partial consumption - reduce quantity
+              await supabase
+                .from('batches')
+                .update({ quantity: extraBatch.quantity - orderItem.quantity })
+                .eq('id', orderItem.extraProductId);
             }
           }
         }
       }
 
-      if (batchesToCreate.length > 0) {
-        const { error: batchesError } = await supabase
-          .from('batches')
-          .insert(batchesToCreate);
-
-        if (batchesError) throw batchesError;
-      }
-
       toast({
         title: 'Success',
-        description: `Order ${orderNumber} created with ${totalBatchQuantity} items in ${batchesToCreate.length} batch(es)`,
+        description: `Order ${orderNumber} created with ${totalBatchQuantity} items in ${createdOrderItems.length} batch(es)`,
       });
 
       navigate('/orders');
