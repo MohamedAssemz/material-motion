@@ -488,7 +488,7 @@ export default function OrderManufacturing() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" onClick={() => navigate(`/orders/${id}`)}>
+          <Button variant="ghost" onClick={() => navigate('/queues/manufacturing')}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div className="flex items-center gap-3">
@@ -504,6 +504,10 @@ export default function OrderManufacturing() {
             </div>
           </div>
         </div>
+        
+        <Button variant="outline" onClick={() => navigate(`/orders/${id}`)}>
+          View Order Details
+        </Button>
         
         {canManage && totalSelected > 0 && (
           <div className="flex items-center gap-2">
