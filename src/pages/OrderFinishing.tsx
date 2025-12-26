@@ -308,6 +308,23 @@ export default function OrderFinishing() {
     setSubmitting(true);
     
     try {
+      // Get current box data for items_list
+      const { data: boxData } = await supabase
+        .from('boxes')
+        .select('items_list')
+        .eq('id', selectedBox.id)
+        .single();
+      
+      const currentItems = Array.isArray(boxData?.items_list) ? boxData.items_list : [];
+      const newItems: Array<{
+        product_id: string;
+        product_name: string;
+        product_sku: string;
+        quantity: number;
+        batch_id: string;
+        batch_type: string;
+      }> = [];
+
       for (const [productId, quantity] of productSelections.entries()) {
         if (quantity <= 0) continue;
         
@@ -329,9 +346,18 @@ export default function OrderFinishing() {
               current_state: nextState,
               box_id: selectedBox.id,
             }).eq('id', batch.id);
+            
+            newItems.push({
+              product_id: group.product_id,
+              product_name: group.product_name,
+              product_sku: group.product_sku,
+              quantity: useQty,
+              batch_id: batch.id,
+              batch_type: 'ORDER',
+            });
           } else {
             const { data: batchCode } = await supabase.rpc('generate_batch_code');
-            await supabase.from('batches').insert({
+            const { data: newBatch } = await supabase.from('batches').insert({
               batch_code: batchCode,
               order_id: id,
               product_id: batch.product_id,
@@ -340,11 +366,28 @@ export default function OrderFinishing() {
               box_id: selectedBox.id,
               created_by: user?.id,
               parent_batch_id_split: batch.id,
-            });
+            }).select('id').single();
+            
             await supabase.from('batches').update({ quantity: batch.quantity - useQty }).eq('id', batch.id);
+            
+            newItems.push({
+              product_id: group.product_id,
+              product_name: group.product_name,
+              product_sku: group.product_sku,
+              quantity: useQty,
+              batch_id: newBatch?.id || batch.id,
+              batch_type: 'ORDER',
+            });
           }
         }
       }
+      
+      // Update box with new items_list and content_type
+      const updatedItems = [...currentItems, ...newItems];
+      await supabase.from('boxes').update({
+        items_list: updatedItems,
+        content_type: 'ORDER',
+      }).eq('id', selectedBox.id);
       
       toast.success(`Assigned ${totalSelected} items to ${selectedBox.box_code}`);
       setBoxAssignDialogOpen(false);
