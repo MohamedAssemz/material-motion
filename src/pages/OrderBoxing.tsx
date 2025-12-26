@@ -43,10 +43,11 @@ interface Batch {
   current_state: string;
   quantity: number;
   product_id: string;
+  order_item_id: string | null;
   box_id: string | null;
   product: { id: string; name: string; sku: string; needs_packing: boolean };
   box?: { id: string; box_code: string } | null;
-  order_item?: { needs_boxing: boolean } | null;
+  order_item?: { id: string; needs_boxing: boolean } | null;
 }
 
 interface Order {
@@ -63,7 +64,9 @@ interface BoxGroup {
   totalQty: number;
 }
 
-interface ProductGroup {
+// Group by order_item_id to preserve order item identity (same product with different needs_boxing stays separate)
+interface OrderItemGroup {
+  order_item_id: string;
   product_id: string;
   product_name: string;
   product_sku: string;
@@ -109,7 +112,7 @@ export default function OrderBoxing() {
       const [orderRes, batchesRes] = await Promise.all([
         supabase.from('orders').select('id, order_number, priority, customer:customers(name)').eq('id', id).single(),
         supabase.from('batches')
-          .select('id, batch_code, current_state, quantity, product_id, box_id, product:products(id, name, sku, needs_packing)')
+          .select('id, batch_code, current_state, quantity, product_id, order_item_id, box_id, product:products(id, name, sku, needs_packing)')
           .eq('order_id', id)
           .eq('is_terminated', false)
           .in('current_state', ['ready_for_boxing', 'in_boxing', 'ready_for_receiving', 'received'])
@@ -118,6 +121,7 @@ export default function OrderBoxing() {
       if (orderRes.error) throw orderRes.error;
       if (batchesRes.error) throw batchesRes.error;
       
+      // Fetch box info
       const boxIds = batchesRes.data?.filter((b: any) => b.box_id).map((b: any) => b.box_id) || [];
       let boxMap = new Map();
       if (boxIds.length > 0) {
@@ -125,13 +129,22 @@ export default function OrderBoxing() {
         boxesData?.forEach(box => boxMap.set(box.id, box));
       }
       
-      const batchesWithBoxes = batchesRes.data?.map((batch: any) => ({
+      // Fetch order_item info for needs_boxing
+      const orderItemIds = batchesRes.data?.filter((b: any) => b.order_item_id).map((b: any) => b.order_item_id) || [];
+      let orderItemMap = new Map();
+      if (orderItemIds.length > 0) {
+        const { data: orderItemsData } = await supabase.from('order_items').select('id, needs_boxing').in('id', orderItemIds);
+        orderItemsData?.forEach(oi => orderItemMap.set(oi.id, oi));
+      }
+      
+      const batchesWithData = batchesRes.data?.map((batch: any) => ({
         ...batch,
         box: batch.box_id ? boxMap.get(batch.box_id) : null,
+        order_item: batch.order_item_id ? orderItemMap.get(batch.order_item_id) : null,
       })) || [];
       
       setOrder(orderRes.data as Order);
-      setBatches(batchesWithBoxes as Batch[]);
+      setBatches(batchesWithData as Batch[]);
     } catch (error: any) {
       toast.error(error.message);
     } finally {
@@ -152,41 +165,46 @@ export default function OrderBoxing() {
   });
   boxGroupMap.forEach(g => readyBoxGroups.push(g));
 
-  // Group in_boxing by product
-  const inBoxingGroups: ProductGroup[] = [];
-  const productMap = new Map<string, ProductGroup>();
+  // Group in_boxing by order_item_id to preserve identity (same product with different needs_boxing stays separate)
+  const inBoxingGroups: OrderItemGroup[] = [];
+  const orderItemMap = new Map<string, OrderItemGroup>();
   batches.filter(b => b.current_state === 'in_boxing').forEach(batch => {
-    if (!productMap.has(batch.product_id)) {
-      productMap.set(batch.product_id, { 
+    // Use order_item_id as key, or fall back to product_id for legacy data
+    const key = batch.order_item_id || batch.product_id;
+    if (!orderItemMap.has(key)) {
+      orderItemMap.set(key, { 
+        order_item_id: batch.order_item_id || '',
         product_id: batch.product_id, 
         product_name: batch.product?.name || 'Unknown', 
         product_sku: batch.product?.sku || 'N/A', 
-        needs_boxing: batch.product?.needs_packing ?? true,
+        needs_boxing: batch.order_item?.needs_boxing ?? true,
         quantity: 0, 
         batches: [] 
       });
     }
-    const group = productMap.get(batch.product_id)!;
+    const group = orderItemMap.get(key)!;
     group.batches.push(batch);
     group.quantity += batch.quantity;
   });
-  productMap.forEach(g => inBoxingGroups.push(g));
+  orderItemMap.forEach(g => inBoxingGroups.push(g));
 
-  // Group ready_for_receiving (ready for shipment) by product
-  const readyForShipmentGroups: ProductGroup[] = [];
-  const readyShipmentMap = new Map<string, ProductGroup>();
+  // Group ready_for_receiving (ready for shipment) by order_item_id
+  const readyForShipmentGroups: OrderItemGroup[] = [];
+  const readyShipmentMap = new Map<string, OrderItemGroup>();
   batches.filter(b => b.current_state === 'ready_for_receiving').forEach(batch => {
-    if (!readyShipmentMap.has(batch.product_id)) {
-      readyShipmentMap.set(batch.product_id, { 
+    const key = batch.order_item_id || batch.product_id;
+    if (!readyShipmentMap.has(key)) {
+      readyShipmentMap.set(key, { 
+        order_item_id: batch.order_item_id || '',
         product_id: batch.product_id, 
         product_name: batch.product?.name || 'Unknown', 
         product_sku: batch.product?.sku || 'N/A', 
-        needs_boxing: batch.product?.needs_packing ?? true,
+        needs_boxing: batch.order_item?.needs_boxing ?? true,
         quantity: 0, 
         batches: [] 
       });
     }
-    const group = readyShipmentMap.get(batch.product_id)!;
+    const group = readyShipmentMap.get(key)!;
     group.batches.push(batch);
     group.quantity += batch.quantity;
   });
@@ -210,9 +228,35 @@ export default function OrderBoxing() {
     try {
       const etaDate = new Date();
       etaDate.setDate(etaDate.getDate() + parseInt(etaDays) || 1);
-      const batchIds = batches.filter(b => b.current_state === 'ready_for_boxing' && b.box_id && selectedBoxes.has(b.box_id)).map(b => b.id);
-      await supabase.from('batches').update({ current_state: 'in_boxing', eta: etaDate.toISOString(), lead_time_days: parseInt(etaDays) || 1 }).in('id', batchIds);
-      toast.success(`Accepted ${selectedBoxes.size} box(es) into boxing`);
+      
+      // Get all batches in selected boxes
+      const selectedBatches = batches.filter(b => b.current_state === 'ready_for_boxing' && b.box_id && selectedBoxes.has(b.box_id));
+      
+      // Route based on needs_boxing flag per batch:
+      // needs_boxing = true -> in_boxing (Processing)
+      // needs_boxing = false -> ready_for_receiving (Ready for Shipment)
+      const batchesToBoxing = selectedBatches.filter(b => b.order_item?.needs_boxing !== false);
+      const batchesToShipment = selectedBatches.filter(b => b.order_item?.needs_boxing === false);
+      
+      if (batchesToBoxing.length > 0) {
+        await supabase.from('batches').update({ 
+          current_state: 'in_boxing', 
+          eta: etaDate.toISOString(), 
+          lead_time_days: parseInt(etaDays) || 1 
+        }).in('id', batchesToBoxing.map(b => b.id));
+      }
+      
+      if (batchesToShipment.length > 0) {
+        await supabase.from('batches').update({ 
+          current_state: 'ready_for_receiving',
+          box_id: null,
+        }).in('id', batchesToShipment.map(b => b.id));
+      }
+      
+      const boxingCount = batchesToBoxing.reduce((sum, b) => sum + b.quantity, 0);
+      const shipmentCount = batchesToShipment.reduce((sum, b) => sum + b.quantity, 0);
+      
+      toast.success(`Routed ${boxingCount} to Processing, ${shipmentCount} directly to Ready for Shipment`);
       setSelectedBoxes(new Set());
       setAcceptDialogOpen(false);
       fetchData();
@@ -225,9 +269,10 @@ export default function OrderBoxing() {
     setSubmitting(true);
     
     try {
-      for (const [productId, quantity] of productSelections.entries()) {
+      // Use order_item_id or product_id as key (matching how groups are created)
+      for (const [key, quantity] of productSelections.entries()) {
         if (quantity <= 0) continue;
-        const group = inBoxingGroups.find(g => g.product_id === productId);
+        const group = inBoxingGroups.find(g => (g.order_item_id || g.product_id) === key);
         if (!group) continue;
         
         let remainingQty = quantity;
@@ -247,6 +292,7 @@ export default function OrderBoxing() {
               batch_code: batchCode,
               order_id: id,
               product_id: batch.product_id,
+              order_item_id: batch.order_item_id,
               current_state: 'ready_for_receiving',
               quantity: useQty,
               created_by: user?.id,
@@ -547,7 +593,7 @@ export default function OrderBoxing() {
             {inBoxingGroups.length === 0 ? (
               <Card><CardContent className="p-8 text-center text-muted-foreground">No items in boxing</CardContent></Card>
             ) : inBoxingGroups.map(group => (
-              <Card key={group.product_id}>
+              <Card key={group.order_item_id || group.product_id}>
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div>
@@ -571,14 +617,16 @@ export default function OrderBoxing() {
                             type="number"
                             min={0}
                             max={group.quantity}
-                            value={productSelections.get(group.product_id) || ''}
+                            value={productSelections.get(group.order_item_id || group.product_id) || ''}
                             onChange={(e) => {
+                              const key = group.order_item_id || group.product_id;
                               const qty = Math.max(0, Math.min(parseInt(e.target.value) || 0, group.quantity));
                               setProductSelections(prev => {
                                 const next = new Map(prev);
-                                if (qty > 0) next.set(group.product_id, qty);
-                                else next.delete(group.product_id);
+                                if (qty > 0) next.set(key, qty);
+                                else next.delete(key);
                                 return next;
+                              });
                               });
                             }}
                             placeholder="0"
@@ -611,7 +659,7 @@ export default function OrderBoxing() {
             {readyForShipmentGroups.length === 0 ? (
               <Card><CardContent className="p-8 text-center text-muted-foreground">No items ready for shipment</CardContent></Card>
             ) : readyForShipmentGroups.map(group => (
-              <Card key={group.product_id}>
+              <Card key={group.order_item_id || group.product_id}>
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div>
@@ -635,14 +683,16 @@ export default function OrderBoxing() {
                             type="number"
                             min={0}
                             max={group.quantity}
-                            value={readyForShipmentSelections.get(group.product_id) || ''}
+                            value={readyForShipmentSelections.get(group.order_item_id || group.product_id) || ''}
                             onChange={(e) => {
+                              const key = group.order_item_id || group.product_id;
                               const qty = Math.max(0, Math.min(parseInt(e.target.value) || 0, group.quantity));
                               setReadyForShipmentSelections(prev => {
                                 const next = new Map(prev);
-                                if (qty > 0) next.set(group.product_id, qty);
-                                else next.delete(group.product_id);
+                                if (qty > 0) next.set(key, qty);
+                                else next.delete(key);
                                 return next;
+                              });
                               });
                             }}
                             placeholder="0"

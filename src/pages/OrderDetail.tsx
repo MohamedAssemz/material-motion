@@ -701,28 +701,28 @@ export default function OrderDetail() {
             );
           })}
 
-          {/* Received / Create Shipment */}
-          {receivedItems > 0 && (
-            <Card className="border-green-200 dark:border-green-800">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-green-100 dark:bg-green-900/30">
-                      <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
-                    </div>
-                    <div>
-                      <p className="font-medium">Ready for Shipment</p>
-                      <p className="text-sm text-muted-foreground">{receivedItems} items received</p>
-                    </div>
-                  </div>
-                  <Button size="sm" onClick={() => setShipmentDialogOpen(true)}>
-                    <Truck className="h-4 w-4 mr-1" />
-                    Create Kartona
-                  </Button>
+          {/* Shipments Section */}
+          <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide pt-4">Shipments</h3>
+          
+          <Card 
+            className="cursor-pointer hover:border-primary/50 transition-colors border-green-200 dark:border-green-800"
+            onClick={() => navigate(`/orders/${id}/shipments`)}
+          >
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-green-100 dark:bg-green-900/30">
+                  <Truck className="h-5 w-5 text-green-600 dark:text-green-400" />
                 </div>
-              </CardContent>
-            </Card>
-          )}
+                <div className="flex-1">
+                  <p className="font-medium">Kartonas</p>
+                  <p className="text-sm text-muted-foreground">
+                    {receivedItems} items fulfilled
+                  </p>
+                </div>
+                <ArrowLeft className="h-4 w-4 rotate-180 text-muted-foreground" />
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
 
