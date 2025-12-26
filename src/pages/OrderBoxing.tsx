@@ -238,18 +238,20 @@ export default function OrderBoxing() {
       const batchesToBoxing = selectedBatches.filter(b => b.order_item?.needs_boxing !== false);
       const batchesToShipment = selectedBatches.filter(b => b.order_item?.needs_boxing === false);
       
+      // Clear box_id when receiving - boxes become available again
       if (batchesToBoxing.length > 0) {
         await supabase.from('batches').update({ 
           current_state: 'in_boxing', 
           eta: etaDate.toISOString(), 
-          lead_time_days: parseInt(etaDays) || 1 
+          lead_time_days: parseInt(etaDays) || 1,
+          box_id: null, // Free up the box
         }).in('id', batchesToBoxing.map(b => b.id));
       }
       
       if (batchesToShipment.length > 0) {
         await supabase.from('batches').update({ 
           current_state: 'ready_for_receiving',
-          box_id: null,
+          box_id: null, // Free up the box
         }).in('id', batchesToShipment.map(b => b.id));
       }
       
@@ -383,16 +385,18 @@ export default function OrderBoxing() {
       
       toast.success(`Created Kartona ${shipment.shipment_code}`);
       
-      // Print label
-      printKartonaLabel(shipment.shipment_code);
-      
+      // Close dialog and reset state FIRST before printing
       setKartonaDialogOpen(false);
       setReadyForShipmentSelections(new Map());
       setShipmentNotes('');
+      setSubmitting(false); // Reset submitting before print to prevent stuck state
+      
+      // Print label (non-blocking)
+      printKartonaLabel(shipment.shipment_code);
+      
       fetchData();
     } catch (error: any) {
       toast.error(error.message);
-    } finally {
       setSubmitting(false);
     }
   };
@@ -739,11 +743,16 @@ export default function OrderBoxing() {
               Move {totalSelected} items to Ready for Shipment status. They will be available to include in a Kartona.
             </p>
             <div className="p-3 bg-muted/50 rounded-lg space-y-1">
-              {Array.from(productSelections.entries()).map(([productId, qty]) => {
-                const group = inBoxingGroups.find(g => g.product_id === productId);
+              {Array.from(productSelections.entries()).map(([key, qty]) => {
+                const group = inBoxingGroups.find(g => (g.order_item_id || g.product_id) === key);
                 return (
-                  <div key={productId} className="flex justify-between text-sm">
-                    <span>{group?.product_sku} - {group?.product_name}</span>
+                  <div key={key} className="flex justify-between text-sm">
+                    <span>
+                      {group?.product_sku} - {group?.product_name}
+                      <Badge variant="outline" className="ml-2 text-xs">
+                        {group?.needs_boxing ? 'Boxed' : 'Not Boxed'}
+                      </Badge>
+                    </span>
                     <span className="font-medium">× {qty}</span>
                   </div>
                 );
@@ -774,10 +783,10 @@ export default function OrderBoxing() {
               Create a Kartona with {totalSelectedForShipment} items. This will mark them as fulfilled.
             </p>
             <div className="p-3 bg-muted/50 rounded-lg space-y-1">
-              {Array.from(readyForShipmentSelections.entries()).map(([productId, qty]) => {
-                const group = readyForShipmentGroups.find(g => g.product_id === productId);
+              {Array.from(readyForShipmentSelections.entries()).map(([key, qty]) => {
+                const group = readyForShipmentGroups.find(g => (g.order_item_id || g.product_id) === key);
                 return (
-                  <div key={productId} className="flex justify-between text-sm">
+                  <div key={key} className="flex justify-between text-sm">
                     <span>
                       {group?.product_sku} - {group?.product_name}
                       <Badge variant="outline" className="ml-2 text-xs">
