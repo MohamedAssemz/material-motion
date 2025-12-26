@@ -627,7 +627,6 @@ export default function OrderBoxing() {
                                 else next.delete(key);
                                 return next;
                               });
-                              });
                             }}
                             placeholder="0"
                           />
@@ -692,7 +691,6 @@ export default function OrderBoxing() {
                                 if (qty > 0) next.set(key, qty);
                                 else next.delete(key);
                                 return next;
-                              });
                               });
                             }}
                             placeholder="0"
