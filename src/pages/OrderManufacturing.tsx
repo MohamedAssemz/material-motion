@@ -85,7 +85,6 @@ export default function OrderManufacturing() {
   
   // Selection & action states
   const [productSelections, setProductSelections] = useState<Map<string, number>>(new Map());
-  const [etaDays, setEtaDays] = useState<string>('1');
   
   // Dialog states
   const [boxDialogOpen, setBoxDialogOpen] = useState(false);
@@ -252,9 +251,6 @@ export default function OrderManufacturing() {
     setSubmitting(true);
     
     try {
-      const etaDate = new Date();
-      etaDate.setDate(etaDate.getDate() + parseInt(etaDays) || 1);
-      
       // Get current box data for items_list
       const { data: boxData } = await supabase
         .from('boxes')
@@ -293,12 +289,10 @@ export default function OrderManufacturing() {
           remainingQty -= useQty;
           
           if (useQty === batch.quantity) {
-            // Update entire batch
+            // Update entire batch - no ETA here, set when receiving
             await supabase.from('batches').update({
               current_state: 'ready_for_finishing',
               box_id: selectedBox.id,
-              eta: etaDate.toISOString(),
-              lead_time_days: parseInt(etaDays) || 1,
             }).eq('id', batch.id);
             
             // Add to items list
@@ -314,7 +308,7 @@ export default function OrderManufacturing() {
             // Split batch
             const { data: batchCode } = await supabase.rpc('generate_batch_code');
             
-            // Create new batch with selected quantity
+            // Create new batch with selected quantity - no ETA here
             const { data: newBatch } = await supabase.from('batches').insert({
               batch_code: batchCode,
               order_id: id,
@@ -322,8 +316,6 @@ export default function OrderManufacturing() {
               current_state: 'ready_for_finishing',
               quantity: useQty,
               box_id: selectedBox.id,
-              eta: etaDate.toISOString(),
-              lead_time_days: parseInt(etaDays) || 1,
               created_by: user?.id,
               parent_batch_id_split: batch.id,
             }).select('id').single();
@@ -695,20 +687,6 @@ export default function OrderManufacturing() {
               <p className="text-sm font-medium">Items to assign: {totalSelected}</p>
             </div>
 
-            {/* ETA Selection inside dialog */}
-            <div className="space-y-2">
-              <Label>ETA (Lead Time)</Label>
-              <Select value={etaDays} onValueChange={setEtaDays}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {[1, 2, 3, 5, 7, 10, 14, 21, 30].map(d => (
-                    <SelectItem key={d} value={d.toString()}>{d} day{d > 1 ? 's' : ''}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
 
             <div className="space-y-2">
               <Label>Scan or Enter Box Code</Label>

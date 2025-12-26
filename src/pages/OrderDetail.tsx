@@ -95,11 +95,24 @@ interface PhaseStats {
   completed: number;
 }
 
+interface OrderItem {
+  product_id: string;
+  quantity: number;
+  needs_boxing: boolean;
+  product: {
+    id: string;
+    name: string;
+    sku: string;
+    needs_packing: boolean;
+  };
+}
+
 export default function OrderDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { hasRole, user } = useAuth();
   const [order, setOrder] = useState<Order | null>(null);
+  const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Dialog states
@@ -131,19 +144,27 @@ export default function OrderDetail() {
 
   const fetchOrder = async () => {
     try {
-      const { data: orderData, error: orderError } = await supabase
-        .from('orders')
-        .select(`
-          *,
-          customer:customers(name, code),
-          batches(
-            id, batch_code, current_state, quantity, product_id, eta, lead_time_days, box_id, is_terminated, is_redo, is_flagged,
-            product:products(id, name, sku, needs_packing)
-          )
-        `)
-        .eq('id', id)
-        .maybeSingle();
+      // Fetch order and order_items separately
+      const [orderRes, orderItemsRes] = await Promise.all([
+        supabase
+          .from('orders')
+          .select(`
+            *,
+            customer:customers(name, code),
+            batches(
+              id, batch_code, current_state, quantity, product_id, eta, lead_time_days, box_id, is_terminated, is_redo, is_flagged,
+              product:products(id, name, sku, needs_packing)
+            )
+          `)
+          .eq('id', id)
+          .maybeSingle(),
+        supabase
+          .from('order_items')
+          .select('product_id, quantity, needs_boxing, product:products(id, name, sku, needs_packing)')
+          .eq('order_id', id)
+      ]);
 
+      const { data: orderData, error: orderError } = orderRes;
       if (orderError) throw orderError;
       if (!orderData) {
         setLoading(false);
@@ -174,6 +195,8 @@ export default function OrderDetail() {
         .eq('id', orderData.created_by)
         .maybeSingle();
 
+      // Store order_items as well for the Order Items table
+      setOrderItems(orderItemsRes.data || []);
       setOrder({
         ...orderData,
         batches: batchesWithBoxes,
@@ -503,7 +526,7 @@ export default function OrderDetail() {
 
         {/* Center Column - Order Items & Timeline */}
         <div className="lg:col-span-5 space-y-4">
-          {/* Order Items Table - Now grouped by product AND needs_boxing */}
+          {/* Order Items Table - Expanded with Packaging, Boxing, Progress */}
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-lg flex items-center justify-between">
@@ -517,68 +540,61 @@ export default function OrderDetail() {
                   <tr className="border-b text-muted-foreground">
                     <th className="text-left py-2">Product</th>
                     <th className="text-center py-2">Qty</th>
+                    <th className="text-center py-2">Packing</th>
                     <th className="text-center py-2">Boxing</th>
                     <th className="text-right py-2">Progress</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {(() => {
-                    // Group by product_id + needs_boxing from order_items
-                    // First, get order items to know boxing preference per product
-                    const itemGroups = new Map<string, { name: string; sku: string; needsBoxing: boolean; batches: typeof activeBatches }>();
-                    
-                    activeBatches.forEach(batch => {
-                      // We need to show separate rows for same product with different boxing needs
-                      // For now, we group by product_id since batches don't have needs_boxing directly
-                      // But we show the product's needs_packing status
-                      const key = batch.product_id;
-                      if (!itemGroups.has(key)) {
-                        itemGroups.set(key, {
-                          name: batch.product?.name || 'Unknown',
-                          sku: batch.product?.sku || 'N/A',
-                          needsBoxing: batch.product?.needs_packing ?? true,
-                          batches: [],
-                        });
-                      }
-                      itemGroups.get(key)!.batches.push(batch);
-                    });
+                  {orderItems.map((item, idx) => {
+                    // Find batches for this product
+                    const productBatches = activeBatches.filter(b => b.product_id === item.product_id);
+                    const totalQty = productBatches.reduce((sum, b) => sum + b.quantity, 0);
+                    const receivedQty = productBatches.filter(b => b.current_state === 'received').reduce((sum, b) => sum + b.quantity, 0);
+                    const progressPct = totalQty > 0 ? Math.round((receivedQty / totalQty) * 100) : 0;
+                    const stateBreakdown = getAllStates().map(s => ({
+                      state: s,
+                      qty: productBatches.filter(b => b.current_state === s).reduce((sum, b) => sum + b.quantity, 0)
+                    })).filter(s => s.qty > 0);
 
-                    return Array.from(itemGroups.entries()).map(([productId, group]) => {
-                      const totalQty = group.batches.reduce((sum, b) => sum + b.quantity, 0);
-                      const receivedQty = group.batches.filter(b => b.current_state === 'received').reduce((sum, b) => sum + b.quantity, 0);
-                      const stateBreakdown = getAllStates().map(s => ({
-                        state: s,
-                        qty: group.batches.filter(b => b.current_state === s).reduce((sum, b) => sum + b.quantity, 0)
-                      })).filter(s => s.qty > 0);
-
-                      return (
-                        <tr key={productId} className="border-b last:border-0">
-                          <td className="py-3">
-                            <p className="font-medium">{group.name}</p>
-                            <p className="text-xs text-muted-foreground">{group.sku}</p>
-                          </td>
-                          <td className="text-center">{totalQty}</td>
-                          <td className="text-center">
-                            {group.needsBoxing ? (
-                              <Badge variant="outline" className="text-xs">Yes</Badge>
-                            ) : (
-                              <Badge variant="secondary" className="text-xs">No</Badge>
-                            )}
-                          </td>
-                          <td className="text-right">
-                            <div className="text-xs text-muted-foreground">
-                              {stateBreakdown.map((s, i) => (
+                    return (
+                      <tr key={`${item.product_id}-${idx}`} className="border-b last:border-0">
+                        <td className="py-3">
+                          <p className="font-medium">{item.product?.name || 'Unknown'}</p>
+                          <p className="text-xs text-muted-foreground">{item.product?.sku || 'N/A'}</p>
+                        </td>
+                        <td className="text-center font-medium">{item.quantity}</td>
+                        <td className="text-center">
+                          {item.product?.needs_packing ? (
+                            <Badge variant="outline" className="text-xs">Yes</Badge>
+                          ) : (
+                            <Badge variant="secondary" className="text-xs">No</Badge>
+                          )}
+                        </td>
+                        <td className="text-center">
+                          {item.needs_boxing ? (
+                            <Badge variant="outline" className="text-xs">Yes</Badge>
+                          ) : (
+                            <Badge variant="secondary" className="text-xs">No</Badge>
+                          )}
+                        </td>
+                        <td className="text-right">
+                          <div className="flex flex-col items-end gap-1">
+                            <span className="font-medium">{progressPct}%</span>
+                            <div className="text-xs text-muted-foreground max-w-[140px] text-right">
+                              {stateBreakdown.slice(0, 2).map((s, i) => (
                                 <span key={s.state}>
                                   {i > 0 && ', '}
                                   {s.qty} {getStateLabel(s.state as UnitState).split(' ').slice(0, 2).join(' ')}
                                 </span>
                               ))}
+                              {stateBreakdown.length > 2 && <span> +{stateBreakdown.length - 2}</span>}
                             </div>
-                          </td>
-                        </tr>
-                      );
-                    });
-                  })()}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </CardContent>

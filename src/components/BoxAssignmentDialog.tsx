@@ -42,7 +42,7 @@ interface BoxData {
 interface BoxAssignmentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onConfirm: (boxId: string, boxCode: string, etaDays: number, boxingOption?: 'needs_boxing' | 'skip_boxing') => void;
+  onConfirm: (boxId: string, boxCode: string, boxingOption?: 'needs_boxing' | 'skip_boxing') => void;
   onCreateNewBox: () => Promise<{ id: string; box_code: string } | null>;
   products: ProductSelection[];
   currentState: UnitState;
@@ -73,7 +73,6 @@ export function BoxAssignmentDialog({
   const [creating, setCreating] = useState(false);
   const [boxingOption, setBoxingOption] = useState<'needs_boxing' | 'skip_boxing'>('needs_boxing');
   const [validationError, setValidationError] = useState<string | null>(null);
-  const [etaDays, setEtaDays] = useState<string>('1');
 
   // Check if in finishing state - validate needs_packing compatibility
   const isFinishingState = currentState === 'in_finishing';
@@ -85,7 +84,6 @@ export function BoxAssignmentDialog({
       setSelectedBox(null);
       setSearchCode('');
       setBoxingOption('needs_boxing');
-      setEtaDays('1');
       setSelectedTab('empty');
       validateProductSelection();
     }
@@ -252,7 +250,7 @@ export function BoxAssignmentDialog({
       return;
     }
     
-    onConfirm(selectedBox.id, selectedBox.box_code, parseInt(etaDays) || 1, isPackagingState ? boxingOption : undefined);
+    onConfirm(selectedBox.id, selectedBox.box_code, isPackagingState ? boxingOption : undefined);
     onOpenChange(false);
   };
 
@@ -297,20 +295,6 @@ export function BoxAssignmentDialog({
           </Alert>
         )}
 
-        {/* ETA Selection */}
-        <div className="space-y-2">
-          <Label>ETA (Lead Time)</Label>
-          <Select value={etaDays} onValueChange={setEtaDays}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {[1, 2, 3, 5, 7, 10, 14, 21, 30].map(d => (
-                <SelectItem key={d} value={d.toString()}>{d} day{d > 1 ? 's' : ''}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
 
         {isPackagingState && !validationError && (
           <div className="space-y-3 p-3 border rounded-lg">
