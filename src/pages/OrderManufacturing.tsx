@@ -255,6 +255,23 @@ export default function OrderManufacturing() {
       const etaDate = new Date();
       etaDate.setDate(etaDate.getDate() + parseInt(etaDays) || 1);
       
+      // Get current box data for items_list
+      const { data: boxData } = await supabase
+        .from('boxes')
+        .select('items_list')
+        .eq('id', selectedBox.id)
+        .single();
+      
+      const currentItems = Array.isArray(boxData?.items_list) ? boxData.items_list : [];
+      const newItems: Array<{
+        product_id: string;
+        product_name: string;
+        product_sku: string;
+        quantity: number;
+        batch_id: string;
+        batch_type: string;
+      }> = [];
+      
       // Process each product selection
       for (const [productId, quantity] of productSelections.entries()) {
         if (quantity <= 0) continue;
@@ -283,12 +300,22 @@ export default function OrderManufacturing() {
               eta: etaDate.toISOString(),
               lead_time_days: parseInt(etaDays) || 1,
             }).eq('id', batch.id);
+            
+            // Add to items list
+            newItems.push({
+              product_id: group.product_id,
+              product_name: group.product_name,
+              product_sku: group.product_sku,
+              quantity: useQty,
+              batch_id: batch.id,
+              batch_type: 'ORDER',
+            });
           } else {
             // Split batch
             const { data: batchCode } = await supabase.rpc('generate_batch_code');
             
             // Create new batch with selected quantity
-            await supabase.from('batches').insert({
+            const { data: newBatch } = await supabase.from('batches').insert({
               batch_code: batchCode,
               order_id: id,
               product_id: batch.product_id,
@@ -299,15 +326,32 @@ export default function OrderManufacturing() {
               lead_time_days: parseInt(etaDays) || 1,
               created_by: user?.id,
               parent_batch_id_split: batch.id,
-            });
+            }).select('id').single();
             
             // Reduce original batch
             await supabase.from('batches').update({
               quantity: batch.quantity - useQty,
             }).eq('id', batch.id);
+            
+            // Add to items list
+            newItems.push({
+              product_id: group.product_id,
+              product_name: group.product_name,
+              product_sku: group.product_sku,
+              quantity: useQty,
+              batch_id: newBatch?.id || batch.id,
+              batch_type: 'ORDER',
+            });
           }
         }
       }
+      
+      // Update box with new items_list and content_type
+      const updatedItems = [...currentItems, ...newItems];
+      await supabase.from('boxes').update({
+        items_list: updatedItems,
+        content_type: 'ORDER',
+      }).eq('id', selectedBox.id);
       
       toast.success(`Assigned ${totalSelected} items to ${selectedBox.box_code}`);
       setBoxDialogOpen(false);

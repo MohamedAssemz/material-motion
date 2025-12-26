@@ -181,20 +181,56 @@ export default function ExtraInventory() {
     }
   };
 
-  const handleAssignBox = async (boxId: string) => {
+  const handleAssignBox = async (boxId: string, isExistingExtraBox?: boolean) => {
     if (!selectedBatchForBox) return;
 
+    const batch = batches.find(b => b.id === selectedBatchForBox);
+    if (!batch) return;
+
     try {
-      const { error } = await supabase
+      // Update batch with box_id
+      const { error: batchError } = await supabase
         .from('batches')
         .update({ box_id: boxId })
         .eq('id', selectedBatchForBox);
 
-      if (error) throw error;
+      if (batchError) throw batchError;
+
+      // Get current box data to update items_list
+      const { data: boxData } = await supabase
+        .from('boxes')
+        .select('items_list')
+        .eq('id', boxId)
+        .single();
+
+      const currentItems = Array.isArray(boxData?.items_list) ? boxData.items_list : [];
+      
+      // Add new item to the list
+      const newItem = {
+        product_id: batch.product_id,
+        product_name: batch.product.name,
+        product_sku: batch.product.sku,
+        quantity: batch.quantity,
+        batch_id: batch.id,
+        batch_type: 'EXTRA',
+      };
+
+      const updatedItems = [...currentItems, newItem];
+
+      // Update box with new items_list and content_type
+      const { error: boxError } = await supabase
+        .from('boxes')
+        .update({ 
+          items_list: updatedItems,
+          content_type: 'EXTRA'
+        })
+        .eq('id', boxId);
+
+      if (boxError) throw boxError;
 
       toast({
         title: 'Success',
-        description: 'Box assigned to batch',
+        description: isExistingExtraBox ? 'Batch added to existing box' : 'Box assigned to batch',
       });
       setSelectedBatchForBox(null);
       fetchData();
@@ -476,6 +512,7 @@ export default function ExtraInventory() {
         onOpenChange={setBoxDialogOpen}
         onConfirm={handleAssignBox}
         title="Assign Box to Extra Batch"
+        allowExtraBoxes={true}
       />
     </div>
   );

@@ -146,21 +146,27 @@ export type Database = {
       boxes: {
         Row: {
           box_code: string
+          content_type: string | null
           created_at: string
           id: string
           is_active: boolean
+          items_list: Json | null
         }
         Insert: {
           box_code: string
+          content_type?: string | null
           created_at?: string
           id?: string
           is_active?: boolean
+          items_list?: Json | null
         }
         Update: {
           box_code?: string
+          content_type?: string | null
           created_at?: string
           id?: string
           is_active?: boolean
+          items_list?: Json | null
         }
         Relationships: []
       }
