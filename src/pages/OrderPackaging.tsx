@@ -42,6 +42,7 @@ interface Batch {
   current_state: string;
   quantity: number;
   product_id: string;
+  order_item_id: string | null;
   box_id: string | null;
   product: {
     id: string;
@@ -49,6 +50,7 @@ interface Batch {
     sku: string;
   };
   box?: { id: string; box_code: string } | null;
+  order_item?: { id: string; needs_boxing: boolean } | null;
 }
 
 interface Order {
@@ -65,10 +67,13 @@ interface BoxGroup {
   totalQty: number;
 }
 
-interface ProductGroup {
+// Group by order_item_id to preserve order item identity
+interface OrderItemGroup {
+  order_item_id: string;
   product_id: string;
   product_name: string;
   product_sku: string;
+  needs_boxing: boolean;
   quantity: number;
   batches: Batch[];
 }
@@ -113,7 +118,7 @@ export default function OrderPackaging() {
       const [orderRes, batchesRes] = await Promise.all([
         supabase.from('orders').select('id, order_number, priority, customer:customers(name)').eq('id', id).single(),
         supabase.from('batches')
-          .select('id, batch_code, current_state, quantity, product_id, box_id, product:products(id, name, sku)')
+          .select('id, batch_code, current_state, quantity, product_id, order_item_id, box_id, product:products(id, name, sku)')
           .eq('order_id', id)
           .eq('is_terminated', false)
           .in('current_state', ['ready_for_packaging', 'in_packaging'])
@@ -129,13 +134,22 @@ export default function OrderPackaging() {
         boxesData?.forEach(box => boxMap.set(box.id, box));
       }
       
-      const batchesWithBoxes = batchesRes.data?.map((batch: any) => ({
+      // Fetch order_item info for needs_boxing
+      const orderItemIds = batchesRes.data?.filter((b: any) => b.order_item_id).map((b: any) => b.order_item_id) || [];
+      let orderItemMap = new Map();
+      if (orderItemIds.length > 0) {
+        const { data: orderItemsData } = await supabase.from('order_items').select('id, needs_boxing').in('id', orderItemIds);
+        orderItemsData?.forEach(oi => orderItemMap.set(oi.id, oi));
+      }
+      
+      const batchesWithData = batchesRes.data?.map((batch: any) => ({
         ...batch,
         box: batch.box_id ? boxMap.get(batch.box_id) : null,
+        order_item: batch.order_item_id ? orderItemMap.get(batch.order_item_id) : null,
       })) || [];
       
       setOrder(orderRes.data as Order);
-      setBatches(batchesWithBoxes as Batch[]);
+      setBatches(batchesWithData as Batch[]);
     } catch (error: any) {
       toast.error(error.message);
     } finally {
@@ -195,18 +209,27 @@ export default function OrderPackaging() {
   });
   boxGroupMap.forEach(g => readyBoxGroups.push(g));
 
-  // Group in_packaging by product
-  const inPackagingGroups: ProductGroup[] = [];
-  const productMap = new Map<string, ProductGroup>();
+  // Group in_packaging by order_item_id to preserve identity
+  const inPackagingGroups: OrderItemGroup[] = [];
+  const orderItemGroupMap = new Map<string, OrderItemGroup>();
   batches.filter(b => b.current_state === 'in_packaging').forEach(batch => {
-    if (!productMap.has(batch.product_id)) {
-      productMap.set(batch.product_id, { product_id: batch.product_id, product_name: batch.product?.name || 'Unknown', product_sku: batch.product?.sku || 'N/A', quantity: 0, batches: [] });
+    const key = batch.order_item_id || batch.product_id;
+    if (!orderItemGroupMap.has(key)) {
+      orderItemGroupMap.set(key, { 
+        order_item_id: batch.order_item_id || '',
+        product_id: batch.product_id, 
+        product_name: batch.product?.name || 'Unknown', 
+        product_sku: batch.product?.sku || 'N/A', 
+        needs_boxing: batch.order_item?.needs_boxing ?? true,
+        quantity: 0, 
+        batches: [] 
+      });
     }
-    const group = productMap.get(batch.product_id)!;
+    const group = orderItemGroupMap.get(key)!;
     group.batches.push(batch);
     group.quantity += batch.quantity;
   });
-  productMap.forEach(g => inPackagingGroups.push(g));
+  orderItemGroupMap.forEach(g => inPackagingGroups.push(g));
 
   const totalReadyForPackaging = readyBoxGroups.reduce((sum, g) => sum + g.totalQty, 0);
   const totalInPackaging = inPackagingGroups.reduce((sum, g) => sum + g.quantity, 0);
@@ -260,11 +283,12 @@ export default function OrderPackaging() {
         quantity: number;
         batch_id: string;
         batch_type: string;
+        needs_boxing: boolean;
       }> = [];
 
-      for (const [productId, quantity] of productSelections.entries()) {
+      for (const [key, quantity] of productSelections.entries()) {
         if (quantity <= 0) continue;
-        const group = inPackagingGroups.find(g => g.product_id === productId);
+        const group = inPackagingGroups.find(g => (g.order_item_id || g.product_id) === key);
         if (!group) continue;
         let remainingQty = quantity;
         for (const batch of group.batches) {
@@ -280,10 +304,11 @@ export default function OrderPackaging() {
               quantity: useQty,
               batch_id: batch.id,
               batch_type: 'ORDER',
+              needs_boxing: group.needs_boxing,
             });
           } else {
             const { data: batchCode } = await supabase.rpc('generate_batch_code');
-            const { data: newBatch } = await supabase.from('batches').insert({ batch_code: batchCode, order_id: id, product_id: batch.product_id, current_state: 'ready_for_boxing', quantity: useQty, box_id: selectedBox.id, created_by: user?.id, parent_batch_id_split: batch.id }).select('id').single();
+            const { data: newBatch } = await supabase.from('batches').insert({ batch_code: batchCode, order_id: id, product_id: batch.product_id, order_item_id: batch.order_item_id, current_state: 'ready_for_boxing', quantity: useQty, box_id: selectedBox.id, created_by: user?.id, parent_batch_id_split: batch.id }).select('id').single();
             await supabase.from('batches').update({ quantity: batch.quantity - useQty }).eq('id', batch.id);
             newItems.push({
               product_id: group.product_id,
@@ -292,6 +317,7 @@ export default function OrderPackaging() {
               quantity: useQty,
               batch_id: newBatch?.id || batch.id,
               batch_type: 'ORDER',
+              needs_boxing: group.needs_boxing,
             });
           }
         }
@@ -319,25 +345,44 @@ export default function OrderPackaging() {
       const etaDate = new Date();
       etaDate.setDate(etaDate.getDate() + parseInt(etaDays) || 1);
       
-      for (const [productId, quantity] of productSelections.entries()) {
+      for (const [key, quantity] of productSelections.entries()) {
         if (quantity <= 0) continue;
-        const group = inPackagingGroups.find(g => g.product_id === productId);
+        const group = inPackagingGroups.find(g => (g.order_item_id || g.product_id) === key);
         if (!group) continue;
+        
+        // Route based on needs_boxing: true -> in_boxing, false -> ready_for_receiving
+        const nextState = group.needs_boxing ? 'in_boxing' : 'ready_for_receiving';
+        
         let remainingQty = quantity;
         for (const batch of group.batches) {
           if (remainingQty <= 0) break;
           const useQty = Math.min(batch.quantity, remainingQty);
           remainingQty -= useQty;
           if (useQty === batch.quantity) {
-            await supabase.from('batches').update({ current_state: 'in_boxing', eta: etaDate.toISOString(), lead_time_days: parseInt(etaDays) || 1 }).eq('id', batch.id);
+            await supabase.from('batches').update({ 
+              current_state: nextState, 
+              eta: group.needs_boxing ? etaDate.toISOString() : null, 
+              lead_time_days: group.needs_boxing ? parseInt(etaDays) || 1 : null 
+            }).eq('id', batch.id);
           } else {
             const { data: batchCode } = await supabase.rpc('generate_batch_code');
-            await supabase.from('batches').insert({ batch_code: batchCode, order_id: id, product_id: batch.product_id, current_state: 'in_boxing', quantity: useQty, eta: etaDate.toISOString(), lead_time_days: parseInt(etaDays) || 1, created_by: user?.id, parent_batch_id_split: batch.id });
+            await supabase.from('batches').insert({ 
+              batch_code: batchCode, 
+              order_id: id, 
+              product_id: batch.product_id, 
+              order_item_id: batch.order_item_id,
+              current_state: nextState, 
+              quantity: useQty, 
+              eta: group.needs_boxing ? etaDate.toISOString() : null, 
+              lead_time_days: group.needs_boxing ? parseInt(etaDays) || 1 : null, 
+              created_by: user?.id, 
+              parent_batch_id_split: batch.id 
+            });
             await supabase.from('batches').update({ quantity: batch.quantity - useQty }).eq('id', batch.id);
           }
         }
       }
-      toast.success(`Moved ${totalSelected} items directly to boxing`);
+      toast.success(`Routed ${totalSelected} items based on boxing requirements`);
       setBoxDirectlyDialogOpen(false);
       setProductSelections(new Map());
       fetchData();
@@ -478,22 +523,29 @@ export default function OrderPackaging() {
           <div className="space-y-3">
             {inPackagingGroups.length === 0 ? (
               <Card><CardContent className="p-8 text-center text-muted-foreground">No items in packaging</CardContent></Card>
-            ) : inPackagingGroups.map(group => (
-              <Card key={group.product_id}>
+            ) : inPackagingGroups.map(group => {
+              const key = group.order_item_id || group.product_id;
+              return (
+              <Card key={key}>
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="font-medium">{group.product_name}</p>
-                      <p className="text-sm text-muted-foreground">{group.product_sku}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {group.product_sku}
+                        <Badge variant={group.needs_boxing ? 'default' : 'secondary'} className="ml-2 text-xs">
+                          {group.needs_boxing ? 'Boxing' : 'No Boxing'}
+                        </Badge>
+                      </p>
                     </div>
                     <div className="flex items-center gap-4">
                       <div className="text-center"><p className="text-lg font-semibold">{group.quantity}</p><p className="text-xs text-muted-foreground">In Packaging</p></div>
                       {canManage && (
                         <div className="w-24">
                           <Label className="text-xs">Select Qty</Label>
-                          <Input type="number" min={0} max={group.quantity} value={productSelections.get(group.product_id) || ''} onChange={(e) => {
+                          <Input type="number" min={0} max={group.quantity} value={productSelections.get(key) || ''} onChange={(e) => {
                             const qty = Math.max(0, Math.min(parseInt(e.target.value) || 0, group.quantity));
-                            setProductSelections(prev => { const next = new Map(prev); if (qty > 0) next.set(group.product_id, qty); else next.delete(group.product_id); return next; });
+                            setProductSelections(prev => { const next = new Map(prev); if (qty > 0) next.set(key, qty); else next.delete(key); return next; });
                           }} placeholder="0" />
                         </div>
                       )}
@@ -501,7 +553,7 @@ export default function OrderPackaging() {
                   </div>
                 </CardContent>
               </Card>
-            ))}
+            )})}
           </div>
         </TabsContent>
       </Tabs>
