@@ -187,14 +187,40 @@ export default function OrderShipments() {
                 </tr>
               </thead>
               <tbody>
-                ${shipment.items.map(item => `
-                  <tr>
-                    <td>${item.batch?.product?.name || 'Unknown'}</td>
-                    <td>${item.batch?.product?.sku || 'N/A'}</td>
-                    <td>${item.order_item?.needs_boxing ? 'Boxed' : 'Not Boxed'}</td>
-                    <td style="text-align: right;">${item.quantity}</td>
-                  </tr>
-                `).join('')}
+                ${(() => {
+                  // Group items by product_id + needs_boxing for printing
+                  const groupedItems = new Map<string, { 
+                    productName: string; 
+                    productSku: string; 
+                    needsBoxing: boolean; 
+                    totalQty: number;
+                  }>();
+                  
+                  shipment.items.forEach((item) => {
+                    const needsBoxing = item.order_item?.needs_boxing ?? true;
+                    const key = `${item.batch?.product?.id || 'unknown'}-${needsBoxing ? 'boxed' : 'not-boxed'}`;
+                    
+                    if (!groupedItems.has(key)) {
+                      groupedItems.set(key, {
+                        productName: item.batch?.product?.name || 'Unknown',
+                        productSku: item.batch?.product?.sku || 'N/A',
+                        needsBoxing,
+                        totalQty: 0,
+                      });
+                    }
+                    const group = groupedItems.get(key)!;
+                    group.totalQty += item.quantity;
+                  });
+                  
+                  return Array.from(groupedItems.values()).map(group => `
+                    <tr>
+                      <td>${group.productName}</td>
+                      <td>${group.productSku}</td>
+                      <td>${group.needsBoxing ? 'Boxed' : 'Not Boxed'}</td>
+                      <td style="text-align: right;">${group.totalQty}</td>
+                    </tr>
+                  `).join('');
+                })()}
                 <tr class="total">
                   <td colspan="3">Total Items</td>
                   <td style="text-align: right;">${totalItems}</td>
@@ -336,20 +362,46 @@ export default function OrderShipments() {
                   <div className="space-y-2">
                     <p className="text-sm font-medium text-muted-foreground">Contents:</p>
                     <div className="grid gap-2">
-                      {shipment.items.map((item) => (
-                        <div key={item.id} className="flex items-center justify-between p-2 bg-muted/50 rounded-lg">
-                          <div>
-                            <p className="font-medium">{item.batch?.product?.name || 'Unknown'}</p>
-                            <p className="text-sm text-muted-foreground">
-                              {item.batch?.product?.sku || 'N/A'}
-                              <Badge variant="outline" className="ml-2 text-xs">
-                                {item.order_item?.needs_boxing ? 'Boxed' : 'Not Boxed'}
-                              </Badge>
-                            </p>
+                      {/* Group items by product_id + needs_boxing */}
+                      {(() => {
+                        const groupedItems = new Map<string, { 
+                          productName: string; 
+                          productSku: string; 
+                          needsBoxing: boolean; 
+                          totalQty: number;
+                        }>();
+                        
+                        shipment.items.forEach((item) => {
+                          const needsBoxing = item.order_item?.needs_boxing ?? true;
+                          const key = `${item.batch?.product?.id || 'unknown'}-${needsBoxing ? 'boxed' : 'not-boxed'}`;
+                          
+                          if (!groupedItems.has(key)) {
+                            groupedItems.set(key, {
+                              productName: item.batch?.product?.name || 'Unknown',
+                              productSku: item.batch?.product?.sku || 'N/A',
+                              needsBoxing,
+                              totalQty: 0,
+                            });
+                          }
+                          const group = groupedItems.get(key)!;
+                          group.totalQty += item.quantity;
+                        });
+                        
+                        return Array.from(groupedItems.entries()).map(([key, group]) => (
+                          <div key={key} className="flex items-center justify-between p-2 bg-muted/50 rounded-lg">
+                            <div>
+                              <p className="font-medium">{group.productName}</p>
+                              <p className="text-sm text-muted-foreground">
+                                {group.productSku}
+                                <Badge variant="outline" className="ml-2 text-xs">
+                                  {group.needsBoxing ? 'Boxed' : 'Not Boxed'}
+                                </Badge>
+                              </p>
+                            </div>
+                            <span className="font-semibold">× {group.totalQty}</span>
                           </div>
-                          <span className="font-semibold">× {item.quantity}</span>
-                        </div>
-                      ))}
+                        ));
+                      })()}
                     </div>
                     {shipment.notes && (
                       <div className="mt-3 p-2 bg-amber-50 dark:bg-amber-900/20 rounded-lg">

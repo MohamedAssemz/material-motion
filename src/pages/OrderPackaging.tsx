@@ -247,7 +247,8 @@ export default function OrderPackaging() {
       const etaDate = new Date();
       etaDate.setDate(etaDate.getDate() + parseInt(etaDays) || 1);
       const batchIds = batches.filter(b => b.current_state === 'ready_for_packaging' && b.box_id && selectedBoxes.has(b.box_id)).map(b => b.id);
-      await supabase.from('batches').update({ current_state: 'in_packaging', eta: etaDate.toISOString(), lead_time_days: parseInt(etaDays) || 1 }).in('id', batchIds);
+      // Clear box_id when receiving - boxes become available again
+      await supabase.from('batches').update({ current_state: 'in_packaging', eta: etaDate.toISOString(), lead_time_days: parseInt(etaDays) || 1, box_id: null }).in('id', batchIds);
       toast.success(`Accepted ${selectedBoxes.size} box(es) into packaging`);
       setSelectedBoxes(new Set());
       setAcceptDialogOpen(false);
