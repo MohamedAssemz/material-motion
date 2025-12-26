@@ -382,7 +382,7 @@ export default function OrderFinishing() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" onClick={() => navigate(`/orders/${id}`)}>
+          <Button variant="ghost" onClick={() => navigate('/queues/finishing')}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div className="flex items-center gap-3">
@@ -398,6 +398,9 @@ export default function OrderFinishing() {
             </div>
           </div>
         </div>
+        <Button variant="outline" onClick={() => navigate(`/orders/${id}`)}>
+          View Order Details
+        </Button>
       </div>
 
       {/* Stats */}

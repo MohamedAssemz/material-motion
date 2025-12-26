@@ -135,7 +135,7 @@ export default function QueueManufacturing() {
                     </TableCell>
                     <TableCell>{format(new Date(order.created_at), 'PPP')}</TableCell>
                     <TableCell>
-                      <Button size="sm" onClick={() => navigate(`/orders/${order.id}`)}>
+                      <Button size="sm" onClick={() => navigate(`/orders/${order.id}/manufacturing`)}>
                         View Details
                       </Button>
                     </TableCell>

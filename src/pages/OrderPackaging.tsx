@@ -322,7 +322,7 @@ export default function OrderPackaging() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" onClick={() => navigate(`/orders/${id}`)}><ArrowLeft className="h-4 w-4" /></Button>
+          <Button variant="ghost" onClick={() => navigate('/queues/packaging')}><ArrowLeft className="h-4 w-4" /></Button>
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-indigo-100 dark:bg-indigo-900/30">
               <Package className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
@@ -336,6 +336,9 @@ export default function OrderPackaging() {
             </div>
           </div>
         </div>
+        <Button variant="outline" onClick={() => navigate(`/orders/${id}`)}>
+          View Order Details
+        </Button>
       </div>
 
       {/* Stats */}
