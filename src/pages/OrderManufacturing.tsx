@@ -45,6 +45,7 @@ interface Batch {
   current_state: string;
   quantity: number;
   product_id: string;
+  order_item_id: string | null;
   eta: string | null;
   lead_time_days: number | null;
   box_id: string | null;
@@ -56,6 +57,9 @@ interface Batch {
     sku: string;
     needs_packing: boolean;
   };
+  order_item?: {
+    needs_boxing: boolean;
+  };
 }
 
 interface Order {
@@ -66,10 +70,12 @@ interface Order {
 }
 
 interface ProductGroup {
+  order_item_id: string;
   product_id: string;
   product_name: string;
   product_sku: string;
   needs_packing: boolean;
+  needs_boxing: boolean;
   pendingRm: number;
   inManufacturing: number;
   batches: Batch[];
@@ -119,7 +125,7 @@ export default function OrderManufacturing() {
       const [orderRes, batchesRes] = await Promise.all([
         supabase.from('orders').select('id, order_number, priority, customer:customers(name)').eq('id', id).single(),
         supabase.from('batches')
-          .select('id, batch_code, current_state, quantity, product_id, eta, lead_time_days, box_id, is_flagged, is_redo, product:products(id, name, sku, needs_packing)')
+          .select('id, batch_code, current_state, quantity, product_id, order_item_id, eta, lead_time_days, box_id, is_flagged, is_redo, product:products(id, name, sku, needs_packing), order_item:order_items(needs_boxing)')
           .eq('order_id', id)
           .eq('is_terminated', false)
           .in('current_state', ['pending_rm', 'in_manufacturing'])
@@ -206,23 +212,27 @@ export default function OrderManufacturing() {
     }
   };
 
-  // Group batches by product
+  // Group batches by order_item_id (not just product_id) to keep items with different needs_boxing separate
   const productGroups: ProductGroup[] = [];
-  const productMap = new Map<string, ProductGroup>();
+  const groupMap = new Map<string, ProductGroup>();
   
   batches.forEach(batch => {
-    if (!productMap.has(batch.product_id)) {
-      productMap.set(batch.product_id, {
+    // Use order_item_id as the key to keep order items separate
+    const groupKey = batch.order_item_id || batch.product_id;
+    if (!groupMap.has(groupKey)) {
+      groupMap.set(groupKey, {
+        order_item_id: batch.order_item_id || '',
         product_id: batch.product_id,
         product_name: batch.product?.name || 'Unknown',
         product_sku: batch.product?.sku || 'N/A',
         needs_packing: batch.product?.needs_packing ?? true,
+        needs_boxing: batch.order_item?.needs_boxing ?? true,
         pendingRm: 0,
         inManufacturing: 0,
         batches: [],
       });
     }
-    const group = productMap.get(batch.product_id)!;
+    const group = groupMap.get(groupKey)!;
     group.batches.push(batch);
     if (batch.current_state === 'pending_rm') {
       group.pendingRm += batch.quantity;
@@ -231,7 +241,7 @@ export default function OrderManufacturing() {
     }
   });
   
-  productMap.forEach(g => productGroups.push(g));
+  groupMap.forEach(g => productGroups.push(g));
 
   const totalSelected = Array.from(productSelections.values()).reduce((a, b) => a + b, 0);
 
@@ -263,16 +273,18 @@ export default function OrderManufacturing() {
         product_id: string;
         product_name: string;
         product_sku: string;
+        order_item_id: string;
+        needs_boxing: boolean;
         quantity: number;
         batch_id: string;
         batch_type: string;
       }> = [];
       
-      // Process each product selection
-      for (const [productId, quantity] of productSelections.entries()) {
+      // Process each order item selection (using order_item_id as key)
+      for (const [groupKey, quantity] of productSelections.entries()) {
         if (quantity <= 0) continue;
         
-        const group = productGroups.find(g => g.product_id === productId);
+        const group = productGroups.find(g => (g.order_item_id || g.product_id) === groupKey);
         if (!group) continue;
         
         let remainingQty = quantity;
@@ -300,6 +312,8 @@ export default function OrderManufacturing() {
               product_id: group.product_id,
               product_name: group.product_name,
               product_sku: group.product_sku,
+              order_item_id: group.order_item_id,
+              needs_boxing: group.needs_boxing,
               quantity: useQty,
               batch_id: batch.id,
               batch_type: 'ORDER',
@@ -313,6 +327,7 @@ export default function OrderManufacturing() {
               batch_code: batchCode,
               order_id: id,
               product_id: batch.product_id,
+              order_item_id: batch.order_item_id,
               current_state: 'ready_for_finishing',
               quantity: useQty,
               box_id: selectedBox.id,
@@ -330,6 +345,8 @@ export default function OrderManufacturing() {
               product_id: group.product_id,
               product_name: group.product_name,
               product_sku: group.product_sku,
+              order_item_id: group.order_item_id,
+              needs_boxing: group.needs_boxing,
               quantity: useQty,
               batch_id: newBatch?.id || batch.id,
               batch_type: 'ORDER',
@@ -361,10 +378,10 @@ export default function OrderManufacturing() {
     setSubmitting(true);
     
     try {
-      for (const [productId, quantity] of productSelections.entries()) {
+      for (const [groupKey, quantity] of productSelections.entries()) {
         if (quantity <= 0) continue;
         
-        const group = productGroups.find(g => g.product_id === productId);
+        const group = productGroups.find(g => (g.order_item_id || g.product_id) === groupKey);
         if (!group) continue;
         
         let remainingQty = quantity;
@@ -389,6 +406,7 @@ export default function OrderManufacturing() {
               batch_code: batchCode,
               order_id: id,
               product_id: batch.product_id,
+              order_item_id: batch.order_item_id,
               current_state: batch.current_state,
               quantity: useQty,
               is_terminated: true,
@@ -427,10 +445,10 @@ export default function OrderManufacturing() {
     setSubmitting(true);
     
     try {
-      for (const [productId, quantity] of productSelections.entries()) {
+      for (const [groupKey, quantity] of productSelections.entries()) {
         if (quantity <= 0) continue;
         
-        const group = productGroups.find(g => g.product_id === productId);
+        const group = productGroups.find(g => (g.order_item_id || g.product_id) === groupKey);
         if (!group) continue;
         
         let remainingQty = quantity;
@@ -459,6 +477,7 @@ export default function OrderManufacturing() {
               batch_code: batchCode,
               order_id: id,
               product_id: batch.product_id,
+              order_item_id: batch.order_item_id,
               current_state: 'pending_rm',
               quantity: useQty,
               is_redo: true,
@@ -614,61 +633,71 @@ export default function OrderManufacturing() {
             </CardContent>
           </Card>
         ) : (
-          productGroups.map(group => (
-            <Card key={group.product_id}>
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <p className="font-medium">{group.product_name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {group.product_sku} · {group.needs_packing ? 'Needs Packing' : 'No Packing'}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-6">
-                    <div className="text-center">
-                      <p className="text-xs text-muted-foreground">Pending RM</p>
-                      <p className="text-lg font-semibold text-warning">{group.pendingRm}</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-xs text-muted-foreground">In Manufacturing</p>
-                      <p className="text-lg font-semibold text-primary">{group.inManufacturing}</p>
-                    </div>
-                    {canManage && (
-                      <div className="w-24">
-                        <Label className="text-xs">Select Qty</Label>
-                        <Input
-                          type="number"
-                          min={0}
-                          max={group.pendingRm + group.inManufacturing}
-                          value={productSelections.get(group.product_id) || ''}
-                          onChange={(e) => {
-                            const qty = Math.max(0, Math.min(parseInt(e.target.value) || 0, group.pendingRm + group.inManufacturing));
-                            setProductSelections(prev => {
-                              const next = new Map(prev);
-                              if (qty > 0) next.set(group.product_id, qty);
-                              else next.delete(group.product_id);
-                              return next;
-                            });
-                          }}
-                          placeholder="0"
-                        />
+          productGroups.map(group => {
+            const groupKey = group.order_item_id || group.product_id;
+            return (
+              <Card key={groupKey}>
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium">{group.product_name}</p>
+                        {group.needs_boxing ? (
+                          <Badge variant="outline" className="text-xs bg-primary/10">Boxing</Badge>
+                        ) : (
+                          <Badge variant="secondary" className="text-xs">No Boxing</Badge>
+                        )}
                       </div>
-                    )}
+                      <p className="text-sm text-muted-foreground">
+                        {group.product_sku} · {group.needs_packing ? 'Needs Packing' : 'No Packing'}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-6">
+                      <div className="text-center">
+                        <p className="text-xs text-muted-foreground">Pending RM</p>
+                        <p className="text-lg font-semibold text-warning">{group.pendingRm}</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-xs text-muted-foreground">In Manufacturing</p>
+                        <p className="text-lg font-semibold text-primary">{group.inManufacturing}</p>
+                      </div>
+                      {canManage && (
+                        <div className="w-24">
+                          <Label className="text-xs">Select Qty</Label>
+                          <Input
+                            type="number"
+                            min={0}
+                            max={group.pendingRm + group.inManufacturing}
+                            value={productSelections.get(groupKey) || ''}
+                            onChange={(e) => {
+                              const qty = Math.max(0, Math.min(parseInt(e.target.value) || 0, group.pendingRm + group.inManufacturing));
+                              setProductSelections(prev => {
+                                const next = new Map(prev);
+                                if (qty > 0) next.set(groupKey, qty);
+                                else next.delete(groupKey);
+                                return next;
+                              });
+                            }}
+                            placeholder="0"
+                          />
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-                
-                {/* Show redo/flagged batches */}
-                {group.batches.filter(b => b.is_flagged || b.is_redo).length > 0 && (
-                  <Alert variant="destructive" className="mt-3">
-                    <AlertTriangle className="h-4 w-4" />
-                    <AlertDescription>
-                      {group.batches.filter(b => b.is_redo).reduce((sum, b) => sum + b.quantity, 0)} items need redo
-                    </AlertDescription>
-                  </Alert>
-                )}
-              </CardContent>
-            </Card>
-          ))
+                  
+                  {/* Show redo/flagged batches */}
+                  {group.batches.filter(b => b.is_flagged || b.is_redo).length > 0 && (
+                    <Alert variant="destructive" className="mt-3">
+                      <AlertTriangle className="h-4 w-4" />
+                      <AlertDescription>
+                        {group.batches.filter(b => b.is_redo).reduce((sum, b) => sum + b.quantity, 0)} items need redo
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })
         )}
       </div>
 

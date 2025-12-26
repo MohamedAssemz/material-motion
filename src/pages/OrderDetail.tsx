@@ -49,6 +49,7 @@ interface Batch {
   current_state: string;
   quantity: number;
   product_id: string;
+  order_item_id: string | null;
   eta: string | null;
   lead_time_days: number | null;
   box_id: string | null;
@@ -96,6 +97,7 @@ interface PhaseStats {
 }
 
 interface OrderItem {
+  id: string;
   product_id: string;
   quantity: number;
   needs_boxing: boolean;
@@ -152,7 +154,7 @@ export default function OrderDetail() {
             *,
             customer:customers(name, code),
             batches(
-              id, batch_code, current_state, quantity, product_id, eta, lead_time_days, box_id, is_terminated, is_redo, is_flagged,
+              id, batch_code, current_state, quantity, product_id, order_item_id, eta, lead_time_days, box_id, is_terminated, is_redo, is_flagged,
               product:products(id, name, sku, needs_packing)
             )
           `)
@@ -160,7 +162,7 @@ export default function OrderDetail() {
           .maybeSingle(),
         supabase
           .from('order_items')
-          .select('product_id, quantity, needs_boxing, product:products(id, name, sku, needs_packing)')
+          .select('id, product_id, quantity, needs_boxing, product:products(id, name, sku, needs_packing)')
           .eq('order_id', id)
       ]);
 
@@ -546,19 +548,19 @@ export default function OrderDetail() {
                   </tr>
                 </thead>
                 <tbody>
-                  {orderItems.map((item, idx) => {
-                    // Find batches for this product
-                    const productBatches = activeBatches.filter(b => b.product_id === item.product_id);
-                    const totalQty = productBatches.reduce((sum, b) => sum + b.quantity, 0);
-                    const receivedQty = productBatches.filter(b => b.current_state === 'received').reduce((sum, b) => sum + b.quantity, 0);
+                  {orderItems.map((item) => {
+                    // Find batches for this specific order item (not just product)
+                    const itemBatches = activeBatches.filter(b => b.order_item_id === item.id);
+                    const totalQty = itemBatches.reduce((sum, b) => sum + b.quantity, 0);
+                    const receivedQty = itemBatches.filter(b => b.current_state === 'received').reduce((sum, b) => sum + b.quantity, 0);
                     const progressPct = totalQty > 0 ? Math.round((receivedQty / totalQty) * 100) : 0;
                     const stateBreakdown = getAllStates().map(s => ({
                       state: s,
-                      qty: productBatches.filter(b => b.current_state === s).reduce((sum, b) => sum + b.quantity, 0)
+                      qty: itemBatches.filter(b => b.current_state === s).reduce((sum, b) => sum + b.quantity, 0)
                     })).filter(s => s.qty > 0);
 
                     return (
-                      <tr key={`${item.product_id}-${idx}`} className="border-b last:border-0">
+                      <tr key={item.id} className="border-b last:border-0">
                         <td className="py-3">
                           <p className="font-medium">{item.product?.name || 'Unknown'}</p>
                           <p className="text-xs text-muted-foreground">{item.product?.sku || 'N/A'}</p>
@@ -573,7 +575,7 @@ export default function OrderDetail() {
                         </td>
                         <td className="text-center">
                           {item.needs_boxing ? (
-                            <Badge variant="outline" className="text-xs">Yes</Badge>
+                            <Badge variant="outline" className="text-xs bg-primary/10">Yes</Badge>
                           ) : (
                             <Badge variant="secondary" className="text-xs">No</Badge>
                           )}
