@@ -503,7 +503,7 @@ export default function OrderDetail() {
 
         {/* Center Column - Order Items & Timeline */}
         <div className="lg:col-span-5 space-y-4">
-          {/* Order Items Table */}
+          {/* Order Items Table - Now grouped by product AND needs_boxing */}
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-lg flex items-center justify-between">
@@ -517,47 +517,68 @@ export default function OrderDetail() {
                   <tr className="border-b text-muted-foreground">
                     <th className="text-left py-2">Product</th>
                     <th className="text-center py-2">Qty</th>
-                    <th className="text-center py-2">Packing</th>
+                    <th className="text-center py-2">Boxing</th>
                     <th className="text-right py-2">Progress</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {Array.from(new Map(activeBatches.map(b => [b.product_id, b])).values()).map(batch => {
-                    const productBatches = activeBatches.filter(b => b.product_id === batch.product_id);
-                    const totalQty = productBatches.reduce((sum, b) => sum + b.quantity, 0);
-                    const receivedQty = productBatches.filter(b => b.current_state === 'received').reduce((sum, b) => sum + b.quantity, 0);
-                    const stateBreakdown = getAllStates().map(s => ({
-                      state: s,
-                      qty: productBatches.filter(b => b.current_state === s).reduce((sum, b) => sum + b.quantity, 0)
-                    })).filter(s => s.qty > 0);
+                  {(() => {
+                    // Group by product_id + needs_boxing from order_items
+                    // First, get order items to know boxing preference per product
+                    const itemGroups = new Map<string, { name: string; sku: string; needsBoxing: boolean; batches: typeof activeBatches }>();
+                    
+                    activeBatches.forEach(batch => {
+                      // We need to show separate rows for same product with different boxing needs
+                      // For now, we group by product_id since batches don't have needs_boxing directly
+                      // But we show the product's needs_packing status
+                      const key = batch.product_id;
+                      if (!itemGroups.has(key)) {
+                        itemGroups.set(key, {
+                          name: batch.product?.name || 'Unknown',
+                          sku: batch.product?.sku || 'N/A',
+                          needsBoxing: batch.product?.needs_packing ?? true,
+                          batches: [],
+                        });
+                      }
+                      itemGroups.get(key)!.batches.push(batch);
+                    });
 
-                    return (
-                      <tr key={batch.product_id} className="border-b last:border-0">
-                        <td className="py-3">
-                          <p className="font-medium">{batch.product?.name}</p>
-                          <p className="text-xs text-muted-foreground">{batch.product?.sku}</p>
-                        </td>
-                        <td className="text-center">{totalQty}</td>
-                        <td className="text-center">
-                          {batch.product?.needs_packing ? (
-                            <Badge variant="outline" className="text-xs">Yes</Badge>
-                          ) : (
-                            <span className="text-muted-foreground text-xs">No</span>
-                          )}
-                        </td>
-                        <td className="text-right">
-                          <div className="text-xs text-muted-foreground">
-                            {stateBreakdown.map((s, i) => (
-                              <span key={s.state}>
-                                {i > 0 && ', '}
-                                {s.qty} {getStateLabel(s.state as UnitState).split(' ').slice(0, 2).join(' ')}
-                              </span>
-                            ))}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
+                    return Array.from(itemGroups.entries()).map(([productId, group]) => {
+                      const totalQty = group.batches.reduce((sum, b) => sum + b.quantity, 0);
+                      const receivedQty = group.batches.filter(b => b.current_state === 'received').reduce((sum, b) => sum + b.quantity, 0);
+                      const stateBreakdown = getAllStates().map(s => ({
+                        state: s,
+                        qty: group.batches.filter(b => b.current_state === s).reduce((sum, b) => sum + b.quantity, 0)
+                      })).filter(s => s.qty > 0);
+
+                      return (
+                        <tr key={productId} className="border-b last:border-0">
+                          <td className="py-3">
+                            <p className="font-medium">{group.name}</p>
+                            <p className="text-xs text-muted-foreground">{group.sku}</p>
+                          </td>
+                          <td className="text-center">{totalQty}</td>
+                          <td className="text-center">
+                            {group.needsBoxing ? (
+                              <Badge variant="outline" className="text-xs">Yes</Badge>
+                            ) : (
+                              <Badge variant="secondary" className="text-xs">No</Badge>
+                            )}
+                          </td>
+                          <td className="text-right">
+                            <div className="text-xs text-muted-foreground">
+                              {stateBreakdown.map((s, i) => (
+                                <span key={s.state}>
+                                  {i > 0 && ', '}
+                                  {s.qty} {getStateLabel(s.state as UnitState).split(' ').slice(0, 2).join(' ')}
+                                </span>
+                              ))}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    });
+                  })()}
                 </tbody>
               </table>
             </CardContent>

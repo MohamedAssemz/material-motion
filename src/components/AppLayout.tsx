@@ -21,6 +21,7 @@ import {
   ChevronRight,
   LogOut,
   Menu,
+  BookOpen,
 } from 'lucide-react';
 
 interface NavItem {
@@ -35,6 +36,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   { title: 'Dashboard', href: '/', icon: LayoutDashboard },
   { title: 'Orders', href: '/orders', icon: ClipboardList },
+  { title: 'Catalog', href: '/catalog', icon: BookOpen },
   { title: 'Manufacturing', href: '/queues/manufacturing', icon: Factory },
   { title: 'Finishing', href: '/queues/finishing', icon: Sparkles },
   { title: 'Packaging', href: '/queues/packaging', icon: Package },

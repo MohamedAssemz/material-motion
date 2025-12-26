@@ -3,31 +3,32 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { AuthProvider } from "./contexts/AuthContext";
-import { ProtectedRoute } from "./components/ProtectedRoute";
-import { AppLayout } from "./components/AppLayout";
-import Auth from "./pages/Auth";
+import { AuthProvider } from "@/contexts/AuthContext";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { AppLayout } from "@/components/AppLayout";
 import Dashboard from "./pages/Dashboard";
 import Orders from "./pages/Orders";
-import OrderDetail from "./pages/OrderDetail";
 import OrderCreate from "./pages/OrderCreate";
-import OrderManufacturing from "./pages/OrderManufacturing";
-import OrderFinishing from "./pages/OrderFinishing";
-import OrderPackaging from "./pages/OrderPackaging";
-import OrderBoxing from "./pages/OrderBoxing";
+import OrderDetail from "./pages/OrderDetail";
 import Products from "./pages/Products";
+import Catalog from "./pages/Catalog";
+import Customers from "./pages/Customers";
+import Machines from "./pages/Machines";
+import Boxes from "./pages/Boxes";
+import ExtraInventory from "./pages/ExtraInventory";
 import Admin from "./pages/Admin";
+import Analytics from "./pages/Analytics";
+import Auth from "./pages/Auth";
+import BatchLookup from "./pages/BatchLookup";
+import NotFound from "./pages/NotFound";
 import QueueManufacturing from "./pages/QueueManufacturing";
 import QueueFinishing from "./pages/QueueFinishing";
 import QueuePackaging from "./pages/QueuePackaging";
 import QueueBoxing from "./pages/QueueBoxing";
-import ExtraInventory from "./pages/ExtraInventory";
-import Boxes from "./pages/Boxes";
-import Machines from "./pages/Machines";
-import Customers from "./pages/Customers";
-import BatchLookup from "./pages/BatchLookup";
-import Analytics from "./pages/Analytics";
-import NotFound from "./pages/NotFound";
+import OrderManufacturing from "./pages/OrderManufacturing";
+import OrderFinishing from "./pages/OrderFinishing";
+import OrderPackaging from "./pages/OrderPackaging";
+import OrderBoxing from "./pages/OrderBoxing";
 
 const queryClient = new QueryClient();
 
@@ -55,6 +56,7 @@ const App = () => (
             <Route path="/orders/:id/boxing" element={<ProtectedPage><OrderBoxing /></ProtectedPage>} />
             <Route path="/orders/create" element={<ProtectedPage><OrderCreate /></ProtectedPage>} />
             <Route path="/products" element={<ProtectedPage><Products /></ProtectedPage>} />
+            <Route path="/catalog" element={<ProtectedPage><Catalog /></ProtectedPage>} />
             <Route path="/users" element={<ProtectedRoute requiredRole="admin"><AppLayout><Admin /></AppLayout></ProtectedRoute>} />
             <Route path="/queues/manufacturing" element={<ProtectedPage><QueueManufacturing /></ProtectedPage>} />
             <Route path="/queues/finishing" element={<ProtectedPage><QueueFinishing /></ProtectedPage>} />

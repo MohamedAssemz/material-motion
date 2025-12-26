@@ -441,6 +441,36 @@ export type Database = {
           },
         ]
       }
+      parent_products: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string
+          name: string
+          needs_packing: boolean | null
+          parent_sku: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name: string
+          needs_packing?: boolean | null
+          parent_sku: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          needs_packing?: boolean | null
+          parent_sku?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       product_bom: {
         Row: {
           created_at: string | null
@@ -480,32 +510,157 @@ export type Database = {
           },
         ]
       }
+      product_colors: {
+        Row: {
+          color_name: string
+          created_at: string | null
+          id: string
+          parent_product_id: string
+        }
+        Insert: {
+          color_name: string
+          created_at?: string | null
+          id?: string
+          parent_product_id: string
+        }
+        Update: {
+          color_name?: string
+          created_at?: string | null
+          id?: string
+          parent_product_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_colors_parent_product_id_fkey"
+            columns: ["parent_product_id"]
+            isOneToOne: false
+            referencedRelation: "parent_products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      product_potential_customers: {
+        Row: {
+          created_at: string | null
+          customer_id: string
+          id: string
+          parent_product_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          customer_id: string
+          id?: string
+          parent_product_id: string
+        }
+        Update: {
+          created_at?: string | null
+          customer_id?: string
+          id?: string
+          parent_product_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_potential_customers_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_potential_customers_parent_product_id_fkey"
+            columns: ["parent_product_id"]
+            isOneToOne: false
+            referencedRelation: "parent_products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      product_sizes: {
+        Row: {
+          created_at: string | null
+          id: string
+          parent_product_id: string
+          size_name: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          parent_product_id: string
+          size_name: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          parent_product_id?: string
+          size_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_sizes_parent_product_id_fkey"
+            columns: ["parent_product_id"]
+            isOneToOne: false
+            referencedRelation: "parent_products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products: {
         Row: {
+          color_id: string | null
           created_at: string | null
           description: string | null
           id: string
           name: string
           needs_packing: boolean | null
+          parent_product_id: string | null
+          size_id: string | null
           sku: string
         }
         Insert: {
+          color_id?: string | null
           created_at?: string | null
           description?: string | null
           id?: string
           name: string
           needs_packing?: boolean | null
+          parent_product_id?: string | null
+          size_id?: string | null
           sku: string
         }
         Update: {
+          color_id?: string | null
           created_at?: string | null
           description?: string | null
           id?: string
           name?: string
           needs_packing?: boolean | null
+          parent_product_id?: string | null
+          size_id?: string | null
           sku?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "products_color_id_fkey"
+            columns: ["color_id"]
+            isOneToOne: false
+            referencedRelation: "product_colors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "products_parent_product_id_fkey"
+            columns: ["parent_product_id"]
+            isOneToOne: false
+            referencedRelation: "parent_products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "products_size_id_fkey"
+            columns: ["size_id"]
+            isOneToOne: false
+            referencedRelation: "product_sizes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -911,6 +1066,7 @@ export type Database = {
       check_late_units: { Args: never; Returns: undefined }
       generate_batch_code: { Args: never; Returns: string }
       generate_box_code: { Args: never; Returns: string }
+      generate_parent_sku: { Args: never; Returns: string }
       generate_shipment_code: { Args: never; Returns: string }
       has_role: {
         Args: {

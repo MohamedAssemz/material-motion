@@ -14,6 +14,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Plus, Trash2, ClipboardList, Loader2, Check, ChevronsUpDown, CalendarIcon, Plane, Truck } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { z } from 'zod';
 import { format } from 'date-fns';
@@ -22,6 +23,7 @@ interface Product {
   id: string;
   sku: string;
   name: string;
+  parent_product_id?: string | null;
 }
 
 interface Customer {
@@ -72,6 +74,7 @@ export default function OrderCreate() {
   const [items, setItems] = useState<OrderItem[]>([{ product_id: '', quantity: 1, needs_boxing: true }]);
   const [extraProducts, setExtraProducts] = useState<ExtraProduct[]>([]);
   const [extraSelections, setExtraSelections] = useState<Map<string, number>>(new Map());
+  const [customerProductMapping, setCustomerProductMapping] = useState<Map<string, Set<string>>>(new Map());
 
   useEffect(() => {
     if (!hasRole('manufacture_lead') && !hasRole('admin')) {
@@ -84,7 +87,7 @@ export default function OrderCreate() {
 
   const fetchData = async () => {
     try {
-      const [productsRes, extraBatchesRes, customersRes] = await Promise.all([
+      const [productsRes, extraBatchesRes, customersRes, potentialCustomersRes] = await Promise.all([
         supabase.from('products').select('id, sku, name').order('sku'),
         supabase
           .from('batches')
@@ -93,13 +96,39 @@ export default function OrderCreate() {
           .eq('inventory_state', 'AVAILABLE')
           .eq('is_terminated', false),
         supabase.from('customers').select('id, name, code, is_domestic').order('name'),
+        supabase.from('product_potential_customers').select('parent_product_id, customer_id'),
       ]);
 
       if (productsRes.error) throw productsRes.error;
       if (extraBatchesRes.error) throw extraBatchesRes.error;
       if (customersRes.error) throw customersRes.error;
+      if (potentialCustomersRes.error) throw potentialCustomersRes.error;
 
-      setProducts(productsRes.data || []);
+      // Get parent_product_id for each product
+      const productParentMap = new Map<string, string>();
+      const { data: productParents } = await supabase
+        .from('products')
+        .select('id, parent_product_id');
+      productParents?.forEach(p => {
+        if (p.parent_product_id) productParentMap.set(p.id, p.parent_product_id);
+      });
+
+      // Build customer->product mapping via parent products
+      const customerProductMap = new Map<string, Set<string>>();
+      potentialCustomersRes.data?.forEach((pc: any) => {
+        if (!customerProductMap.has(pc.customer_id)) {
+          customerProductMap.set(pc.customer_id, new Set());
+        }
+        customerProductMap.get(pc.customer_id)!.add(pc.parent_product_id);
+      });
+
+      // Attach parent product IDs to products
+      const productsWithParent = productsRes.data?.map(p => ({
+        ...p,
+        parent_product_id: productParentMap.get(p.id) || null,
+      })) || [];
+
+      setProducts(productsWithParent);
       setExtraProducts(extraBatchesRes.data?.map(b => ({
         id: b.id,
         product_id: b.product_id,
@@ -107,6 +136,7 @@ export default function OrderCreate() {
         product: b.product as any,
       })) || []);
       setCustomers(customersRes.data || []);
+      setCustomerProductMapping(customerProductMap);
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -539,7 +569,39 @@ export default function OrderCreate() {
                           <CommandInput placeholder="Search products by SKU or name..." />
                           <CommandList>
                             <CommandEmpty>No product found.</CommandEmpty>
-                            <CommandGroup>
+                            {/* Suggested products for selected customer */}
+                            {selectedCustomerId && (() => {
+                              const suggestedParentIds = customerProductMapping.get(selectedCustomerId);
+                              const suggestedProducts = suggestedParentIds 
+                                ? products.filter(p => p.parent_product_id && suggestedParentIds.has(p.parent_product_id))
+                                : [];
+                              
+                              if (suggestedProducts.length > 0) {
+                                return (
+                                  <CommandGroup heading="Suggested for this customer">
+                                    {suggestedProducts.map((product) => (
+                                      <CommandItem
+                                        key={`suggested-${product.id}`}
+                                        value={`suggested-${product.sku} ${product.name}`}
+                                        onSelect={() => updateItem(index, 'product_id', product.id)}
+                                      >
+                                        <Check
+                                          className={cn(
+                                            "mr-2 h-4 w-4",
+                                            item.product_id === product.id ? "opacity-100" : "opacity-0"
+                                          )}
+                                        />
+                                        <span className="font-mono mr-2">{product.sku}</span>
+                                        <span className="text-muted-foreground">{product.name}</span>
+                                        <Badge variant="secondary" className="ml-2 text-xs">Suggested</Badge>
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                );
+                              }
+                              return null;
+                            })()}
+                            <CommandGroup heading={selectedCustomerId ? "All products" : undefined}>
                               {products.map((product) => (
                                 <CommandItem
                                   key={product.id}
