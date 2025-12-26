@@ -29,6 +29,8 @@ import OrderManufacturing from "./pages/OrderManufacturing";
 import OrderFinishing from "./pages/OrderFinishing";
 import OrderPackaging from "./pages/OrderPackaging";
 import OrderBoxing from "./pages/OrderBoxing";
+import Shipments from "./pages/Shipments";
+import OrderShipments from "./pages/OrderShipments";
 
 const queryClient = new QueryClient();
 
@@ -54,6 +56,7 @@ const App = () => (
             <Route path="/orders/:id/finishing" element={<ProtectedPage><OrderFinishing /></ProtectedPage>} />
             <Route path="/orders/:id/packaging" element={<ProtectedPage><OrderPackaging /></ProtectedPage>} />
             <Route path="/orders/:id/boxing" element={<ProtectedPage><OrderBoxing /></ProtectedPage>} />
+            <Route path="/orders/:id/shipments" element={<ProtectedPage><OrderShipments /></ProtectedPage>} />
             <Route path="/orders/create" element={<ProtectedPage><OrderCreate /></ProtectedPage>} />
             <Route path="/products" element={<ProtectedPage><Products /></ProtectedPage>} />
             <Route path="/catalog" element={<ProtectedPage><Catalog /></ProtectedPage>} />
@@ -62,6 +65,7 @@ const App = () => (
             <Route path="/queues/finishing" element={<ProtectedPage><QueueFinishing /></ProtectedPage>} />
             <Route path="/queues/packaging" element={<ProtectedPage><QueuePackaging /></ProtectedPage>} />
             <Route path="/queues/boxing" element={<ProtectedPage><QueueBoxing /></ProtectedPage>} />
+            <Route path="/shipments" element={<ProtectedPage><Shipments /></ProtectedPage>} />
             <Route path="/extra-inventory" element={<ProtectedPage><ExtraInventory /></ProtectedPage>} />
             <Route path="/boxes" element={<ProtectedPage><Boxes /></ProtectedPage>} />
             <Route path="/machines" element={<ProtectedRoute requiredRole="admin"><AppLayout><Machines /></AppLayout></ProtectedRoute>} />

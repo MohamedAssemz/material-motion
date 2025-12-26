@@ -22,6 +22,7 @@ import {
   LogOut,
   Menu,
   BookOpen,
+  Truck,
 } from 'lucide-react';
 
 interface NavItem {
@@ -41,6 +42,7 @@ const navItems: NavItem[] = [
   { title: 'Finishing', href: '/queues/finishing', icon: Sparkles },
   { title: 'Packaging', href: '/queues/packaging', icon: Package },
   { title: 'Boxing', href: '/queues/boxing', icon: Box },
+  { title: 'Shipments', href: '/shipments', icon: Truck },
   { title: 'Warehouse', href: '/boxes', icon: Warehouse },
   { title: 'Extra Inventory', href: '/extra-inventory', icon: PackageOpen },
   { title: 'Machines', href: '/machines', icon: Settings, roles: ['admin'] },

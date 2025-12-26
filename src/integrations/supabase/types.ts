@@ -33,6 +33,7 @@ export type Database = {
           is_terminated: boolean | null
           lead_time_days: number | null
           order_id: string | null
+          order_item_id: string | null
           origin_state: string | null
           parent_batch_id: string | null
           parent_batch_id_split: string | null
@@ -63,6 +64,7 @@ export type Database = {
           is_terminated?: boolean | null
           lead_time_days?: number | null
           order_id?: string | null
+          order_item_id?: string | null
           origin_state?: string | null
           parent_batch_id?: string | null
           parent_batch_id_split?: string | null
@@ -93,6 +95,7 @@ export type Database = {
           is_terminated?: boolean | null
           lead_time_days?: number | null
           order_id?: string | null
+          order_item_id?: string | null
           origin_state?: string | null
           parent_batch_id?: string | null
           parent_batch_id_split?: string | null
@@ -118,6 +121,13 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batches_order_item_id_fkey"
+            columns: ["order_item_id"]
+            isOneToOne: false
+            referencedRelation: "order_items"
             referencedColumns: ["id"]
           },
           {
