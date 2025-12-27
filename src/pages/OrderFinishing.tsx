@@ -95,6 +95,7 @@ export default function OrderFinishing() {
   const [selectedBoxes, setSelectedBoxes] = useState<Set<string>>(new Set());
   const [productSelections, setProductSelections] = useState<Map<string, number>>(new Map());
   const [etaDays, setEtaDays] = useState('1');
+  const [receiveSearchQuery, setReceiveSearchQuery] = useState('');
   
   // Dialog states
   const [acceptDialogOpen, setAcceptDialogOpen] = useState(false);
@@ -311,11 +312,23 @@ export default function OrderFinishing() {
   const totalCompleted = completedGroups.reduce((sum, g) => sum + g.quantity, 0);
   const totalSelected = Array.from(productSelections.values()).reduce((a, b) => a + b, 0);
 
+  // Filter boxes based on search query (box code, product SKU, or product name)
+  const filteredReadyBoxGroups = receiveSearchQuery.trim()
+    ? readyBoxGroups.filter(group => {
+        const query = receiveSearchQuery.trim().toUpperCase();
+        if (group.box_code.toUpperCase().includes(query)) return true;
+        return group.batches.some(b => 
+          b.product?.sku?.toUpperCase().includes(query) ||
+          b.product?.name?.toUpperCase().includes(query)
+        );
+      })
+    : readyBoxGroups;
+
   const handleSelectAllBoxes = () => {
-    if (selectedBoxes.size === readyBoxGroups.length) {
+    if (selectedBoxes.size === filteredReadyBoxGroups.length) {
       setSelectedBoxes(new Set());
     } else {
-      setSelectedBoxes(new Set(readyBoxGroups.map(g => g.box_id)));
+      setSelectedBoxes(new Set(filteredReadyBoxGroups.map(g => g.box_id)));
     }
   };
 
@@ -556,7 +569,7 @@ export default function OrderFinishing() {
                 <div className="flex items-center gap-4">
                   <Button variant="outline" size="sm" onClick={handleSelectAllBoxes}>
                     <CheckSquare className="h-4 w-4 mr-2" />
-                    {selectedBoxes.size === readyBoxGroups.length ? 'Deselect All' : 'Select All'}
+                    {selectedBoxes.size === filteredReadyBoxGroups.length ? 'Deselect All' : 'Select All'}
                   </Button>
                   <div>
                     <Label className="text-xs text-muted-foreground">ETA (days)</Label>
@@ -582,38 +595,43 @@ export default function OrderFinishing() {
           {/* Search Box */}
           <Card>
             <CardContent className="p-4">
-              <Label>Search or Scan Box</Label>
+              <Label>Search by Box Code, Product SKU, or Name</Label>
               <div className="flex gap-2 mt-2">
                 <div className="flex-1 relative">
-                  <QrCode className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
-                    placeholder="Enter box code..."
+                    value={receiveSearchQuery}
+                    onChange={(e) => setReceiveSearchQuery(e.target.value)}
+                    placeholder="Type to filter boxes..."
                     className="pl-10"
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        const code = (e.target as HTMLInputElement).value.toUpperCase();
-                        const found = readyBoxGroups.find(g => g.box_code === code);
-                        if (found) {
-                          setSelectedBoxes(prev => new Set(prev).add(found.box_id));
-                          (e.target as HTMLInputElement).value = '';
-                          toast.success(`Added ${code} to selection`);
-                        } else {
-                          toast.error(`Box ${code} not found in ready for finishing`);
-                        }
+                    onBlur={() => {
+                      if (!receiveSearchQuery.trim()) {
+                        setReceiveSearchQuery('');
                       }
                     }}
                   />
                 </div>
+                {receiveSearchQuery && (
+                  <Button variant="ghost" size="sm" onClick={() => setReceiveSearchQuery('')}>
+                    Clear
+                  </Button>
+                )}
               </div>
             </CardContent>
           </Card>
 
           {/* Boxes List */}
           <div className="space-y-3">
-            {readyBoxGroups.length === 0 ? (
-              <Card><CardContent className="p-8 text-center text-muted-foreground">No boxes ready for finishing</CardContent></Card>
+            {filteredReadyBoxGroups.length === 0 ? (
+              <Card>
+                <CardContent className="p-8 text-center text-muted-foreground">
+                  {receiveSearchQuery.trim() 
+                    ? `No boxes matching "${receiveSearchQuery}"` 
+                    : 'No boxes ready for finishing'}
+                </CardContent>
+              </Card>
             ) : (
-              readyBoxGroups.map(group => (
+              filteredReadyBoxGroups.map(group => (
                 <Card key={group.box_id} className={selectedBoxes.has(group.box_id) ? 'border-primary' : ''}>
                   <CardContent className="p-4">
                     <div className="flex items-center gap-4">
@@ -636,7 +654,7 @@ export default function OrderFinishing() {
                       </div>
                       <Badge variant="secondary">{group.totalQty} items</Badge>
                       <div className="flex-1 text-sm text-muted-foreground">
-                        {group.batches.map(b => `${b.product?.sku} (${b.quantity})`).join(', ')}
+                        {group.batches.map(b => `${b.product?.sku} - ${b.product?.name} (${b.quantity})`).join(', ')}
                       </div>
                     </div>
                   </CardContent>

@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { ArrowLeft, Box, Loader2, QrCode, CheckSquare, Truck, Printer, Package, CheckCircle, Download } from "lucide-react";
+import { ArrowLeft, Box, Loader2, QrCode, CheckSquare, Truck, Printer, Package, CheckCircle, Download, Search } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -89,6 +89,7 @@ export default function OrderBoxing() {
   const [productSelections, setProductSelections] = useState<Map<string, number>>(new Map());
   const [readyForShipmentSelections, setReadyForShipmentSelections] = useState<Map<string, number>>(new Map());
   const [etaDays, setEtaDays] = useState("1");
+  const [receiveSearchQuery, setReceiveSearchQuery] = useState('');
 
   const [acceptDialogOpen, setAcceptDialogOpen] = useState(false);
   const [moveToReadyDialogOpen, setMoveToReadyDialogOpen] = useState(false);
@@ -308,9 +309,21 @@ export default function OrderBoxing() {
   const totalSelectedForShipment = Array.from(readyForShipmentSelections.values()).reduce((a, b) => a + b, 0);
   const totalShipped = shipments.reduce((sum, s) => sum + s.items.reduce((iSum, item) => iSum + item.quantity, 0), 0);
 
+  // Filter boxes based on search query (box code, product SKU, or product name)
+  const filteredReadyBoxGroups = receiveSearchQuery.trim()
+    ? readyBoxGroups.filter(group => {
+        const query = receiveSearchQuery.trim().toUpperCase();
+        if (group.box_code.toUpperCase().includes(query)) return true;
+        return group.batches.some(b => 
+          b.product?.sku?.toUpperCase().includes(query) ||
+          b.product?.name?.toUpperCase().includes(query)
+        );
+      })
+    : readyBoxGroups;
+
   const handleSelectAllBoxes = () => {
-    if (selectedBoxes.size === readyBoxGroups.length) setSelectedBoxes(new Set());
-    else setSelectedBoxes(new Set(readyBoxGroups.map((g) => g.box_id)));
+    if (selectedBoxes.size === filteredReadyBoxGroups.length) setSelectedBoxes(new Set());
+    else setSelectedBoxes(new Set(filteredReadyBoxGroups.map((g) => g.box_id)));
   };
 
   const handleAcceptBoxes = async () => {
@@ -692,7 +705,7 @@ export default function OrderBoxing() {
                 <div className="flex items-center gap-4">
                   <Button variant="outline" size="sm" onClick={handleSelectAllBoxes}>
                     <CheckSquare className="h-4 w-4 mr-2" />
-                    {selectedBoxes.size === readyBoxGroups.length ? "Deselect All" : "Select All"}
+                    {selectedBoxes.size === filteredReadyBoxGroups.length ? "Deselect All" : "Select All"}
                   </Button>
                   <div>
                     <Label className="text-xs text-muted-foreground">ETA (days)</Label>
@@ -719,37 +732,37 @@ export default function OrderBoxing() {
 
           <Card>
             <CardContent className="p-4">
-              <Label>Search or Scan Box</Label>
+              <Label>Search by Box Code, Product SKU, or Name</Label>
               <div className="flex gap-2 mt-2">
                 <div className="flex-1 relative">
-                  <QrCode className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
-                    placeholder="Enter box code..."
+                    value={receiveSearchQuery}
+                    onChange={(e) => setReceiveSearchQuery(e.target.value)}
+                    placeholder="Type to filter boxes..."
                     className="pl-10"
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        const code = (e.target as HTMLInputElement).value.toUpperCase();
-                        const found = readyBoxGroups.find((g) => g.box_code === code);
-                        if (found) {
-                          setSelectedBoxes((prev) => new Set(prev).add(found.box_id));
-                          (e.target as HTMLInputElement).value = "";
-                          toast.success(`Added ${code}`);
-                        } else toast.error(`Box ${code} not found`);
-                      }
-                    }}
                   />
                 </div>
+                {receiveSearchQuery && (
+                  <Button variant="ghost" size="sm" onClick={() => setReceiveSearchQuery('')}>
+                    Clear
+                  </Button>
+                )}
               </div>
             </CardContent>
           </Card>
 
           <div className="space-y-3">
-            {readyBoxGroups.length === 0 ? (
+            {filteredReadyBoxGroups.length === 0 ? (
               <Card>
-                <CardContent className="p-8 text-center text-muted-foreground">No boxes ready for boxing</CardContent>
+                <CardContent className="p-8 text-center text-muted-foreground">
+                  {receiveSearchQuery.trim() 
+                    ? `No boxes matching "${receiveSearchQuery}"` 
+                    : 'No boxes ready for boxing'}
+                </CardContent>
               </Card>
             ) : (
-              readyBoxGroups.map((group) => (
+              filteredReadyBoxGroups.map((group) => (
                 <Card key={group.box_id} className={selectedBoxes.has(group.box_id) ? "border-primary" : ""}>
                   <CardContent className="p-4">
                     <div className="flex items-center gap-4">
@@ -773,8 +786,7 @@ export default function OrderBoxing() {
                         {group.batches.slice(0, 3).map((b, i) => (
                           <span key={b.id}>
                             {i > 0 && ", "}
-                            {b.product?.sku} × {b.quantity}
-                            {b.product?.needs_packing ? " (Boxed)" : " (Not Boxed)"}
+                            {b.product?.sku} - {b.product?.name} × {b.quantity}
                           </span>
                         ))}
                         {group.batches.length > 3 && <span> +{group.batches.length - 3} more</span>}
