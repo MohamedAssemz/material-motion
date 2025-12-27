@@ -137,40 +137,30 @@ All colors MUST be HSL.
 
 /* Print styles for Kartona label */
 @media print {
-  body > *:not([data-radix-dialog-overlay]) {
-    display: none !important;
+  body * {
+    visibility: hidden;
   }
   
-  [data-radix-dialog-overlay] {
-    position: static !important;
-    background: none !important;
+  #print-area,
+  #print-area * {
+    visibility: visible !important;
+    display: block;
   }
   
-  [role="dialog"] {
-    position: static !important;
-    max-width: none !important;
+  #print-area {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
     width: 100% !important;
-    max-height: none !important;
-    border: none !important;
-    box-shadow: none !important;
     background: white !important;
-    color: black !important;
-    transform: none !important;
-    animation: none !important;
+    padding: 20px !important;
   }
   
-  .print-content {
+  #print-area .flex {
+    display: flex !important;
+  }
+  
+  #print-area .hidden {
     display: block !important;
-    color: black !important;
-    background: white !important;
-  }
-  
-  .print-content * {
-    color: black !important;
-    border-color: #333 !important;
-  }
-  
-  .print-content .text-muted-foreground {
-    color: #666 !important;
   }
 }
