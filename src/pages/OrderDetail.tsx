@@ -489,14 +489,6 @@ export default function OrderDetail() {
                 <span className="font-mono font-medium">{order.order_number}</span>
               </div>
 
-              <Badge variant={statusConfig[orderState].variant as any} className="flex items-center gap-1">
-                {(() => {
-                  const Icon = statusConfig[orderState].icon;
-                  return <Icon className="h-3 w-3" />;
-                })()}
-                {orderState}
-              </Badge>
-
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Customer</span>
                 <span>{order.customer?.name || "N/A"}</span>
