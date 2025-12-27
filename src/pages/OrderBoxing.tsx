@@ -410,15 +410,18 @@ export default function OrderBoxing() {
 
       toast.success(`Created Kartona ${shipment.shipment_code}`);
 
-      printKartonaLabel(shipment.shipment_code);
-
-      // CLOSE FIRST
+      // CLOSE UI FIRST (sync, guaranteed)
       setKartonaDialogOpen(false);
+      setSubmitting(false);
 
-      // THEN reset internal state
+      // RESET STATE
       setReadyForShipmentSelections(new Map());
       setShipmentNotes("");
-      setSubmitting(false);
+
+      // DEFER PRINT (non-blocking)
+      setTimeout(() => {
+        printKartonaLabel(shipment.shipment_code);
+      }, 0);
 
       // REFRESH LAST
       fetchData();
@@ -476,7 +479,12 @@ export default function OrderBoxing() {
           </div>
           ${shipmentNotes ? `<div class="section"><div class="label">NOTES:</div><p>${shipmentNotes}</p></div>` : ""}
           <div class="date">Created: ${format(new Date(), "PPP p")}</div>
-          <script>window.print(); window.close();</script>
+      <script>
+  window.onload = () => {
+    window.print();
+  };
+</script>
+
         </body>
       </html>
     `;
