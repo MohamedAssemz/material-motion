@@ -410,17 +410,19 @@ export default function OrderBoxing() {
 
       toast.success(`Created Kartona ${shipment.shipment_code}`);
 
-      // Close dialog and reset state FIRST before printing
-      setKartonaDialogOpen(false);
-      setReadyForShipmentSelections(new Map());
-      setShipmentNotes("");
-      setSubmitting(false); // Reset submitting before print to prevent stuck state
+      setSubmitting(false);
 
-      // Print label (non-blocking)
+      // Trigger print first
       setTimeout(() => {
         printKartonaLabel(shipment.shipment_code);
       }, 0);
 
+      // Now safely close + reset dialog
+      setKartonaDialogOpen(false);
+      setReadyForShipmentSelections(new Map());
+      setShipmentNotes("");
+
+      // Refresh data last
       fetchData();
     } catch (error: any) {
       toast.error(error.message);
