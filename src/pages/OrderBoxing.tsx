@@ -96,9 +96,8 @@ export default function OrderBoxing() {
   const [shipmentNotes, setShipmentNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  // Print preview dialog state
-  const [printPreviewOpen, setPrintPreviewOpen] = useState(false);
-  const [printPreviewData, setPrintPreviewData] = useState<{
+  // Print data for hidden printable area
+  const [printData, setPrintData] = useState<{
     shipmentCode: string;
     items: Array<{ sku: string; name: string; qty: number; needsBoxing: boolean }>;
     totalItems: number;
@@ -541,13 +540,11 @@ export default function OrderBoxing() {
     totalItems: number,
     notes: string,
   ) => {
-    // Open print preview dialog instead of new tab
-    setPrintPreviewData({ shipmentCode, items, totalItems, notes });
-    setPrintPreviewOpen(true);
-  };
-
-  const handlePrint = () => {
-    window.print();
+    // Set print data and trigger print after render
+    setPrintData({ shipmentCode, items, totalItems, notes });
+    setTimeout(() => {
+      window.print();
+    }, 100);
   };
 
   if (loading) {
@@ -1121,78 +1118,57 @@ export default function OrderBoxing() {
         </DialogContent>
       </Dialog>
 
-      {/* Print Preview Dialog */}
-      <Dialog open={printPreviewOpen} onOpenChange={setPrintPreviewOpen}>
-        <DialogContent className="max-w-lg print:max-w-none print:m-0 print:p-0 print:shadow-none print:border-none">
-          <div className="print:hidden">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Printer className="h-5 w-5" />
-                Print Preview
-              </DialogTitle>
-            </DialogHeader>
-          </div>
-
-          {printPreviewData && (
-            <div className="print-content">
-              {/* Header */}
-              <div className="text-center border-b-2 border-foreground pb-3 mb-4">
-                <p className="text-3xl font-bold font-mono">{printPreviewData.shipmentCode}</p>
-                <p className="text-lg mt-1">{order?.order_number || "N/A"}</p>
-                <p className="text-muted-foreground">{order?.customer?.name || "N/A"}</p>
-              </div>
-
-              {/* Contents */}
-              <div className="space-y-3">
-                <p className="text-xs text-muted-foreground uppercase tracking-wide">Contents:</p>
-                <div className="space-y-2">
-                  {printPreviewData.items.map((item, idx) => (
-                    <div key={idx} className="flex items-start justify-between py-2 border-b border-muted">
-                      <div className="flex gap-3">
-                        <span className="font-mono text-sm w-20">{item.sku}</span>
-                        <div>
-                          <span className="text-sm">{item.name}</span>
-                          <p className="text-xs text-muted-foreground">
-                            {item.needsBoxing ? "Boxed" : "Not Boxed"}
-                          </p>
-                        </div>
-                      </div>
-                      <span className="font-semibold">{item.qty}</span>
-                    </div>
-                  ))}
-                  <div className="flex justify-between pt-2 border-t-2 border-foreground font-bold">
-                    <span>Total Items</span>
-                    <span>{printPreviewData.totalItems}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Notes */}
-              {printPreviewData.notes && (
-                <div className="mt-4">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Notes:</p>
-                  <p className="mt-1 text-sm">{printPreviewData.notes}</p>
-                </div>
-              )}
-
-              {/* Date */}
-              <p className="text-center text-xs text-muted-foreground mt-6">
-                Created: {format(new Date(), "PPP p")}
-              </p>
+      {/* Hidden Printable Area - Only visible when printing */}
+      {printData && (
+        <div id="print-area" className="hidden print:block fixed inset-0 bg-white p-8 z-[9999]">
+          <div className="max-w-md mx-auto">
+            {/* Header */}
+            <div className="text-center border-b-2 border-black pb-3 mb-4">
+              <p className="text-3xl font-bold font-mono text-black">{printData.shipmentCode}</p>
+              <p className="text-lg mt-1 text-black">{order?.order_number || "N/A"}</p>
+              <p className="text-gray-600">{order?.customer?.name || "N/A"}</p>
             </div>
-          )}
 
-          <DialogFooter className="print:hidden">
-            <Button variant="outline" onClick={() => setPrintPreviewOpen(false)}>
-              Close
-            </Button>
-            <Button onClick={handlePrint}>
-              <Printer className="h-4 w-4 mr-2" />
-              Print
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            {/* Contents */}
+            <div className="space-y-3">
+              <p className="text-xs text-gray-600 uppercase tracking-wide">Contents:</p>
+              <div className="space-y-2">
+                {printData.items.map((item, idx) => (
+                  <div key={idx} className="flex items-start justify-between py-2 border-b border-gray-300">
+                    <div className="flex gap-3">
+                      <span className="font-mono text-sm w-20 text-black">{item.sku}</span>
+                      <div>
+                        <span className="text-sm text-black">{item.name}</span>
+                        <p className="text-xs text-gray-500">
+                          {item.needsBoxing ? "Boxed" : "Not Boxed"}
+                        </p>
+                      </div>
+                    </div>
+                    <span className="font-semibold text-black">{item.qty}</span>
+                  </div>
+                ))}
+                <div className="flex justify-between pt-2 border-t-2 border-black font-bold text-black">
+                  <span>Total Items</span>
+                  <span>{printData.totalItems}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Notes */}
+            {printData.notes && (
+              <div className="mt-4">
+                <p className="text-xs text-gray-600 uppercase tracking-wide">Notes:</p>
+                <p className="mt-1 text-sm text-black">{printData.notes}</p>
+              </div>
+            )}
+
+            {/* Date */}
+            <p className="text-center text-xs text-gray-600 mt-6">
+              Created: {format(new Date(), "PPP p")}
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
