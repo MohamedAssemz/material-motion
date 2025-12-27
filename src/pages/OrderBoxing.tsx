@@ -409,13 +409,11 @@ export default function OrderBoxing() {
       }
 
       toast.success(`Created Kartona ${shipment.shipment_code}`);
+      printKartonaLabel(shipment.shipment_code);
 
       setSubmitting(false);
 
       // Trigger print first
-      setTimeout(() => {
-        printKartonaLabel(shipment.shipment_code);
-      }, 0);
 
       // Now safely close + reset dialog
       setReadyForShipmentSelections(new Map());
