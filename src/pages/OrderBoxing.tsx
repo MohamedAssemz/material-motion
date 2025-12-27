@@ -410,7 +410,18 @@ export default function OrderBoxing() {
 
       toast.success(`Created Kartona ${shipment.shipment_code}`);
 
-      toast.success(`Created Kartona ${shipment.shipment_code}`);
+      // Capture print data BEFORE clearing state (so print is always correct)
+      const printItems = Array.from(readyForShipmentSelections.entries())
+        .map(([key, qty]) => {
+          const group = readyForShipmentGroups.find((g) => (g.order_item_id || g.product_id) === key);
+          return group
+            ? { sku: group.product_sku, name: group.product_name, qty, needsBoxing: group.needs_boxing }
+            : null;
+        })
+        .filter(Boolean) as Array<{ sku: string; name: string; qty: number; needsBoxing: boolean }>;
+
+      const printTotal = totalSelectedForShipment;
+      const printNotes = shipmentNotes;
 
       // CLOSE + RESET UI FIRST (critical)
       setKartonaDialogOpen(false);
@@ -418,9 +429,9 @@ export default function OrderBoxing() {
       setShipmentNotes("");
       setSubmitting(false);
 
-      // Let React commit UI updates
+      // Open printable tab WITHOUT auto-printing (prevents UI freeze while print dialog is open)
       setTimeout(() => {
-        printKartonaLabel(shipment.shipment_code);
+        printKartonaLabel(shipment.shipment_code, printItems, printTotal, printNotes);
       }, 0);
 
       // Refresh after
@@ -431,18 +442,16 @@ export default function OrderBoxing() {
     }
   };
 
-  const printKartonaLabel = (shipmentCode: string) => {
-    const printWindow = window.open("", "_blank");
+  const printKartonaLabel = (
+    shipmentCode: string,
+    items: Array<{ sku: string; name: string; qty: number; needsBoxing: boolean }>,
+    totalItems: number,
+    notes: string,
+  ) => {
+    const printWindow = window.open("", "_blank", "noopener,noreferrer");
     if (!printWindow) return;
 
-    const selectedItems = Array.from(readyForShipmentSelections.entries())
-      .map(([key, qty]) => {
-        const group = readyForShipmentGroups.find((g) => (g.order_item_id || g.product_id) === key);
-        return group
-          ? { sku: group.product_sku, name: group.product_name, qty, needsBoxing: group.needs_boxing }
-          : null;
-      })
-      .filter(Boolean);
+    const safeNotes = (notes || "").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
     const html = `
       <!DOCTYPE html>
@@ -450,18 +459,26 @@ export default function OrderBoxing() {
         <head>
           <title>Kartona ${shipmentCode}</title>
           <style>
-            body { font-family: Arial, sans-serif; padding: 20px; max-width: 400px; margin: 0 auto; }
+            body { font-family: Arial, sans-serif; padding: 20px; max-width: 520px; margin: 0 auto; }
             .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 15px; }
             .code { font-size: 32px; font-weight: bold; font-family: monospace; }
             .order { font-size: 18px; margin-top: 5px; }
             .customer { color: #666; }
+            .actions { display: flex; gap: 10px; justify-content: center; margin: 14px 0 6px; }
+            .btn { cursor: pointer; border: 1px solid #333; background: #fff; padding: 8px 12px; border-radius: 8px; font-weight: 600; }
+            .btn.primary { background: #111; color: #fff; }
+            .hint { text-align: center; color: #666; font-size: 12px; margin-top: 6px; }
             .section { margin: 15px 0; }
             .label { font-size: 12px; color: #666; }
             table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-            td { padding: 5px 0; border-bottom: 1px solid #eee; }
+            td { padding: 6px 0; border-bottom: 1px solid #eee; vertical-align: top; }
             .total { font-weight: bold; border-top: 2px solid #333; }
             .date { text-align: center; color: #666; font-size: 12px; margin-top: 20px; }
             .boxing { font-size: 10px; color: #888; }
+            @media print {
+              .actions, .hint { display: none; }
+              body { padding: 0; max-width: none; }
+            }
           </style>
         </head>
         <body>
@@ -470,25 +487,33 @@ export default function OrderBoxing() {
             <div class="order">${order?.order_number || "N/A"}</div>
             <div class="customer">${order?.customer?.name || "N/A"}</div>
           </div>
+
+          <div class="actions">
+            <button class="btn primary" onclick="window.print()">Print</button>
+            <button class="btn" onclick="window.close()">Close</button>
+          </div>
+          <div class="hint">Printing opens in this tab. Your main app tab stays usable.</div>
+
           <div class="section">
             <div class="label">CONTENTS:</div>
             <table>
-              ${selectedItems.map((item: any) => `<tr><td>${item.sku}</td><td>${item.name}<br><span class="boxing">${item.needsBoxing ? "Boxed" : "Not Boxed"}</span></td><td style="text-align:right">${item.qty}</td></tr>`).join("")}
-              <tr class="total"><td colspan="2">Total Items</td><td style="text-align:right">${totalSelectedForShipment}</td></tr>
+              ${items
+                .map(
+                  (item) =>
+                    `<tr><td style="width:90px; font-family: monospace;">${item.sku}</td><td>${item.name}<br><span class="boxing">${item.needsBoxing ? "Boxed" : "Not Boxed"}</span></td><td style="text-align:right">${item.qty}</td></tr>`,
+                )
+                .join("")}
+              <tr class="total"><td colspan="2">Total Items</td><td style="text-align:right">${totalItems}</td></tr>
             </table>
           </div>
-          ${shipmentNotes ? `<div class="section"><div class="label">NOTES:</div><p>${shipmentNotes}</p></div>` : ""}
+
+          ${safeNotes ? `<div class="section"><div class="label">NOTES:</div><p>${safeNotes}</p></div>` : ""}
+
           <div class="date">Created: ${format(new Date(), "PPP p")}</div>
-<script>
-  setTimeout(() => {
-    window.print();
-  }, 100);
-</script>
-
-
         </body>
       </html>
     `;
+
     printWindow.document.write(html);
     printWindow.document.close();
   };
