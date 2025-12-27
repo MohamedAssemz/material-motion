@@ -409,13 +409,18 @@ export default function OrderBoxing() {
       }
 
       toast.success(`Created Kartona ${shipment.shipment_code}`);
-      printKartonaLabel(shipment.shipment_code);
-      setKartonaDialogOpen(false);
-      setSubmitting(false);
 
+      printKartonaLabel(shipment.shipment_code);
+
+      // CLOSE FIRST
+      setKartonaDialogOpen(false);
+
+      // THEN reset internal state
       setReadyForShipmentSelections(new Map());
       setShipmentNotes("");
+      setSubmitting(false);
 
+      // REFRESH LAST
       fetchData();
     } catch (error: any) {
       toast.error(error.message);
