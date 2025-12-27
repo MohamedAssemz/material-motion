@@ -448,8 +448,11 @@ export default function OrderBoxing() {
     totalItems: number,
     notes: string,
   ) => {
-    const printWindow = window.open("", "_blank", "noopener,noreferrer");
-    if (!printWindow) return;
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) {
+      toast.error("Please allow pop-ups for printing");
+      return;
+    }
 
     const safeNotes = (notes || "").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
