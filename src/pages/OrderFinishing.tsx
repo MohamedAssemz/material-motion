@@ -647,11 +647,11 @@ export default function OrderFinishing() {
         </TabsContent>
 
         <TabsContent value="process" className="space-y-4">
-          {canManage && totalSelected > 0 && (
+          {canManage && (
             <Card>
               <CardContent className="p-4 flex items-center justify-between">
                 <Badge variant="secondary" className="text-lg px-3 py-1">{totalSelected} selected</Badge>
-                <Button onClick={handleOpenAssignDialog}>
+                <Button onClick={handleOpenAssignDialog} disabled={totalSelected === 0}>
                   <Box className="h-4 w-4 mr-2" />
                   Assign to Box
                 </Button>
