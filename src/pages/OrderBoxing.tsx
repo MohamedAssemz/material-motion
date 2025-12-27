@@ -410,20 +410,20 @@ export default function OrderBoxing() {
 
       toast.success(`Created Kartona ${shipment.shipment_code}`);
 
-      // CLOSE UI FIRST (sync, guaranteed)
-      setKartonaDialogOpen(false);
-      setSubmitting(false);
+      toast.success(`Created Kartona ${shipment.shipment_code}`);
 
-      // RESET STATE
+      // CLOSE + RESET UI FIRST (critical)
+      setKartonaDialogOpen(false);
       setReadyForShipmentSelections(new Map());
       setShipmentNotes("");
+      setSubmitting(false);
 
-      // DEFER PRINT (non-blocking)
+      // Let React commit UI updates
       setTimeout(() => {
         printKartonaLabel(shipment.shipment_code);
       }, 0);
 
-      // REFRESH LAST
+      // Refresh after
       fetchData();
     } catch (error: any) {
       toast.error(error.message);
@@ -479,11 +479,12 @@ export default function OrderBoxing() {
           </div>
           ${shipmentNotes ? `<div class="section"><div class="label">NOTES:</div><p>${shipmentNotes}</p></div>` : ""}
           <div class="date">Created: ${format(new Date(), "PPP p")}</div>
-      <script>
-  window.onload = () => {
+<script>
+  setTimeout(() => {
     window.print();
-  };
+  }, 100);
 </script>
+
 
         </body>
       </html>
