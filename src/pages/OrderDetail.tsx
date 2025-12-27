@@ -475,70 +475,66 @@ export default function OrderDetail() {
         </div>
       </div>
 
-      {/* Three Column Layout */}
-      <div className="grid gap-6 lg:grid-cols-12">
-        {/* Left Column - Order Summary */}
-        <div className="lg:col-span-3 space-y-4">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg">Order Summary</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Order #</span>
-                <span className="font-mono font-medium">{order.order_number}</span>
-              </div>
+      {/* Order Summary - Full Width Horizontal Card */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-4 text-sm">
+            <div>
+              <span className="text-muted-foreground block mb-1">Order #</span>
+              <span className="font-mono font-medium">{order.order_number}</span>
+            </div>
+            <div>
+              <span className="text-muted-foreground block mb-1">Status</span>
+              <Badge variant={orderState === "Fulfilled" ? "default" : "secondary"}>{orderState}</Badge>
+            </div>
+            <div>
+              <span className="text-muted-foreground block mb-1">Priority</span>
+              <Badge variant={order.priority === "high" ? "destructive" : "secondary"} className="text-xs">
+                {order.priority}
+              </Badge>
+            </div>
+            <div>
+              <span className="text-muted-foreground block mb-1">EFT</span>
+              <span>{order.estimated_fulfillment_time ? format(new Date(order.estimated_fulfillment_time), "PP") : "N/A"}</span>
+            </div>
+            <div>
+              <span className="text-muted-foreground block mb-1">Customer</span>
+              <span>{order.customer?.name || "N/A"}</span>
+            </div>
+            <div>
+              <span className="text-muted-foreground block mb-1">Shipping</span>
+              <span className="flex items-center gap-1">
+                {order.shipping_type === "international" ? (
+                  <Plane className="h-3 w-3" />
+                ) : (
+                  <Truck className="h-3 w-3" />
+                )}
+                {order.shipping_type === "international" ? "International" : "Domestic"}
+              </span>
+            </div>
+            <div>
+              <span className="text-muted-foreground block mb-1">Created</span>
+              <span>{format(new Date(order.created_at), "PP")}</span>
+            </div>
+            <div>
+              <span className="text-muted-foreground block mb-1">Created By</span>
+              <span className="truncate">{order.profile.full_name}</span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Customer</span>
-                <span>{order.customer?.name || "N/A"}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Priority</span>
-                <Badge variant={order.priority === "high" ? "destructive" : "secondary"} className="text-xs">
-                  {order.priority}
-                </Badge>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Shipping</span>
-                <span className="flex items-center gap-1">
-                  {order.shipping_type === "international" ? (
-                    <Plane className="h-3 w-3" />
-                  ) : (
-                    <Truck className="h-3 w-3" />
-                  )}
-                  {order.shipping_type === "international" ? "International" : "Domestic"}
-                </span>
-              </div>
-              {order.estimated_fulfillment_time && (
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">EFT</span>
-                  <span>{format(new Date(order.estimated_fulfillment_time), "PP")}</span>
-                </div>
-              )}
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Created</span>
-                <span>{format(new Date(order.created_at), "PP")}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Created by</span>
-                <span className="truncate max-w-[120px]">{order.profile.full_name}</span>
-              </div>
-            </CardContent>
-          </Card>
-
+      {/* Notes & Alerts Row */}
+      {(order.notes || flaggedCount > 0 || redoCount > 0) && (
+        <div className="flex flex-wrap gap-4">
           {order.notes && (
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg">Notes</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">{order.notes}</p>
+            <Card className="flex-1 min-w-[200px]">
+              <CardContent className="p-4">
+                <span className="text-sm font-medium">Notes:</span>
+                <p className="text-sm text-muted-foreground mt-1">{order.notes}</p>
               </CardContent>
             </Card>
           )}
-
-          {/* Alert Cards */}
           {(flaggedCount > 0 || redoCount > 0) && (
             <Card
               className="border-warning/50 bg-warning/5 cursor-pointer hover:bg-warning/10 transition-colors"
@@ -556,296 +552,290 @@ export default function OrderDetail() {
             </Card>
           )}
         </div>
+      )}
 
-        {/* Center Column - Order Items & Timeline */}
-        <div className="lg:col-span-5 space-y-4">
-          {/* Order Items Table - Expanded with Packaging, Boxing, Progress */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg flex items-center justify-between">
-                Order Items
-                <Badge variant="secondary">{totalItems} total</Badge>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b text-muted-foreground">
-                    <th className="text-left py-2">Product</th>
-                    <th className="text-center py-2">Qty</th>
-                    <th className="text-center py-2">Packing</th>
-                    <th className="text-center py-2">Boxing</th>
-                    <th className="text-right py-2">Progress</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {orderItems.map((item) => {
-                    // Find batches for this specific order item (not just product)
-                    const itemBatches = activeBatches.filter((b) => b.order_item_id === item.id);
-                    const totalQty = itemBatches.reduce((sum, b) => sum + b.quantity, 0);
-                    const receivedQty = itemBatches
-                      .filter((b) => b.current_state === "received")
-                      .reduce((sum, b) => sum + b.quantity, 0);
-                    const progressPct = totalQty > 0 ? Math.round((receivedQty / totalQty) * 100) : 0;
-                    const stateBreakdown = getAllStates()
-                      .map((s) => ({
-                        state: s,
-                        qty: itemBatches.filter((b) => b.current_state === s).reduce((sum, b) => sum + b.quantity, 0),
-                      }))
-                      .filter((s) => s.qty > 0);
+      {/* Middle Section - Two Cards Side by Side */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Left Card - Production Timeline */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg">Production Timeline</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {[
+                {
+                  label: "Manufacturing",
+                  in: "in_manufacturing",
+                  ready: "pending_rm",
+                  stats: manufacturingStats,
+                  icon: Factory,
+                  color: "blue",
+                },
+                {
+                  label: "Finishing",
+                  in: "in_finishing",
+                  ready: "ready_for_finishing",
+                  stats: finishingStats,
+                  icon: Sparkles,
+                  color: "purple",
+                },
+                {
+                  label: "Packaging",
+                  in: "in_packaging",
+                  ready: "ready_for_packaging",
+                  stats: packagingStats,
+                  icon: Package,
+                  color: "indigo",
+                },
+                {
+                  label: "Boxing",
+                  in: "in_boxing",
+                  ready: "ready_for_boxing",
+                  stats: boxingStats,
+                  icon: Box,
+                  color: "cyan",
+                },
+              ].map((phase, idx) => {
+                const Icon = phase.icon;
+                const total = phase.stats.waiting + phase.stats.inProgress + phase.stats.completed;
+                const progress = totalItems > 0 ? (phase.stats.completed / totalItems) * 100 : 0;
 
-                    return (
-                      <tr key={item.id} className="border-b last:border-0">
-                        <td className="py-3">
-                          <p className="font-medium">{item.product?.name || "Unknown"}</p>
-                          <p className="text-xs text-muted-foreground">{item.product?.sku || "N/A"}</p>
-                        </td>
-                        <td className="text-center font-medium">{item.quantity}</td>
-                        <td className="text-center">
-                          {item.product?.needs_packing ? (
-                            <Badge variant="outline" className="text-xs">
-                              Yes
-                            </Badge>
-                          ) : (
-                            <Badge variant="secondary" className="text-xs">
-                              No
-                            </Badge>
-                          )}
-                        </td>
-                        <td className="text-center">
-                          {item.needs_boxing ? (
-                            <Badge variant="outline" className="text-xs bg-primary/10">
-                              Yes
-                            </Badge>
-                          ) : (
-                            <Badge variant="secondary" className="text-xs">
-                              No
-                            </Badge>
-                          )}
-                        </td>
-                        <td className="text-right">
-                          <div className="flex flex-col items-end gap-1">
-                            <span className="font-medium">{progressPct}%</span>
-                            <div className="text-xs text-muted-foreground max-w-[140px] text-right">
-                              {stateBreakdown.slice(0, 2).map((s, i) => (
-                                <span key={s.state}>
-                                  {i > 0 && ", "}
-                                  {s.qty}{" "}
-                                  {getStateLabel(s.state as UnitState)
-                                    .split(" ")
-                                    .slice(0, 2)
-                                    .join(" ")}
-                                </span>
-                              ))}
-                              {stateBreakdown.length > 2 && <span> +{stateBreakdown.length - 2}</span>}
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </CardContent>
-          </Card>
-
-          {/* Visual Timeline */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg">Production Timeline</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {[
-                  {
-                    label: "Manufacturing",
-                    in: "in_manufacturing",
-                    ready: "pending_rm",
-                    stats: manufacturingStats,
-                    icon: Factory,
-                    color: "blue",
-                  },
-                  {
-                    label: "Finishing",
-                    in: "in_finishing",
-                    ready: "ready_for_finishing",
-                    stats: finishingStats,
-                    icon: Sparkles,
-                    color: "purple",
-                  },
-                  {
-                    label: "Packaging",
-                    in: "in_packaging",
-                    ready: "ready_for_packaging",
-                    stats: packagingStats,
-                    icon: Package,
-                    color: "indigo",
-                  },
-                  {
-                    label: "Boxing",
-                    in: "in_boxing",
-                    ready: "ready_for_boxing",
-                    stats: boxingStats,
-                    icon: Box,
-                    color: "cyan",
-                  },
-                ].map((phase, idx) => {
-                  const Icon = phase.icon;
-                  const total = phase.stats.waiting + phase.stats.inProgress + phase.stats.completed;
-                  const progress = totalItems > 0 ? (phase.stats.completed / totalItems) * 100 : 0;
-
-                  return (
-                    <div key={phase.label} className="flex items-center gap-3">
-                      <div
-                        className={`flex items-center justify-center w-8 h-8 rounded-full bg-${phase.color}-100 dark:bg-${phase.color}-900/30`}
-                      >
-                        <Icon className={`h-4 w-4 text-${phase.color}-600 dark:text-${phase.color}-400`} />
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="font-medium">{phase.label}</span>
-                          <span className="text-muted-foreground">
-                            {phase.stats.waiting > 0 && (
-                              <span className="text-warning">{phase.stats.waiting} waiting · </span>
-                            )}
-                            {phase.stats.inProgress > 0 && (
-                              <span className="text-primary">{phase.stats.inProgress} active · </span>
-                            )}
-                            {phase.stats.completed}/{totalItems} done
-                          </span>
-                        </div>
-                        <div className="h-1.5 bg-secondary rounded-full mt-1 overflow-hidden">
-                          <div
-                            className="h-full bg-primary rounded-full transition-all"
-                            style={{ width: `${progress}%` }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-
-                {/* Fulfilled */}
-                <div className="flex items-center gap-3 pt-2 border-t">
-                  <div className="flex items-center justify-center w-8 h-8 rounded-full bg-green-100 dark:bg-green-900/30">
-                    <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium">Fulfilled</span>
-                      <span className="text-green-600 font-medium">
-                        {receivedItems}/{totalItems}
-                      </span>
-                    </div>
-                    <div className="h-1.5 bg-secondary rounded-full mt-1 overflow-hidden">
-                      <div
-                        className="h-full bg-green-500 rounded-full transition-all"
-                        style={{ width: `${(receivedItems / totalItems) * 100}%` }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Right Column - Phase Cards */}
-        <div className="lg:col-span-4 space-y-4">
-          <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Production Phases</h3>
-
-          {[
-            {
-              label: "Manufacturing",
-              href: `/orders/${id}/manufacturing`,
-              in: "in_manufacturing",
-              ready: "pending_rm",
-              icon: Factory,
-              color: "blue",
-            },
-            {
-              label: "Finishing",
-              href: `/orders/${id}/finishing`,
-              in: "in_finishing",
-              ready: "ready_for_finishing",
-              icon: Sparkles,
-              color: "purple",
-            },
-            {
-              label: "Packaging",
-              href: `/orders/${id}/packaging`,
-              in: "in_packaging",
-              ready: "ready_for_packaging",
-              icon: Package,
-              color: "indigo",
-            },
-            {
-              label: "Boxing",
-              href: `/orders/${id}/boxing`,
-              in: "in_boxing",
-              ready: "ready_for_boxing",
-              icon: Box,
-              color: "cyan",
-            },
-          ].map((phase) => {
-            const Icon = phase.icon;
-            const waiting = activeBatches
-              .filter((b) => b.current_state === phase.ready)
-              .reduce((sum, b) => sum + b.quantity, 0);
-            const inProgress = activeBatches
-              .filter((b) => b.current_state === phase.in)
-              .reduce((sum, b) => sum + b.quantity, 0);
-
-            if (waiting === 0 && inProgress === 0) return null;
-
-            return (
-              <Card
-                key={phase.label}
-                className="cursor-pointer hover:border-primary/50 transition-colors"
-                onClick={() => navigate(phase.href)}
-              >
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-lg bg-${phase.color}-100 dark:bg-${phase.color}-900/30`}>
-                      <Icon className={`h-5 w-5 text-${phase.color}-600 dark:text-${phase.color}-400`} />
+                return (
+                  <div key={phase.label} className="flex items-center gap-3">
+                    <div
+                      className={`flex items-center justify-center w-8 h-8 rounded-full bg-${phase.color}-100 dark:bg-${phase.color}-900/30`}
+                    >
+                      <Icon className={`h-4 w-4 text-${phase.color}-600 dark:text-${phase.color}-400`} />
                     </div>
                     <div className="flex-1">
-                      <p className="font-medium">{phase.label}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {waiting > 0 && <span className="text-warning">{waiting} waiting</span>}
-                        {waiting > 0 && inProgress > 0 && " · "}
-                        {inProgress > 0 && <span className="text-primary">{inProgress} in progress</span>}
-                      </p>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="font-medium">{phase.label}</span>
+                        <span className="text-muted-foreground">
+                          {phase.stats.waiting > 0 && (
+                            <span className="text-warning">{phase.stats.waiting} waiting · </span>
+                          )}
+                          {phase.stats.inProgress > 0 && (
+                            <span className="text-primary">{phase.stats.inProgress} active · </span>
+                          )}
+                          {phase.stats.completed}/{totalItems} done
+                        </span>
+                      </div>
+                      <div className="h-1.5 bg-secondary rounded-full mt-1 overflow-hidden">
+                        <div
+                          className="h-full bg-primary rounded-full transition-all"
+                          style={{ width: `${progress}%` }}
+                        />
+                      </div>
                     </div>
-                    <ArrowLeft className="h-4 w-4 rotate-180 text-muted-foreground" />
                   </div>
-                </CardContent>
-              </Card>
-            );
-          })}
+                );
+              })}
 
-          {/* Shipments Section */}
-          <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide pt-4">Shipments</h3>
-
-          <Card
-            className="cursor-pointer hover:border-primary/50 transition-colors border-green-200 dark:border-green-800"
-            onClick={() => navigate(`/orders/${id}/shipments`)}
-          >
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-green-100 dark:bg-green-900/30">
-                  <Truck className="h-5 w-5 text-green-600 dark:text-green-400" />
+              {/* Fulfilled */}
+              <div className="flex items-center gap-3 pt-2 border-t">
+                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-green-100 dark:bg-green-900/30">
+                  <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
                 </div>
                 <div className="flex-1">
-                  <p className="font-medium">Kartonas</p>
-                  <p className="text-sm text-muted-foreground">{receivedItems} items fulfilled</p>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium">Fulfilled</span>
+                    <span className="text-green-600 font-medium">
+                      {receivedItems}/{totalItems}
+                    </span>
+                  </div>
+                  <div className="h-1.5 bg-secondary rounded-full mt-1 overflow-hidden">
+                    <div
+                      className="h-full bg-green-500 rounded-full transition-all"
+                      style={{ width: `${(receivedItems / totalItems) * 100}%` }}
+                    />
+                  </div>
                 </div>
-                <ArrowLeft className="h-4 w-4 rotate-180 text-muted-foreground" />
               </div>
-            </CardContent>
-          </Card>
-        </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Right Card - Production Phases */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg">Production Phases</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {[
+              {
+                label: "Manufacturing",
+                href: `/orders/${id}/manufacturing`,
+                in: "in_manufacturing",
+                ready: "pending_rm",
+                icon: Factory,
+                color: "blue",
+              },
+              {
+                label: "Finishing",
+                href: `/orders/${id}/finishing`,
+                in: "in_finishing",
+                ready: "ready_for_finishing",
+                icon: Sparkles,
+                color: "purple",
+              },
+              {
+                label: "Packaging",
+                href: `/orders/${id}/packaging`,
+                in: "in_packaging",
+                ready: "ready_for_packaging",
+                icon: Package,
+                color: "indigo",
+              },
+              {
+                label: "Boxing",
+                href: `/orders/${id}/boxing`,
+                in: "in_boxing",
+                ready: "ready_for_boxing",
+                icon: Box,
+                color: "cyan",
+              },
+            ].map((phase) => {
+              const Icon = phase.icon;
+              const waiting = activeBatches
+                .filter((b) => b.current_state === phase.ready)
+                .reduce((sum, b) => sum + b.quantity, 0);
+              const inProgress = activeBatches
+                .filter((b) => b.current_state === phase.in)
+                .reduce((sum, b) => sum + b.quantity, 0);
+
+              return (
+                <div
+                  key={phase.label}
+                  className="flex items-center gap-3 p-3 rounded-lg border cursor-pointer hover:border-primary/50 transition-colors"
+                  onClick={() => navigate(phase.href)}
+                >
+                  <div className={`p-2 rounded-lg bg-${phase.color}-100 dark:bg-${phase.color}-900/30`}>
+                    <Icon className={`h-5 w-5 text-${phase.color}-600 dark:text-${phase.color}-400`} />
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-medium">{phase.label}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {waiting > 0 && <span className="text-warning">{waiting} waiting</span>}
+                      {waiting > 0 && inProgress > 0 && " · "}
+                      {inProgress > 0 && <span className="text-primary">{inProgress} in progress</span>}
+                      {waiting === 0 && inProgress === 0 && <span>No active items</span>}
+                    </p>
+                  </div>
+                  <ArrowLeft className="h-4 w-4 rotate-180 text-muted-foreground" />
+                </div>
+              );
+            })}
+
+            {/* Shipments */}
+            <div
+              className="flex items-center gap-3 p-3 rounded-lg border border-green-200 dark:border-green-800 cursor-pointer hover:border-primary/50 transition-colors"
+              onClick={() => navigate(`/orders/${id}/shipments`)}
+            >
+              <div className="p-2 rounded-lg bg-green-100 dark:bg-green-900/30">
+                <Truck className="h-5 w-5 text-green-600 dark:text-green-400" />
+              </div>
+              <div className="flex-1">
+                <p className="font-medium">Shipments</p>
+                <p className="text-sm text-muted-foreground">{receivedItems} items fulfilled</p>
+              </div>
+              <ArrowLeft className="h-4 w-4 rotate-180 text-muted-foreground" />
+            </div>
+          </CardContent>
+        </Card>
       </div>
+
+      {/* Order Items - Full Width Section */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg flex items-center justify-between">
+            Order Items
+            <Badge variant="secondary">{totalItems} total</Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b text-muted-foreground">
+                  <th className="text-left py-2">Product</th>
+                  <th className="text-center py-2">Qty</th>
+                  <th className="text-center py-2">Packing</th>
+                  <th className="text-center py-2">Boxing</th>
+                  <th className="text-right py-2">Progress</th>
+                </tr>
+              </thead>
+              <tbody>
+                {orderItems.map((item) => {
+                  // Find batches for this specific order item (not just product)
+                  const itemBatches = activeBatches.filter((b) => b.order_item_id === item.id);
+                  const totalQty = itemBatches.reduce((sum, b) => sum + b.quantity, 0);
+                  const receivedQty = itemBatches
+                    .filter((b) => b.current_state === "received")
+                    .reduce((sum, b) => sum + b.quantity, 0);
+                  const progressPct = totalQty > 0 ? Math.round((receivedQty / totalQty) * 100) : 0;
+                  const stateBreakdown = getAllStates()
+                    .map((s) => ({
+                      state: s,
+                      qty: itemBatches.filter((b) => b.current_state === s).reduce((sum, b) => sum + b.quantity, 0),
+                    }))
+                    .filter((s) => s.qty > 0);
+
+                  return (
+                    <tr key={item.id} className="border-b last:border-0">
+                      <td className="py-3">
+                        <p className="font-medium">{item.product?.name || "Unknown"}</p>
+                        <p className="text-xs text-muted-foreground">{item.product?.sku || "N/A"}</p>
+                      </td>
+                      <td className="text-center font-medium">{item.quantity}</td>
+                      <td className="text-center">
+                        {item.product?.needs_packing ? (
+                          <Badge variant="outline" className="text-xs">
+                            Yes
+                          </Badge>
+                        ) : (
+                          <Badge variant="secondary" className="text-xs">
+                            No
+                          </Badge>
+                        )}
+                      </td>
+                      <td className="text-center">
+                        {item.needs_boxing ? (
+                          <Badge variant="outline" className="text-xs bg-primary/10">
+                            Yes
+                          </Badge>
+                        ) : (
+                          <Badge variant="secondary" className="text-xs">
+                            No
+                          </Badge>
+                        )}
+                      </td>
+                      <td className="text-right">
+                        <div className="flex flex-col items-end gap-1">
+                          <span className="font-medium">{progressPct}%</span>
+                          <div className="text-xs text-muted-foreground max-w-[140px] text-right">
+                            {stateBreakdown.slice(0, 2).map((s, i) => (
+                              <span key={s.state}>
+                                {i > 0 && ", "}
+                                {s.qty}{" "}
+                                {getStateLabel(s.state as UnitState)
+                                  .split(" ")
+                                  .slice(0, 2)
+                                  .join(" ")}
+                              </span>
+                            ))}
+                            {stateBreakdown.length > 2 && <span> +{stateBreakdown.length - 2}</span>}
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Dialogs */}
       <RawMaterialsDialog open={rawMaterialsOpen} onOpenChange={setRawMaterialsOpen} orderId={id!} />
