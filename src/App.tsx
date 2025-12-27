@@ -29,7 +29,6 @@ import OrderManufacturing from "./pages/OrderManufacturing";
 import OrderFinishing from "./pages/OrderFinishing";
 import OrderPackaging from "./pages/OrderPackaging";
 import OrderBoxing from "./pages/OrderBoxing";
-import Shipments from "./pages/Shipments";
 
 const queryClient = new QueryClient();
 
@@ -63,7 +62,6 @@ const App = () => (
             <Route path="/queues/finishing" element={<ProtectedPage><QueueFinishing /></ProtectedPage>} />
             <Route path="/queues/packaging" element={<ProtectedPage><QueuePackaging /></ProtectedPage>} />
             <Route path="/queues/boxing" element={<ProtectedPage><QueueBoxing /></ProtectedPage>} />
-            <Route path="/shipments" element={<ProtectedPage><Shipments /></ProtectedPage>} />
             <Route path="/extra-inventory" element={<ProtectedPage><ExtraInventory /></ProtectedPage>} />
             <Route path="/boxes" element={<ProtectedPage><Boxes /></ProtectedPage>} />
             <Route path="/machines" element={<ProtectedRoute requiredRole="admin"><AppLayout><Machines /></AppLayout></ProtectedRoute>} />
