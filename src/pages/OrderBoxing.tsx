@@ -54,12 +54,35 @@ interface OrderItemGroup {
   batches: Batch[];
 }
 
+interface ShipmentItem {
+  id: string;
+  quantity: number;
+  batch: {
+    id: string;
+    batch_code: string;
+    order_item_id: string | null;
+    product: { id: string; name: string; sku: string };
+  };
+  order_item?: { needs_boxing: boolean } | null;
+}
+
+interface Shipment {
+  id: string;
+  shipment_code: string;
+  status: string;
+  notes: string | null;
+  created_at: string;
+  sealed_at: string | null;
+  items: ShipmentItem[];
+}
+
 export default function OrderBoxing() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { hasRole, user } = useAuth();
   const [order, setOrder] = useState<Order | null>(null);
   const [batches, setBatches] = useState<Batch[]>([]);
+  const [shipments, setShipments] = useState<Shipment[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [selectedBoxes, setSelectedBoxes] = useState<Set<string>>(new Set());
@@ -133,10 +156,70 @@ export default function OrderBoxing() {
 
       setOrder(orderRes.data as Order);
       setBatches(batchesWithData as Batch[]);
+
+      // Fetch shipments for this order
+      await fetchShipments();
     } catch (error: any) {
       toast.error(error.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchShipments = async () => {
+    try {
+      const { data: shipmentsData, error: shipmentsError } = await supabase
+        .from("shipments")
+        .select("id, shipment_code, status, notes, created_at, sealed_at")
+        .eq("order_id", id)
+        .order("created_at", { ascending: false });
+
+      if (shipmentsError) throw shipmentsError;
+
+      const shipmentsWithItems: Shipment[] = [];
+      for (const shipment of shipmentsData || []) {
+        const { data: itemsData } = await supabase
+          .from("shipment_items")
+          .select(`
+            id,
+            quantity,
+            batch:batches(
+              id,
+              batch_code,
+              order_item_id,
+              product:products(id, name, sku)
+            )
+          `)
+          .eq("shipment_id", shipment.id);
+
+        const itemsWithOrderItem: ShipmentItem[] = [];
+        for (const item of itemsData || []) {
+          let orderItem = null;
+          if ((item.batch as any)?.order_item_id) {
+            const { data: oiData } = await supabase
+              .from("order_items")
+              .select("needs_boxing")
+              .eq("id", (item.batch as any).order_item_id)
+              .single();
+            orderItem = oiData;
+          }
+          itemsWithOrderItem.push({
+            id: item.id,
+            quantity: item.quantity,
+            batch: item.batch as any,
+            order_item: orderItem,
+          });
+        }
+
+        shipmentsWithItems.push({
+          ...shipment,
+          items: itemsWithOrderItem,
+        });
+      }
+
+      setShipments(shipmentsWithItems);
+    } catch (error: any) {
+      console.error("Error fetching shipments:", error);
     }
   };
 
@@ -215,6 +298,7 @@ export default function OrderBoxing() {
   const totalReceived = batches.filter((b) => b.current_state === "received").reduce((sum, b) => sum + b.quantity, 0);
   const totalSelected = Array.from(productSelections.values()).reduce((a, b) => a + b, 0);
   const totalSelectedForShipment = Array.from(readyForShipmentSelections.values()).reduce((a, b) => a + b, 0);
+  const totalShipped = shipments.reduce((sum, s) => sum + s.items.reduce((iSum, item) => iSum + item.quantity, 0), 0);
 
   const handleSelectAllBoxes = () => {
     if (selectedBoxes.size === readyBoxGroups.length) setSelectedBoxes(new Set());
@@ -593,23 +677,24 @@ export default function OrderBoxing() {
         </Card>
         <Card>
           <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Kartonas Created</p>
-            <p className="text-2xl font-bold text-purple-600">{totalReceived}</p>
+            <p className="text-sm text-muted-foreground">Total Kartonas</p>
+            <p className="text-2xl font-bold text-purple-600">{shipments.length}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Boxes Waiting</p>
-            <p className="text-2xl font-bold">{readyBoxGroups.length}</p>
+            <p className="text-sm text-muted-foreground">Total Shipped</p>
+            <p className="text-2xl font-bold text-green-600">{totalShipped}</p>
           </CardContent>
         </Card>
       </div>
 
       <Tabs defaultValue="receive" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="receive">Receive Boxes ({readyBoxGroups.length})</TabsTrigger>
-          <TabsTrigger value="process">Process Items ({totalInBoxing})</TabsTrigger>
-          <TabsTrigger value="ready">Ready for Shipment ({totalReadyForShipment})</TabsTrigger>
+        <TabsList className="grid grid-cols-4 w-full max-w-2xl">
+          <TabsTrigger value="receive">Receive ({readyBoxGroups.length})</TabsTrigger>
+          <TabsTrigger value="process">Process ({totalInBoxing})</TabsTrigger>
+          <TabsTrigger value="ready">Ready ({totalReadyForShipment})</TabsTrigger>
+          <TabsTrigger value="shipped">Shipped ({shipments.length})</TabsTrigger>
         </TabsList>
 
         {/* Tab 1: Receive Boxes */}
@@ -856,6 +941,114 @@ export default function OrderBoxing() {
               ))
             )}
           </div>
+        </TabsContent>
+
+        {/* Tab 4: Shipped (Kartonas) */}
+        <TabsContent value="shipped" className="space-y-4">
+          {shipments.length === 0 ? (
+            <Card>
+              <CardContent className="p-8 text-center text-muted-foreground">
+                No kartonas created for this order yet
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-4">
+              {shipments.map((shipment) => {
+                const totalItems = shipment.items.reduce((sum, item) => sum + item.quantity, 0);
+
+                // Group items by product_id + needs_boxing
+                const groupedItems = new Map<
+                  string,
+                  { productName: string; productSku: string; needsBoxing: boolean; totalQty: number }
+                >();
+                shipment.items.forEach((item) => {
+                  const needsBoxing = item.order_item?.needs_boxing ?? true;
+                  const key = `${item.batch?.product?.id || "unknown"}-${needsBoxing ? "boxed" : "not-boxed"}`;
+
+                  if (!groupedItems.has(key)) {
+                    groupedItems.set(key, {
+                      productName: item.batch?.product?.name || "Unknown",
+                      productSku: item.batch?.product?.sku || "N/A",
+                      needsBoxing,
+                      totalQty: 0,
+                    });
+                  }
+                  const group = groupedItems.get(key)!;
+                  group.totalQty += item.quantity;
+                });
+
+                return (
+                  <Card key={shipment.id}>
+                    <CardHeader className="pb-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <Package className="h-5 w-5 text-green-600" />
+                          <div>
+                            <CardTitle className="text-lg font-mono">{shipment.shipment_code}</CardTitle>
+                            <p className="text-sm text-muted-foreground">
+                              Created {format(new Date(shipment.created_at), "PPP p")}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge
+                            variant="secondary"
+                            className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                          >
+                            {totalItems} items
+                          </Badge>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              const items = Array.from(groupedItems.values()).map((g) => ({
+                                sku: g.productSku,
+                                name: g.productName,
+                                qty: g.totalQty,
+                                needsBoxing: g.needsBoxing,
+                              }));
+                              printKartonaLabel(shipment.shipment_code, items, totalItems, shipment.notes || "");
+                            }}
+                          >
+                            <Printer className="h-4 w-4 mr-1" />
+                            Print
+                          </Button>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium text-muted-foreground">Contents:</p>
+                        <div className="grid gap-2">
+                          {Array.from(groupedItems.entries()).map(([key, group]) => (
+                            <div key={key} className="flex items-center justify-between p-2 bg-muted/50 rounded-lg">
+                              <div>
+                                <p className="font-medium">{group.productName}</p>
+                                <p className="text-sm text-muted-foreground">
+                                  {group.productSku}
+                                  <Badge variant="outline" className="ml-2 text-xs">
+                                    {group.needsBoxing ? "Boxed" : "Not Boxed"}
+                                  </Badge>
+                                </p>
+                              </div>
+                              <span className="font-semibold">× {group.totalQty}</span>
+                            </div>
+                          ))}
+                        </div>
+                        {shipment.notes && (
+                          <div className="mt-3 p-2 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
+                            <p className="text-sm">
+                              <strong>Notes:</strong> {shipment.notes}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
         </TabsContent>
       </Tabs>
 
