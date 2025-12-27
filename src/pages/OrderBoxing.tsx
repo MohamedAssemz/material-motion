@@ -418,7 +418,7 @@ export default function OrderBoxing() {
 
       // Print label (non-blocking)
       setTimeout(() => {
-        printKartonaLabel(shipment.shipment_code, printData, printTotal, printNotes);
+        printKartonaLabel(shipment.shipment_code);
       }, 0);
 
       fetchData();
