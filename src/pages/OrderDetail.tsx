@@ -662,72 +662,74 @@ export default function OrderDetail() {
             <CardTitle className="text-lg">Production Phases</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {[
-              {
-                label: "Manufacturing",
-                href: `/orders/${id}/manufacturing`,
-                in: "in_manufacturing",
-                ready: "pending_rm",
-                icon: Factory,
-                color: "blue",
-              },
-              {
-                label: "Finishing",
-                href: `/orders/${id}/finishing`,
-                in: "in_finishing",
-                ready: "ready_for_finishing",
-                icon: Sparkles,
-                color: "purple",
-              },
-              {
-                label: "Packaging",
-                href: `/orders/${id}/packaging`,
-                in: "in_packaging",
-                ready: "ready_for_packaging",
-                icon: Package,
-                color: "indigo",
-              },
-              {
-                label: "Boxing",
-                href: `/orders/${id}/boxing`,
-                in: "in_boxing",
-                ready: "ready_for_boxing",
-                icon: Box,
-                color: "cyan",
-              },
-            ].map((phase) => {
-              const Icon = phase.icon;
-              const waiting = activeBatches
-                .filter((b) => b.current_state === phase.ready)
-                .reduce((sum, b) => sum + b.quantity, 0);
-              const inProgress = activeBatches
-                .filter((b) => b.current_state === phase.in)
-                .reduce((sum, b) => sum + b.quantity, 0);
+            {/* 2x2 Grid for phases */}
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                {
+                  label: "Manufacturing",
+                  href: `/orders/${id}/manufacturing`,
+                  in: "in_manufacturing",
+                  ready: "pending_rm",
+                  icon: Factory,
+                  color: "blue",
+                },
+                {
+                  label: "Finishing",
+                  href: `/orders/${id}/finishing`,
+                  in: "in_finishing",
+                  ready: "ready_for_finishing",
+                  icon: Sparkles,
+                  color: "purple",
+                },
+                {
+                  label: "Packaging",
+                  href: `/orders/${id}/packaging`,
+                  in: "in_packaging",
+                  ready: "ready_for_packaging",
+                  icon: Package,
+                  color: "indigo",
+                },
+                {
+                  label: "Boxing",
+                  href: `/orders/${id}/boxing`,
+                  in: "in_boxing",
+                  ready: "ready_for_boxing",
+                  icon: Box,
+                  color: "cyan",
+                },
+              ].map((phase) => {
+                const Icon = phase.icon;
+                const waiting = activeBatches
+                  .filter((b) => b.current_state === phase.ready)
+                  .reduce((sum, b) => sum + b.quantity, 0);
+                const inProgress = activeBatches
+                  .filter((b) => b.current_state === phase.in)
+                  .reduce((sum, b) => sum + b.quantity, 0);
 
-              return (
-                <div
-                  key={phase.label}
-                  className="flex items-center gap-3 p-3 rounded-lg border cursor-pointer hover:border-primary/50 transition-colors"
-                  onClick={() => navigate(phase.href)}
-                >
-                  <div className={`p-2 rounded-lg bg-${phase.color}-100 dark:bg-${phase.color}-900/30`}>
-                    <Icon className={`h-5 w-5 text-${phase.color}-600 dark:text-${phase.color}-400`} />
+                return (
+                  <div
+                    key={phase.label}
+                    className="flex items-center gap-3 p-3 rounded-lg border cursor-pointer hover:border-primary/50 transition-colors"
+                    onClick={() => navigate(phase.href)}
+                  >
+                    <div className={`p-2 rounded-lg bg-${phase.color}-100 dark:bg-${phase.color}-900/30`}>
+                      <Icon className={`h-5 w-5 text-${phase.color}-600 dark:text-${phase.color}-400`} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm">{phase.label}</p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {waiting > 0 && <span className="text-warning">{waiting} wait</span>}
+                        {waiting > 0 && inProgress > 0 && " · "}
+                        {inProgress > 0 && <span className="text-primary">{inProgress} active</span>}
+                        {waiting === 0 && inProgress === 0 && <span>No active</span>}
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex-1">
-                    <p className="font-medium">{phase.label}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {waiting > 0 && <span className="text-warning">{waiting} waiting</span>}
-                      {waiting > 0 && inProgress > 0 && " · "}
-                      {inProgress > 0 && <span className="text-primary">{inProgress} in progress</span>}
-                      {waiting === 0 && inProgress === 0 && <span>No active items</span>}
-                    </p>
-                  </div>
-                  <ArrowLeft className="h-4 w-4 rotate-180 text-muted-foreground" />
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
 
-            {/* Shipments */}
+            {/* Shipments - Full width */}
             <div
               className="flex items-center gap-3 p-3 rounded-lg border border-green-200 dark:border-green-800 cursor-pointer hover:border-primary/50 transition-colors"
               onClick={() => navigate(`/orders/${id}/shipments`)}
