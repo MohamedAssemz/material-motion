@@ -1,12 +1,12 @@
-import { useEffect, useState } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Checkbox } from '@/components/ui/checkbox';
+import { useEffect, useState } from "react";
+import { useParams, useNavigate, Link } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,30 +18,37 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { RawMaterialsDialog } from '@/components/RawMaterialsDialog';
-import { FlaggedItemsDialog } from '@/components/FlaggedItemsDialog';
-import { ShipmentDialog } from '@/components/ShipmentDialog';
-import { BoxAssignmentDialog } from '@/components/BoxAssignmentDialog';
-import { LeadTimeDialog } from '@/components/LeadTimeDialog';
-import { toast } from 'sonner';
-import { format } from 'date-fns';
-import { 
-  ArrowLeft, 
-  AlertTriangle, 
-  Trash2, 
-  Printer, 
-  FileText, 
-  Factory, 
-  Sparkles, 
-  Package, 
-  Box, 
+import { RawMaterialsDialog } from "@/components/RawMaterialsDialog";
+import { FlaggedItemsDialog } from "@/components/FlaggedItemsDialog";
+import { ShipmentDialog } from "@/components/ShipmentDialog";
+import { BoxAssignmentDialog } from "@/components/BoxAssignmentDialog";
+import { LeadTimeDialog } from "@/components/LeadTimeDialog";
+import { toast } from "sonner";
+import { format } from "date-fns";
+import {
+  ArrowLeft,
+  AlertTriangle,
+  Trash2,
+  Printer,
+  FileText,
+  Factory,
+  Sparkles,
+  Package,
+  Box,
   CheckCircle,
   Clock,
   RotateCcw,
   Truck,
-  Plane
-} from 'lucide-react';
-import { getNextState, getStateLabel, getAllStates, isInState, isReadyForState, type UnitState } from '@/lib/stateMachine';
+  Plane,
+} from "lucide-react";
+import {
+  getNextState,
+  getStateLabel,
+  getAllStates,
+  isInState,
+  isReadyForState,
+  type UnitState,
+} from "@/lib/stateMachine";
 
 interface Batch {
   id: string;
@@ -134,7 +141,7 @@ export default function OrderDetail() {
 
     const channel = supabase
       .channel(`order-${id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'batches', filter: `order_id=eq.${id}` }, () => {
+      .on("postgres_changes", { event: "*", schema: "public", table: "batches", filter: `order_id=eq.${id}` }, () => {
         fetchOrder();
       })
       .subscribe();
@@ -149,21 +156,23 @@ export default function OrderDetail() {
       // Fetch order and order_items separately
       const [orderRes, orderItemsRes] = await Promise.all([
         supabase
-          .from('orders')
-          .select(`
+          .from("orders")
+          .select(
+            `
             *,
             customer:customers(name, code),
             batches(
               id, batch_code, current_state, quantity, product_id, order_item_id, eta, lead_time_days, box_id, is_terminated, is_redo, is_flagged,
               product:products(id, name, sku, needs_packing)
             )
-          `)
-          .eq('id', id)
+          `,
+          )
+          .eq("id", id)
           .maybeSingle(),
         supabase
-          .from('order_items')
-          .select('id, product_id, quantity, needs_boxing, product:products(id, name, sku, needs_packing)')
-          .eq('order_id', id)
+          .from("order_items")
+          .select("id, product_id, quantity, needs_boxing, product:products(id, name, sku, needs_packing)")
+          .eq("order_id", id),
       ]);
 
       const { data: orderData, error: orderError } = orderRes;
@@ -178,23 +187,21 @@ export default function OrderDetail() {
       let boxMap = new Map();
 
       if (boxIds.length > 0) {
-        const { data: boxesData } = await supabase
-          .from('boxes')
-          .select('id, box_code')
-          .in('id', boxIds);
-        boxesData?.forEach(box => boxMap.set(box.id, box));
+        const { data: boxesData } = await supabase.from("boxes").select("id, box_code").in("id", boxIds);
+        boxesData?.forEach((box) => boxMap.set(box.id, box));
       }
 
-      const batchesWithBoxes = orderData.batches?.map((batch: any) => ({
-        ...batch,
-        product: batch.product,
-        box: batch.box_id ? boxMap.get(batch.box_id) : null,
-      })) || [];
+      const batchesWithBoxes =
+        orderData.batches?.map((batch: any) => ({
+          ...batch,
+          product: batch.product,
+          box: batch.box_id ? boxMap.get(batch.box_id) : null,
+        })) || [];
 
       const { data: profileData } = await supabase
-        .from('profiles')
-        .select('full_name, email')
-        .eq('id', orderData.created_by)
+        .from("profiles")
+        .select("full_name, email")
+        .eq("id", orderData.created_by)
         .maybeSingle();
 
       // Store order_items as well for the Order Items table
@@ -202,11 +209,11 @@ export default function OrderDetail() {
       setOrder({
         ...orderData,
         batches: batchesWithBoxes,
-        profile: profileData || { full_name: 'Unknown', email: '' }
+        profile: profileData || { full_name: "Unknown", email: "" },
       } as Order);
     } catch (error) {
-      console.error('Error fetching order:', error);
-      toast.error('Failed to load order details');
+      console.error("Error fetching order:", error);
+      toast.error("Failed to load order details");
     } finally {
       setLoading(false);
     }
@@ -214,37 +221,39 @@ export default function OrderDetail() {
 
   const handleDeleteOrder = async () => {
     try {
-      await supabase.from('batches').delete().eq('order_id', id);
-      await supabase.from('order_items').delete().eq('order_id', id);
-      await supabase.from('raw_material_versions').delete().eq('order_id', id);
-      await supabase.from('notifications').delete().eq('order_id', id);
-      
-      const { error } = await supabase.from('orders').delete().eq('id', id);
+      await supabase.from("batches").delete().eq("order_id", id);
+      await supabase.from("order_items").delete().eq("order_id", id);
+      await supabase.from("raw_material_versions").delete().eq("order_id", id);
+      await supabase.from("notifications").delete().eq("order_id", id);
+
+      const { error } = await supabase.from("orders").delete().eq("id", id);
       if (error) throw error;
-      
-      toast.success('Order deleted successfully');
-      navigate('/orders');
+
+      toast.success("Order deleted successfully");
+      navigate("/orders");
     } catch (error) {
-      console.error('Error deleting order:', error);
-      toast.error('Failed to delete order');
+      console.error("Error deleting order:", error);
+      toast.error("Failed to delete order");
     }
   };
 
   const handlePrintOrder = () => {
     if (!order) return;
-    const printWindow = window.open('', '_blank');
+    const printWindow = window.open("", "_blank");
     if (!printWindow) return;
 
     const itemsByProduct = new Map<string, { name: string; sku: string; quantity: number }>();
-    order.batches.filter(b => !b.is_terminated).forEach(batch => {
-      const existing = itemsByProduct.get(batch.product_id) || { 
-        name: batch.product?.name || 'Unknown', 
-        sku: batch.product?.sku || 'N/A', 
-        quantity: 0 
-      };
-      existing.quantity += batch.quantity;
-      itemsByProduct.set(batch.product_id, existing);
-    });
+    order.batches
+      .filter((b) => !b.is_terminated)
+      .forEach((batch) => {
+        const existing = itemsByProduct.get(batch.product_id) || {
+          name: batch.product?.name || "Unknown",
+          sku: batch.product?.sku || "N/A",
+          quantity: 0,
+        };
+        existing.quantity += batch.quantity;
+        itemsByProduct.set(batch.product_id, existing);
+      });
 
     const html = `
       <!DOCTYPE html>
@@ -270,25 +279,29 @@ export default function OrderDetail() {
           <div class="header">
             <div class="order-number">${order.order_number}</div>
             <div class="meta">
-              Customer: ${order.customer?.name || 'N/A'} | 
+              Customer: ${order.customer?.name || "N/A"} | 
               Priority: <span class="badge ${order.priority}">${order.priority}</span> |
-              Shipping: ${order.shipping_type === 'international' ? 'International' : 'Domestic'}
+              Shipping: ${order.shipping_type === "international" ? "International" : "Domestic"}
             </div>
-            <div class="meta">Created: ${format(new Date(order.created_at), 'PPP')}</div>
-            ${order.estimated_fulfillment_time ? `<div class="meta">EFT: ${format(new Date(order.estimated_fulfillment_time), 'PPP')}</div>` : ''}
+            <div class="meta">Created: ${format(new Date(order.created_at), "PPP")}</div>
+            ${order.estimated_fulfillment_time ? `<div class="meta">EFT: ${format(new Date(order.estimated_fulfillment_time), "PPP")}</div>` : ""}
           </div>
 
           <div class="section">
             <div class="section-title">Order Items</div>
             <table>
               <tr><th>Product</th><th>SKU</th><th>Quantity</th></tr>
-              ${Array.from(itemsByProduct.values()).map(item => `
+              ${Array.from(itemsByProduct.values())
+                .map(
+                  (item) => `
                 <tr><td>${item.name}</td><td>${item.sku}</td><td>${item.quantity}</td></tr>
-              `).join('')}
+              `,
+                )
+                .join("")}
             </table>
           </div>
 
-          ${order.notes ? `<div class="section"><div class="section-title">Notes</div><p>${order.notes}</p></div>` : ''}
+          ${order.notes ? `<div class="section"><div class="section-title">Notes</div><p>${order.notes}</p></div>` : ""}
 
           <script>window.print(); window.close();</script>
         </body>
@@ -298,8 +311,9 @@ export default function OrderDetail() {
     printWindow.document.close();
   };
 
-  const canUpdate = hasRole('manufacture_lead') || hasRole('manufacturer') || hasRole('packer') || hasRole('boxer') || hasRole('admin');
-  const canDelete = hasRole('manufacture_lead') || hasRole('admin');
+  const canUpdate =
+    hasRole("manufacture_lead") || hasRole("manufacturer") || hasRole("packer") || hasRole("boxer") || hasRole("admin");
+  const canDelete = hasRole("manufacture_lead") || hasRole("admin");
 
   if (loading) {
     return (
@@ -312,7 +326,7 @@ export default function OrderDetail() {
   if (!order) {
     return (
       <div className="p-6">
-        <Button variant="ghost" onClick={() => navigate('/orders')}>
+        <Button variant="ghost" onClick={() => navigate("/orders")}>
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Orders
         </Button>
@@ -321,98 +335,108 @@ export default function OrderDetail() {
     );
   }
 
-  const activeBatches = order.batches.filter(b => !b.is_terminated);
+  const activeBatches = order.batches.filter((b) => !b.is_terminated);
   const totalItems = activeBatches.reduce((sum, b) => sum + b.quantity, 0);
-  const receivedItems = activeBatches.filter(b => b.current_state === 'received').reduce((sum, b) => sum + b.quantity, 0);
-  const flaggedCount = activeBatches.filter(b => b.is_flagged).reduce((sum, b) => sum + b.quantity, 0);
-  const redoCount = activeBatches.filter(b => b.is_redo).reduce((sum, b) => sum + b.quantity, 0);
+  const receivedItems = activeBatches
+    .filter((b) => b.current_state === "received")
+    .reduce((sum, b) => sum + b.quantity, 0);
+  const flaggedCount = activeBatches.filter((b) => b.is_flagged).reduce((sum, b) => sum + b.quantity, 0);
+  const redoCount = activeBatches.filter((b) => b.is_redo).reduce((sum, b) => sum + b.quantity, 0);
 
   // Calculate phase stats
   const getPhaseStats = (inState: string, readyState?: string): PhaseStats => {
-    const waiting = readyState ? activeBatches.filter(b => b.current_state === readyState).reduce((sum, b) => sum + b.quantity, 0) : 0;
-    const inProgress = activeBatches.filter(b => b.current_state === inState).reduce((sum, b) => sum + b.quantity, 0);
+    const waiting = readyState
+      ? activeBatches.filter((b) => b.current_state === readyState).reduce((sum, b) => sum + b.quantity, 0)
+      : 0;
+    const inProgress = activeBatches.filter((b) => b.current_state === inState).reduce((sum, b) => sum + b.quantity, 0);
     const stateIndex = getAllStates().indexOf(inState as UnitState);
     const completed = activeBatches
-      .filter(b => getAllStates().indexOf(b.current_state as UnitState) > stateIndex)
+      .filter((b) => getAllStates().indexOf(b.current_state as UnitState) > stateIndex)
       .reduce((sum, b) => sum + b.quantity, 0);
     return { waiting, inProgress, completed };
   };
 
-  const manufacturingStats = getPhaseStats('in_manufacturing', 'pending_rm');
-  const finishingStats = getPhaseStats('in_finishing', 'ready_for_finishing');
-  const packagingStats = getPhaseStats('in_packaging', 'ready_for_packaging');
-  const boxingStats = getPhaseStats('in_boxing', 'ready_for_boxing');
+  const manufacturingStats = getPhaseStats("in_manufacturing", "pending_rm");
+  const finishingStats = getPhaseStats("in_finishing", "ready_for_finishing");
+  const packagingStats = getPhaseStats("in_packaging", "ready_for_packaging");
+  const boxingStats = getPhaseStats("in_boxing", "ready_for_boxing");
 
   // Items grouped by product for each state
   const getProductsByState = (state: string) => {
-    const stateData = new Map<string, { name: string; sku: string; needsPacking: boolean; quantity: number; batches: Batch[] }>();
-    activeBatches.filter(b => b.current_state === state).forEach(batch => {
-      if (!stateData.has(batch.product_id)) {
-        stateData.set(batch.product_id, {
-          name: batch.product?.name || 'Unknown',
-          sku: batch.product?.sku || 'N/A',
-          needsPacking: batch.product?.needs_packing ?? true,
-          quantity: 0,
-          batches: [],
-        });
-      }
-      const item = stateData.get(batch.product_id)!;
-      item.quantity += batch.quantity;
-      item.batches.push(batch);
-    });
+    const stateData = new Map<
+      string,
+      { name: string; sku: string; needsPacking: boolean; quantity: number; batches: Batch[] }
+    >();
+    activeBatches
+      .filter((b) => b.current_state === state)
+      .forEach((batch) => {
+        if (!stateData.has(batch.product_id)) {
+          stateData.set(batch.product_id, {
+            name: batch.product?.name || "Unknown",
+            sku: batch.product?.sku || "N/A",
+            needsPacking: batch.product?.needs_packing ?? true,
+            quantity: 0,
+            batches: [],
+          });
+        }
+        const item = stateData.get(batch.product_id)!;
+        item.quantity += batch.quantity;
+        item.batches.push(batch);
+      });
     return Array.from(stateData.entries());
   };
 
   // Boxes by state
   const getBoxesByState = (state: string) => {
     const boxData = new Map<string, { code: string; quantity: number; batches: Batch[] }>();
-    activeBatches.filter(b => b.current_state === state && b.box_id && b.box).forEach(batch => {
-      if (!boxData.has(batch.box_id!)) {
-        boxData.set(batch.box_id!, {
-          code: batch.box?.box_code || 'Unknown',
-          quantity: 0,
-          batches: [],
-        });
-      }
-      const item = boxData.get(batch.box_id!)!;
-      item.quantity += batch.quantity;
-      item.batches.push(batch);
-    });
+    activeBatches
+      .filter((b) => b.current_state === state && b.box_id && b.box)
+      .forEach((batch) => {
+        if (!boxData.has(batch.box_id!)) {
+          boxData.set(batch.box_id!, {
+            code: batch.box?.box_code || "Unknown",
+            quantity: 0,
+            batches: [],
+          });
+        }
+        const item = boxData.get(batch.box_id!)!;
+        item.quantity += batch.quantity;
+        item.batches.push(batch);
+      });
     return Array.from(boxData.entries());
   };
 
-  const receivedBatches = activeBatches.filter(b => b.current_state === 'received').map(b => ({
-    id: b.id,
-    batch_code: b.batch_code,
-    product_id: b.product_id,
-    product_name: b.product?.name || 'Unknown',
-    product_sku: b.product?.sku || 'N/A',
-    quantity: b.quantity,
-  }));
+  const receivedBatches = activeBatches
+    .filter((b) => b.current_state === "received")
+    .map((b) => ({
+      id: b.id,
+      batch_code: b.batch_code,
+      product_id: b.product_id,
+      product_name: b.product?.name || "Unknown",
+      product_sku: b.product?.sku || "N/A",
+      quantity: b.quantity,
+    }));
 
   // Order state
-  const orderState = receivedItems === totalItems && totalItems > 0 
-    ? 'Fulfilled' 
-    : receivedItems > 0 
-      ? 'In Progress' 
-      : 'Pending';
+  const orderState =
+    receivedItems === totalItems && totalItems > 0 ? "Fulfilled" : receivedItems > 0 ? "In Progress" : "Pending";
 
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" onClick={() => navigate('/orders')}>
+          <Button variant="ghost" onClick={() => navigate("/orders")}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-3xl font-bold">{order.order_number}</h1>
-              {order.priority === 'high' && <Badge variant="destructive">High Priority</Badge>}
-              <Badge variant={orderState === 'Fulfilled' ? 'default' : 'secondary'}>{orderState}</Badge>
+              {order.priority === "high" && <Badge variant="destructive">High Priority</Badge>}
+              <Badge variant={orderState === "Fulfilled" ? "default" : "secondary"}>{orderState}</Badge>
             </div>
             <p className="text-muted-foreground">
-              {order.customer?.name || 'No Customer'} · Created {format(new Date(order.created_at), 'PPP')}
+              {order.customer?.name || "No Customer"} · Created {format(new Date(order.created_at), "PPP")}
             </p>
           </div>
         </div>
@@ -441,7 +465,9 @@ export default function OrderDetail() {
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleDeleteOrder} className="bg-destructive">Delete</AlertDialogAction>
+                  <AlertDialogAction onClick={handleDeleteOrder} className="bg-destructive">
+                    Delete
+                  </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
@@ -462,32 +488,45 @@ export default function OrderDetail() {
                 <span className="text-muted-foreground">Order #</span>
                 <span className="font-mono font-medium">{order.order_number}</span>
               </div>
+
+              <Badge variant={statusConfig[orderState].variant as any} className="flex items-center gap-1">
+                {(() => {
+                  const Icon = statusConfig[orderState].icon;
+                  return <Icon className="h-3 w-3" />;
+                })()}
+                {orderState}
+              </Badge>
+
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Customer</span>
-                <span>{order.customer?.name || 'N/A'}</span>
+                <span>{order.customer?.name || "N/A"}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Priority</span>
-                <Badge variant={order.priority === 'high' ? 'destructive' : 'secondary'} className="text-xs">
+                <Badge variant={order.priority === "high" ? "destructive" : "secondary"} className="text-xs">
                   {order.priority}
                 </Badge>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Shipping</span>
                 <span className="flex items-center gap-1">
-                  {order.shipping_type === 'international' ? <Plane className="h-3 w-3" /> : <Truck className="h-3 w-3" />}
-                  {order.shipping_type === 'international' ? 'International' : 'Domestic'}
+                  {order.shipping_type === "international" ? (
+                    <Plane className="h-3 w-3" />
+                  ) : (
+                    <Truck className="h-3 w-3" />
+                  )}
+                  {order.shipping_type === "international" ? "International" : "Domestic"}
                 </span>
               </div>
               {order.estimated_fulfillment_time && (
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">EFT</span>
-                  <span>{format(new Date(order.estimated_fulfillment_time), 'PP')}</span>
+                  <span>{format(new Date(order.estimated_fulfillment_time), "PP")}</span>
                 </div>
               )}
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Created</span>
-                <span>{format(new Date(order.created_at), 'PP')}</span>
+                <span>{format(new Date(order.created_at), "PP")}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Created by</span>
@@ -509,7 +548,7 @@ export default function OrderDetail() {
 
           {/* Alert Cards */}
           {(flaggedCount > 0 || redoCount > 0) && (
-            <Card 
+            <Card
               className="border-warning/50 bg-warning/5 cursor-pointer hover:bg-warning/10 transition-colors"
               onClick={() => setFlaggedItemsOpen(true)}
             >
@@ -550,34 +589,46 @@ export default function OrderDetail() {
                 <tbody>
                   {orderItems.map((item) => {
                     // Find batches for this specific order item (not just product)
-                    const itemBatches = activeBatches.filter(b => b.order_item_id === item.id);
+                    const itemBatches = activeBatches.filter((b) => b.order_item_id === item.id);
                     const totalQty = itemBatches.reduce((sum, b) => sum + b.quantity, 0);
-                    const receivedQty = itemBatches.filter(b => b.current_state === 'received').reduce((sum, b) => sum + b.quantity, 0);
+                    const receivedQty = itemBatches
+                      .filter((b) => b.current_state === "received")
+                      .reduce((sum, b) => sum + b.quantity, 0);
                     const progressPct = totalQty > 0 ? Math.round((receivedQty / totalQty) * 100) : 0;
-                    const stateBreakdown = getAllStates().map(s => ({
-                      state: s,
-                      qty: itemBatches.filter(b => b.current_state === s).reduce((sum, b) => sum + b.quantity, 0)
-                    })).filter(s => s.qty > 0);
+                    const stateBreakdown = getAllStates()
+                      .map((s) => ({
+                        state: s,
+                        qty: itemBatches.filter((b) => b.current_state === s).reduce((sum, b) => sum + b.quantity, 0),
+                      }))
+                      .filter((s) => s.qty > 0);
 
                     return (
                       <tr key={item.id} className="border-b last:border-0">
                         <td className="py-3">
-                          <p className="font-medium">{item.product?.name || 'Unknown'}</p>
-                          <p className="text-xs text-muted-foreground">{item.product?.sku || 'N/A'}</p>
+                          <p className="font-medium">{item.product?.name || "Unknown"}</p>
+                          <p className="text-xs text-muted-foreground">{item.product?.sku || "N/A"}</p>
                         </td>
                         <td className="text-center font-medium">{item.quantity}</td>
                         <td className="text-center">
                           {item.product?.needs_packing ? (
-                            <Badge variant="outline" className="text-xs">Yes</Badge>
+                            <Badge variant="outline" className="text-xs">
+                              Yes
+                            </Badge>
                           ) : (
-                            <Badge variant="secondary" className="text-xs">No</Badge>
+                            <Badge variant="secondary" className="text-xs">
+                              No
+                            </Badge>
                           )}
                         </td>
                         <td className="text-center">
                           {item.needs_boxing ? (
-                            <Badge variant="outline" className="text-xs bg-primary/10">Yes</Badge>
+                            <Badge variant="outline" className="text-xs bg-primary/10">
+                              Yes
+                            </Badge>
                           ) : (
-                            <Badge variant="secondary" className="text-xs">No</Badge>
+                            <Badge variant="secondary" className="text-xs">
+                              No
+                            </Badge>
                           )}
                         </td>
                         <td className="text-right">
@@ -586,8 +637,12 @@ export default function OrderDetail() {
                             <div className="text-xs text-muted-foreground max-w-[140px] text-right">
                               {stateBreakdown.slice(0, 2).map((s, i) => (
                                 <span key={s.state}>
-                                  {i > 0 && ', '}
-                                  {s.qty} {getStateLabel(s.state as UnitState).split(' ').slice(0, 2).join(' ')}
+                                  {i > 0 && ", "}
+                                  {s.qty}{" "}
+                                  {getStateLabel(s.state as UnitState)
+                                    .split(" ")
+                                    .slice(0, 2)
+                                    .join(" ")}
                                 </span>
                               ))}
                               {stateBreakdown.length > 2 && <span> +{stateBreakdown.length - 2}</span>}
@@ -610,10 +665,38 @@ export default function OrderDetail() {
             <CardContent>
               <div className="space-y-3">
                 {[
-                  { label: 'Manufacturing', in: 'in_manufacturing', ready: 'pending_rm', stats: manufacturingStats, icon: Factory, color: 'blue' },
-                  { label: 'Finishing', in: 'in_finishing', ready: 'ready_for_finishing', stats: finishingStats, icon: Sparkles, color: 'purple' },
-                  { label: 'Packaging', in: 'in_packaging', ready: 'ready_for_packaging', stats: packagingStats, icon: Package, color: 'indigo' },
-                  { label: 'Boxing', in: 'in_boxing', ready: 'ready_for_boxing', stats: boxingStats, icon: Box, color: 'cyan' },
+                  {
+                    label: "Manufacturing",
+                    in: "in_manufacturing",
+                    ready: "pending_rm",
+                    stats: manufacturingStats,
+                    icon: Factory,
+                    color: "blue",
+                  },
+                  {
+                    label: "Finishing",
+                    in: "in_finishing",
+                    ready: "ready_for_finishing",
+                    stats: finishingStats,
+                    icon: Sparkles,
+                    color: "purple",
+                  },
+                  {
+                    label: "Packaging",
+                    in: "in_packaging",
+                    ready: "ready_for_packaging",
+                    stats: packagingStats,
+                    icon: Package,
+                    color: "indigo",
+                  },
+                  {
+                    label: "Boxing",
+                    in: "in_boxing",
+                    ready: "ready_for_boxing",
+                    stats: boxingStats,
+                    icon: Box,
+                    color: "cyan",
+                  },
                 ].map((phase, idx) => {
                   const Icon = phase.icon;
                   const total = phase.stats.waiting + phase.stats.inProgress + phase.stats.completed;
@@ -621,26 +704,35 @@ export default function OrderDetail() {
 
                   return (
                     <div key={phase.label} className="flex items-center gap-3">
-                      <div className={`flex items-center justify-center w-8 h-8 rounded-full bg-${phase.color}-100 dark:bg-${phase.color}-900/30`}>
+                      <div
+                        className={`flex items-center justify-center w-8 h-8 rounded-full bg-${phase.color}-100 dark:bg-${phase.color}-900/30`}
+                      >
                         <Icon className={`h-4 w-4 text-${phase.color}-600 dark:text-${phase.color}-400`} />
                       </div>
                       <div className="flex-1">
                         <div className="flex items-center justify-between text-sm">
                           <span className="font-medium">{phase.label}</span>
                           <span className="text-muted-foreground">
-                            {phase.stats.waiting > 0 && <span className="text-warning">{phase.stats.waiting} waiting · </span>}
-                            {phase.stats.inProgress > 0 && <span className="text-primary">{phase.stats.inProgress} active · </span>}
+                            {phase.stats.waiting > 0 && (
+                              <span className="text-warning">{phase.stats.waiting} waiting · </span>
+                            )}
+                            {phase.stats.inProgress > 0 && (
+                              <span className="text-primary">{phase.stats.inProgress} active · </span>
+                            )}
                             {phase.stats.completed}/{totalItems} done
                           </span>
                         </div>
                         <div className="h-1.5 bg-secondary rounded-full mt-1 overflow-hidden">
-                          <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${progress}%` }} />
+                          <div
+                            className="h-full bg-primary rounded-full transition-all"
+                            style={{ width: `${progress}%` }}
+                          />
                         </div>
                       </div>
                     </div>
                   );
                 })}
-                
+
                 {/* Fulfilled */}
                 <div className="flex items-center gap-3 pt-2 border-t">
                   <div className="flex items-center justify-center w-8 h-8 rounded-full bg-green-100 dark:bg-green-900/30">
@@ -649,10 +741,15 @@ export default function OrderDetail() {
                   <div className="flex-1">
                     <div className="flex items-center justify-between text-sm">
                       <span className="font-medium">Fulfilled</span>
-                      <span className="text-green-600 font-medium">{receivedItems}/{totalItems}</span>
+                      <span className="text-green-600 font-medium">
+                        {receivedItems}/{totalItems}
+                      </span>
                     </div>
                     <div className="h-1.5 bg-secondary rounded-full mt-1 overflow-hidden">
-                      <div className="h-full bg-green-500 rounded-full transition-all" style={{ width: `${(receivedItems / totalItems) * 100}%` }} />
+                      <div
+                        className="h-full bg-green-500 rounded-full transition-all"
+                        style={{ width: `${(receivedItems / totalItems) * 100}%` }}
+                      />
                     </div>
                   </div>
                 </div>
@@ -664,22 +761,54 @@ export default function OrderDetail() {
         {/* Right Column - Phase Cards */}
         <div className="lg:col-span-4 space-y-4">
           <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Production Phases</h3>
-          
+
           {[
-            { label: 'Manufacturing', href: `/orders/${id}/manufacturing`, in: 'in_manufacturing', ready: 'pending_rm', icon: Factory, color: 'blue' },
-            { label: 'Finishing', href: `/orders/${id}/finishing`, in: 'in_finishing', ready: 'ready_for_finishing', icon: Sparkles, color: 'purple' },
-            { label: 'Packaging', href: `/orders/${id}/packaging`, in: 'in_packaging', ready: 'ready_for_packaging', icon: Package, color: 'indigo' },
-            { label: 'Boxing', href: `/orders/${id}/boxing`, in: 'in_boxing', ready: 'ready_for_boxing', icon: Box, color: 'cyan' },
-          ].map(phase => {
+            {
+              label: "Manufacturing",
+              href: `/orders/${id}/manufacturing`,
+              in: "in_manufacturing",
+              ready: "pending_rm",
+              icon: Factory,
+              color: "blue",
+            },
+            {
+              label: "Finishing",
+              href: `/orders/${id}/finishing`,
+              in: "in_finishing",
+              ready: "ready_for_finishing",
+              icon: Sparkles,
+              color: "purple",
+            },
+            {
+              label: "Packaging",
+              href: `/orders/${id}/packaging`,
+              in: "in_packaging",
+              ready: "ready_for_packaging",
+              icon: Package,
+              color: "indigo",
+            },
+            {
+              label: "Boxing",
+              href: `/orders/${id}/boxing`,
+              in: "in_boxing",
+              ready: "ready_for_boxing",
+              icon: Box,
+              color: "cyan",
+            },
+          ].map((phase) => {
             const Icon = phase.icon;
-            const waiting = activeBatches.filter(b => b.current_state === phase.ready).reduce((sum, b) => sum + b.quantity, 0);
-            const inProgress = activeBatches.filter(b => b.current_state === phase.in).reduce((sum, b) => sum + b.quantity, 0);
+            const waiting = activeBatches
+              .filter((b) => b.current_state === phase.ready)
+              .reduce((sum, b) => sum + b.quantity, 0);
+            const inProgress = activeBatches
+              .filter((b) => b.current_state === phase.in)
+              .reduce((sum, b) => sum + b.quantity, 0);
 
             if (waiting === 0 && inProgress === 0) return null;
 
             return (
-              <Card 
-                key={phase.label} 
+              <Card
+                key={phase.label}
                 className="cursor-pointer hover:border-primary/50 transition-colors"
                 onClick={() => navigate(phase.href)}
               >
@@ -692,7 +821,7 @@ export default function OrderDetail() {
                       <p className="font-medium">{phase.label}</p>
                       <p className="text-sm text-muted-foreground">
                         {waiting > 0 && <span className="text-warning">{waiting} waiting</span>}
-                        {waiting > 0 && inProgress > 0 && ' · '}
+                        {waiting > 0 && inProgress > 0 && " · "}
                         {inProgress > 0 && <span className="text-primary">{inProgress} in progress</span>}
                       </p>
                     </div>
@@ -705,8 +834,8 @@ export default function OrderDetail() {
 
           {/* Shipments Section */}
           <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide pt-4">Shipments</h3>
-          
-          <Card 
+
+          <Card
             className="cursor-pointer hover:border-primary/50 transition-colors border-green-200 dark:border-green-800"
             onClick={() => navigate(`/orders/${id}/shipments`)}
           >
@@ -717,9 +846,7 @@ export default function OrderDetail() {
                 </div>
                 <div className="flex-1">
                   <p className="font-medium">Kartonas</p>
-                  <p className="text-sm text-muted-foreground">
-                    {receivedItems} items fulfilled
-                  </p>
+                  <p className="text-sm text-muted-foreground">{receivedItems} items fulfilled</p>
                 </div>
                 <ArrowLeft className="h-4 w-4 rotate-180 text-muted-foreground" />
               </div>
@@ -729,26 +856,24 @@ export default function OrderDetail() {
       </div>
 
       {/* Dialogs */}
-      <RawMaterialsDialog
-        open={rawMaterialsOpen}
-        onOpenChange={setRawMaterialsOpen}
-        orderId={id!}
-      />
+      <RawMaterialsDialog open={rawMaterialsOpen} onOpenChange={setRawMaterialsOpen} orderId={id!} />
 
       <FlaggedItemsDialog
         open={flaggedItemsOpen}
         onOpenChange={setFlaggedItemsOpen}
         orderId={id!}
-        batches={activeBatches.filter(b => b.is_flagged || b.is_redo).map(b => ({
-          id: b.id,
-          batch_code: b.batch_code,
-          product_name: b.product?.name || 'Unknown',
-          product_sku: b.product?.sku || 'N/A',
-          quantity: b.quantity,
-          current_state: b.current_state,
-          is_flagged: b.is_flagged || false,
-          is_redo: b.is_redo || false,
-        }))}
+        batches={activeBatches
+          .filter((b) => b.is_flagged || b.is_redo)
+          .map((b) => ({
+            id: b.id,
+            batch_code: b.batch_code,
+            product_name: b.product?.name || "Unknown",
+            product_sku: b.product?.sku || "N/A",
+            quantity: b.quantity,
+            current_state: b.current_state,
+            is_flagged: b.is_flagged || false,
+            is_redo: b.is_redo || false,
+          }))}
         onRefresh={fetchOrder}
       />
 
