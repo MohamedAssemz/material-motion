@@ -420,10 +420,10 @@ export default function OrderBoxing() {
       // Now safely close + reset dialog
       setReadyForShipmentSelections(new Map());
       setShipmentNotes("");
-      setKartonaDialogOpen(false);
 
       // Refresh data last
       fetchData();
+      setKartonaDialogOpen(false);
     } catch (error: any) {
       toast.error(error.message);
       setSubmitting(false);
