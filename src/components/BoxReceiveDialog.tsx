@@ -47,7 +47,8 @@ export function BoxReceiveDialog({
   const { toast } = useToast();
   const [searchCode, setSearchCode] = useState('');
   const [selectedBoxes, setSelectedBoxes] = useState<SelectedBox[]>([]);
-  const [availableBoxes, setAvailableBoxes] = useState<SelectedBox[]>([]);
+  const [allBoxes, setAllBoxes] = useState<SelectedBox[]>([]);
+  const [filteredBoxes, setFilteredBoxes] = useState<SelectedBox[]>([]);
   const [loading, setLoading] = useState(true);
   const [searching, setSearching] = useState(false);
 
@@ -58,6 +59,26 @@ export function BoxReceiveDialog({
       setSearchCode('');
     }
   }, [open, orderId, filterState]);
+
+  // Real-time filtering as user types
+  useEffect(() => {
+    if (!searchCode.trim()) {
+      setFilteredBoxes(allBoxes);
+      return;
+    }
+
+    const searchTerm = searchCode.trim().toUpperCase();
+    const filtered = allBoxes.filter(box => {
+      // Match by box code
+      if (box.box_code.toUpperCase().includes(searchTerm)) return true;
+      // Match by product SKU or name inside the box
+      return box.batches.some(batch => 
+        batch.product_sku.toUpperCase().includes(searchTerm) ||
+        batch.product_name.toUpperCase().includes(searchTerm)
+      );
+    });
+    setFilteredBoxes(filtered);
+  }, [searchCode, allBoxes]);
 
   const fetchBoxesWithBatches = async () => {
     setLoading(true);
@@ -80,8 +101,9 @@ export function BoxReceiveDialog({
 
       if (error) throw error;
 
-      if (!batches?.length) {
-        setAvailableBoxes([]);
+    if (!batches?.length) {
+        setAllBoxes([]);
+        setFilteredBoxes([]);
         setLoading(false);
         return;
       }
@@ -124,8 +146,9 @@ export function BoxReceiveDialog({
         });
         group.total_quantity += batch.quantity;
       });
-
-      setAvailableBoxes(Array.from(boxGroups.values()));
+      const boxesData = Array.from(boxGroups.values());
+      setAllBoxes(boxesData);
+      setFilteredBoxes(boxesData);
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -411,16 +434,20 @@ export function BoxReceiveDialog({
           <div className="flex items-center justify-center py-8">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
-        ) : availableBoxes.length === 0 ? (
+        ) : filteredBoxes.length === 0 ? (
           <div className="text-center py-8">
             <Box className="mx-auto h-12 w-12 text-muted-foreground opacity-50 mb-4" />
-            <p className="text-muted-foreground">No boxes in {getStateLabel(filterState)} state</p>
+            <p className="text-muted-foreground">
+              {searchCode.trim() 
+                ? `No boxes matching "${searchCode}"` 
+                : `No boxes in ${getStateLabel(filterState)} state`}
+            </p>
           </div>
         ) : (
           <div className="space-y-2">
-            <Label>Available Boxes ({availableBoxes.length})</Label>
+            <Label>Available Boxes ({filteredBoxes.length})</Label>
             <div className="grid gap-2 max-h-[300px] overflow-y-auto">
-              {availableBoxes.map((box) => {
+              {filteredBoxes.map((box) => {
                 const isSelected = selectedBoxes.some(b => b.id === box.id);
                 return (
                   <Card
@@ -440,7 +467,7 @@ export function BoxReceiveDialog({
                             {box.batches.map((b, i) => (
                               <span key={b.id}>
                                 {i > 0 && ', '}
-                                {b.product_sku} × {b.quantity}
+                                {b.product_sku} ({b.product_name}) × {b.quantity}
                               </span>
                             ))}
                           </div>

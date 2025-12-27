@@ -45,17 +45,41 @@ export function BoxScanDialog({
   const { toast } = useToast();
   const [searchCode, setSearchCode] = useState('');
   const [selectedBoxes, setSelectedBoxes] = useState<BoxWithBatch[]>([]);
-  const [availableBoxes, setAvailableBoxes] = useState<BoxWithBatch[]>([]);
+  const [allBoxes, setAllBoxes] = useState<BoxWithBatch[]>([]);
+  const [filteredBoxes, setFilteredBoxes] = useState<BoxWithBatch[]>([]);
   const [loading, setLoading] = useState(true);
   const [searching, setSearching] = useState(false);
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
 
   useEffect(() => {
     if (open) {
       fetchBoxes();
       setSelectedBoxes([]);
       setSearchCode('');
+      setIsSearchFocused(false);
     }
   }, [open, mode, filterState]);
+
+  // Real-time filtering as user types
+  useEffect(() => {
+    if (!searchCode.trim()) {
+      setFilteredBoxes(allBoxes);
+      return;
+    }
+
+    const searchTerm = searchCode.trim().toUpperCase();
+    const filtered = allBoxes.filter(box => {
+      // Match by box code
+      if (box.box_code.toUpperCase().includes(searchTerm)) return true;
+      // Match by product SKU or name (for receive mode)
+      if (box.batch) {
+        if (box.batch.product.sku.toUpperCase().includes(searchTerm)) return true;
+        if (box.batch.product.name.toUpperCase().includes(searchTerm)) return true;
+      }
+      return false;
+    });
+    setFilteredBoxes(filtered);
+  }, [searchCode, allBoxes]);
 
   const fetchBoxes = async () => {
     setLoading(true);
@@ -77,8 +101,9 @@ export function BoxScanDialog({
 
         const occupiedBoxIds = new Set(occupiedBatches?.map(b => b.box_id) || []);
         const emptyBoxes = allBoxes?.filter(box => !occupiedBoxIds.has(box.id)) || [];
-        
-        setAvailableBoxes(emptyBoxes.map(b => ({ ...b, batch: null })));
+        const boxesData = emptyBoxes.map(b => ({ ...b, batch: null }));
+        setAllBoxes(boxesData);
+        setFilteredBoxes(boxesData);
       } else {
         // Get boxes containing batches in the specified state
         const { data: batches } = await supabase
@@ -95,8 +120,9 @@ export function BoxScanDialog({
           .not('box_id', 'is', null)
           .eq('is_terminated', false);
 
-        if (!batches?.length) {
-          setAvailableBoxes([]);
+      if (!batches?.length) {
+          setAllBoxes([]);
+          setFilteredBoxes([]);
           setLoading(false);
           return;
         }
@@ -122,7 +148,8 @@ export function BoxScanDialog({
             },
           }));
 
-        setAvailableBoxes(boxesWithBatches);
+        setAllBoxes(boxesWithBatches);
+        setFilteredBoxes(boxesWithBatches);
       }
     } catch (error: any) {
       toast({
@@ -302,9 +329,17 @@ export function BoxScanDialog({
             <Input
               value={searchCode}
               onChange={(e) => setSearchCode(e.target.value.toUpperCase())}
-              placeholder="Scan or enter box code (e.g., BOX-0001)"
+              placeholder="Search by box code, product SKU, or product name"
               className="pl-10"
               onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+              onFocus={() => setIsSearchFocused(true)}
+              onBlur={() => {
+                setIsSearchFocused(false);
+                // Reset filter on blur if search is empty
+                if (!searchCode.trim()) {
+                  setFilteredBoxes(allBoxes);
+                }
+              }}
             />
           </div>
           <Button onClick={handleSearch} disabled={searching || !searchCode.trim()}>
@@ -344,18 +379,20 @@ export function BoxScanDialog({
           <div className="flex items-center justify-center py-8">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
-        ) : availableBoxes.length === 0 ? (
+        ) : filteredBoxes.length === 0 ? (
           <div className="text-center py-8">
             <Box className="mx-auto h-12 w-12 text-muted-foreground opacity-50 mb-4" />
             <p className="text-muted-foreground">
-              {mode === 'assign' ? 'No empty boxes available' : 'No boxes with items in this state'}
+              {searchCode.trim() 
+                ? `No boxes matching "${searchCode}"` 
+                : (mode === 'assign' ? 'No empty boxes available' : 'No boxes with items in this state')}
             </p>
           </div>
         ) : (
           <div className="space-y-2">
-            <Label>Available Boxes ({availableBoxes.length})</Label>
+            <Label>Available Boxes ({filteredBoxes.length})</Label>
             <div className="grid gap-2 max-h-[300px] overflow-y-auto">
-              {availableBoxes.map((box) => {
+              {filteredBoxes.map((box) => {
                 const isSelected = selectedBoxes.some(b => b.id === box.id);
                 return (
                   <Card
@@ -372,7 +409,7 @@ export function BoxScanDialog({
                           <span className="font-mono font-bold">{box.box_code}</span>
                           {box.batch && (
                             <div className="text-sm text-muted-foreground">
-                              {box.batch.product.sku} • {box.batch.quantity} items
+                              {box.batch.product.sku} • {box.batch.product.name} • {box.batch.quantity} items
                             </div>
                           )}
                         </div>
