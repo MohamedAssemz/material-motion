@@ -1,14 +1,22 @@
-import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useState, useMemo } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ArrowLeft, Plus, Search, Eye, AlertCircle } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { ArrowLeft, Plus, Search, AlertCircle, Download, Filter, CalendarIcon, X } from 'lucide-react';
+import { format, isWithinInterval, parseISO } from 'date-fns';
+import { cn } from '@/lib/utils';
+
+type OrderStatus = 'pending' | 'in_progress' | 'completed';
 
 interface Order {
   id: string;
@@ -18,18 +26,50 @@ interface Order {
   notes: string | null;
   created_at: string;
   created_by: string | null;
+  estimated_fulfillment_time: string | null;
   profiles?: {
     full_name: string | null;
     email: string | null;
   };
   unit_count?: number;
+  received_count?: number;
+  computed_status?: OrderStatus;
+  customer?: {
+    name: string;
+  } | null;
+}
+
+interface OrderItem {
+  id: string;
+  order_id: string;
+  quantity: number;
+  product: {
+    name: string;
+    sku: string;
+  };
+}
+
+interface DateRange {
+  from: Date | undefined;
+  to: Date | undefined;
 }
 
 export default function Orders() {
   const { hasRole } = useAuth();
+  const navigate = useNavigate();
   const [orders, setOrders] = useState<Order[]>([]);
+  const [orderItems, setOrderItems] = useState<Map<string, OrderItem[]>>(new Map());
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [activeTab, setActiveTab] = useState<OrderStatus>('pending');
+
+  // Filters
+  const [dateRange, setDateRange] = useState<DateRange>({ from: undefined, to: undefined });
+  const [minQty, setMinQty] = useState('');
+  const [maxQty, setMaxQty] = useState('');
+  const [eftRange, setEftRange] = useState<DateRange>({ from: undefined, to: undefined });
+  const [priorityFilter, setPriorityFilter] = useState<string>('all');
+  const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
     fetchOrders();
@@ -37,6 +77,9 @@ export default function Orders() {
     const channel = supabase
       .channel('orders-list')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
+        fetchOrders();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'batches' }, () => {
         fetchOrders();
       })
       .subscribe();
@@ -48,15 +91,15 @@ export default function Orders() {
 
   const fetchOrders = async () => {
     try {
-      // First get orders
+      // Fetch orders with customer
       const { data: ordersData, error } = await supabase
         .from('orders')
-        .select('*')
+        .select('*, customer:customers(name)')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
 
-      // Get creator profiles separately
+      // Get creator profiles
       const orderIds = ordersData?.map(o => o.created_by).filter(Boolean) || [];
       const { data: profilesData } = await supabase
         .from('profiles')
@@ -65,23 +108,53 @@ export default function Orders() {
 
       const profilesMap = new Map(profilesData?.map(p => [p.id, p]) || []);
 
-      // Get unit counts for each order
-      const ordersWithCounts = await Promise.all(
+      // Get batch counts for each order to calculate status
+      const ordersWithStatus = await Promise.all(
         (ordersData || []).map(async (order) => {
-          const { count } = await supabase
-            .from('units')
-            .select('*', { count: 'exact', head: true })
-            .eq('order_id', order.id);
+          const { data: batches } = await supabase
+            .from('batches')
+            .select('current_state, quantity')
+            .eq('order_id', order.id)
+            .eq('is_terminated', false);
+
+          const totalCount = batches?.reduce((sum, b) => sum + b.quantity, 0) || 0;
+          const receivedCount = batches?.filter(b => b.current_state === 'received').reduce((sum, b) => sum + b.quantity, 0) || 0;
+          const inProgressCount = batches?.filter(b => b.current_state !== 'waiting_for_rm' && b.current_state !== 'received').reduce((sum, b) => sum + b.quantity, 0) || 0;
+
+          // Compute status
+          let computed_status: OrderStatus = 'pending';
+          if (totalCount > 0 && receivedCount === totalCount) {
+            computed_status = 'completed';
+          } else if (inProgressCount > 0 || receivedCount > 0) {
+            computed_status = 'in_progress';
+          }
 
           return {
             ...order,
             profiles: order.created_by ? profilesMap.get(order.created_by) : null,
-            unit_count: count || 0,
+            unit_count: totalCount,
+            received_count: receivedCount,
+            computed_status,
           };
         })
       );
 
-      setOrders(ordersWithCounts);
+      setOrders(ordersWithStatus);
+
+      // Fetch order items for export
+      const { data: itemsData } = await supabase
+        .from('order_items')
+        .select('id, order_id, quantity, product:products(name, sku)')
+        .in('order_id', ordersData?.map(o => o.id) || []);
+
+      const itemsMap = new Map<string, OrderItem[]>();
+      (itemsData || []).forEach((item: any) => {
+        const existing = itemsMap.get(item.order_id) || [];
+        existing.push(item);
+        itemsMap.set(item.order_id, existing);
+      });
+      setOrderItems(itemsMap);
+
     } catch (error) {
       console.error('Error fetching orders:', error);
     } finally {
@@ -89,10 +162,130 @@ export default function Orders() {
     }
   };
 
-  const filteredOrders = orders.filter((order) =>
-    order.order_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    order.status.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredOrders = useMemo(() => {
+    return orders.filter((order) => {
+      // Search filter
+      if (searchTerm && !order.order_number.toLowerCase().includes(searchTerm.toLowerCase())) {
+        return false;
+      }
+
+      // Tab filter (status)
+      if (order.computed_status !== activeTab) {
+        return false;
+      }
+
+      // Date range filter
+      if (dateRange.from || dateRange.to) {
+        const orderDate = parseISO(order.created_at);
+        if (dateRange.from && dateRange.to) {
+          if (!isWithinInterval(orderDate, { start: dateRange.from, end: dateRange.to })) {
+            return false;
+          }
+        } else if (dateRange.from && orderDate < dateRange.from) {
+          return false;
+        } else if (dateRange.to && orderDate > dateRange.to) {
+          return false;
+        }
+      }
+
+      // Quantity filter
+      if (minQty && order.unit_count !== undefined && order.unit_count < parseInt(minQty)) {
+        return false;
+      }
+      if (maxQty && order.unit_count !== undefined && order.unit_count > parseInt(maxQty)) {
+        return false;
+      }
+
+      // EFT filter
+      if (eftRange.from || eftRange.to) {
+        if (!order.estimated_fulfillment_time) return false;
+        const eftDate = parseISO(order.estimated_fulfillment_time);
+        if (eftRange.from && eftRange.to) {
+          if (!isWithinInterval(eftDate, { start: eftRange.from, end: eftRange.to })) {
+            return false;
+          }
+        } else if (eftRange.from && eftDate < eftRange.from) {
+          return false;
+        } else if (eftRange.to && eftDate > eftRange.to) {
+          return false;
+        }
+      }
+
+      // Priority filter
+      if (priorityFilter !== 'all' && order.priority !== priorityFilter) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [orders, searchTerm, activeTab, dateRange, minQty, maxQty, eftRange, priorityFilter]);
+
+  const clearFilters = () => {
+    setDateRange({ from: undefined, to: undefined });
+    setMinQty('');
+    setMaxQty('');
+    setEftRange({ from: undefined, to: undefined });
+    setPriorityFilter('all');
+  };
+
+  const hasActiveFilters = dateRange.from || dateRange.to || minQty || maxQty || eftRange.from || eftRange.to || priorityFilter !== 'all';
+
+  const exportOrders = () => {
+    // Build CSV content
+    const headers = ['Order Number', 'Customer', 'Priority', 'Status', 'Total Items', 'Received', 'Created At', 'EFT', 'Notes', 'Item SKU', 'Item Name', 'Item Quantity'];
+    const rows: string[][] = [];
+
+    filteredOrders.forEach(order => {
+      const items = orderItems.get(order.id) || [];
+      if (items.length === 0) {
+        rows.push([
+          order.order_number,
+          order.customer?.name || '',
+          order.priority,
+          order.computed_status || '',
+          String(order.unit_count || 0),
+          String(order.received_count || 0),
+          format(new Date(order.created_at), 'yyyy-MM-dd HH:mm'),
+          order.estimated_fulfillment_time ? format(new Date(order.estimated_fulfillment_time), 'yyyy-MM-dd') : '',
+          order.notes || '',
+          '', '', ''
+        ]);
+      } else {
+        items.forEach((item, idx) => {
+          rows.push([
+            idx === 0 ? order.order_number : '',
+            idx === 0 ? (order.customer?.name || '') : '',
+            idx === 0 ? order.priority : '',
+            idx === 0 ? (order.computed_status || '') : '',
+            idx === 0 ? String(order.unit_count || 0) : '',
+            idx === 0 ? String(order.received_count || 0) : '',
+            idx === 0 ? format(new Date(order.created_at), 'yyyy-MM-dd HH:mm') : '',
+            idx === 0 && order.estimated_fulfillment_time ? format(new Date(order.estimated_fulfillment_time), 'yyyy-MM-dd') : '',
+            idx === 0 ? (order.notes || '') : '',
+            item.product?.sku || '',
+            item.product?.name || '',
+            String(item.quantity)
+          ]);
+        });
+      }
+    });
+
+    const csvContent = [headers, ...rows].map(row => 
+      row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')
+    ).join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `orders-${activeTab}-${format(new Date(), 'yyyy-MM-dd')}.csv`;
+    link.click();
+  };
+
+  const tabCounts = useMemo(() => ({
+    pending: orders.filter(o => o.computed_status === 'pending').length,
+    in_progress: orders.filter(o => o.computed_status === 'in_progress').length,
+    completed: orders.filter(o => o.computed_status === 'completed').length,
+  }), [orders]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -125,10 +318,24 @@ export default function Orders() {
       </header>
 
       <div className="container mx-auto p-6">
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>All Orders</CardTitle>
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as OrderStatus)} className="space-y-4">
+          <div className="flex items-center justify-between">
+            <TabsList>
+              <TabsTrigger value="pending" className="gap-2">
+                Pending
+                <Badge variant="secondary" className="ml-1">{tabCounts.pending}</Badge>
+              </TabsTrigger>
+              <TabsTrigger value="in_progress" className="gap-2">
+                In Progress
+                <Badge variant="secondary" className="ml-1">{tabCounts.in_progress}</Badge>
+              </TabsTrigger>
+              <TabsTrigger value="completed" className="gap-2">
+                Completed
+                <Badge variant="secondary" className="ml-1">{tabCounts.completed}</Badge>
+              </TabsTrigger>
+            </TabsList>
+
+            <div className="flex items-center gap-2">
               <div className="relative w-64">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -138,75 +345,214 @@ export default function Orders() {
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
+              <Button
+                variant={showFilters ? "default" : "outline"}
+                size="icon"
+                onClick={() => setShowFilters(!showFilters)}
+                className={hasActiveFilters ? "border-primary" : ""}
+              >
+                <Filter className="h-4 w-4" />
+              </Button>
+              <Button variant="outline" onClick={exportOrders}>
+                <Download className="h-4 w-4 mr-2" />
+                Export
+              </Button>
             </div>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="flex justify-center py-8">
-                <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-primary border-r-transparent"></div>
-              </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Order Number</TableHead>
-                    <TableHead>Priority</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Units</TableHead>
-                    <TableHead>Created By</TableHead>
-                    <TableHead>Created</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredOrders.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={7} className="text-center text-muted-foreground">
-                        No orders found
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    filteredOrders.map((order) => (
-                      <TableRow key={order.id} className={order.priority === 'high' ? 'bg-destructive/5' : ''}>
-                        <TableCell className="font-medium">
-                          <div className="flex items-center gap-2">
-                            {order.priority === 'high' && (
-                              <AlertCircle className="h-4 w-4 text-destructive" />
-                            )}
-                            {order.order_number}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={order.priority === 'high' ? 'destructive' : 'secondary'}>
-                            {order.priority}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="secondary">{order.status}</Badge>
-                        </TableCell>
-                        <TableCell>{order.unit_count}</TableCell>
-                        <TableCell>
-                          {order.profiles?.full_name || order.profiles?.email || 'Unknown'}
-                        </TableCell>
-                        <TableCell>
-                          {formatDistanceToNow(new Date(order.created_at), { addSuffix: true })}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button variant="ghost" size="sm" asChild>
-                            <Link to={`/orders/${order.id}`}>
-                              <Eye className="mr-2 h-4 w-4" />
-                              View
-                            </Link>
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))
+          </div>
+
+          {/* Filters Panel */}
+          {showFilters && (
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-medium">Filters</h3>
+                  {hasActiveFilters && (
+                    <Button variant="ghost" size="sm" onClick={clearFilters}>
+                      <X className="h-4 w-4 mr-1" />
+                      Clear All
+                    </Button>
                   )}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                  {/* Created Date Range */}
+                  <div className="space-y-2">
+                    <Label>Created Date</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" className="w-full justify-start text-left font-normal">
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {dateRange.from ? (
+                            dateRange.to ? (
+                              `${format(dateRange.from, 'MMM d')} - ${format(dateRange.to, 'MMM d')}`
+                            ) : (
+                              format(dateRange.from, 'MMM d, yyyy')
+                            )
+                          ) : (
+                            "Pick dates"
+                          )}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="range"
+                          selected={{ from: dateRange.from, to: dateRange.to }}
+                          onSelect={(range) => setDateRange({ from: range?.from, to: range?.to })}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+
+                  {/* Quantity Range */}
+                  <div className="space-y-2">
+                    <Label>Items Quantity</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        type="number"
+                        placeholder="Min"
+                        value={minQty}
+                        onChange={(e) => setMinQty(e.target.value)}
+                        className="w-full"
+                      />
+                      <Input
+                        type="number"
+                        placeholder="Max"
+                        value={maxQty}
+                        onChange={(e) => setMaxQty(e.target.value)}
+                        className="w-full"
+                      />
+                    </div>
+                  </div>
+
+                  {/* EFT Range */}
+                  <div className="space-y-2">
+                    <Label>EFT Date</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" className="w-full justify-start text-left font-normal">
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {eftRange.from ? (
+                            eftRange.to ? (
+                              `${format(eftRange.from, 'MMM d')} - ${format(eftRange.to, 'MMM d')}`
+                            ) : (
+                              format(eftRange.from, 'MMM d, yyyy')
+                            )
+                          ) : (
+                            "Pick dates"
+                          )}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="range"
+                          selected={{ from: eftRange.from, to: eftRange.to }}
+                          onSelect={(range) => setEftRange({ from: range?.from, to: range?.to })}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+
+                  {/* Priority */}
+                  <div className="space-y-2">
+                    <Label>Priority</Label>
+                    <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="All priorities" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Priorities</SelectItem>
+                        <SelectItem value="high">High</SelectItem>
+                        <SelectItem value="normal">Normal</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Table Content */}
+          {['pending', 'in_progress', 'completed'].map((tab) => (
+            <TabsContent key={tab} value={tab}>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="capitalize">{tab.replace('_', ' ')} Orders</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {loading ? (
+                    <div className="flex justify-center py-8">
+                      <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-primary border-r-transparent"></div>
+                    </div>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Order Number</TableHead>
+                          <TableHead>Customer</TableHead>
+                          <TableHead>Priority</TableHead>
+                          <TableHead>Units</TableHead>
+                          <TableHead>EFT</TableHead>
+                          <TableHead>Created</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredOrders.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={6} className="text-center text-muted-foreground">
+                              No orders found
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          filteredOrders.map((order) => (
+                            <TableRow 
+                              key={order.id} 
+                              className={cn(
+                                "cursor-pointer hover:bg-muted/50",
+                                order.priority === 'high' && 'bg-destructive/5'
+                              )}
+                              onClick={() => navigate(`/orders/${order.id}`)}
+                            >
+                              <TableCell className="font-medium">
+                                <div className="flex items-center gap-2">
+                                  {order.priority === 'high' && (
+                                    <AlertCircle className="h-4 w-4 text-destructive" />
+                                  )}
+                                  <span className="text-primary hover:underline">
+                                    {order.order_number}
+                                  </span>
+                                </div>
+                              </TableCell>
+                              <TableCell>{order.customer?.name || '-'}</TableCell>
+                              <TableCell>
+                                <Badge variant={order.priority === 'high' ? 'destructive' : 'secondary'}>
+                                  {order.priority}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                {order.computed_status === 'completed' 
+                                  ? order.unit_count
+                                  : `${order.received_count || 0}/${order.unit_count}`
+                                }
+                              </TableCell>
+                              <TableCell>
+                                {order.estimated_fulfillment_time 
+                                  ? format(new Date(order.estimated_fulfillment_time), 'MMM d, yyyy')
+                                  : '-'
+                                }
+                              </TableCell>
+                              <TableCell>
+                                {format(new Date(order.created_at), 'MMM d, yyyy')}
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          ))}
+        </Tabs>
       </div>
     </div>
   );
