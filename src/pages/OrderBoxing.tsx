@@ -418,9 +418,9 @@ export default function OrderBoxing() {
       }, 0);
 
       // Now safely close + reset dialog
-      setKartonaDialogOpen(false);
       setReadyForShipmentSelections(new Map());
       setShipmentNotes("");
+      setKartonaDialogOpen(false);
 
       // Refresh data last
       fetchData();
