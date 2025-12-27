@@ -17,6 +17,7 @@ import { format, isWithinInterval, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
 
 type OrderStatus = 'pending' | 'in_progress' | 'completed';
+type TabStatus = 'pending' | 'completed';
 
 interface Order {
   id: string;
@@ -61,7 +62,7 @@ export default function Orders() {
   const [orderItems, setOrderItems] = useState<Map<string, OrderItem[]>>(new Map());
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [activeTab, setActiveTab] = useState<OrderStatus>('pending');
+  const [activeTab, setActiveTab] = useState<TabStatus>('pending');
 
   // Filters
   const [dateRange, setDateRange] = useState<DateRange>({ from: undefined, to: undefined });
@@ -169,9 +170,15 @@ export default function Orders() {
         return false;
       }
 
-      // Tab filter (status)
-      if (order.computed_status !== activeTab) {
-        return false;
+      // Tab filter (status) - pending tab includes both 'pending' and 'in_progress'
+      if (activeTab === 'pending') {
+        if (order.computed_status !== 'pending' && order.computed_status !== 'in_progress') {
+          return false;
+        }
+      } else if (activeTab === 'completed') {
+        if (order.computed_status !== 'completed') {
+          return false;
+        }
       }
 
       // Date range filter
@@ -282,8 +289,7 @@ export default function Orders() {
   };
 
   const tabCounts = useMemo(() => ({
-    pending: orders.filter(o => o.computed_status === 'pending').length,
-    in_progress: orders.filter(o => o.computed_status === 'in_progress').length,
+    pending: orders.filter(o => o.computed_status === 'pending' || o.computed_status === 'in_progress').length,
     completed: orders.filter(o => o.computed_status === 'completed').length,
   }), [orders]);
 
@@ -318,16 +324,12 @@ export default function Orders() {
       </header>
 
       <div className="container mx-auto p-6">
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as OrderStatus)} className="space-y-4">
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabStatus)} className="space-y-4">
           <div className="flex items-center justify-between">
             <TabsList>
               <TabsTrigger value="pending" className="gap-2">
                 Pending
                 <Badge variant="secondary" className="ml-1">{tabCounts.pending}</Badge>
-              </TabsTrigger>
-              <TabsTrigger value="in_progress" className="gap-2">
-                In Progress
-                <Badge variant="secondary" className="ml-1">{tabCounts.in_progress}</Badge>
               </TabsTrigger>
               <TabsTrigger value="completed" className="gap-2">
                 Completed
@@ -471,11 +473,11 @@ export default function Orders() {
           )}
 
           {/* Table Content */}
-          {['pending', 'in_progress', 'completed'].map((tab) => (
+          {['pending', 'completed'].map((tab) => (
             <TabsContent key={tab} value={tab}>
               <Card>
                 <CardHeader>
-                  <CardTitle className="capitalize">{tab.replace('_', ' ')} Orders</CardTitle>
+                  <CardTitle className="capitalize">{tab} Orders</CardTitle>
                 </CardHeader>
                 <CardContent>
                   {loading ? (
@@ -489,6 +491,7 @@ export default function Orders() {
                           <TableHead>Order Number</TableHead>
                           <TableHead>Customer</TableHead>
                           <TableHead>Priority</TableHead>
+                          {tab === 'pending' && <TableHead>Status</TableHead>}
                           <TableHead>Units</TableHead>
                           <TableHead>EFT</TableHead>
                           <TableHead>Created</TableHead>
@@ -497,7 +500,7 @@ export default function Orders() {
                       <TableBody>
                         {filteredOrders.length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={6} className="text-center text-muted-foreground">
+                            <TableCell colSpan={tab === 'pending' ? 7 : 6} className="text-center text-muted-foreground">
                               No orders found
                             </TableCell>
                           </TableRow>
@@ -527,6 +530,13 @@ export default function Orders() {
                                   {order.priority}
                                 </Badge>
                               </TableCell>
+                              {tab === 'pending' && (
+                                <TableCell>
+                                  <Badge variant={order.computed_status === 'in_progress' ? 'default' : 'outline'}>
+                                    {order.computed_status === 'in_progress' ? 'In Progress' : 'Pending'}
+                                  </Badge>
+                                </TableCell>
+                              )}
                               <TableCell>
                                 {order.computed_status === 'completed' 
                                   ? order.unit_count
