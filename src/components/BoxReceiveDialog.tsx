@@ -142,72 +142,150 @@ export function BoxReceiveDialog({
 
     setSearching(true);
     try {
+      const searchTerm = searchCode.trim().toUpperCase();
+      
+      // First try to find a box by code
       const { data: box } = await supabase
         .from('boxes')
         .select('id, box_code')
-        .eq('box_code', searchCode.trim().toUpperCase())
+        .eq('box_code', searchTerm)
         .eq('is_active', true)
         .single();
 
-      if (!box) {
-        toast({
-          title: 'Not Found',
-          description: `Box ${searchCode} not found`,
-          variant: 'destructive',
-        });
-        return;
-      }
+      if (box) {
+        // Check if already selected
+        if (selectedBoxes.some(b => b.id === box.id)) {
+          toast({
+            title: 'Already Selected',
+            description: `Box ${box.box_code} is already selected`,
+          });
+          setSearchCode('');
+          return;
+        }
 
-      // Check if already selected
-      if (selectedBoxes.some(b => b.id === box.id)) {
-        toast({
-          title: 'Already Selected',
-          description: `Box ${box.box_code} is already selected`,
-        });
+        // Check if box has batches in the correct state for this order
+        const { data: batches } = await supabase
+          .from('batches')
+          .select(`
+            id,
+            batch_code,
+            product_id,
+            quantity,
+            product:products(id, name, sku)
+          `)
+          .eq('box_id', box.id)
+          .eq('order_id', orderId)
+          .eq('current_state', filterState)
+          .eq('is_terminated', false);
+
+        if (!batches?.length) {
+          toast({
+            title: 'Invalid Box',
+            description: `Box ${box.box_code} doesn't contain items in ${getStateLabel(filterState)} state for this order`,
+            variant: 'destructive',
+          });
+          return;
+        }
+
+        const selectedBox: SelectedBox = {
+          id: box.id,
+          box_code: box.box_code,
+          batches: batches.map(b => ({
+            id: b.id,
+            batch_code: b.batch_code,
+            product_id: b.product_id,
+            product_name: (b.product as any)?.name || 'Unknown',
+            product_sku: (b.product as any)?.sku || 'N/A',
+            quantity: b.quantity,
+          })),
+          total_quantity: batches.reduce((sum, b) => sum + b.quantity, 0),
+        };
+
+        setSelectedBoxes(prev => [...prev, selectedBox]);
         setSearchCode('');
-        return;
+      } else {
+        // Search by product SKU or name - find boxes containing matching products
+        const { data: matchingBatches } = await supabase
+          .from('batches')
+          .select(`
+            id,
+            batch_code,
+            product_id,
+            quantity,
+            box_id,
+            product:products(id, name, sku)
+          `)
+          .eq('order_id', orderId)
+          .eq('current_state', filterState)
+          .eq('is_terminated', false)
+          .not('box_id', 'is', null);
+
+        // Filter by product sku or name containing search term
+        const filteredBatches = matchingBatches?.filter(b => {
+          const product = b.product as any;
+          return product?.sku?.toUpperCase().includes(searchTerm) || 
+                 product?.name?.toUpperCase().includes(searchTerm);
+        }) || [];
+
+        if (filteredBatches.length === 0) {
+          toast({
+            title: 'Not Found',
+            description: `No boxes found containing products matching "${searchCode}"`,
+            variant: 'destructive',
+          });
+          return;
+        }
+
+        // Get unique box IDs from matching batches
+        const matchingBoxIds = [...new Set(filteredBatches.map(b => b.box_id).filter(Boolean))];
+        
+        const { data: boxes } = await supabase
+          .from('boxes')
+          .select('id, box_code')
+          .in('id', matchingBoxIds);
+
+        const boxMap = new Map(boxes?.map(b => [b.id, b]) || []);
+
+        // Add all matching boxes that aren't already selected
+        let addedCount = 0;
+        for (const boxId of matchingBoxIds) {
+          if (selectedBoxes.some(b => b.id === boxId)) continue;
+          
+          const box = boxMap.get(boxId);
+          if (!box) continue;
+
+          const boxBatches = filteredBatches.filter(b => b.box_id === boxId);
+          const selectedBox: SelectedBox = {
+            id: box.id,
+            box_code: box.box_code,
+            batches: boxBatches.map(b => ({
+              id: b.id,
+              batch_code: b.batch_code,
+              product_id: b.product_id,
+              product_name: (b.product as any)?.name || 'Unknown',
+              product_sku: (b.product as any)?.sku || 'N/A',
+              quantity: b.quantity,
+            })),
+            total_quantity: boxBatches.reduce((sum, b) => sum + b.quantity, 0),
+          };
+
+          setSelectedBoxes(prev => [...prev, selectedBox]);
+          addedCount++;
+        }
+
+        if (addedCount > 0) {
+          toast({
+            title: 'Boxes Found',
+            description: `Added ${addedCount} box(es) containing products matching "${searchCode}"`,
+          });
+          setSearchCode('');
+        } else {
+          toast({
+            title: 'Already Selected',
+            description: `All matching boxes are already selected`,
+          });
+        }
       }
-
-      // Check if box has batches in the correct state for this order
-      const { data: batches } = await supabase
-        .from('batches')
-        .select(`
-          id,
-          batch_code,
-          product_id,
-          quantity,
-          product:products(id, name, sku)
-        `)
-        .eq('box_id', box.id)
-        .eq('order_id', orderId)
-        .eq('current_state', filterState)
-        .eq('is_terminated', false);
-
-      if (!batches?.length) {
-        toast({
-          title: 'Invalid Box',
-          description: `Box ${box.box_code} doesn't contain items in ${getStateLabel(filterState)} state for this order`,
-          variant: 'destructive',
-        });
-        return;
-      }
-
-      const selectedBox: SelectedBox = {
-        id: box.id,
-        box_code: box.box_code,
-        batches: batches.map(b => ({
-          id: b.id,
-          batch_code: b.batch_code,
-          product_id: b.product_id,
-          product_name: (b.product as any)?.name || 'Unknown',
-          product_sku: (b.product as any)?.sku || 'N/A',
-          quantity: b.quantity,
-        })),
-        total_quantity: batches.reduce((sum, b) => sum + b.quantity, 0),
-      };
-
-      setSelectedBoxes(prev => [...prev, selectedBox]);
-      setSearchCode('');
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -290,7 +368,7 @@ export function BoxReceiveDialog({
             <Input
               value={searchCode}
               onChange={(e) => setSearchCode(e.target.value.toUpperCase())}
-              placeholder="Scan or enter box code (e.g., BOX-0001)"
+              placeholder="Scan box code or search by product SKU/name"
               className="pl-10"
               onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
             />

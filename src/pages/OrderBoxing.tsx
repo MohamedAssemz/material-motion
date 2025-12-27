@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { ArrowLeft, Box, Loader2, QrCode, CheckSquare, Truck, Printer, Package, CheckCircle } from "lucide-react";
+import { ArrowLeft, Box, Loader2, QrCode, CheckSquare, Truck, Printer, Package, CheckCircle, Download } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -534,6 +534,51 @@ export default function OrderBoxing() {
     }
   };
 
+  const exportShipments = () => {
+    if (shipments.length === 0) return;
+
+    const headers = ['Shipment Code', 'Status', 'Created At', 'Sealed At', 'Notes', 'Product SKU', 'Product Name', 'Quantity', 'Needs Boxing'];
+    const rows: string[][] = [];
+
+    shipments.forEach(shipment => {
+      const items = shipment.items || [];
+      if (items.length === 0) {
+        rows.push([
+          shipment.shipment_code,
+          shipment.status,
+          format(new Date(shipment.created_at), 'yyyy-MM-dd HH:mm'),
+          shipment.sealed_at ? format(new Date(shipment.sealed_at), 'yyyy-MM-dd HH:mm') : '',
+          shipment.notes || '',
+          '', '', '', ''
+        ]);
+      } else {
+        items.forEach((item, idx) => {
+          rows.push([
+            idx === 0 ? shipment.shipment_code : '',
+            idx === 0 ? shipment.status : '',
+            idx === 0 ? format(new Date(shipment.created_at), 'yyyy-MM-dd HH:mm') : '',
+            idx === 0 && shipment.sealed_at ? format(new Date(shipment.sealed_at), 'yyyy-MM-dd HH:mm') : '',
+            idx === 0 ? (shipment.notes || '') : '',
+            item.batch?.product?.sku || '',
+            item.batch?.product?.name || '',
+            String(item.quantity),
+            (item.order_item?.needs_boxing ?? true) ? 'Yes' : 'No'
+          ]);
+        });
+      }
+    });
+
+    const csvContent = [headers, ...rows].map(row =>
+      row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')
+    ).join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `shipments-${order?.order_number || 'export'}-${format(new Date(), 'yyyy-MM-dd')}.csv`;
+    link.click();
+  };
+
   const printKartonaLabel = (
     shipmentCode: string,
     items: Array<{ sku: string; name: string; qty: number; needsBoxing: boolean }>,
@@ -632,12 +677,11 @@ export default function OrderBoxing() {
       </div>
 
       <Tabs defaultValue="receive" className="space-y-4">
-        <TabsList className="grid grid-cols-5 w-full max-w-3xl">
+        <TabsList className="grid grid-cols-4 w-full max-w-2xl">
           <TabsTrigger value="receive">Receive ({readyBoxGroups.length})</TabsTrigger>
           <TabsTrigger value="process">Process ({totalInBoxing})</TabsTrigger>
           <TabsTrigger value="ready">Ready ({totalReadyForShipment})</TabsTrigger>
-          <TabsTrigger value="shipped">Shipped ({shipments.length})</TabsTrigger>
-          <TabsTrigger value="completed">Completed ({totalReceived})</TabsTrigger>
+          <TabsTrigger value="shipments">Shipments ({shipments.length})</TabsTrigger>
         </TabsList>
 
         {/* Tab 1: Receive Boxes */}
@@ -886,8 +930,17 @@ export default function OrderBoxing() {
           </div>
         </TabsContent>
 
-        {/* Tab 4: Shipped (Kartonas) */}
-        <TabsContent value="shipped" className="space-y-4">
+        {/* Tab 4: Shipments (Kartonas) */}
+        <TabsContent value="shipments" className="space-y-4">
+          {/* Export Button */}
+          {shipments.length > 0 && (
+            <div className="flex justify-end">
+              <Button variant="outline" onClick={exportShipments}>
+                <Download className="h-4 w-4 mr-2" />
+                Export Shipments
+              </Button>
+            </div>
+          )}
           {shipments.length === 0 ? (
             <Card>
               <CardContent className="p-8 text-center text-muted-foreground">
@@ -954,7 +1007,7 @@ export default function OrderBoxing() {
                             }}
                           >
                             <Printer className="h-4 w-4 mr-1" />
-                            Print
+                            Reprint
                           </Button>
                         </div>
                       </div>
@@ -994,70 +1047,6 @@ export default function OrderBoxing() {
           )}
         </TabsContent>
 
-        {/* Tab 5: Completed (Received items) */}
-        <TabsContent value="completed" className="space-y-4">
-          {(() => {
-            // Group received items by order_item_id
-            const receivedBatches = batches.filter(b => b.current_state === 'received');
-            const receivedGroups = new Map<string, OrderItemGroup>();
-            receivedBatches.forEach(batch => {
-              const key = batch.order_item_id || batch.product_id;
-              if (!receivedGroups.has(key)) {
-                receivedGroups.set(key, {
-                  order_item_id: batch.order_item_id || '',
-                  product_id: batch.product_id,
-                  product_name: batch.product?.name || 'Unknown',
-                  product_sku: batch.product?.sku || 'N/A',
-                  needs_boxing: batch.order_item?.needs_boxing ?? true,
-                  quantity: 0,
-                  batches: [],
-                });
-              }
-              const group = receivedGroups.get(key)!;
-              group.batches.push(batch);
-              group.quantity += batch.quantity;
-            });
-            const completedGroups = Array.from(receivedGroups.values());
-
-            return completedGroups.length === 0 ? (
-              <Card>
-                <CardContent className="p-8 text-center text-muted-foreground">
-                  No items completed in boxing yet
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="space-y-3">
-                {completedGroups.map(group => {
-                  const key = group.order_item_id || group.product_id;
-                  return (
-                    <Card key={key}>
-                      <CardContent className="p-4">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="font-medium">{group.product_name}</p>
-                            <p className="text-sm text-muted-foreground">
-                              {group.product_sku}
-                              <Badge variant="outline" className="ml-2 text-xs bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                                <CheckCircle className="h-3 w-3 mr-1" />
-                                Completed
-                              </Badge>
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-4">
-                            <div className="text-center">
-                              <p className="text-lg font-semibold text-green-600">{group.quantity}</p>
-                              <p className="text-xs text-muted-foreground">Received</p>
-                            </div>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
-            );
-          })()}
-        </TabsContent>
       </Tabs>
 
       {/* Accept Boxes Dialog */}
