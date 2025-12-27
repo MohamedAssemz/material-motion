@@ -1,23 +1,34 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar } from '@/components/ui/calendar';
-import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Plus, Trash2, ClipboardList, Loader2, Check, ChevronsUpDown, CalendarIcon, Plane, Truck } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils';
-import { z } from 'zod';
-import { format } from 'date-fns';
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { useToast } from "@/hooks/use-toast";
+import {
+  ArrowLeft,
+  Plus,
+  Trash2,
+  ClipboardList,
+  Loader2,
+  Check,
+  ChevronsUpDown,
+  CalendarIcon,
+  Plane,
+  Truck,
+} from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
+import { z } from "zod";
+import { format } from "date-fns";
 
 interface Product {
   id: string;
@@ -47,10 +58,10 @@ interface ExtraProduct {
 }
 
 const orderSchema = z.object({
-  order_number: z.string().trim().min(1, 'Order number is required').max(50, 'Order number too long'),
-  notes: z.string().trim().max(500, 'Notes must be less than 500 characters').optional(),
-  priority: z.enum(['high', 'normal']),
-  shipping_type: z.enum(['domestic', 'international']),
+  order_number: z.string().trim().min(1, "Order number is required").max(50, "Order number too long"),
+  notes: z.string().trim().max(500, "Notes must be less than 500 characters").optional(),
+  priority: z.enum(["high", "normal"]),
+  shipping_type: z.enum(["domestic", "international"]),
   raw_materials: z.string().optional(),
 });
 
@@ -62,23 +73,23 @@ export default function OrderCreate() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [orderNumber, setOrderNumber] = useState('');
-  const [notes, setNotes] = useState('');
-  const [priority, setPriority] = useState<'high' | 'normal'>('normal');
-  const [shippingType, setShippingType] = useState<'domestic' | 'international'>('domestic');
+  const [orderNumber, setOrderNumber] = useState("");
+  const [notes, setNotes] = useState("");
+  const [priority, setPriority] = useState<"high" | "normal">("normal");
+  const [shippingType, setShippingType] = useState<"domestic" | "international">("domestic");
   const [estimatedFulfillment, setEstimatedFulfillment] = useState<Date | undefined>();
-  const [rawMaterials, setRawMaterials] = useState('');
+  const [rawMaterials, setRawMaterials] = useState("");
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const [customerOpen, setCustomerOpen] = useState(false);
   const [eftOpen, setEftOpen] = useState(false);
-  const [items, setItems] = useState<OrderItem[]>([{ product_id: '', quantity: 1, needs_boxing: true }]);
+  const [items, setItems] = useState<OrderItem[]>([{ product_id: "", quantity: 1, needs_boxing: true }]);
   const [extraProducts, setExtraProducts] = useState<ExtraProduct[]>([]);
   const [extraSelections, setExtraSelections] = useState<Map<string, number>>(new Map());
   const [customerProductMapping, setCustomerProductMapping] = useState<Map<string, Set<string>>>(new Map());
 
   useEffect(() => {
-    if (!hasRole('manufacture_lead') && !hasRole('admin')) {
-      navigate('/');
+    if (!hasRole("manufacture_lead") && !hasRole("admin")) {
+      navigate("/");
       return;
     }
 
@@ -88,15 +99,15 @@ export default function OrderCreate() {
   const fetchData = async () => {
     try {
       const [productsRes, extraBatchesRes, customersRes, potentialCustomersRes] = await Promise.all([
-        supabase.from('products').select('id, sku, name').order('sku'),
+        supabase.from("products").select("id, sku, name").order("sku"),
         supabase
-          .from('batches')
-          .select('id, batch_code, product_id, quantity, current_state, product:products(id, sku, name)')
-          .eq('batch_type', 'EXTRA')
-          .eq('inventory_state', 'AVAILABLE')
-          .eq('is_terminated', false),
-        supabase.from('customers').select('id, name, code, is_domestic').order('name'),
-        supabase.from('product_potential_customers').select('parent_product_id, customer_id'),
+          .from("batches")
+          .select("id, batch_code, product_id, quantity, current_state, product:products(id, sku, name)")
+          .eq("batch_type", "EXTRA")
+          .eq("inventory_state", "AVAILABLE")
+          .eq("is_terminated", false),
+        supabase.from("customers").select("id, name, code, is_domestic").order("name"),
+        supabase.from("product_potential_customers").select("parent_product_id, customer_id"),
       ]);
 
       if (productsRes.error) throw productsRes.error;
@@ -106,10 +117,8 @@ export default function OrderCreate() {
 
       // Get parent_product_id for each product
       const productParentMap = new Map<string, string>();
-      const { data: productParents } = await supabase
-        .from('products')
-        .select('id, parent_product_id');
-      productParents?.forEach(p => {
+      const { data: productParents } = await supabase.from("products").select("id, parent_product_id");
+      productParents?.forEach((p) => {
         if (p.parent_product_id) productParentMap.set(p.id, p.parent_product_id);
       });
 
@@ -123,25 +132,28 @@ export default function OrderCreate() {
       });
 
       // Attach parent product IDs to products
-      const productsWithParent = productsRes.data?.map(p => ({
-        ...p,
-        parent_product_id: productParentMap.get(p.id) || null,
-      })) || [];
+      const productsWithParent =
+        productsRes.data?.map((p) => ({
+          ...p,
+          parent_product_id: productParentMap.get(p.id) || null,
+        })) || [];
 
       setProducts(productsWithParent);
-      setExtraProducts(extraBatchesRes.data?.map(b => ({
-        id: b.id,
-        product_id: b.product_id,
-        quantity: b.quantity,
-        product: b.product as any,
-      })) || []);
+      setExtraProducts(
+        extraBatchesRes.data?.map((b) => ({
+          id: b.id,
+          product_id: b.product_id,
+          quantity: b.quantity,
+          product: b.product as any,
+        })) || [],
+      );
       setCustomers(customersRes.data || []);
       setCustomerProductMapping(customerProductMap);
     } catch (error: any) {
       toast({
-        title: 'Error',
+        title: "Error",
         description: error.message,
-        variant: 'destructive',
+        variant: "destructive",
       });
     } finally {
       setLoading(false);
@@ -149,7 +161,7 @@ export default function OrderCreate() {
   };
 
   const addItem = () => {
-    setItems([...items, { product_id: '', quantity: 1, needs_boxing: true }]);
+    setItems([...items, { product_id: "", quantity: 1, needs_boxing: true }]);
   };
 
   const removeItem = (index: number) => {
@@ -168,25 +180,31 @@ export default function OrderCreate() {
     e.preventDefault();
 
     try {
-      const validation = orderSchema.safeParse({ order_number: orderNumber, notes, priority, shipping_type: shippingType, raw_materials: rawMaterials });
+      const validation = orderSchema.safeParse({
+        order_number: orderNumber,
+        notes,
+        priority,
+        shipping_type: shippingType,
+        raw_materials: rawMaterials,
+      });
       if (!validation.success) {
         toast({
-          title: 'Validation Error',
+          title: "Validation Error",
           description: validation.error.errors[0].message,
-          variant: 'destructive',
+          variant: "destructive",
         });
         return;
       }
 
-      const validItems = items.filter(item => item.product_id && item.quantity > 0);
-      
+      const validItems = items.filter((item) => item.product_id && item.quantity > 0);
+
       // Check if we have at least order items OR extra selections
-      const hasExtraSelections = Array.from(extraSelections.values()).some(qty => qty > 0);
+      const hasExtraSelections = Array.from(extraSelections.values()).some((qty) => qty > 0);
       if (validItems.length === 0 && !hasExtraSelections) {
         toast({
-          title: 'Validation Error',
-          description: 'Please add at least one product with valid quantity',
-          variant: 'destructive',
+          title: "Validation Error",
+          description: "Please add at least one product with valid quantity",
+          variant: "destructive",
         });
         return;
       }
@@ -195,7 +213,7 @@ export default function OrderCreate() {
 
       // Create order
       const { data: order, error: orderError } = await supabase
-        .from('orders')
+        .from("orders")
         .insert({
           order_number: orderNumber.trim(),
           notes: notes.trim() || null,
@@ -212,7 +230,7 @@ export default function OrderCreate() {
 
       // Save raw materials version if provided
       if (rawMaterials.trim()) {
-        await supabase.from('raw_material_versions').insert({
+        await supabase.from("raw_material_versions").insert({
           order_id: order.id,
           version_number: 1,
           content: rawMaterials.trim(),
@@ -230,11 +248,11 @@ export default function OrderCreate() {
         isExtra?: boolean;
         extraProductId?: string;
       }> = [];
-      
+
       // Create order items for regular items
       for (const item of validItems) {
         const { data: orderItem, error: itemError } = await supabase
-          .from('order_items')
+          .from("order_items")
           .insert({
             order_id: order.id,
             product_id: item.product_id,
@@ -243,7 +261,7 @@ export default function OrderCreate() {
           })
           .select()
           .single();
-        
+
         if (itemError) throw itemError;
         createdOrderItems.push({
           id: orderItem.id,
@@ -252,14 +270,14 @@ export default function OrderCreate() {
           needs_boxing: item.needs_boxing,
         });
       }
-      
+
       // Create order items for extra selections
       for (const [extraId, quantity] of extraSelections.entries()) {
         if (quantity > 0) {
-          const extraProduct = extraProducts.find(ep => ep.id === extraId);
+          const extraProduct = extraProducts.find((ep) => ep.id === extraId);
           if (extraProduct) {
             const { data: orderItem, error: itemError } = await supabase
-              .from('order_items')
+              .from("order_items")
               .insert({
                 order_id: order.id,
                 product_id: extraProduct.product_id,
@@ -268,7 +286,7 @@ export default function OrderCreate() {
               })
               .select()
               .single();
-            
+
             if (itemError) throw itemError;
             createdOrderItems.push({
               id: orderItem.id,
@@ -284,14 +302,14 @@ export default function OrderCreate() {
 
       // Create batches linked to each order item
       let totalBatchQuantity = 0;
-      
+
       for (const orderItem of createdOrderItems) {
-        const { data: batchCode } = await supabase.rpc('generate_batch_code');
-        
+        const { data: batchCode } = await supabase.rpc("generate_batch_code");
+
         // Determine initial state
-        const initialState = orderItem.isExtra ? 'received' : 'pending_rm';
-        
-        const { error: batchError } = await supabase.from('batches').insert({
+        const initialState = orderItem.isExtra ? "received" : "pending_rm";
+
+        const { error: batchError } = await supabase.from("batches").insert({
           batch_code: batchCode || `B-${Date.now()}`,
           order_id: order.id,
           order_item_id: orderItem.id,
@@ -300,49 +318,46 @@ export default function OrderCreate() {
           quantity: orderItem.quantity,
           created_by: user?.id,
         });
-        
+
         if (batchError) throw batchError;
         totalBatchQuantity += orderItem.quantity;
-        
+
         // Handle extra product consumption
         if (orderItem.isExtra && orderItem.extraProductId) {
-          const extraBatch = extraProducts.find(ep => ep.id === orderItem.extraProductId);
+          const extraBatch = extraProducts.find((ep) => ep.id === orderItem.extraProductId);
           if (extraBatch) {
             if (orderItem.quantity === extraBatch.quantity) {
               // Full consumption
-              await supabase
-                .from('batches')
-                .update({ inventory_state: 'CONSUMED' })
-                .eq('id', orderItem.extraProductId);
+              await supabase.from("batches").update({ inventory_state: "CONSUMED" }).eq("id", orderItem.extraProductId);
             } else {
               // Partial consumption - reduce quantity
               await supabase
-                .from('batches')
+                .from("batches")
                 .update({ quantity: extraBatch.quantity - orderItem.quantity })
-                .eq('id', orderItem.extraProductId);
+                .eq("id", orderItem.extraProductId);
             }
           }
         }
       }
 
       toast({
-        title: 'Success',
+        title: "Success",
         description: `Order ${orderNumber} created with ${totalBatchQuantity} items in ${createdOrderItems.length} batch(es)`,
       });
 
-      navigate('/orders');
+      navigate("/orders");
     } catch (error: any) {
       toast({
-        title: 'Error',
+        title: "Error",
         description: error.message,
-        variant: 'destructive',
+        variant: "destructive",
       });
     } finally {
       setSubmitting(false);
     }
   };
 
-  const selectedCustomer = customers.find(c => c.id === selectedCustomerId);
+  const selectedCustomer = customers.find((c) => c.id === selectedCustomerId);
 
   if (loading) {
     return (
@@ -356,7 +371,7 @@ export default function OrderCreate() {
     <div className="min-h-screen bg-background">
       <header className="border-b border-border bg-card">
         <div className="container mx-auto flex items-center gap-3 px-4 py-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/orders')}>
+          <Button variant="ghost" size="icon" onClick={() => navigate("/orders")}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <ClipboardList className="h-6 w-6 text-primary" />
@@ -396,7 +411,7 @@ export default function OrderCreate() {
                       className="w-full justify-between"
                     >
                       {selectedCustomer
-                        ? `${selectedCustomer.name}${selectedCustomer.code ? ` (${selectedCustomer.code})` : ''}`
+                        ? `${selectedCustomer.name}${selectedCustomer.code ? ` (${selectedCustomer.code})` : ""}`
                         : "Select customer..."}
                       <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
@@ -414,18 +429,13 @@ export default function OrderCreate() {
                               setCustomerOpen(false);
                             }}
                           >
-                            <Check
-                              className={cn(
-                                "mr-2 h-4 w-4",
-                                !selectedCustomerId ? "opacity-100" : "opacity-0"
-                              )}
-                            />
+                            <Check className={cn("mr-2 h-4 w-4", !selectedCustomerId ? "opacity-100" : "opacity-0")} />
                             No customer
                           </CommandItem>
                           {customers.map((customer) => (
                             <CommandItem
                               key={customer.id}
-                              value={`${customer.name} ${customer.code || ''}`}
+                              value={`${customer.name} ${customer.code || ""}`}
                               onSelect={() => {
                                 setSelectedCustomerId(customer.id);
                                 setCustomerOpen(false);
@@ -434,13 +444,11 @@ export default function OrderCreate() {
                               <Check
                                 className={cn(
                                   "mr-2 h-4 w-4",
-                                  selectedCustomerId === customer.id ? "opacity-100" : "opacity-0"
+                                  selectedCustomerId === customer.id ? "opacity-100" : "opacity-0",
                                 )}
                               />
                               {customer.name}
-                              {customer.code && (
-                                <span className="ml-2 text-muted-foreground">({customer.code})</span>
-                              )}
+                              {customer.code && <span className="ml-2 text-muted-foreground">({customer.code})</span>}
                             </CommandItem>
                           ))}
                         </CommandGroup>
@@ -452,7 +460,7 @@ export default function OrderCreate() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="priority">Priority *</Label>
-                  <Select value={priority} onValueChange={(value: 'high' | 'normal') => setPriority(value)}>
+                  <Select value={priority} onValueChange={(value: "high" | "normal") => setPriority(value)}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -464,7 +472,10 @@ export default function OrderCreate() {
                 </div>
                 <div>
                   <Label>Shipping Type *</Label>
-                  <Select value={shippingType} onValueChange={(value: 'domestic' | 'international') => setShippingType(value)}>
+                  <Select
+                    value={shippingType}
+                    onValueChange={(value: "domestic" | "international") => setShippingType(value)}
+                  >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -493,11 +504,11 @@ export default function OrderCreate() {
                       variant="outline"
                       className={cn(
                         "w-full justify-start text-left font-normal",
-                        !estimatedFulfillment && "text-muted-foreground"
+                        !estimatedFulfillment && "text-muted-foreground",
                       )}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      {estimatedFulfillment ? format(estimatedFulfillment, 'PPP') : 'Select date'}
+                      {estimatedFulfillment ? format(estimatedFulfillment, "PPP") : "Select date"}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
@@ -514,12 +525,13 @@ export default function OrderCreate() {
                 </Popover>
               </div>
               <div>
-                <Label htmlFor="raw_materials">Raw Materials (mandatory info)</Label>
+                <Label htmlFor="raw_materials">Raw Materials *</Label>
                 <Textarea
                   id="raw_materials"
                   value={rawMaterials}
                   onChange={(e) => setRawMaterials(e.target.value)}
                   placeholder="Enter raw material details for this order..."
+                  required
                   rows={3}
                 />
               </div>
@@ -554,14 +566,10 @@ export default function OrderCreate() {
                     <Label>Product *</Label>
                     <Popover>
                       <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          role="combobox"
-                          className="w-full justify-between"
-                        >
+                        <Button variant="outline" role="combobox" className="w-full justify-between">
                           {item.product_id
-                            ? products.find(p => p.id === item.product_id)
-                              ? `${products.find(p => p.id === item.product_id)?.sku} - ${products.find(p => p.id === item.product_id)?.name}`
+                            ? products.find((p) => p.id === item.product_id)
+                              ? `${products.find((p) => p.id === item.product_id)?.sku} - ${products.find((p) => p.id === item.product_id)?.name}`
                               : "Select product..."
                             : "Select product..."}
                           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -573,48 +581,53 @@ export default function OrderCreate() {
                           <CommandList>
                             <CommandEmpty>No product found.</CommandEmpty>
                             {/* Suggested products for selected customer */}
-                            {selectedCustomerId && (() => {
-                              const suggestedParentIds = customerProductMapping.get(selectedCustomerId);
-                              const suggestedProducts = suggestedParentIds 
-                                ? products.filter(p => p.parent_product_id && suggestedParentIds.has(p.parent_product_id))
-                                : [];
-                              
-                              if (suggestedProducts.length > 0) {
-                                return (
-                                  <CommandGroup heading="Suggested for this customer">
-                                    {suggestedProducts.map((product) => (
-                                      <CommandItem
-                                        key={`suggested-${product.id}`}
-                                        value={`suggested-${product.sku} ${product.name}`}
-                                        onSelect={() => updateItem(index, 'product_id', product.id)}
-                                      >
-                                        <Check
-                                          className={cn(
-                                            "mr-2 h-4 w-4",
-                                            item.product_id === product.id ? "opacity-100" : "opacity-0"
-                                          )}
-                                        />
-                                        <span className="font-mono mr-2">{product.sku}</span>
-                                        <span className="text-muted-foreground">{product.name}</span>
-                                        <Badge variant="secondary" className="ml-2 text-xs">Suggested</Badge>
-                                      </CommandItem>
-                                    ))}
-                                  </CommandGroup>
-                                );
-                              }
-                              return null;
-                            })()}
+                            {selectedCustomerId &&
+                              (() => {
+                                const suggestedParentIds = customerProductMapping.get(selectedCustomerId);
+                                const suggestedProducts = suggestedParentIds
+                                  ? products.filter(
+                                      (p) => p.parent_product_id && suggestedParentIds.has(p.parent_product_id),
+                                    )
+                                  : [];
+
+                                if (suggestedProducts.length > 0) {
+                                  return (
+                                    <CommandGroup heading="Suggested for this customer">
+                                      {suggestedProducts.map((product) => (
+                                        <CommandItem
+                                          key={`suggested-${product.id}`}
+                                          value={`suggested-${product.sku} ${product.name}`}
+                                          onSelect={() => updateItem(index, "product_id", product.id)}
+                                        >
+                                          <Check
+                                            className={cn(
+                                              "mr-2 h-4 w-4",
+                                              item.product_id === product.id ? "opacity-100" : "opacity-0",
+                                            )}
+                                          />
+                                          <span className="font-mono mr-2">{product.sku}</span>
+                                          <span className="text-muted-foreground">{product.name}</span>
+                                          <Badge variant="secondary" className="ml-2 text-xs">
+                                            Suggested
+                                          </Badge>
+                                        </CommandItem>
+                                      ))}
+                                    </CommandGroup>
+                                  );
+                                }
+                                return null;
+                              })()}
                             <CommandGroup heading={selectedCustomerId ? "All products" : undefined}>
                               {products.map((product) => (
                                 <CommandItem
                                   key={product.id}
                                   value={`${product.sku} ${product.name}`}
-                                  onSelect={() => updateItem(index, 'product_id', product.id)}
+                                  onSelect={() => updateItem(index, "product_id", product.id)}
                                 >
                                   <Check
                                     className={cn(
                                       "mr-2 h-4 w-4",
-                                      item.product_id === product.id ? "opacity-100" : "opacity-0"
+                                      item.product_id === product.id ? "opacity-100" : "opacity-0",
                                     )}
                                   />
                                   <span className="font-mono mr-2">{product.sku}</span>
@@ -633,16 +646,18 @@ export default function OrderCreate() {
                       type="number"
                       min="1"
                       value={item.quantity}
-                      onChange={(e) => updateItem(index, 'quantity', parseInt(e.target.value) || 1)}
+                      onChange={(e) => updateItem(index, "quantity", parseInt(e.target.value) || 1)}
                     />
                   </div>
                   <div className="flex items-center gap-2 pb-1">
                     <Checkbox
                       id={`needs_boxing_${index}`}
                       checked={item.needs_boxing}
-                      onCheckedChange={(checked) => updateItem(index, 'needs_boxing', !!checked)}
+                      onCheckedChange={(checked) => updateItem(index, "needs_boxing", !!checked)}
                     />
-                    <Label htmlFor={`needs_boxing_${index}`} className="text-xs cursor-pointer">Boxing</Label>
+                    <Label htmlFor={`needs_boxing_${index}`} className="text-xs cursor-pointer">
+                      Boxing
+                    </Label>
                   </div>
                   <Button
                     type="button"
@@ -664,43 +679,45 @@ export default function OrderCreate() {
                 <CardTitle>Extra Products Inventory (Finished Units)</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                {extraProducts.filter(ep => ep.quantity > 0).map((extra) => (
-                  <div key={extra.id} className="flex items-center gap-4 p-3 border rounded-lg">
-                    <div className="flex-1">
-                      <p className="font-medium">{extra.product.name}</p>
-                      <p className="text-sm text-muted-foreground">
-                        SKU: {extra.product.sku} • Available: {extra.quantity}
-                      </p>
+                {extraProducts
+                  .filter((ep) => ep.quantity > 0)
+                  .map((extra) => (
+                    <div key={extra.id} className="flex items-center gap-4 p-3 border rounded-lg">
+                      <div className="flex-1">
+                        <p className="font-medium">{extra.product.name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          SKU: {extra.product.sku} • Available: {extra.quantity}
+                        </p>
+                      </div>
+                      <div className="w-32">
+                        <Label htmlFor={`extra-${extra.id}`} className="text-xs">
+                          Use Qty
+                        </Label>
+                        <Input
+                          id={`extra-${extra.id}`}
+                          type="number"
+                          min="0"
+                          max={extra.quantity}
+                          value={extraSelections.get(extra.id) || ""}
+                          onChange={(e) => {
+                            const qty = parseInt(e.target.value) || 0;
+                            const clamped = Math.max(0, Math.min(qty, extra.quantity));
+                            setExtraSelections((prev) => {
+                              const newMap = new Map(prev);
+                              if (clamped > 0) {
+                                newMap.set(extra.id, clamped);
+                              } else {
+                                newMap.delete(extra.id);
+                              }
+                              return newMap;
+                            });
+                          }}
+                          placeholder="0"
+                          className="mt-1"
+                        />
+                      </div>
                     </div>
-                    <div className="w-32">
-                      <Label htmlFor={`extra-${extra.id}`} className="text-xs">
-                        Use Qty
-                      </Label>
-                      <Input
-                        id={`extra-${extra.id}`}
-                        type="number"
-                        min="0"
-                        max={extra.quantity}
-                        value={extraSelections.get(extra.id) || ''}
-                        onChange={(e) => {
-                          const qty = parseInt(e.target.value) || 0;
-                          const clamped = Math.max(0, Math.min(qty, extra.quantity));
-                          setExtraSelections(prev => {
-                            const newMap = new Map(prev);
-                            if (clamped > 0) {
-                              newMap.set(extra.id, clamped);
-                            } else {
-                              newMap.delete(extra.id);
-                            }
-                            return newMap;
-                          });
-                        }}
-                        placeholder="0"
-                        className="mt-1"
-                      />
-                    </div>
-                  </div>
-                ))}
+                  ))}
               </CardContent>
             </Card>
           )}
@@ -713,10 +730,10 @@ export default function OrderCreate() {
                   Creating Order...
                 </>
               ) : (
-                'Create Order'
+                "Create Order"
               )}
             </Button>
-            <Button type="button" variant="outline" onClick={() => navigate('/orders')}>
+            <Button type="button" variant="outline" onClick={() => navigate("/orders")}>
               Cancel
             </Button>
           </div>
