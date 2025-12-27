@@ -88,6 +88,7 @@ export default function OrderFinishing() {
   const { hasRole, user } = useAuth();
   const [order, setOrder] = useState<Order | null>(null);
   const [batches, setBatches] = useState<Batch[]>([]);
+  const [completedBatches, setCompletedBatches] = useState<Batch[]>([]);
   const [loading, setLoading] = useState(true);
   
   // Selection states
@@ -120,31 +121,38 @@ export default function OrderFinishing() {
 
   const fetchData = async () => {
     try {
-      const [orderRes, batchesRes] = await Promise.all([
+      const [orderRes, batchesRes, completedRes] = await Promise.all([
         supabase.from('orders').select('id, order_number, priority, customer:customers(name)').eq('id', id).single(),
         supabase.from('batches')
           .select('id, batch_code, current_state, quantity, product_id, order_item_id, box_id, product:products(id, name, sku, needs_packing)')
           .eq('order_id', id)
           .eq('is_terminated', false)
-          .in('current_state', ['ready_for_finishing', 'in_finishing'])
+          .in('current_state', ['ready_for_finishing', 'in_finishing']),
+        // Fetch completed items for this phase (moved to next phases)
+        supabase.from('batches')
+          .select('id, batch_code, current_state, quantity, product_id, order_item_id, box_id, product:products(id, name, sku, needs_packing)')
+          .eq('order_id', id)
+          .eq('is_terminated', false)
+          .in('current_state', ['ready_for_packaging', 'in_packaging', 'ready_for_boxing', 'in_boxing', 'ready_for_receiving', 'received'])
       ]);
       
       if (orderRes.error) throw orderRes.error;
       if (batchesRes.error) throw batchesRes.error;
       
-      // Fetch box info
-      const boxIds = batchesRes.data?.filter((b: any) => b.box_id).map((b: any) => b.box_id) || [];
+      // Fetch box info for all batches
+      const allBatchData = [...(batchesRes.data || []), ...(completedRes.data || [])];
+      const boxIds = allBatchData.filter((b: any) => b.box_id).map((b: any) => b.box_id);
       let boxMap = new Map();
       if (boxIds.length > 0) {
-        const { data: boxesData } = await supabase.from('boxes').select('id, box_code').in('id', boxIds);
+        const { data: boxesData } = await supabase.from('boxes').select('id, box_code').in('id', [...new Set(boxIds)]);
         boxesData?.forEach(box => boxMap.set(box.id, box));
       }
       
       // Fetch order_item info for needs_boxing
-      const orderItemIds = batchesRes.data?.filter((b: any) => b.order_item_id).map((b: any) => b.order_item_id) || [];
+      const orderItemIds = allBatchData.filter((b: any) => b.order_item_id).map((b: any) => b.order_item_id);
       let orderItemMap = new Map();
       if (orderItemIds.length > 0) {
-        const { data: orderItemsData } = await supabase.from('order_items').select('id, needs_boxing').in('id', orderItemIds);
+        const { data: orderItemsData } = await supabase.from('order_items').select('id, needs_boxing').in('id', [...new Set(orderItemIds)]);
         orderItemsData?.forEach(oi => orderItemMap.set(oi.id, oi));
       }
       
@@ -154,8 +162,15 @@ export default function OrderFinishing() {
         order_item: batch.order_item_id ? orderItemMap.get(batch.order_item_id) : null,
       })) || [];
       
+      const completedWithData = completedRes.data?.map((batch: any) => ({
+        ...batch,
+        box: batch.box_id ? boxMap.get(batch.box_id) : null,
+        order_item: batch.order_item_id ? orderItemMap.get(batch.order_item_id) : null,
+      })) || [];
+      
       setOrder(orderRes.data as Order);
       setBatches(batchesWithData as Batch[]);
+      setCompletedBatches(completedWithData as Batch[]);
     } catch (error: any) {
       toast.error(error.message);
     } finally {
@@ -268,8 +283,32 @@ export default function OrderFinishing() {
   });
   orderItemGroupMap.forEach(g => inFinishingGroups.push(g));
 
+  // Group completed items by order_item_id
+  const completedGroups: OrderItemGroup[] = [];
+  const completedGroupMap = new Map<string, OrderItemGroup>();
+  completedBatches.forEach(batch => {
+    const key = batch.order_item_id || batch.product_id;
+    if (!completedGroupMap.has(key)) {
+      completedGroupMap.set(key, {
+        order_item_id: batch.order_item_id || '',
+        product_id: batch.product_id,
+        product_name: batch.product?.name || 'Unknown',
+        product_sku: batch.product?.sku || 'N/A',
+        needs_packing: batch.product?.needs_packing ?? true,
+        needs_boxing: batch.order_item?.needs_boxing ?? true,
+        quantity: 0,
+        batches: [],
+      });
+    }
+    const group = completedGroupMap.get(key)!;
+    group.batches.push(batch);
+    group.quantity += batch.quantity;
+  });
+  completedGroupMap.forEach(g => completedGroups.push(g));
+
   const totalReadyForFinishing = readyBoxGroups.reduce((sum, g) => sum + g.totalQty, 0);
   const totalInFinishing = inFinishingGroups.reduce((sum, g) => sum + g.quantity, 0);
+  const totalCompleted = completedGroups.reduce((sum, g) => sum + g.quantity, 0);
   const totalSelected = Array.from(productSelections.values()).reduce((a, b) => a + b, 0);
 
   const handleSelectAllBoxes = () => {
@@ -470,7 +509,7 @@ export default function OrderFinishing() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <Card>
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">Ready for Finishing</p>
@@ -495,12 +534,19 @@ export default function OrderFinishing() {
             <p className="text-2xl font-bold">{inFinishingGroups.length}</p>
           </CardContent>
         </Card>
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-sm text-muted-foreground">Completed</p>
+            <p className="text-2xl font-bold text-green-600">{totalCompleted}</p>
+          </CardContent>
+        </Card>
       </div>
 
       <Tabs defaultValue="receive" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="receive">Receive Boxes ({readyBoxGroups.length})</TabsTrigger>
-          <TabsTrigger value="process">Process Items ({totalInFinishing})</TabsTrigger>
+        <TabsList className="grid grid-cols-3 w-full max-w-xl">
+          <TabsTrigger value="receive">Receive ({readyBoxGroups.length})</TabsTrigger>
+          <TabsTrigger value="process">Process ({totalInFinishing})</TabsTrigger>
+          <TabsTrigger value="completed">Completed ({totalCompleted})</TabsTrigger>
         </TabsList>
 
         <TabsContent value="receive" className="space-y-4">
@@ -661,6 +707,41 @@ export default function OrderFinishing() {
                             />
                           </div>
                         )}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )})
+            )}
+          </div>
+        </TabsContent>
+
+        {/* Completed Tab */}
+        <TabsContent value="completed" className="space-y-4">
+          <div className="space-y-3">
+            {completedGroups.length === 0 ? (
+              <Card><CardContent className="p-8 text-center text-muted-foreground">No items completed in finishing yet</CardContent></Card>
+            ) : (
+              completedGroups.map(group => {
+                const key = group.order_item_id || group.product_id;
+                return (
+                <Card key={key}>
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium">{group.product_name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {group.product_sku}
+                          <Badge variant="outline" className="ml-2 text-xs bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                            Completed
+                          </Badge>
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <div className="text-center">
+                          <p className="text-lg font-semibold text-green-600">{group.quantity}</p>
+                          <p className="text-xs text-muted-foreground">Completed</p>
+                        </div>
                       </div>
                     </div>
                   </CardContent>
