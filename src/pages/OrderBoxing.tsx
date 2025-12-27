@@ -96,6 +96,15 @@ export default function OrderBoxing() {
   const [shipmentNotes, setShipmentNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
+  // Print preview dialog state
+  const [printPreviewOpen, setPrintPreviewOpen] = useState(false);
+  const [printPreviewData, setPrintPreviewData] = useState<{
+    shipmentCode: string;
+    items: Array<{ sku: string; name: string; qty: number; needsBoxing: boolean }>;
+    totalItems: number;
+    notes: string;
+  } | null>(null);
+
   const canManage = hasRole("boxing_manager") || hasRole("boxer") || hasRole("admin");
 
   useEffect(() => {
@@ -532,77 +541,13 @@ export default function OrderBoxing() {
     totalItems: number,
     notes: string,
   ) => {
-    const printWindow = window.open("", "_blank");
-    if (!printWindow) {
-      toast.error("Please allow pop-ups for printing");
-      return;
-    }
+    // Open print preview dialog instead of new tab
+    setPrintPreviewData({ shipmentCode, items, totalItems, notes });
+    setPrintPreviewOpen(true);
+  };
 
-    const safeNotes = (notes || "").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-
-    const html = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Kartona ${shipmentCode}</title>
-          <style>
-            body { font-family: Arial, sans-serif; padding: 20px; max-width: 520px; margin: 0 auto; }
-            .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 15px; }
-            .code { font-size: 32px; font-weight: bold; font-family: monospace; }
-            .order { font-size: 18px; margin-top: 5px; }
-            .customer { color: #666; }
-            .actions { display: flex; gap: 10px; justify-content: center; margin: 14px 0 6px; }
-            .btn { cursor: pointer; border: 1px solid #333; background: #fff; padding: 8px 12px; border-radius: 8px; font-weight: 600; }
-            .btn.primary { background: #111; color: #fff; }
-            .hint { text-align: center; color: #666; font-size: 12px; margin-top: 6px; }
-            .section { margin: 15px 0; }
-            .label { font-size: 12px; color: #666; }
-            table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-            td { padding: 6px 0; border-bottom: 1px solid #eee; vertical-align: top; }
-            .total { font-weight: bold; border-top: 2px solid #333; }
-            .date { text-align: center; color: #666; font-size: 12px; margin-top: 20px; }
-            .boxing { font-size: 10px; color: #888; }
-            @media print {
-              .actions, .hint { display: none; }
-              body { padding: 0; max-width: none; }
-            }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <div class="code">${shipmentCode}</div>
-            <div class="order">${order?.order_number || "N/A"}</div>
-            <div class="customer">${order?.customer?.name || "N/A"}</div>
-          </div>
-
-          <div class="actions">
-            <button class="btn primary" onclick="window.print()">Print</button>
-            <button class="btn" onclick="window.close()">Close</button>
-          </div>
-          <div class="hint">Printing opens in this tab. Your main app tab stays usable.</div>
-
-          <div class="section">
-            <div class="label">CONTENTS:</div>
-            <table>
-              ${items
-                .map(
-                  (item) =>
-                    `<tr><td style="width:90px; font-family: monospace;">${item.sku}</td><td>${item.name}<br><span class="boxing">${item.needsBoxing ? "Boxed" : "Not Boxed"}</span></td><td style="text-align:right">${item.qty}</td></tr>`,
-                )
-                .join("")}
-              <tr class="total"><td colspan="2">Total Items</td><td style="text-align:right">${totalItems}</td></tr>
-            </table>
-          </div>
-
-          ${safeNotes ? `<div class="section"><div class="label">NOTES:</div><p>${safeNotes}</p></div>` : ""}
-
-          <div class="date">Created: ${format(new Date(), "PPP p")}</div>
-        </body>
-      </html>
-    `;
-
-    printWindow.document.write(html);
-    printWindow.document.close();
+  const handlePrint = () => {
+    window.print();
   };
 
   if (loading) {
@@ -1171,6 +1116,79 @@ export default function OrderBoxing() {
             <Button onClick={handleCreateKartona} disabled={submitting}>
               {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Printer className="h-4 w-4 mr-2" />}
               Create & Print
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Print Preview Dialog */}
+      <Dialog open={printPreviewOpen} onOpenChange={setPrintPreviewOpen}>
+        <DialogContent className="max-w-lg print:max-w-none print:m-0 print:p-0 print:shadow-none print:border-none">
+          <div className="print:hidden">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Printer className="h-5 w-5" />
+                Print Preview
+              </DialogTitle>
+            </DialogHeader>
+          </div>
+
+          {printPreviewData && (
+            <div className="print-content">
+              {/* Header */}
+              <div className="text-center border-b-2 border-foreground pb-3 mb-4">
+                <p className="text-3xl font-bold font-mono">{printPreviewData.shipmentCode}</p>
+                <p className="text-lg mt-1">{order?.order_number || "N/A"}</p>
+                <p className="text-muted-foreground">{order?.customer?.name || "N/A"}</p>
+              </div>
+
+              {/* Contents */}
+              <div className="space-y-3">
+                <p className="text-xs text-muted-foreground uppercase tracking-wide">Contents:</p>
+                <div className="space-y-2">
+                  {printPreviewData.items.map((item, idx) => (
+                    <div key={idx} className="flex items-start justify-between py-2 border-b border-muted">
+                      <div className="flex gap-3">
+                        <span className="font-mono text-sm w-20">{item.sku}</span>
+                        <div>
+                          <span className="text-sm">{item.name}</span>
+                          <p className="text-xs text-muted-foreground">
+                            {item.needsBoxing ? "Boxed" : "Not Boxed"}
+                          </p>
+                        </div>
+                      </div>
+                      <span className="font-semibold">{item.qty}</span>
+                    </div>
+                  ))}
+                  <div className="flex justify-between pt-2 border-t-2 border-foreground font-bold">
+                    <span>Total Items</span>
+                    <span>{printPreviewData.totalItems}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Notes */}
+              {printPreviewData.notes && (
+                <div className="mt-4">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Notes:</p>
+                  <p className="mt-1 text-sm">{printPreviewData.notes}</p>
+                </div>
+              )}
+
+              {/* Date */}
+              <p className="text-center text-xs text-muted-foreground mt-6">
+                Created: {format(new Date(), "PPP p")}
+              </p>
+            </div>
+          )}
+
+          <DialogFooter className="print:hidden">
+            <Button variant="outline" onClick={() => setPrintPreviewOpen(false)}>
+              Close
+            </Button>
+            <Button onClick={handlePrint}>
+              <Printer className="h-4 w-4 mr-2" />
+              Print
             </Button>
           </DialogFooter>
         </DialogContent>
