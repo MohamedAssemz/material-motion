@@ -748,7 +748,12 @@ export default function OrderBoxing() {
             <Card>
               <CardContent className="p-4 flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">{totalSelectedForShipment} items selected</span>
-                <Button onClick={() => setKartonaDialogOpen(true)}>
+                <Button
+                  onClick={() => {
+                    if (readyForShipmentSelections.size === 0) return;
+                    setKartonaDialogOpen(true);
+                  }}
+                >
                   <Package className="h-4 w-4 mr-2" />
                   Create Kartona
                 </Button>
@@ -879,7 +884,14 @@ export default function OrderBoxing() {
       </Dialog>
 
       {/* Create Kartona Dialog */}
-      <Dialog open={kartonaDialogOpen} onOpenChange={setKartonaDialogOpen}>
+      <Dialog
+        open={kartonaDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setKartonaDialogOpen(false);
+          }
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
