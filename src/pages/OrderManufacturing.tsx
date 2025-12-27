@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { 
@@ -20,7 +21,8 @@ import {
   RotateCcw,
   XCircle,
   Plus,
-  Search
+  Search,
+  CheckCircle
 } from 'lucide-react';
 import {
   Dialog,
@@ -87,6 +89,7 @@ export default function OrderManufacturing() {
   const { hasRole, user } = useAuth();
   const [order, setOrder] = useState<Order | null>(null);
   const [batches, setBatches] = useState<Batch[]>([]);
+  const [completedBatches, setCompletedBatches] = useState<Batch[]>([]);
   const [loading, setLoading] = useState(true);
   
   // Selection & action states
@@ -122,13 +125,19 @@ export default function OrderManufacturing() {
 
   const fetchData = async () => {
     try {
-      const [orderRes, batchesRes] = await Promise.all([
+      const [orderRes, batchesRes, completedRes] = await Promise.all([
         supabase.from('orders').select('id, order_number, priority, customer:customers(name)').eq('id', id).single(),
         supabase.from('batches')
           .select('id, batch_code, current_state, quantity, product_id, order_item_id, eta, lead_time_days, box_id, is_flagged, is_redo, product:products(id, name, sku, needs_packing), order_item:order_items(needs_boxing)')
           .eq('order_id', id)
           .eq('is_terminated', false)
-          .in('current_state', ['pending_rm', 'in_manufacturing'])
+          .in('current_state', ['pending_rm', 'in_manufacturing']),
+        // Fetch completed items for this phase (moved to next phases)
+        supabase.from('batches')
+          .select('id, batch_code, current_state, quantity, product_id, order_item_id, eta, lead_time_days, box_id, is_flagged, is_redo, product:products(id, name, sku, needs_packing), order_item:order_items(needs_boxing)')
+          .eq('order_id', id)
+          .eq('is_terminated', false)
+          .in('current_state', ['ready_for_finishing', 'in_finishing', 'ready_for_packaging', 'in_packaging', 'ready_for_boxing', 'in_boxing', 'ready_for_receiving', 'received'])
       ]);
       
       if (orderRes.error) throw orderRes.error;
@@ -136,6 +145,7 @@ export default function OrderManufacturing() {
       
       setOrder(orderRes.data as Order);
       setBatches(batchesRes.data as Batch[] || []);
+      setCompletedBatches(completedRes.data as Batch[] || []);
     } catch (error: any) {
       toast.error(error.message);
     } finally {
@@ -243,6 +253,31 @@ export default function OrderManufacturing() {
   
   groupMap.forEach(g => productGroups.push(g));
 
+  // Group completed items by order_item_id
+  const completedGroups: ProductGroup[] = [];
+  const completedGroupMap = new Map<string, ProductGroup>();
+  completedBatches.forEach(batch => {
+    const groupKey = batch.order_item_id || batch.product_id;
+    if (!completedGroupMap.has(groupKey)) {
+      completedGroupMap.set(groupKey, {
+        order_item_id: batch.order_item_id || '',
+        product_id: batch.product_id,
+        product_name: batch.product?.name || 'Unknown',
+        product_sku: batch.product?.sku || 'N/A',
+        needs_packing: batch.product?.needs_packing ?? true,
+        needs_boxing: batch.order_item?.needs_boxing ?? true,
+        pendingRm: 0,
+        inManufacturing: 0,
+        batches: [],
+      });
+    }
+    const group = completedGroupMap.get(groupKey)!;
+    group.batches.push(batch);
+    group.inManufacturing += batch.quantity; // reusing field for total
+  });
+  completedGroupMap.forEach(g => completedGroups.push(g));
+
+  const totalCompleted = completedGroups.reduce((sum, g) => g.batches.reduce((s, b) => s + b.quantity, 0) + sum, 0);
   const totalSelected = Array.from(productSelections.values()).reduce((a, b) => a + b, 0);
 
   const handleOpenBoxDialog = () => {
@@ -563,18 +598,10 @@ export default function OrderManufacturing() {
         <Button variant="outline" onClick={() => navigate(`/orders/${id}`)}>
           View Order Details
         </Button>
-        
-        {canManage && totalSelected > 0 && (
-          <div className="flex items-center gap-2">
-            <Badge variant="secondary" className="text-lg px-3 py-1">
-              {totalSelected} selected
-            </Badge>
-          </div>
-        )}
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <Card>
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">Pending RM</p>
@@ -599,107 +626,158 @@ export default function OrderManufacturing() {
             <p className="text-2xl font-bold">{totalPendingRm + totalInManufacturing}</p>
           </CardContent>
         </Card>
-      </div>
-
-      {/* Action Buttons - ETA moved to box dialog */}
-      {canManage && (
         <Card>
-          <CardContent className="p-4 flex flex-wrap items-center gap-3">
-            <div className="flex-1 text-sm text-muted-foreground">
-              Select quantities below, then choose an action
-            </div>
-            <Button onClick={handleOpenBoxDialog} disabled={totalSelected === 0}>
-              <Box className="h-4 w-4 mr-2" />
-              Assign to Box
-            </Button>
-            <Button variant="outline" onClick={() => setRedoDialogOpen(true)} disabled={totalSelected === 0}>
-              <RotateCcw className="h-4 w-4 mr-2" />
-              Mark Redo
-            </Button>
-            <Button variant="destructive" onClick={() => setTerminateDialogOpen(true)} disabled={totalSelected === 0}>
-              <XCircle className="h-4 w-4 mr-2" />
-              Terminate
-            </Button>
+          <CardContent className="p-4">
+            <p className="text-sm text-muted-foreground">Completed</p>
+            <p className="text-2xl font-bold text-green-600">{totalCompleted}</p>
           </CardContent>
         </Card>
-      )}
+      </div>
 
-      {/* Products List */}
-      <div className="space-y-4">
-        {productGroups.length === 0 ? (
-          <Card>
-            <CardContent className="p-8 text-center text-muted-foreground">
-              No items in manufacturing phase for this order
-            </CardContent>
-          </Card>
-        ) : (
-          productGroups.map(group => {
-            const groupKey = group.order_item_id || group.product_id;
-            return (
-              <Card key={groupKey}>
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <p className="font-medium">{group.product_name}</p>
-                        {group.needs_boxing ? (
-                          <Badge variant="outline" className="text-xs bg-primary/10">Boxing</Badge>
-                        ) : (
-                          <Badge variant="secondary" className="text-xs">No Boxing</Badge>
-                        )}
-                      </div>
-                      <p className="text-sm text-muted-foreground">
-                        {group.product_sku} · {group.needs_packing ? 'Needs Packing' : 'No Packing'}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-6">
-                      <div className="text-center">
-                        <p className="text-xs text-muted-foreground">Pending RM</p>
-                        <p className="text-lg font-semibold text-warning">{group.pendingRm}</p>
-                      </div>
-                      <div className="text-center">
-                        <p className="text-xs text-muted-foreground">In Manufacturing</p>
-                        <p className="text-lg font-semibold text-primary">{group.inManufacturing}</p>
-                      </div>
-                      {canManage && (
-                        <div className="w-24">
-                          <Label className="text-xs">Select Qty</Label>
-                          <Input
-                            type="number"
-                            min={0}
-                            max={group.pendingRm + group.inManufacturing}
-                            value={productSelections.get(groupKey) || ''}
-                            onChange={(e) => {
-                              const qty = Math.max(0, Math.min(parseInt(e.target.value) || 0, group.pendingRm + group.inManufacturing));
-                              setProductSelections(prev => {
-                                const next = new Map(prev);
-                                if (qty > 0) next.set(groupKey, qty);
-                                else next.delete(groupKey);
-                                return next;
-                              });
-                            }}
-                            placeholder="0"
-                          />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  
-                  {/* Show redo/flagged batches */}
-                  {group.batches.filter(b => b.is_flagged || b.is_redo).length > 0 && (
-                    <Alert variant="destructive" className="mt-3">
-                      <AlertTriangle className="h-4 w-4" />
-                      <AlertDescription>
-                        {group.batches.filter(b => b.is_redo).reduce((sum, b) => sum + b.quantity, 0)} items need redo
-                      </AlertDescription>
-                    </Alert>
-                  )}
+      <Tabs defaultValue="active" className="space-y-4">
+        <TabsList className="grid grid-cols-2 w-full max-w-md">
+          <TabsTrigger value="active">Active ({totalPendingRm + totalInManufacturing})</TabsTrigger>
+          <TabsTrigger value="completed">Completed ({totalCompleted})</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="active" className="space-y-4">
+          {/* Action Buttons */}
+          {canManage && (
+            <Card>
+              <CardContent className="p-4 flex flex-wrap items-center gap-3">
+                <div className="flex-1 text-sm text-muted-foreground">
+                  {totalSelected > 0 ? `${totalSelected} selected` : 'Select quantities below, then choose an action'}
+                </div>
+                <Button onClick={handleOpenBoxDialog} disabled={totalSelected === 0}>
+                  <Box className="h-4 w-4 mr-2" />
+                  Assign to Box
+                </Button>
+                <Button variant="outline" onClick={() => setRedoDialogOpen(true)} disabled={totalSelected === 0}>
+                  <RotateCcw className="h-4 w-4 mr-2" />
+                  Mark Redo
+                </Button>
+                <Button variant="destructive" onClick={() => setTerminateDialogOpen(true)} disabled={totalSelected === 0}>
+                  <XCircle className="h-4 w-4 mr-2" />
+                  Terminate
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Products List */}
+          <div className="space-y-4">
+            {productGroups.length === 0 ? (
+              <Card>
+                <CardContent className="p-8 text-center text-muted-foreground">
+                  No items in manufacturing phase for this order
                 </CardContent>
               </Card>
-            );
-          })
-        )}
-      </div>
+            ) : (
+              productGroups.map(group => {
+                const groupKey = group.order_item_id || group.product_id;
+                return (
+                  <Card key={groupKey}>
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium">{group.product_name}</p>
+                            {group.needs_boxing ? (
+                              <Badge variant="outline" className="text-xs bg-primary/10">Boxing</Badge>
+                            ) : (
+                              <Badge variant="secondary" className="text-xs">No Boxing</Badge>
+                            )}
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            {group.product_sku} · {group.needs_packing ? 'Needs Packing' : 'No Packing'}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-6">
+                          <div className="text-center">
+                            <p className="text-xs text-muted-foreground">Pending RM</p>
+                            <p className="text-lg font-semibold text-warning">{group.pendingRm}</p>
+                          </div>
+                          <div className="text-center">
+                            <p className="text-xs text-muted-foreground">In Manufacturing</p>
+                            <p className="text-lg font-semibold text-primary">{group.inManufacturing}</p>
+                          </div>
+                          {canManage && (
+                            <div className="w-24">
+                              <Label className="text-xs">Select Qty</Label>
+                              <Input
+                                type="number"
+                                min={0}
+                                max={group.pendingRm + group.inManufacturing}
+                                value={productSelections.get(groupKey) || ''}
+                                onChange={(e) => {
+                                  const qty = Math.max(0, Math.min(parseInt(e.target.value) || 0, group.pendingRm + group.inManufacturing));
+                                  setProductSelections(prev => {
+                                    const next = new Map(prev);
+                                    if (qty > 0) next.set(groupKey, qty);
+                                    else next.delete(groupKey);
+                                    return next;
+                                  });
+                                }}
+                                placeholder="0"
+                              />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      
+                      {/* Show redo/flagged batches */}
+                      {group.batches.filter(b => b.is_flagged || b.is_redo).length > 0 && (
+                        <Alert variant="destructive" className="mt-3">
+                          <AlertTriangle className="h-4 w-4" />
+                          <AlertDescription>
+                            {group.batches.filter(b => b.is_redo).reduce((sum, b) => sum + b.quantity, 0)} items need redo
+                          </AlertDescription>
+                        </Alert>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })
+            )}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="completed" className="space-y-4">
+          <div className="space-y-3">
+            {completedGroups.length === 0 ? (
+              <Card><CardContent className="p-8 text-center text-muted-foreground">No items completed in manufacturing yet</CardContent></Card>
+            ) : (
+              completedGroups.map(group => {
+                const key = group.order_item_id || group.product_id;
+                const totalQty = group.batches.reduce((sum, b) => sum + b.quantity, 0);
+                return (
+                <Card key={key}>
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium">{group.product_name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {group.product_sku}
+                          <Badge variant="outline" className="ml-2 text-xs bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                            <CheckCircle className="h-3 w-3 mr-1" />
+                            Completed
+                          </Badge>
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <div className="text-center">
+                          <p className="text-lg font-semibold text-green-600">{totalQty}</p>
+                          <p className="text-xs text-muted-foreground">Completed</p>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )})
+            )}
+          </div>
+        </TabsContent>
+      </Tabs>
 
       {/* Box Assignment Dialog */}
       <Dialog open={boxDialogOpen} onOpenChange={setBoxDialogOpen}>
