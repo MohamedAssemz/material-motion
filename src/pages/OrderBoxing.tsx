@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { ArrowLeft, Box, Loader2, QrCode, CheckSquare, Truck, Printer, Package } from "lucide-react";
+import { ArrowLeft, Box, Loader2, QrCode, CheckSquare, Truck, Printer, Package, CheckCircle } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -632,11 +632,12 @@ export default function OrderBoxing() {
       </div>
 
       <Tabs defaultValue="receive" className="space-y-4">
-        <TabsList className="grid grid-cols-4 w-full max-w-2xl">
+        <TabsList className="grid grid-cols-5 w-full max-w-3xl">
           <TabsTrigger value="receive">Receive ({readyBoxGroups.length})</TabsTrigger>
           <TabsTrigger value="process">Process ({totalInBoxing})</TabsTrigger>
           <TabsTrigger value="ready">Ready ({totalReadyForShipment})</TabsTrigger>
           <TabsTrigger value="shipped">Shipped ({shipments.length})</TabsTrigger>
+          <TabsTrigger value="completed">Completed ({totalReceived})</TabsTrigger>
         </TabsList>
 
         {/* Tab 1: Receive Boxes */}
@@ -991,6 +992,71 @@ export default function OrderBoxing() {
               })}
             </div>
           )}
+        </TabsContent>
+
+        {/* Tab 5: Completed (Received items) */}
+        <TabsContent value="completed" className="space-y-4">
+          {(() => {
+            // Group received items by order_item_id
+            const receivedBatches = batches.filter(b => b.current_state === 'received');
+            const receivedGroups = new Map<string, OrderItemGroup>();
+            receivedBatches.forEach(batch => {
+              const key = batch.order_item_id || batch.product_id;
+              if (!receivedGroups.has(key)) {
+                receivedGroups.set(key, {
+                  order_item_id: batch.order_item_id || '',
+                  product_id: batch.product_id,
+                  product_name: batch.product?.name || 'Unknown',
+                  product_sku: batch.product?.sku || 'N/A',
+                  needs_boxing: batch.order_item?.needs_boxing ?? true,
+                  quantity: 0,
+                  batches: [],
+                });
+              }
+              const group = receivedGroups.get(key)!;
+              group.batches.push(batch);
+              group.quantity += batch.quantity;
+            });
+            const completedGroups = Array.from(receivedGroups.values());
+
+            return completedGroups.length === 0 ? (
+              <Card>
+                <CardContent className="p-8 text-center text-muted-foreground">
+                  No items completed in boxing yet
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-3">
+                {completedGroups.map(group => {
+                  const key = group.order_item_id || group.product_id;
+                  return (
+                    <Card key={key}>
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="font-medium">{group.product_name}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {group.product_sku}
+                              <Badge variant="outline" className="ml-2 text-xs bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                                <CheckCircle className="h-3 w-3 mr-1" />
+                                Completed
+                              </Badge>
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-4">
+                            <div className="text-center">
+                              <p className="text-lg font-semibold text-green-600">{group.quantity}</p>
+                              <p className="text-xs text-muted-foreground">Received</p>
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            );
+          })()}
         </TabsContent>
       </Tabs>
 
