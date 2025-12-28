@@ -373,6 +373,13 @@ export default function OrderBoxing() {
           );
       }
 
+      // Reset boxes to empty state
+      const boxIds = Array.from(selectedBoxes);
+      await supabase.from('boxes').update({
+        items_list: [],
+        content_type: 'EMPTY',
+      }).in('id', boxIds);
+
       const boxingCount = batchesToBoxing.reduce((sum, b) => sum + b.quantity, 0);
       const shipmentCount = batchesToShipment.reduce((sum, b) => sum + b.quantity, 0);
 
