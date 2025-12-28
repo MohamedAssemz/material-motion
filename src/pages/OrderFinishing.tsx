@@ -352,6 +352,13 @@ export default function OrderFinishing() {
         box_id: null, // Free up the box
       }).in('id', batchIds);
       
+      // Reset boxes to empty state
+      const boxIds = Array.from(selectedBoxes);
+      await supabase.from('boxes').update({
+        items_list: [],
+        content_type: 'EMPTY',
+      }).in('id', boxIds);
+      
       toast.success(`Accepted ${selectedBoxes.size} box(es) into finishing`);
       setSelectedBoxes(new Set());
       setAcceptDialogOpen(false);

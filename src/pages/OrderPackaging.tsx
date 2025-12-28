@@ -301,6 +301,14 @@ export default function OrderPackaging() {
       const batchIds = batches.filter(b => b.current_state === 'ready_for_packaging' && b.box_id && selectedBoxes.has(b.box_id)).map(b => b.id);
       // Clear box_id when receiving - boxes become available again
       await supabase.from('batches').update({ current_state: 'in_packaging', eta: etaDate.toISOString(), lead_time_days: parseInt(etaDays) || 1, box_id: null }).in('id', batchIds);
+      
+      // Reset boxes to empty state
+      const boxIds = Array.from(selectedBoxes);
+      await supabase.from('boxes').update({
+        items_list: [],
+        content_type: 'EMPTY',
+      }).in('id', boxIds);
+      
       toast.success(`Accepted ${selectedBoxes.size} box(es) into packaging`);
       setSelectedBoxes(new Set());
       setAcceptDialogOpen(false);
