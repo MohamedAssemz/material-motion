@@ -732,7 +732,7 @@ export default function OrderDetail() {
             {/* Shipments - Full width */}
             <div
               className="flex items-center gap-3 p-3 rounded-lg border border-green-200 dark:border-green-800 cursor-pointer hover:border-primary/50 transition-colors"
-              onClick={() => navigate(`/orders/${id}/shipments`)}
+              onClick={() => navigate(`/orders/${id}/boxing?tab=shipments`)}
             >
               <div className="p-2 rounded-lg bg-green-100 dark:bg-green-900/30">
                 <Truck className="h-5 w-5 text-green-600 dark:text-green-400" />
