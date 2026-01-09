@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -79,11 +79,15 @@ interface Shipment {
 export default function OrderBoxing() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { hasRole, user } = useAuth();
   const [order, setOrder] = useState<Order | null>(null);
   const [batches, setBatches] = useState<Batch[]>([]);
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // Get default tab from URL query params
+  const defaultTab = searchParams.get('tab') || 'receive';
 
   const [selectedBoxes, setSelectedBoxes] = useState<Set<string>>(new Set());
   const [productSelections, setProductSelections] = useState<Map<string, number>>(new Map());
@@ -696,7 +700,7 @@ export default function OrderBoxing() {
         </Card>
       </div>
 
-      <Tabs defaultValue="receive" className="space-y-4">
+      <Tabs defaultValue={defaultTab} className="space-y-4">
         <TabsList className="grid grid-cols-4 w-full max-w-2xl">
           <TabsTrigger value="receive">Receive ({readyBoxGroups.length})</TabsTrigger>
           <TabsTrigger value="process">Process ({totalInBoxing})</TabsTrigger>
