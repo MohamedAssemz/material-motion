@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { ArrowLeft, Box, Loader2, QrCode, CheckSquare, Truck, Printer, Package, CheckCircle, Download, Search } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { ExtraItemsTab } from '@/components/ExtraItemsTab';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { format } from "date-fns";
@@ -701,9 +702,10 @@ export default function OrderBoxing() {
       </div>
 
       <Tabs defaultValue={defaultTab} className="space-y-4">
-        <TabsList className="grid grid-cols-4 w-full max-w-2xl">
+        <TabsList className="grid grid-cols-5 w-full max-w-3xl">
           <TabsTrigger value="receive">Receive ({readyBoxGroups.length})</TabsTrigger>
           <TabsTrigger value="process">Process ({totalInBoxing})</TabsTrigger>
+          <TabsTrigger value="extra">Extra</TabsTrigger>
           <TabsTrigger value="ready">Ready ({totalReadyForShipment})</TabsTrigger>
           <TabsTrigger value="shipments">Shipments ({shipments.length})</TabsTrigger>
         </TabsList>
@@ -951,6 +953,11 @@ export default function OrderBoxing() {
               ))
             )}
           </div>
+        </TabsContent>
+
+        {/* Extra Tab */}
+        <TabsContent value="extra">
+          <ExtraItemsTab orderId={id!} phase="boxing" onRefresh={fetchData} />
         </TabsContent>
 
         {/* Tab 4: Shipments (Kartonas) */}

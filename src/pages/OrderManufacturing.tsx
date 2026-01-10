@@ -31,6 +31,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
+import { ExtraItemsTab } from '@/components/ExtraItemsTab';
 import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
@@ -635,8 +636,9 @@ export default function OrderManufacturing() {
       </div>
 
       <Tabs defaultValue="active" className="space-y-4">
-        <TabsList className="grid grid-cols-2 w-full max-w-md">
+        <TabsList className="grid grid-cols-3 w-full max-w-xl">
           <TabsTrigger value="active">Active ({totalPendingRm + totalInManufacturing})</TabsTrigger>
+          <TabsTrigger value="extra">Extra</TabsTrigger>
           <TabsTrigger value="completed">Completed ({totalCompleted})</TabsTrigger>
         </TabsList>
 
@@ -776,6 +778,11 @@ export default function OrderManufacturing() {
               )})
             )}
           </div>
+        </TabsContent>
+
+        {/* Extra Tab */}
+        <TabsContent value="extra">
+          <ExtraItemsTab orderId={id!} phase="manufacturing" onRefresh={fetchData} />
         </TabsContent>
       </Tabs>
 

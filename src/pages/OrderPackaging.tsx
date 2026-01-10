@@ -29,6 +29,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
+import { ExtraItemsTab } from '@/components/ExtraItemsTab';
 import {
   Select,
   SelectContent,
@@ -498,9 +499,10 @@ export default function OrderPackaging() {
       </div>
 
       <Tabs defaultValue="receive" className="space-y-4">
-        <TabsList className="grid grid-cols-3 w-full max-w-xl">
+        <TabsList className="grid grid-cols-4 w-full max-w-2xl">
           <TabsTrigger value="receive">Receive Boxes ({readyBoxGroups.length})</TabsTrigger>
           <TabsTrigger value="process">Process Items ({totalInPackaging})</TabsTrigger>
+          <TabsTrigger value="extra">Extra</TabsTrigger>
           <TabsTrigger value="completed">Completed ({totalCompleted})</TabsTrigger>
         </TabsList>
 
@@ -663,6 +665,11 @@ export default function OrderPackaging() {
               )})
             )}
           </div>
+        </TabsContent>
+
+        {/* Extra Tab */}
+        <TabsContent value="extra">
+          <ExtraItemsTab orderId={id!} phase="packaging" onRefresh={fetchData} />
         </TabsContent>
       </Tabs>
 
