@@ -34,7 +34,6 @@ export type Database = {
           lead_time_days: number | null
           order_id: string | null
           order_item_id: string | null
-          origin_state: string | null
           parent_batch_id: string | null
           parent_batch_id_split: string | null
           product_id: string
@@ -65,7 +64,6 @@ export type Database = {
           lead_time_days?: number | null
           order_id?: string | null
           order_item_id?: string | null
-          origin_state?: string | null
           parent_batch_id?: string | null
           parent_batch_id_split?: string | null
           product_id: string
@@ -96,7 +94,6 @@ export type Database = {
           lead_time_days?: number | null
           order_id?: string | null
           order_item_id?: string | null
-          origin_state?: string | null
           parent_batch_id?: string | null
           parent_batch_id_split?: string | null
           product_id?: string

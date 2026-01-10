@@ -246,10 +246,11 @@ export function ExtraInventoryDialog({
 
         // If using entire batch quantity, update the existing batch to assign to order
         if (quantity === batch.quantity) {
-          // Move entire batch to the order - keep current_state, just assign order_id
+          // Move entire batch to the order - change batch_type to ORDER and assign order_id
           await supabase.from('batches').update({
             order_id: orderId,
-            inventory_state: 'RESERVED', // No longer available in extra inventory
+            batch_type: 'ORDER', // Now part of the order
+            inventory_state: 'RESERVED',
           }).eq('id', batchId);
 
           selectedItems.push({
@@ -261,7 +262,7 @@ export function ExtraInventoryDialog({
           // Using partial quantity - create a new batch for the order and subtract from source
           const { data: batchCode } = await supabase.rpc('generate_batch_code');
           
-          // New batch keeps the same current_state as source batch
+          // New batch keeps the same current_state as source batch, but becomes ORDER type
           const { data: newBatch, error: insertError } = await supabase.from('batches').insert({
             batch_code: batchCode || `EX-${Date.now()}`,
             order_id: orderId,
@@ -269,8 +270,8 @@ export function ExtraInventoryDialog({
             current_state: batch.current_state, // Keep the same state
             quantity: quantity,
             box_id: null, // New batch doesn't inherit box - needs to be assigned
-            batch_type: 'EXTRA',
-            inventory_state: 'RESERVED', // Reserved for this order
+            batch_type: 'ORDER', // Now part of the order
+            inventory_state: 'RESERVED',
             created_by: user?.id,
             parent_batch_id_split: batchId,
           }).select('id').single();
