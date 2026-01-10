@@ -350,7 +350,7 @@ export default function ExtraInventory() {
                       <SelectItem value="ready_for_finishing">Ready for Finishing</SelectItem>
                       <SelectItem value="ready_for_packaging">Ready for Packaging</SelectItem>
                       <SelectItem value="ready_for_boxing">Ready for Boxing</SelectItem>
-                      <SelectItem value="received">Received</SelectItem>
+                      <SelectItem value="ready_for_receiving">Ready for Shipment</SelectItem>
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-muted-foreground mt-1">
