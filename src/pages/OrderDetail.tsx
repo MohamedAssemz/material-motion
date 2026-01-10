@@ -952,6 +952,19 @@ export default function OrderDetail() {
         receivedBatches={receivedBatches}
         onRefresh={fetchOrder}
       />
+
+      <ExtraInventoryDialog
+        open={extraInventoryOpen}
+        onOpenChange={setExtraInventoryOpen}
+        phase={selectedExtraPhase}
+        orderId={id!}
+        orderItems={orderItems.map(oi => ({ product_id: oi.product_id, quantity: oi.quantity }))}
+        onItemsSelected={async (selections) => {
+          // Handle the extra inventory selection - this will be processed in the phase pages
+          toast.success(`Selected ${selections.reduce((sum, s) => sum + s.quantity, 0)} extra items`);
+          fetchOrder();
+        }}
+      />
     </div>
   );
 }
