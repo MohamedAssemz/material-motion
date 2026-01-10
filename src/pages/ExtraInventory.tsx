@@ -13,7 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Plus, Package, Loader2, Box, QrCode, Printer } from 'lucide-react';
 import { format } from 'date-fns';
-import { getStateLabel, type UnitState } from '@/lib/stateMachine';
+import { getStateLabel, getStateColor as getStateColorFn, type UnitState } from '@/lib/stateMachine';
 import { BoxSelectionDialog } from '@/components/BoxSelectionDialog';
 import { BatchCardPrintable } from '@/components/BatchCardPrintable';
 
@@ -253,21 +253,7 @@ export default function ExtraInventory() {
     }
   };
 
-  const getStateColor = (state: string) => {
-    const colors: Record<string, string> = {
-      'pending_rm': 'bg-yellow-500',
-      'in_manufacturing': 'bg-blue-500',
-      'ready_for_finishing': 'bg-blue-300',
-      'in_finishing': 'bg-purple-500',
-      'ready_for_packaging': 'bg-orange-500',
-      'in_packaging': 'bg-indigo-500',
-      'ready_for_boxing': 'bg-cyan-300',
-      'in_boxing': 'bg-cyan-500',
-      'ready_for_receiving': 'bg-teal-300',
-      'received': 'bg-green-500',
-    };
-    return colors[state] || 'bg-gray-500';
-  };
+  const getStateColor = getStateColorFn;
 
   const getInventoryStateColor = (state: string) => {
     switch (state) {
@@ -447,7 +433,8 @@ export default function ExtraInventory() {
                     <TableHead>Batch Code</TableHead>
                     <TableHead>Product</TableHead>
                     <TableHead>Quantity</TableHead>
-                    <TableHead>State</TableHead>
+                    <TableHead>Origin</TableHead>
+                    <TableHead>Current State</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Box</TableHead>
                     <TableHead>Created</TableHead>
@@ -466,8 +453,13 @@ export default function ExtraInventory() {
                       </TableCell>
                       <TableCell className="font-bold">{batch.quantity}</TableCell>
                       <TableCell>
-                        <Badge className={getStateColor(batch.current_state)}>
-                          {getStateLabel(batch.current_state as UnitState)}
+                        <Badge className={getStateColor(batch.origin_state || batch.current_state)}>
+                          {getStateLabel(batch.origin_state || batch.current_state)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline">
+                          {getStateLabel(batch.current_state)}
                         </Badge>
                       </TableCell>
                       <TableCell>
