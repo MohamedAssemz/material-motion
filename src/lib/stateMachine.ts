@@ -12,7 +12,7 @@ export type UnitState =
   | 'received';            // 10. Received
 
 // Human-readable labels for each state
-const stateLabels: Record<UnitState, string> = {
+const stateLabels: Record<string, string> = {
   'pending_rm': 'Pending RM',
   'in_manufacturing': 'In Manufacturing',
   'ready_for_finishing': 'Ready for Finishing',
@@ -23,6 +23,11 @@ const stateLabels: Record<UnitState, string> = {
   'in_boxing': 'In Boxing',
   'ready_for_receiving': 'Ready for Receiving',
   'received': 'Received',
+  // Origin states for extra inventory
+  'extra_manufacturing': 'Extra Manufacturing',
+  'extra_finishing': 'Extra Finishing',
+  'extra_packaging': 'Extra Packaging',
+  'extra_boxing': 'Extra Boxing',
 };
 
 // Define the next state for each current state
@@ -102,6 +107,11 @@ export function getStateColor(state: string): string {
     'in_boxing': 'bg-cyan-500',
     'ready_for_receiving': 'bg-teal-300',
     'received': 'bg-green-500',
+    // Origin states for extra inventory
+    'extra_manufacturing': 'bg-amber-500',
+    'extra_finishing': 'bg-amber-400',
+    'extra_packaging': 'bg-amber-300',
+    'extra_boxing': 'bg-amber-200',
   };
   return colors[state] || 'bg-gray-500';
 }

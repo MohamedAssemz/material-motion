@@ -55,7 +55,16 @@ interface ExtraInventoryDialogProps {
   onItemsSelected: (selections: Array<{ batch_id: string; quantity: number; product_id: string }>) => void;
 }
 
-const PHASE_STATE_MAP: Record<string, string> = {
+// Map phase to the origin_state used in extra inventory
+const PHASE_ORIGIN_STATE_MAP: Record<string, string> = {
+  manufacturing: 'extra_manufacturing',
+  finishing: 'extra_finishing',
+  packaging: 'extra_packaging',
+  boxing: 'extra_boxing',
+};
+
+// Map phase to the current_state that extra batches are at
+const PHASE_CURRENT_STATE_MAP: Record<string, string> = {
   manufacturing: 'ready_for_finishing',
   finishing: 'ready_for_packaging',
   packaging: 'ready_for_boxing',
@@ -94,7 +103,17 @@ export function ExtraInventoryDialog({
   const fetchExtraBatches = async () => {
     setLoading(true);
     try {
-      const targetState = PHASE_STATE_MAP[phase];
+      const targetOriginState = PHASE_ORIGIN_STATE_MAP[phase];
+      const targetCurrentState = PHASE_CURRENT_STATE_MAP[phase];
+      
+      // Get product IDs from order items
+      const orderProductIds = orderItems.map(oi => oi.product_id);
+      
+      if (orderProductIds.length === 0) {
+        setBatches([]);
+        setLoading(false);
+        return;
+      }
       
       const { data, error } = await supabase
         .from('batches')
@@ -111,7 +130,9 @@ export function ExtraInventoryDialog({
         .eq('batch_type', 'EXTRA')
         .eq('inventory_state', 'AVAILABLE')
         .eq('is_terminated', false)
-        .eq('current_state', targetState);
+        .eq('origin_state', targetOriginState)
+        .eq('current_state', targetCurrentState)
+        .in('product_id', orderProductIds);
 
       if (error) throw error;
 
