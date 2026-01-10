@@ -50,13 +50,6 @@ interface OrderItem {
   needs_boxing: boolean;
 }
 
-interface ExtraProduct {
-  id: string;
-  product_id: string;
-  quantity: number;
-  product: Product;
-}
-
 const orderSchema = z.object({
   order_number: z.string().trim().min(1, "Order number is required").max(50, "Order number too long"),
   notes: z.string().trim().max(500, "Notes must be less than 500 characters").optional(),
@@ -83,8 +76,6 @@ export default function OrderCreate() {
   const [customerOpen, setCustomerOpen] = useState(false);
   const [eftOpen, setEftOpen] = useState(false);
   const [items, setItems] = useState<OrderItem[]>([{ product_id: "", quantity: 1, needs_boxing: true }]);
-  const [extraProducts, setExtraProducts] = useState<ExtraProduct[]>([]);
-  const [extraSelections, setExtraSelections] = useState<Map<string, number>>(new Map());
   const [customerProductMapping, setCustomerProductMapping] = useState<Map<string, Set<string>>>(new Map());
 
   useEffect(() => {
@@ -98,20 +89,13 @@ export default function OrderCreate() {
 
   const fetchData = async () => {
     try {
-      const [productsRes, extraBatchesRes, customersRes, potentialCustomersRes] = await Promise.all([
+      const [productsRes, customersRes, potentialCustomersRes] = await Promise.all([
         supabase.from("products").select("id, sku, name").order("sku"),
-        supabase
-          .from("batches")
-          .select("id, batch_code, product_id, quantity, current_state, product:products(id, sku, name)")
-          .eq("batch_type", "EXTRA")
-          .eq("inventory_state", "AVAILABLE")
-          .eq("is_terminated", false),
         supabase.from("customers").select("id, name, code, is_domestic").order("name"),
         supabase.from("product_potential_customers").select("parent_product_id, customer_id"),
       ]);
 
       if (productsRes.error) throw productsRes.error;
-      if (extraBatchesRes.error) throw extraBatchesRes.error;
       if (customersRes.error) throw customersRes.error;
       if (potentialCustomersRes.error) throw potentialCustomersRes.error;
 
@@ -139,14 +123,6 @@ export default function OrderCreate() {
         })) || [];
 
       setProducts(productsWithParent);
-      setExtraProducts(
-        extraBatchesRes.data?.map((b) => ({
-          id: b.id,
-          product_id: b.product_id,
-          quantity: b.quantity,
-          product: b.product as any,
-        })) || [],
-      );
       setCustomers(customersRes.data || []);
       setCustomerProductMapping(customerProductMap);
     } catch (error: any) {
@@ -198,9 +174,7 @@ export default function OrderCreate() {
 
       const validItems = items.filter((item) => item.product_id && item.quantity > 0);
 
-      // Check if we have at least order items OR extra selections
-      const hasExtraSelections = Array.from(extraSelections.values()).some((qty) => qty > 0);
-      if (validItems.length === 0 && !hasExtraSelections) {
+      if (validItems.length === 0) {
         toast({
           title: "Validation Error",
           description: "Please add at least one product with valid quantity",
@@ -271,73 +245,24 @@ export default function OrderCreate() {
         });
       }
 
-      // Create order items for extra selections
-      for (const [extraId, quantity] of extraSelections.entries()) {
-        if (quantity > 0) {
-          const extraProduct = extraProducts.find((ep) => ep.id === extraId);
-          if (extraProduct) {
-            const { data: orderItem, error: itemError } = await supabase
-              .from("order_items")
-              .insert({
-                order_id: order.id,
-                product_id: extraProduct.product_id,
-                quantity: quantity,
-                needs_boxing: true, // Extra products default to needing boxing
-              })
-              .select()
-              .single();
-
-            if (itemError) throw itemError;
-            createdOrderItems.push({
-              id: orderItem.id,
-              product_id: extraProduct.product_id,
-              quantity: quantity,
-              needs_boxing: true,
-              isExtra: true,
-              extraProductId: extraId,
-            });
-          }
-        }
-      }
-
       // Create batches linked to each order item
       let totalBatchQuantity = 0;
 
       for (const orderItem of createdOrderItems) {
         const { data: batchCode } = await supabase.rpc("generate_batch_code");
 
-        // Determine initial state
-        const initialState = orderItem.isExtra ? "received" : "pending_rm";
-
         const { error: batchError } = await supabase.from("batches").insert({
           batch_code: batchCode || `B-${Date.now()}`,
           order_id: order.id,
           order_item_id: orderItem.id,
           product_id: orderItem.product_id,
-          current_state: initialState,
+          current_state: "pending_rm",
           quantity: orderItem.quantity,
           created_by: user?.id,
         });
 
         if (batchError) throw batchError;
         totalBatchQuantity += orderItem.quantity;
-
-        // Handle extra product consumption
-        if (orderItem.isExtra && orderItem.extraProductId) {
-          const extraBatch = extraProducts.find((ep) => ep.id === orderItem.extraProductId);
-          if (extraBatch) {
-            if (orderItem.quantity === extraBatch.quantity) {
-              // Full consumption
-              await supabase.from("batches").update({ inventory_state: "CONSUMED" }).eq("id", orderItem.extraProductId);
-            } else {
-              // Partial consumption - reduce quantity
-              await supabase
-                .from("batches")
-                .update({ quantity: extraBatch.quantity - orderItem.quantity })
-                .eq("id", orderItem.extraProductId);
-            }
-          }
-        }
       }
 
       toast({
@@ -672,56 +597,6 @@ export default function OrderCreate() {
               ))}
             </CardContent>
           </Card>
-
-          {extraProducts.length > 0 && (
-            <Card className="mb-6">
-              <CardHeader>
-                <CardTitle>Extra Products Inventory (Finished Units)</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {extraProducts
-                  .filter((ep) => ep.quantity > 0)
-                  .map((extra) => (
-                    <div key={extra.id} className="flex items-center gap-4 p-3 border rounded-lg">
-                      <div className="flex-1">
-                        <p className="font-medium">{extra.product.name}</p>
-                        <p className="text-sm text-muted-foreground">
-                          SKU: {extra.product.sku} • Available: {extra.quantity}
-                        </p>
-                      </div>
-                      <div className="w-32">
-                        <Label htmlFor={`extra-${extra.id}`} className="text-xs">
-                          Use Qty
-                        </Label>
-                        <Input
-                          id={`extra-${extra.id}`}
-                          type="number"
-                          min="0"
-                          max={extra.quantity}
-                          value={extraSelections.get(extra.id) || ""}
-                          onChange={(e) => {
-                            const qty = parseInt(e.target.value) || 0;
-                            const clamped = Math.max(0, Math.min(qty, extra.quantity));
-                            setExtraSelections((prev) => {
-                              const newMap = new Map(prev);
-                              if (clamped > 0) {
-                                newMap.set(extra.id, clamped);
-                              } else {
-                                newMap.delete(extra.id);
-                              }
-                              return newMap;
-                            });
-                          }}
-                          placeholder="0"
-                          className="mt-1"
-                        />
-                      </div>
-                    </div>
-                  ))}
-              </CardContent>
-            </Card>
-          )}
-
           <div className="flex gap-4">
             <Button type="submit" disabled={submitting} className="flex-1">
               {submitting ? (
