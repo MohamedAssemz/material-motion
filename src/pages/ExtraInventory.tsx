@@ -53,7 +53,7 @@ export default function ExtraInventory() {
   const [formData, setFormData] = useState({
     product_id: '',
     quantity: 1,
-    origin_state: 'ready_for_finishing' as UnitState,
+    origin_state: 'extra_manufacturing',
   });
 
   const canManage = hasRole('manufacture_lead') || hasRole('admin');
@@ -150,12 +150,22 @@ export default function ExtraInventory() {
     try {
       const { data: batchCode } = await supabase.rpc('generate_batch_code');
 
+      // Map origin state to the current_state for the production pipeline
+      const ORIGIN_TO_CURRENT_STATE: Record<string, string> = {
+        'extra_manufacturing': 'ready_for_finishing',
+        'extra_finishing': 'ready_for_packaging',
+        'extra_packaging': 'ready_for_boxing',
+        'extra_boxing': 'ready_for_receiving',
+      };
+
+      const currentState = ORIGIN_TO_CURRENT_STATE[formData.origin_state] || 'ready_for_finishing';
+
       const { error } = await supabase.from('batches').insert({
         batch_code: batchCode || `B-${Date.now()}`,
         order_id: null as any, // Extra batches don't belong to orders initially
         product_id: formData.product_id,
         quantity: formData.quantity,
-        current_state: formData.origin_state,
+        current_state: currentState,
         batch_type: 'EXTRA',
         origin_state: formData.origin_state,
         inventory_state: 'AVAILABLE',
@@ -170,7 +180,7 @@ export default function ExtraInventory() {
       });
 
       setDialogOpen(false);
-      setFormData({ product_id: '', quantity: 1, origin_state: 'ready_for_finishing' });
+      setFormData({ product_id: '', quantity: 1, origin_state: 'extra_manufacturing' });
       fetchData();
     } catch (error: any) {
       toast({
@@ -347,14 +357,14 @@ export default function ExtraInventory() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="ready_for_finishing">Ready for Finishing</SelectItem>
-                      <SelectItem value="ready_for_packaging">Ready for Packaging</SelectItem>
-                      <SelectItem value="ready_for_boxing">Ready for Boxing</SelectItem>
-                      <SelectItem value="ready_for_receiving">Ready for Shipment</SelectItem>
+                      <SelectItem value="extra_manufacturing">Extra Manufacturing</SelectItem>
+                      <SelectItem value="extra_finishing">Extra Finishing</SelectItem>
+                      <SelectItem value="extra_packaging">Extra Packaging</SelectItem>
+                      <SelectItem value="extra_boxing">Extra Boxing</SelectItem>
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-muted-foreground mt-1">
-                    State where these extra units were produced
+                    Phase where these extra units were produced
                   </p>
                 </div>
                 <div className="flex gap-2">

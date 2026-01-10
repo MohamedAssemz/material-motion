@@ -56,6 +56,7 @@ interface ExtraItemsTabProps {
   onRefresh?: () => void;
 }
 
+// Map phase to the in_progress state for items being worked on
 const PHASE_STATE_MAP: Record<string, string> = {
   manufacturing: 'in_manufacturing',
   finishing: 'in_finishing',
@@ -68,6 +69,14 @@ const PHASE_NEXT_STATE_MAP: Record<string, string> = {
   finishing: 'ready_for_packaging',
   packaging: 'ready_for_boxing',
   boxing: 'ready_for_receiving',
+};
+
+// Map phase to the origin_state for filtering extra inventory
+const PHASE_ORIGIN_STATE_MAP: Record<string, string> = {
+  manufacturing: 'extra_manufacturing',
+  finishing: 'extra_finishing',
+  packaging: 'extra_packaging',
+  boxing: 'extra_boxing',
 };
 
 const PHASE_LABELS: Record<string, string> = {
