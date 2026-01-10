@@ -27,6 +27,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
+import { ExtraItemsTab } from '@/components/ExtraItemsTab';
 import {
   Select,
   SelectContent,
@@ -563,9 +564,10 @@ export default function OrderFinishing() {
       </div>
 
       <Tabs defaultValue="receive" className="space-y-4">
-        <TabsList className="grid grid-cols-3 w-full max-w-xl">
+        <TabsList className="grid grid-cols-4 w-full max-w-2xl">
           <TabsTrigger value="receive">Receive ({readyBoxGroups.length})</TabsTrigger>
           <TabsTrigger value="process">Process ({totalInFinishing})</TabsTrigger>
+          <TabsTrigger value="extra">Extra</TabsTrigger>
           <TabsTrigger value="completed">Completed ({totalCompleted})</TabsTrigger>
         </TabsList>
 
@@ -774,6 +776,11 @@ export default function OrderFinishing() {
               )})
             )}
           </div>
+        </TabsContent>
+
+        {/* Extra Tab */}
+        <TabsContent value="extra">
+          <ExtraItemsTab orderId={id!} phase="finishing" onRefresh={fetchData} />
         </TabsContent>
       </Tabs>
 
