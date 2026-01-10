@@ -23,6 +23,7 @@ import { FlaggedItemsDialog } from "@/components/FlaggedItemsDialog";
 import { ShipmentDialog } from "@/components/ShipmentDialog";
 import { BoxAssignmentDialog } from "@/components/BoxAssignmentDialog";
 import { LeadTimeDialog } from "@/components/LeadTimeDialog";
+import { ExtraInventoryDialog } from "@/components/ExtraInventoryDialog";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import {
@@ -130,6 +131,9 @@ export default function OrderDetail() {
   const [shipmentDialogOpen, setShipmentDialogOpen] = useState(false);
   const [boxAssignDialogOpen, setBoxAssignDialogOpen] = useState(false);
   const [leadTimeDialogOpen, setLeadTimeDialogOpen] = useState(false);
+  const [extraInventoryOpen, setExtraInventoryOpen] = useState(false);
+  const [selectedExtraPhase, setSelectedExtraPhase] = useState<'manufacturing' | 'finishing' | 'packaging' | 'boxing'>('manufacturing');
+  const [extraInventoryCounts, setExtraInventoryCounts] = useState<Record<string, number>>({});
 
   // Selection states for inline actions
   const [productSelections, setProductSelections] = useState<Map<string, number>>(new Map());
@@ -138,6 +142,7 @@ export default function OrderDetail() {
 
   useEffect(() => {
     fetchOrder();
+    fetchExtraInventoryCounts();
 
     const channel = supabase
       .channel(`order-${id}`)
@@ -146,8 +151,16 @@ export default function OrderDetail() {
       })
       .subscribe();
 
+    const extraChannel = supabase
+      .channel('extra-inventory-counts')
+      .on("postgres_changes", { event: "*", schema: "public", table: "batches" }, () => {
+        fetchExtraInventoryCounts();
+      })
+      .subscribe();
+
     return () => {
       supabase.removeChannel(channel);
+      supabase.removeChannel(extraChannel);
     };
   }, [id]);
 
@@ -216,6 +229,37 @@ export default function OrderDetail() {
       toast.error("Failed to load order details");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchExtraInventoryCounts = async () => {
+    try {
+      const states = [
+        { phase: 'manufacturing', state: 'ready_for_finishing' },
+        { phase: 'finishing', state: 'ready_for_packaging' },
+        { phase: 'packaging', state: 'ready_for_boxing' },
+        { phase: 'boxing', state: 'ready_for_receiving' },
+      ];
+
+      const counts: Record<string, number> = {};
+
+      for (const { phase, state } of states) {
+        const { data, error } = await supabase
+          .from('batches')
+          .select('quantity')
+          .eq('batch_type', 'EXTRA')
+          .eq('inventory_state', 'AVAILABLE')
+          .eq('is_terminated', false)
+          .eq('current_state', state);
+
+        if (!error && data) {
+          counts[phase] = data.reduce((sum, b) => sum + b.quantity, 0);
+        }
+      }
+
+      setExtraInventoryCounts(counts);
+    } catch (error) {
+      console.error('Error fetching extra inventory counts:', error);
     }
   };
 
@@ -653,17 +697,57 @@ export default function OrderDetail() {
                 </div>
               </div>
             </div>
-          </CardContent>
+        </CardContent>
         </Card>
 
-        {/* Right Card - Production Phases */}
+        {/* Right Card - Extra Inventory */}
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-lg">Production Phases</CardTitle>
+            <CardTitle className="text-lg">Extra Inventory</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {/* 2x2 Grid for phases */}
             <div className="grid grid-cols-2 gap-3">
+              {([
+                { phase: 'manufacturing', label: 'Manufacturing', icon: Factory, color: 'blue' },
+                { phase: 'finishing', label: 'Finishing', icon: Sparkles, color: 'purple' },
+                { phase: 'packaging', label: 'Packaging', icon: Package, color: 'indigo' },
+                { phase: 'boxing', label: 'Boxing', icon: Box, color: 'cyan' },
+              ] as const).map((item) => {
+                const Icon = item.icon;
+                const count = extraInventoryCounts[item.phase] || 0;
+                return (
+                  <div
+                    key={item.phase}
+                    className="flex items-center gap-3 p-3 rounded-lg border cursor-pointer hover:border-primary/50 transition-colors"
+                    onClick={() => {
+                      setSelectedExtraPhase(item.phase);
+                      setExtraInventoryOpen(true);
+                    }}
+                  >
+                    <div className={`p-2 rounded-lg bg-${item.color}-100 dark:bg-${item.color}-900/30`}>
+                      <Icon className={`h-5 w-5 text-${item.color}-600 dark:text-${item.color}-400`} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm">{item.label}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {count > 0 ? <span className="text-green-600">{count} available</span> : 'No items'}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Production Phases - Full Width */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg">Production Phases</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {[
                 {
                   label: "Manufacturing",
@@ -729,7 +813,7 @@ export default function OrderDetail() {
               })}
             </div>
 
-            {/* Shipments - Full width */}
+            {/* Shipments */}
             <div
               className="flex items-center gap-3 p-3 rounded-lg border border-green-200 dark:border-green-800 cursor-pointer hover:border-primary/50 transition-colors"
               onClick={() => navigate(`/orders/${id}/boxing?tab=shipments`)}
@@ -745,7 +829,6 @@ export default function OrderDetail() {
             </div>
           </CardContent>
         </Card>
-      </div>
 
       {/* Order Items - Full Width Section */}
       <Card>
