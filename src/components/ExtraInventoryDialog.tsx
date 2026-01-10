@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,6 +16,7 @@ interface ExtraBatch {
   product_id: string;
   quantity: number;
   current_state: string;
+  origin_state: string | null;
   inventory_state: string;
   box_id: string | null;
   product: {
@@ -71,6 +73,14 @@ const PHASE_CURRENT_STATE_MAP: Record<string, string> = {
   boxing: 'ready_for_receiving',
 };
 
+// Map phase to the in-progress state for items being added to order
+const PHASE_IN_PROGRESS_STATE_MAP: Record<string, string> = {
+  manufacturing: 'in_manufacturing',
+  finishing: 'in_finishing',
+  packaging: 'in_packaging',
+  boxing: 'in_boxing',
+};
+
 const PHASE_LABELS: Record<string, string> = {
   manufacturing: 'Extra Manufacturing',
   finishing: 'Extra Finishing',
@@ -86,6 +96,7 @@ export function ExtraInventoryDialog({
   orderItems,
   onItemsSelected,
 }: ExtraInventoryDialogProps) {
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [batches, setBatches] = useState<ExtraBatch[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -123,6 +134,7 @@ export function ExtraInventoryDialog({
           product_id,
           quantity,
           current_state,
+          origin_state,
           inventory_state,
           box_id,
           product:products(id, name, sku)
@@ -241,21 +253,62 @@ export function ExtraInventoryDialog({
     setSubmitting(true);
 
     try {
+      const targetInProgressState = PHASE_IN_PROGRESS_STATE_MAP[phase];
       const selectedItems: Array<{ batch_id: string; quantity: number; product_id: string }> = [];
       
       for (const [batchId, quantity] of selections.entries()) {
-        if (quantity > 0) {
-          const batch = batches.find(b => b.id === batchId);
-          if (batch) {
-            selectedItems.push({
-              batch_id: batchId,
-              quantity,
-              product_id: batch.product_id,
-            });
-          }
+        if (quantity <= 0) continue;
+        
+        const batch = batches.find(b => b.id === batchId);
+        if (!batch) continue;
+
+        // If using entire batch quantity, update the existing batch
+        if (quantity === batch.quantity) {
+          await supabase.from('batches').update({
+            order_id: orderId,
+            current_state: targetInProgressState,
+            inventory_state: 'CONSUMED',
+          }).eq('id', batchId);
+
+          selectedItems.push({
+            batch_id: batchId,
+            quantity,
+            product_id: batch.product_id,
+          });
+        } else {
+          // Using partial quantity - create a new batch for the order and subtract from source
+          const { data: batchCode } = await supabase.rpc('generate_batch_code');
+          
+          const { data: newBatch, error: insertError } = await supabase.from('batches').insert({
+            batch_code: batchCode || `EX-${Date.now()}`,
+            order_id: orderId,
+            product_id: batch.product_id,
+            current_state: targetInProgressState,
+            origin_state: batch.origin_state,
+            quantity: quantity,
+            box_id: batch.box_id,
+            batch_type: 'EXTRA',
+            inventory_state: 'CONSUMED',
+            created_by: user?.id,
+            parent_batch_id_split: batchId,
+          }).select('id').single();
+
+          if (insertError) throw insertError;
+
+          // Subtract quantity from source batch
+          await supabase.from('batches').update({
+            quantity: batch.quantity - quantity,
+          }).eq('id', batchId);
+
+          selectedItems.push({
+            batch_id: newBatch?.id || batchId,
+            quantity,
+            product_id: batch.product_id,
+          });
         }
       }
 
+      toast.success(`Added ${totalSelected} extra items to order`);
       onItemsSelected(selectedItems);
       onOpenChange(false);
     } catch (error: any) {
