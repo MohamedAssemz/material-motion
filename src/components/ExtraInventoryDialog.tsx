@@ -16,7 +16,6 @@ interface ExtraBatch {
   product_id: string;
   quantity: number;
   current_state: string;
-  origin_state: string | null;
   inventory_state: string;
   box_id: string | null;
   product: {
@@ -57,28 +56,12 @@ interface ExtraInventoryDialogProps {
   onItemsSelected: (selections: Array<{ batch_id: string; quantity: number; product_id: string }>) => void;
 }
 
-// Map phase to the origin_state used in extra inventory
-const PHASE_ORIGIN_STATE_MAP: Record<string, string> = {
-  manufacturing: 'extra_manufacturing',
-  finishing: 'extra_finishing',
-  packaging: 'extra_packaging',
-  boxing: 'extra_boxing',
-};
-
-// Map phase to the current_state that extra batches are at
+// Map phase to the current_state that extra batches should have to be available
 const PHASE_CURRENT_STATE_MAP: Record<string, string> = {
   manufacturing: 'ready_for_finishing',
   finishing: 'ready_for_packaging',
   packaging: 'ready_for_boxing',
   boxing: 'ready_for_receiving',
-};
-
-// Map phase to the in-progress state for items being added to order
-const PHASE_IN_PROGRESS_STATE_MAP: Record<string, string> = {
-  manufacturing: 'in_manufacturing',
-  finishing: 'in_finishing',
-  packaging: 'in_packaging',
-  boxing: 'in_boxing',
 };
 
 const PHASE_LABELS: Record<string, string> = {
@@ -114,7 +97,6 @@ export function ExtraInventoryDialog({
   const fetchExtraBatches = async () => {
     setLoading(true);
     try {
-      const targetOriginState = PHASE_ORIGIN_STATE_MAP[phase];
       const targetCurrentState = PHASE_CURRENT_STATE_MAP[phase];
       
       // Get product IDs from order items
@@ -126,6 +108,8 @@ export function ExtraInventoryDialog({
         return;
       }
       
+      // Fetch available extra inventory batches that match the phase's current_state
+      // and contain products from this order
       const { data, error } = await supabase
         .from('batches')
         .select(`
@@ -134,7 +118,6 @@ export function ExtraInventoryDialog({
           product_id,
           quantity,
           current_state,
-          origin_state,
           inventory_state,
           box_id,
           product:products(id, name, sku)
@@ -142,8 +125,8 @@ export function ExtraInventoryDialog({
         .eq('batch_type', 'EXTRA')
         .eq('inventory_state', 'AVAILABLE')
         .eq('is_terminated', false)
-        .eq('origin_state', targetOriginState)
         .eq('current_state', targetCurrentState)
+        .is('order_id', null)
         .in('product_id', orderProductIds);
 
       if (error) throw error;
@@ -253,7 +236,6 @@ export function ExtraInventoryDialog({
     setSubmitting(true);
 
     try {
-      const targetInProgressState = PHASE_IN_PROGRESS_STATE_MAP[phase];
       const selectedItems: Array<{ batch_id: string; quantity: number; product_id: string }> = [];
       
       for (const [batchId, quantity] of selections.entries()) {
@@ -264,10 +246,9 @@ export function ExtraInventoryDialog({
 
         // If using entire batch quantity, update the existing batch to assign to order
         if (quantity === batch.quantity) {
-          // Move entire batch to the order's Extra tab
+          // Move entire batch to the order - keep current_state, just assign order_id
           await supabase.from('batches').update({
             order_id: orderId,
-            current_state: targetInProgressState,
             inventory_state: 'RESERVED', // No longer available in extra inventory
           }).eq('id', batchId);
 
@@ -280,12 +261,12 @@ export function ExtraInventoryDialog({
           // Using partial quantity - create a new batch for the order and subtract from source
           const { data: batchCode } = await supabase.rpc('generate_batch_code');
           
+          // New batch keeps the same current_state as source batch
           const { data: newBatch, error: insertError } = await supabase.from('batches').insert({
             batch_code: batchCode || `EX-${Date.now()}`,
             order_id: orderId,
             product_id: batch.product_id,
-            current_state: targetInProgressState,
-            origin_state: batch.origin_state,
+            current_state: batch.current_state, // Keep the same state
             quantity: quantity,
             box_id: null, // New batch doesn't inherit box - needs to be assigned
             batch_type: 'EXTRA',
