@@ -262,12 +262,13 @@ export function ExtraInventoryDialog({
         const batch = batches.find(b => b.id === batchId);
         if (!batch) continue;
 
-        // If using entire batch quantity, update the existing batch
+        // If using entire batch quantity, update the existing batch to assign to order
         if (quantity === batch.quantity) {
+          // Move entire batch to the order's Extra tab
           await supabase.from('batches').update({
             order_id: orderId,
             current_state: targetInProgressState,
-            inventory_state: 'CONSUMED',
+            inventory_state: 'RESERVED', // No longer available in extra inventory
           }).eq('id', batchId);
 
           selectedItems.push({
@@ -286,19 +287,25 @@ export function ExtraInventoryDialog({
             current_state: targetInProgressState,
             origin_state: batch.origin_state,
             quantity: quantity,
-            box_id: batch.box_id,
+            box_id: null, // New batch doesn't inherit box - needs to be assigned
             batch_type: 'EXTRA',
-            inventory_state: 'CONSUMED',
+            inventory_state: 'RESERVED', // Reserved for this order
             created_by: user?.id,
             parent_batch_id_split: batchId,
           }).select('id').single();
 
           if (insertError) throw insertError;
 
-          // Subtract quantity from source batch
-          await supabase.from('batches').update({
-            quantity: batch.quantity - quantity,
-          }).eq('id', batchId);
+          // Subtract quantity from source batch (stays AVAILABLE in extra inventory)
+          const newQuantity = batch.quantity - quantity;
+          if (newQuantity <= 0) {
+            // Delete the source batch if quantity is zero
+            await supabase.from('batches').delete().eq('id', batchId);
+          } else {
+            await supabase.from('batches').update({
+              quantity: newQuantity,
+            }).eq('id', batchId);
+          }
 
           selectedItems.push({
             batch_id: newBatch?.id || batchId,
