@@ -14,145 +14,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      batches: {
-        Row: {
-          batch_code: string
-          batch_type: string
-          box_id: string | null
-          created_at: string
-          created_by: string | null
-          current_state: string
-          eta: string | null
-          flagged_at: string | null
-          flagged_by: string | null
-          flagged_reason: string | null
-          id: string
-          inventory_state: string | null
-          is_flagged: boolean | null
-          is_from_extra: boolean | null
-          is_redo: boolean | null
-          is_terminated: boolean | null
-          lead_time_days: number | null
-          order_id: string | null
-          order_item_id: string | null
-          parent_batch_id: string | null
-          parent_batch_id_split: string | null
-          product_id: string
-          qr_code_data: string | null
-          quantity: number
-          redo_by: string | null
-          redo_reason: string | null
-          terminated_by: string | null
-          terminated_reason: string | null
-          updated_at: string
-        }
-        Insert: {
-          batch_code: string
-          batch_type?: string
-          box_id?: string | null
-          created_at?: string
-          created_by?: string | null
-          current_state?: string
-          eta?: string | null
-          flagged_at?: string | null
-          flagged_by?: string | null
-          flagged_reason?: string | null
-          id?: string
-          inventory_state?: string | null
-          is_flagged?: boolean | null
-          is_from_extra?: boolean | null
-          is_redo?: boolean | null
-          is_terminated?: boolean | null
-          lead_time_days?: number | null
-          order_id?: string | null
-          order_item_id?: string | null
-          parent_batch_id?: string | null
-          parent_batch_id_split?: string | null
-          product_id: string
-          qr_code_data?: string | null
-          quantity?: number
-          redo_by?: string | null
-          redo_reason?: string | null
-          terminated_by?: string | null
-          terminated_reason?: string | null
-          updated_at?: string
-        }
-        Update: {
-          batch_code?: string
-          batch_type?: string
-          box_id?: string | null
-          created_at?: string
-          created_by?: string | null
-          current_state?: string
-          eta?: string | null
-          flagged_at?: string | null
-          flagged_by?: string | null
-          flagged_reason?: string | null
-          id?: string
-          inventory_state?: string | null
-          is_flagged?: boolean | null
-          is_from_extra?: boolean | null
-          is_redo?: boolean | null
-          is_terminated?: boolean | null
-          lead_time_days?: number | null
-          order_id?: string | null
-          order_item_id?: string | null
-          parent_batch_id?: string | null
-          parent_batch_id_split?: string | null
-          product_id?: string
-          qr_code_data?: string | null
-          quantity?: number
-          redo_by?: string | null
-          redo_reason?: string | null
-          terminated_by?: string | null
-          terminated_reason?: string | null
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "batches_box_id_fkey"
-            columns: ["box_id"]
-            isOneToOne: false
-            referencedRelation: "boxes"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "batches_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "batches_order_item_id_fkey"
-            columns: ["order_item_id"]
-            isOneToOne: false
-            referencedRelation: "order_items"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "batches_parent_batch_id_fkey"
-            columns: ["parent_batch_id"]
-            isOneToOne: false
-            referencedRelation: "batches"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "batches_parent_batch_id_split_fkey"
-            columns: ["parent_batch_id_split"]
-            isOneToOne: false
-            referencedRelation: "batches"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "batches_product_id_fkey"
-            columns: ["product_id"]
-            isOneToOne: false
-            referencedRelation: "products"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       boxes: {
         Row: {
           box_code: string
@@ -204,6 +65,97 @@ export type Database = {
           id?: string
           is_domestic?: boolean | null
           name?: string
+        }
+        Relationships: []
+      }
+      extra_batches: {
+        Row: {
+          box_id: string | null
+          created_at: string
+          created_by: string | null
+          current_state: string
+          id: string
+          inventory_state: string
+          order_id: string | null
+          product_id: string
+          qr_code_data: string | null
+          quantity: number
+          updated_at: string
+        }
+        Insert: {
+          box_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          current_state?: string
+          id?: string
+          inventory_state?: string
+          order_id?: string | null
+          product_id: string
+          qr_code_data?: string | null
+          quantity?: number
+          updated_at?: string
+        }
+        Update: {
+          box_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          current_state?: string
+          id?: string
+          inventory_state?: string
+          order_id?: string | null
+          product_id?: string
+          qr_code_data?: string | null
+          quantity?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "extra_batches_box_id_fkey"
+            columns: ["box_id"]
+            isOneToOne: false
+            referencedRelation: "extra_boxes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "extra_batches_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "extra_batches_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      extra_boxes: {
+        Row: {
+          box_code: string
+          content_type: string | null
+          created_at: string
+          id: string
+          is_active: boolean
+          items_list: Json | null
+        }
+        Insert: {
+          box_code: string
+          content_type?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          items_list?: Json | null
+        }
+        Update: {
+          box_code?: string
+          content_type?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          items_list?: Json | null
         }
         Relationships: []
       }
@@ -272,7 +224,7 @@ export type Database = {
             foreignKeyName: "machine_production_batch_id_fkey"
             columns: ["batch_id"]
             isOneToOne: false
-            referencedRelation: "batches"
+            referencedRelation: "order_batches"
             referencedColumns: ["id"]
           },
           {
@@ -355,6 +307,110 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      order_batches: {
+        Row: {
+          box_id: string | null
+          created_at: string
+          created_by: string | null
+          current_state: string
+          eta: string | null
+          flagged_by: string | null
+          flagged_reason: string | null
+          id: string
+          is_flagged: boolean | null
+          is_redo: boolean | null
+          is_terminated: boolean | null
+          lead_time_days: number | null
+          order_id: string | null
+          order_item_id: string | null
+          product_id: string
+          qr_code_data: string | null
+          quantity: number
+          redo_by: string | null
+          redo_reason: string | null
+          terminated_by: string | null
+          terminated_reason: string | null
+          updated_at: string
+        }
+        Insert: {
+          box_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          current_state?: string
+          eta?: string | null
+          flagged_by?: string | null
+          flagged_reason?: string | null
+          id?: string
+          is_flagged?: boolean | null
+          is_redo?: boolean | null
+          is_terminated?: boolean | null
+          lead_time_days?: number | null
+          order_id?: string | null
+          order_item_id?: string | null
+          product_id: string
+          qr_code_data?: string | null
+          quantity?: number
+          redo_by?: string | null
+          redo_reason?: string | null
+          terminated_by?: string | null
+          terminated_reason?: string | null
+          updated_at?: string
+        }
+        Update: {
+          box_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          current_state?: string
+          eta?: string | null
+          flagged_by?: string | null
+          flagged_reason?: string | null
+          id?: string
+          is_flagged?: boolean | null
+          is_redo?: boolean | null
+          is_terminated?: boolean | null
+          lead_time_days?: number | null
+          order_id?: string | null
+          order_item_id?: string | null
+          product_id?: string
+          qr_code_data?: string | null
+          quantity?: number
+          redo_by?: string | null
+          redo_reason?: string | null
+          terminated_by?: string | null
+          terminated_reason?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "batches_box_id_fkey"
+            columns: ["box_id"]
+            isOneToOne: false
+            referencedRelation: "boxes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batches_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batches_order_item_id_fkey"
+            columns: ["order_item_id"]
+            isOneToOne: false
+            referencedRelation: "order_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batches_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
             referencedColumns: ["id"]
           },
         ]
@@ -817,7 +873,7 @@ export type Database = {
             foreignKeyName: "shipment_items_batch_id_fkey"
             columns: ["batch_id"]
             isOneToOne: false
-            referencedRelation: "batches"
+            referencedRelation: "order_batches"
             referencedColumns: ["id"]
           },
           {
@@ -1027,7 +1083,7 @@ export type Database = {
             foreignKeyName: "units_batch_id_fkey"
             columns: ["batch_id"]
             isOneToOne: false
-            referencedRelation: "batches"
+            referencedRelation: "order_batches"
             referencedColumns: ["id"]
           },
           {
@@ -1082,6 +1138,8 @@ export type Database = {
       check_late_units: { Args: never; Returns: undefined }
       generate_batch_code: { Args: never; Returns: string }
       generate_box_code: { Args: never; Returns: string }
+      generate_extra_batch_code: { Args: never; Returns: string }
+      generate_extra_box_code: { Args: never; Returns: string }
       generate_parent_sku: { Args: never; Returns: string }
       generate_shipment_code: { Args: never; Returns: string }
       has_role: {
