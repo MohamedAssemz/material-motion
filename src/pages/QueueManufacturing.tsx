@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, Factory } from 'lucide-react';
+import { ArrowLeft, Factory, Package } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -21,6 +21,7 @@ interface Order {
   created_at: string;
   waiting_for_rm_count: number;
   manufacturing_count: number;
+  extra_manufacturing_count: number;
 }
 
 export default function QueueManufacturing() {
@@ -36,6 +37,9 @@ export default function QueueManufacturing() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'order_batches' }, () => {
         fetchOrders();
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'extra_batches' }, () => {
+        fetchOrders();
+      })
       .subscribe();
 
     return () => {
@@ -45,30 +49,65 @@ export default function QueueManufacturing() {
 
   const fetchOrders = async () => {
     try {
-      const { data, error } = await supabase
+      // Fetch orders with order_batches in manufacturing states
+      const { data: orderBatchesData, error: batchError } = await supabase
+        .from('order_batches')
+        .select('order_id, current_state, quantity')
+        .in('current_state', ['pending_rm', 'in_manufacturing'])
+        .eq('is_terminated', false);
+
+      if (batchError) throw batchError;
+
+      // Fetch orders with reserved extra_batches in extra_manufacturing state
+      const { data: extraBatchesData, error: extraError } = await supabase
+        .from('extra_batches')
+        .select('order_id, current_state, quantity')
+        .eq('current_state', 'extra_manufacturing')
+        .eq('inventory_state', 'RESERVED')
+        .not('order_id', 'is', null);
+
+      if (extraError) throw extraError;
+
+      // Combine order IDs from both sources
+      const orderBatchOrderIds = orderBatchesData?.map(b => b.order_id).filter(Boolean) || [];
+      const extraBatchOrderIds = extraBatchesData?.map(b => b.order_id).filter(Boolean) || [];
+      const allOrderIds = [...new Set([...orderBatchOrderIds, ...extraBatchOrderIds])];
+
+      if (allOrderIds.length === 0) {
+        setOrders([]);
+        setLoading(false);
+        return;
+      }
+
+      // Fetch order details
+      const { data: ordersData, error: ordersError } = await supabase
         .from('orders')
-        .select(`
-          id,
-          order_number,
-          created_at,
-          order_batches!inner(current_state, quantity)
-        `)
-        .or('current_state.eq.pending_rm,current_state.eq.in_manufacturing', { foreignTable: 'order_batches' });
+        .select('id, order_number, created_at')
+        .in('id', allOrderIds);
 
-      if (error) throw error;
+      if (ordersError) throw ordersError;
 
-      const ordersWithCounts = (data || []).map((order: any) => ({
-        id: order.id,
-        order_number: order.order_number,
-        created_at: order.created_at,
-        waiting_for_rm_count: order.order_batches
-          .filter((b: any) => b.current_state === 'pending_rm')
-          .reduce((sum: number, b: any) => sum + b.quantity, 0),
-        manufacturing_count: order.order_batches
-          .filter((b: any) => b.current_state === 'in_manufacturing')
-          .reduce((sum: number, b: any) => sum + b.quantity, 0),
-      })).filter((order: Order) => 
-        order.waiting_for_rm_count > 0 || order.manufacturing_count > 0
+      const ordersWithCounts = (ordersData || []).map((order: any) => {
+        const orderBatches = orderBatchesData?.filter(b => b.order_id === order.id) || [];
+        const extraBatches = extraBatchesData?.filter(b => b.order_id === order.id) || [];
+
+        return {
+          id: order.id,
+          order_number: order.order_number,
+          created_at: order.created_at,
+          waiting_for_rm_count: orderBatches
+            .filter((b: any) => b.current_state === 'pending_rm')
+            .reduce((sum: number, b: any) => sum + b.quantity, 0),
+          manufacturing_count: orderBatches
+            .filter((b: any) => b.current_state === 'in_manufacturing')
+            .reduce((sum: number, b: any) => sum + b.quantity, 0),
+          extra_manufacturing_count: extraBatches
+            .reduce((sum: number, b: any) => sum + b.quantity, 0),
+        };
+      }).filter((order: Order) => 
+        order.waiting_for_rm_count > 0 || 
+        order.manufacturing_count > 0 || 
+        order.extra_manufacturing_count > 0
       );
 
       setOrders(ordersWithCounts);
@@ -115,6 +154,7 @@ export default function QueueManufacturing() {
                   <TableHead>Order Number</TableHead>
                   <TableHead>Pending RM</TableHead>
                   <TableHead>In Manufacturing</TableHead>
+                  <TableHead>Extra Items</TableHead>
                   <TableHead>Created Date</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
@@ -131,6 +171,14 @@ export default function QueueManufacturing() {
                     <TableCell>
                       {order.manufacturing_count > 0 && (
                         <Badge className="bg-blue-500">{order.manufacturing_count} items</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {order.extra_manufacturing_count > 0 && (
+                        <Badge variant="outline" className="border-amber-500 text-amber-600">
+                          <Package className="h-3 w-3 mr-1" />
+                          {order.extra_manufacturing_count} extra
+                        </Badge>
                       )}
                     </TableCell>
                     <TableCell>{format(new Date(order.created_at), 'PPP')}</TableCell>
