@@ -325,7 +325,7 @@ export type Database = {
           is_redo: boolean | null
           is_terminated: boolean | null
           lead_time_days: number | null
-          order_id: string | null
+          order_id: string
           order_item_id: string | null
           product_id: string
           qr_code_data: string | null
@@ -349,7 +349,7 @@ export type Database = {
           is_redo?: boolean | null
           is_terminated?: boolean | null
           lead_time_days?: number | null
-          order_id?: string | null
+          order_id: string
           order_item_id?: string | null
           product_id: string
           qr_code_data?: string | null
@@ -373,7 +373,7 @@ export type Database = {
           is_redo?: boolean | null
           is_terminated?: boolean | null
           lead_time_days?: number | null
-          order_id?: string | null
+          order_id?: string
           order_item_id?: string | null
           product_id?: string
           qr_code_data?: string | null
