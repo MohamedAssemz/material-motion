@@ -60,12 +60,16 @@ export default function ExtraInventory() {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [boxDialogOpen, setBoxDialogOpen] = useState(false);
+  const [createBoxDialogOpen, setCreateBoxDialogOpen] = useState(false);
   const [selectedBatchForBox, setSelectedBatchForBox] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     product_id: '',
     quantity: 1,
     current_state: 'extra_manufacturing',
+    box_id: '', // Required field - EBox selection
   });
+  const [selectedBoxCode, setSelectedBoxCode] = useState<string>(''); // For display
+  const [submitting, setSubmitting] = useState(false);
 
   const canManage = hasRole('manufacture_lead') || hasRole('admin');
 
@@ -155,19 +159,57 @@ export default function ExtraInventory() {
       return;
     }
 
+    if (!formData.box_id) {
+      toast({
+        title: 'Validation Error',
+        description: 'Please select an Extra Box (EBox) for this batch',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setSubmitting(true);
     try {
       const { data: qrCode } = await supabase.rpc('generate_extra_batch_code');
 
-      const { error } = await supabase.from('extra_batches').insert({
+      // Get product info for box items_list
+      const selectedProduct = products.find(p => p.id === formData.product_id);
+
+      const { data: newBatch, error } = await supabase.from('extra_batches').insert({
         product_id: formData.product_id,
         quantity: formData.quantity,
         current_state: formData.current_state,
         inventory_state: 'AVAILABLE',
         qr_code_data: qrCode || `EB-${Date.now()}`,
+        box_id: formData.box_id,
         created_by: user?.id,
-      });
+      }).select('id').single();
 
       if (error) throw error;
+
+      // Update box items_list
+      const { data: boxData } = await supabase
+        .from('extra_boxes')
+        .select('items_list')
+        .eq('id', formData.box_id)
+        .single();
+
+      const currentItems = Array.isArray(boxData?.items_list) ? boxData.items_list : [];
+      const newItem = {
+        product_id: formData.product_id,
+        product_name: selectedProduct?.name || 'Unknown',
+        product_sku: selectedProduct?.sku || 'N/A',
+        quantity: formData.quantity,
+        batch_id: newBatch?.id,
+      };
+
+      await supabase
+        .from('extra_boxes')
+        .update({ 
+          items_list: [...currentItems, newItem],
+          content_type: 'EXTRA'
+        })
+        .eq('id', formData.box_id);
 
       toast({
         title: 'Success',
@@ -175,7 +217,8 @@ export default function ExtraInventory() {
       });
 
       setDialogOpen(false);
-      setFormData({ product_id: '', quantity: 1, current_state: 'extra_manufacturing' });
+      setFormData({ product_id: '', quantity: 1, current_state: 'extra_manufacturing', box_id: '' });
+      setSelectedBoxCode('');
       fetchData();
     } catch (error: any) {
       toast({
@@ -183,10 +226,12 @@ export default function ExtraInventory() {
         description: error.message,
         variant: 'destructive',
       });
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  const handleAssignBox = async (boxId: string) => {
+  const handleAssignBox = async (boxId: string, _boxCode?: string) => {
     if (!selectedBatchForBox) return;
 
     const batch = batches.find(b => b.id === selectedBatchForBox);
@@ -344,9 +389,55 @@ export default function ExtraInventory() {
                     Current production state of these extra units
                   </p>
                 </div>
+                
+                {/* EBox Selection - Required */}
+                <div>
+                  <Label>Extra Box (EBox) *</Label>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="flex-1 justify-start"
+                      onClick={() => setCreateBoxDialogOpen(true)}
+                    >
+                      {formData.box_id && selectedBoxCode ? (
+                        <span className="flex items-center gap-2">
+                          <Box className="h-4 w-4 text-primary" />
+                          <span className="font-mono">{selectedBoxCode}</span>
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground flex items-center gap-2">
+                          <Box className="h-4 w-4" />
+                          Select or create an EBox...
+                        </span>
+                      )}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Extra batches must be assigned to an EBox
+                  </p>
+                </div>
+
                 <div className="flex gap-2">
-                  <Button type="submit" className="flex-1">Create Batch</Button>
-                  <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+                  <Button type="submit" className="flex-1" disabled={submitting || !formData.box_id}>
+                    {submitting ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Creating...
+                      </>
+                    ) : (
+                      'Create Batch'
+                    )}
+                  </Button>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => {
+                      setDialogOpen(false);
+                      setFormData({ product_id: '', quantity: 1, current_state: 'extra_manufacturing', box_id: '' });
+                      setSelectedBoxCode('');
+                    }}
+                  >
                     Cancel
                   </Button>
                 </div>
@@ -355,6 +446,19 @@ export default function ExtraInventory() {
           </Dialog>
         </div>
       </header>
+
+      {/* EBox Selection Dialog for Create Form */}
+      <ExtraBoxSelectionDialog
+        open={createBoxDialogOpen}
+        onOpenChange={setCreateBoxDialogOpen}
+        onConfirm={(boxId, boxCode) => {
+          setFormData({ ...formData, box_id: boxId });
+          setSelectedBoxCode(boxCode || '');
+          setCreateBoxDialogOpen(false);
+        }}
+        title="Select Extra Box for Batch"
+        allowCreate={true}
+      />
 
       <div className="container mx-auto p-6 space-y-6">
         {/* Stats */}
