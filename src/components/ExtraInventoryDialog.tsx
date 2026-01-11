@@ -239,21 +239,26 @@ export function ExtraInventoryDialog({
   /**
    * Extra Inventory Consumption Logic:
    * 
-   * Invariant: Quantities are owned by batches, not boxes or products.
-   * A box can contain multiple batches of different products.
+   * INVARIANT: Order items do NOT own quantities directly.
+   * Quantities are owned by batches.
+   * Order Item Quantity = sum of its order batches
+   * 
+   * RULE: When using extra inventory for an order:
+   * - The total quantity of the order item must remain UNCHANGED
+   * - The used extra inventory quantity must be SUBTRACTED from the order's own batches
+   * - Extra inventory batches never increase order totals; they only REPLACE internal order batches
    * 
    * When a user selects a subset of an AVAILABLE extra batch:
    * 
-   * 1. If selected quantity < batch quantity (partial):
-   *    - Split the batch into two:
-   *      a) Original batch keeps remaining quantity, stays AVAILABLE
-   *      b) New batch is created with selected quantity, state = RESERVED
-   *    - BOTH batches remain linked to the same EBox (preserve box_id)
-   * 
-   * 2. If selected quantity == batch quantity (full):
-   *    - Do NOT create a new batch
-   *    - Update existing batch: inventory_state AVAILABLE → RESERVED
+   * 1. Reserve the extra batch (full or partial):
+   *    - If partial: Split the batch, new portion becomes RESERVED
+   *    - If full: Update existing batch to RESERVED
    *    - Preserve box linkage
+   * 
+   * 2. CRITICAL: Reduce the order's own batches by the same quantity:
+   *    - Find order batches for the same product
+   *    - Reduce or delete them to offset the extra inventory being used
+   *    - This ensures order item quantity remains constant
    */
   const handleConfirm = async () => {
     if (totalSelected === 0) return;
@@ -262,20 +267,28 @@ export function ExtraInventoryDialog({
     try {
       const selectedItems: Array<{ batch_id: string; quantity: number; product_id: string }> = [];
       
+      // Group selections by product for batch reduction
+      const productQuantities = new Map<string, number>();
+      
       for (const [batchId, quantity] of selections.entries()) {
         if (quantity <= 0) continue;
         
         const batch = batches.find(b => b.id === batchId);
         if (!batch) continue;
+        
+        // Track total quantity per product for order batch reduction
+        productQuantities.set(
+          batch.product_id,
+          (productQuantities.get(batch.product_id) || 0) + quantity
+        );
 
         if (quantity === batch.quantity) {
           // FULL QUANTITY: Update existing batch state from AVAILABLE → RESERVED
-          // Preserve box linkage, do NOT assign order_id yet (that happens on actual consumption)
           const { error: updateError } = await supabase
             .from('extra_batches')
             .update({
               inventory_state: 'RESERVED',
-              order_id: orderId, // Link to order for tracking
+              order_id: orderId,
             })
             .eq('id', batchId);
 
@@ -288,9 +301,6 @@ export function ExtraInventoryDialog({
           });
         } else {
           // PARTIAL QUANTITY: Split the batch
-          // Original batch keeps remaining quantity, stays AVAILABLE in same box
-          // New batch gets selected quantity, marked RESERVED, stays in same box
-          
           const { data: newBatchCode } = await supabase.rpc('generate_extra_batch_code');
           
           // Create new batch with selected quantity - PRESERVE box_id linkage
@@ -298,11 +308,11 @@ export function ExtraInventoryDialog({
             .from('extra_batches')
             .insert({
               qr_code_data: newBatchCode || `EB-${Date.now()}`,
-              order_id: orderId, // Link to order for tracking
+              order_id: orderId,
               product_id: batch.product_id,
-              current_state: batch.current_state, // Preserve same production state
+              current_state: batch.current_state,
               quantity: quantity,
-              box_id: batch.box_id, // CRITICAL: Preserve box linkage
+              box_id: batch.box_id,
               inventory_state: 'RESERVED',
               created_by: user?.id,
             })
@@ -311,15 +321,11 @@ export function ExtraInventoryDialog({
 
           if (insertError) throw insertError;
 
-          // Update original batch: reduce quantity, stays AVAILABLE, stays in same box
+          // Update original batch: reduce quantity, stays AVAILABLE
           const remainingQuantity = batch.quantity - quantity;
           const { error: updateError } = await supabase
             .from('extra_batches')
-            .update({
-              quantity: remainingQuantity,
-              // inventory_state stays 'AVAILABLE'
-              // box_id stays the same
-            })
+            .update({ quantity: remainingQuantity })
             .eq('id', batchId);
 
           if (updateError) throw updateError;
@@ -332,6 +338,12 @@ export function ExtraInventoryDialog({
         }
       }
 
+      // CRITICAL: Reduce order batches for each product to maintain quantity invariant
+      // Extra inventory replaces order batches, it does NOT add to them
+      for (const [productId, quantityToReduce] of productQuantities.entries()) {
+        await reduceOrderBatchesForProduct(orderId, productId, quantityToReduce);
+      }
+
       toast.success(`Reserved ${totalSelected} extra items for order`);
       onItemsSelected(selectedItems);
       onOpenChange(false);
@@ -339,6 +351,65 @@ export function ExtraInventoryDialog({
       toast.error(error.message);
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  /**
+   * Reduces order batches for a specific product by the given quantity.
+   * This ensures the order item quantity remains unchanged when extra inventory is used.
+   * 
+   * @param orderId - The order to reduce batches for
+   * @param productId - The product whose batches should be reduced
+   * @param quantityToReduce - The amount to reduce
+   */
+  const reduceOrderBatchesForProduct = async (
+    orderId: string,
+    productId: string,
+    quantityToReduce: number
+  ) => {
+    // Fetch order batches for this product (prioritize earlier states)
+    const { data: orderBatches, error: fetchError } = await supabase
+      .from('order_batches')
+      .select('id, quantity, current_state, order_item_id')
+      .eq('order_id', orderId)
+      .eq('product_id', productId)
+      .eq('is_terminated', false)
+      .order('created_at', { ascending: true });
+
+    if (fetchError) throw fetchError;
+    if (!orderBatches || orderBatches.length === 0) {
+      console.warn(`No order batches found for product ${productId} in order ${orderId}`);
+      return;
+    }
+
+    let remaining = quantityToReduce;
+
+    for (const batch of orderBatches) {
+      if (remaining <= 0) break;
+
+      if (batch.quantity <= remaining) {
+        // Delete this batch entirely - it's fully replaced by extra inventory
+        const { error: deleteError } = await supabase
+          .from('order_batches')
+          .delete()
+          .eq('id', batch.id);
+
+        if (deleteError) throw deleteError;
+        remaining -= batch.quantity;
+      } else {
+        // Reduce batch quantity - partially replaced by extra inventory
+        const { error: updateError } = await supabase
+          .from('order_batches')
+          .update({ quantity: batch.quantity - remaining })
+          .eq('id', batch.id);
+
+        if (updateError) throw updateError;
+        remaining = 0;
+      }
+    }
+
+    if (remaining > 0) {
+      console.warn(`Could not reduce all ${quantityToReduce} units for product ${productId}. ${remaining} units remaining.`);
     }
   };
 
