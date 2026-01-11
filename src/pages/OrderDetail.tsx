@@ -241,11 +241,13 @@ export default function OrderDetail() {
 
   const fetchExtraInventoryCounts = async () => {
     try {
+      // State mapping: extra batches in each state are usable for that corresponding phase
+      // e.g., extra_manufacturing batches can be used when order is in manufacturing phase
       const states = [
-        { phase: 'manufacturing', state: 'extra_ready_for_finishing' },
-        { phase: 'finishing', state: 'extra_ready_for_packaging' },
-        { phase: 'packaging', state: 'extra_ready_for_boxing' },
-        { phase: 'boxing', state: 'extra_ready_for_receiving' },
+        { phase: 'manufacturing', state: 'extra_manufacturing' },
+        { phase: 'finishing', state: 'extra_finishing' },
+        { phase: 'packaging', state: 'extra_packaging' },
+        { phase: 'boxing', state: 'extra_boxing' },
       ];
 
       const counts: Record<string, number> = {};

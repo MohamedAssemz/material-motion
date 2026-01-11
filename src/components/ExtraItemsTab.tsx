@@ -57,10 +57,11 @@ interface ExtraItemsTabProps {
 }
 
 // Map phase to the current_state for extra items assigned to this order
+// Extra batches in state X are usable when order is in phase X
 const PHASE_CURRENT_STATE_MAP: Record<string, string> = {
-  manufacturing: 'extra_finishing',
-  finishing: 'extra_packaging',
-  packaging: 'extra_boxing',
+  manufacturing: 'extra_manufacturing',
+  finishing: 'extra_finishing',
+  packaging: 'extra_packaging',
   boxing: 'extra_boxing',
 };
 
