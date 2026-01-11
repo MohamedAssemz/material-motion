@@ -70,7 +70,7 @@ export type Database = {
       }
       extra_batches: {
         Row: {
-          box_id: string | null
+          box_id: string
           created_at: string
           created_by: string | null
           current_state: string
@@ -83,7 +83,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
-          box_id?: string | null
+          box_id: string
           created_at?: string
           created_by?: string | null
           current_state?: string
@@ -96,7 +96,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
-          box_id?: string | null
+          box_id?: string
           created_at?: string
           created_by?: string | null
           current_state?: string
