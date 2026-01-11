@@ -33,7 +33,7 @@ export default function QueueManufacturing() {
 
     const channel = supabase
       .channel('manufacturing-queue')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'batches' }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_batches' }, () => {
         fetchOrders();
       })
       .subscribe();
@@ -51,9 +51,9 @@ export default function QueueManufacturing() {
           id,
           order_number,
           created_at,
-          batches!inner(current_state, quantity)
+          order_batches!inner(current_state, quantity)
         `)
-        .or('current_state.eq.pending_rm,current_state.eq.in_manufacturing', { foreignTable: 'batches' });
+        .or('current_state.eq.pending_rm,current_state.eq.in_manufacturing', { foreignTable: 'order_batches' });
 
       if (error) throw error;
 
@@ -61,10 +61,10 @@ export default function QueueManufacturing() {
         id: order.id,
         order_number: order.order_number,
         created_at: order.created_at,
-        waiting_for_rm_count: order.batches
+        waiting_for_rm_count: order.order_batches
           .filter((b: any) => b.current_state === 'pending_rm')
           .reduce((sum: number, b: any) => sum + b.quantity, 0),
-        manufacturing_count: order.batches
+        manufacturing_count: order.order_batches
           .filter((b: any) => b.current_state === 'in_manufacturing')
           .reduce((sum: number, b: any) => sum + b.quantity, 0),
       })).filter((order: Order) => 

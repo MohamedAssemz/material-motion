@@ -11,7 +11,7 @@ import { getStateLabel } from '@/lib/stateMachine';
 
 interface BatchInfo {
   id: string;
-  batch_code: string;
+  qr_code_data: string;
   current_state: string;
   eta: string | null;
   lead_time_days: number | null;
@@ -53,14 +53,14 @@ export default function BatchLookup() {
     
     try {
       const { data, error } = await supabase
-        .from('batches')
+        .from('order_batches')
         .select(`
           *,
           order:orders(id, order_number, priority),
           product:products(name, sku),
           units(id, serial_no, state, is_damaged)
         `)
-        .eq('batch_code', batchCode.toUpperCase())
+        .eq('qr_code_data', batchCode.toUpperCase())
         .maybeSingle();
 
       if (error) throw error;
@@ -125,7 +125,7 @@ export default function BatchLookup() {
               <Input
                 value={searchCode}
                 onChange={(e) => setSearchCode(e.target.value)}
-                placeholder="Enter batch code (e.g., B-1A2B3C4D)"
+                placeholder="Enter batch code (e.g., EB-1A2B3C4D)"
                 className="font-mono"
               />
               <Button type="submit">
@@ -160,7 +160,7 @@ export default function BatchLookup() {
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
-                <CardTitle className="font-mono text-2xl">{batch.batch_code}</CardTitle>
+                <CardTitle className="font-mono text-2xl">{batch.qr_code_data}</CardTitle>
                 <Badge className={getStatusColor(batch.current_state)}>
                   {getStateLabel(batch.current_state as any)}
                 </Badge>

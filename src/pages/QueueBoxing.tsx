@@ -40,7 +40,7 @@ export default function QueueBoxing() {
 
     const channel = supabase
       .channel('boxing-queue')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'batches' }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_batches' }, () => {
         fetchOrders();
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'shipments' }, () => {
@@ -57,7 +57,7 @@ export default function QueueBoxing() {
     try {
       // Get orders with boxing-related batches
       const { data: batchesData, error: batchError } = await supabase
-        .from('batches')
+        .from('order_batches')
         .select('order_id, current_state, quantity')
         .in('current_state', ['ready_for_boxing', 'in_boxing', 'ready_for_receiving', 'received'])
         .eq('is_terminated', false);

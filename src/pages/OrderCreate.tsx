@@ -251,8 +251,8 @@ export default function OrderCreate() {
       for (const orderItem of createdOrderItems) {
         const { data: batchCode } = await supabase.rpc("generate_batch_code");
 
-        const { error: batchError } = await supabase.from("batches").insert({
-          batch_code: batchCode || `B-${Date.now()}`,
+        const { error: batchError } = await supabase.from("order_batches").insert({
+          qr_code_data: batchCode || `EB-${Date.now()}`,
           order_id: order.id,
           order_item_id: orderItem.id,
           product_id: orderItem.product_id,

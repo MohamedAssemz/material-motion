@@ -24,7 +24,7 @@ import {
 
 interface BatchETA {
   id: string;
-  batch_code: string;
+  qr_code_data: string;
   eta: string;
   current_state: string;
   quantity: number;
@@ -89,7 +89,7 @@ export default function Analytics() {
 
     const channel = supabase
       .channel('analytics-updates')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'batches' }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_batches' }, () => {
         fetchAnalytics();
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'machine_production' }, () => {
@@ -106,10 +106,10 @@ export default function Analytics() {
     try {
       // Fetch batches with ETA
       const { data: batchesData } = await supabase
-        .from('batches')
+        .from('order_batches')
         .select(`
           id,
-          batch_code,
+          qr_code_data,
           eta,
           current_state,
           quantity,
@@ -129,7 +129,7 @@ export default function Analytics() {
         const daysRemaining = differenceInDays(etaDate, now);
         return {
           id: batch.id,
-          batch_code: batch.batch_code,
+          qr_code_data: batch.qr_code_data || 'N/A',
           eta: batch.eta,
           current_state: batch.current_state,
           quantity: batch.quantity,
@@ -187,7 +187,7 @@ export default function Analytics() {
 
       // Fetch state distribution
       const { data: allBatches } = await supabase
-        .from('batches')
+        .from('order_batches')
         .select('current_state, quantity');
 
       const stateMap = new Map<string, number>();
@@ -212,7 +212,7 @@ export default function Analytics() {
       const totalRedos = (ordersData || []).reduce((sum, o: any) => sum + (o.redo_counter || 0), 0);
 
       const { data: leadTimeData } = await supabase
-        .from('batches')
+        .from('order_batches')
         .select('lead_time_days')
         .not('lead_time_days', 'is', null);
 
@@ -416,7 +416,7 @@ export default function Analytics() {
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="font-medium">{batch.batch_code}</span>
+                        <span className="font-medium">{batch.qr_code_data}</span>
                         <Badge variant="outline" className="text-xs">
                           {batch.current_state.replace(/_/g, ' ')}
                         </Badge>
