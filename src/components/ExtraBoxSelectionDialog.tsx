@@ -2,10 +2,13 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Box, Loader2 } from 'lucide-react';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Box, Loader2, Plus, Search } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface ExtraBoxOption {
   id: string;
@@ -24,24 +27,29 @@ interface ExtraBoxOption {
 interface ExtraBoxSelectionDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onConfirm: (boxId: string) => void;
+  onConfirm: (boxId: string, boxCode?: string) => void;
   title?: string;
+  allowCreate?: boolean;
 }
 
 export function ExtraBoxSelectionDialog({
   open,
   onOpenChange,
   onConfirm,
-  title = 'Assign Extra Box',
+  title = 'Select Extra Box',
+  allowCreate = true,
 }: ExtraBoxSelectionDialogProps) {
   const [boxes, setBoxes] = useState<ExtraBoxOption[]>([]);
   const [selectedBoxId, setSelectedBoxId] = useState<string>('');
   const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     if (open) {
       fetchExtraBoxes();
       setSelectedBoxId('');
+      setSearchQuery('');
     }
   }, [open]);
 
@@ -72,15 +80,65 @@ export function ExtraBoxSelectionDialog({
     }
   };
 
+  const handleCreateNewBox = async () => {
+    setCreating(true);
+    try {
+      const { data: boxCode } = await supabase.rpc('generate_extra_box_code');
+      
+      const { data: newBox, error } = await supabase
+        .from('extra_boxes')
+        .insert({
+          box_code: boxCode || `EBOX-${Date.now()}`,
+          is_active: true,
+          content_type: 'EMPTY',
+          items_list: [],
+        })
+        .select('id, box_code, is_active, content_type, items_list')
+        .single();
+
+      if (error) throw error;
+
+      toast.success(`Created new box: ${newBox.box_code}`);
+      
+      // Add to list and auto-select
+      const formattedBox: ExtraBoxOption = {
+        id: newBox.id,
+        box_code: newBox.box_code,
+        is_active: newBox.is_active,
+        content_type: newBox.content_type || 'EMPTY',
+        items_list: [],
+      };
+      
+      setBoxes(prev => [formattedBox, ...prev]);
+      setSelectedBoxId(newBox.id);
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to create box');
+    } finally {
+      setCreating(false);
+    }
+  };
+
   const handleConfirm = () => {
     if (selectedBoxId) {
-      onConfirm(selectedBoxId);
+      const box = boxes.find(b => b.id === selectedBoxId);
+      onConfirm(selectedBoxId, box?.box_code);
       setSelectedBoxId('');
       onOpenChange(false);
     }
   };
 
   const selectedBox = boxes.find(b => b.id === selectedBoxId);
+  
+  // Filter boxes by search query
+  const filteredBoxes = searchQuery.trim()
+    ? boxes.filter(box => 
+        box.box_code.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        box.items_list.some(item => 
+          item.product_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          item.product_sku.toLowerCase().includes(searchQuery.toLowerCase())
+        )
+      )
+    : boxes;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -96,58 +154,118 @@ export function ExtraBoxSelectionDialog({
           <div className="flex items-center justify-center py-8">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
-        ) : boxes.length === 0 ? (
-          <div className="text-center py-8">
-            <Box className="mx-auto h-12 w-12 text-muted-foreground opacity-50 mb-4" />
-            <p className="text-muted-foreground">No extra boxes available</p>
-            <p className="text-sm text-muted-foreground">Create extra boxes from the Boxes page</p>
-          </div>
         ) : (
           <div className="space-y-4">
-            <div>
-              <Label>Select Extra Box</Label>
-              <Select value={selectedBoxId} onValueChange={setSelectedBoxId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Choose a box..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {boxes.map((box) => (
-                    <SelectItem key={box.id} value={box.id}>
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono">{box.box_code}</span>
-                        {box.items_list.length > 0 ? (
-                          <Badge variant="outline" className="text-xs text-amber-600 border-amber-600">
-                            {box.items_list.length} item(s)
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline" className="text-xs text-green-600 border-green-600">
-                            EMPTY
-                          </Badge>
-                        )}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground mt-1">
-                {boxes.length} extra box(es) available
-              </p>
+            {/* Search and Create Row */}
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search boxes..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+              {allowCreate && (
+                <Button 
+                  variant="outline" 
+                  size="icon"
+                  onClick={handleCreateNewBox}
+                  disabled={creating}
+                  title="Create new EBox"
+                >
+                  {creating ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Plus className="h-4 w-4" />
+                  )}
+                </Button>
+              )}
             </div>
 
-            {/* Show selected box contents if it has items */}
-            {selectedBox && selectedBox.items_list.length > 0 && (
-              <div className="p-3 bg-muted/50 rounded-lg space-y-2">
-                <Label className="text-xs text-muted-foreground">Current Contents:</Label>
-                <div className="space-y-1">
-                  {selectedBox.items_list.map((item, idx) => (
-                    <div key={idx} className="flex items-center justify-between text-sm">
-                      <span>{item.product_sku} - {item.product_name}</span>
-                      <span className="font-medium">× {item.quantity}</span>
-                    </div>
-                  ))}
-                </div>
+            {/* Box List */}
+            {filteredBoxes.length === 0 ? (
+              <div className="text-center py-8">
+                <Box className="mx-auto h-12 w-12 text-muted-foreground opacity-50 mb-4" />
+                {boxes.length === 0 ? (
+                  <>
+                    <p className="text-muted-foreground">No extra boxes available</p>
+                    {allowCreate && (
+                      <Button 
+                        variant="link" 
+                        onClick={handleCreateNewBox}
+                        disabled={creating}
+                        className="mt-2"
+                      >
+                        <Plus className="h-4 w-4 mr-1" />
+                        Create your first EBox
+                      </Button>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-muted-foreground">No boxes match your search</p>
+                )}
               </div>
+            ) : (
+              <ScrollArea className="h-[250px]">
+                <div className="space-y-2 pr-4">
+                  {filteredBoxes.map((box) => {
+                    const isSelected = selectedBoxId === box.id;
+                    const totalQty = box.items_list.reduce((sum, item) => sum + item.quantity, 0);
+                    
+                    return (
+                      <div
+                        key={box.id}
+                        onClick={() => setSelectedBoxId(box.id)}
+                        className={`p-3 rounded-lg border cursor-pointer transition-colors ${
+                          isSelected 
+                            ? 'border-primary bg-primary/5' 
+                            : 'border-border hover:border-muted-foreground/50'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Box className={`h-4 w-4 ${isSelected ? 'text-primary' : 'text-muted-foreground'}`} />
+                            <span className="font-mono font-medium">{box.box_code}</span>
+                          </div>
+                          {box.items_list.length > 0 ? (
+                            <Badge variant="secondary" className="text-xs">
+                              {totalQty} units in {box.items_list.length} batch(es)
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-xs text-green-600 border-green-600">
+                              EMPTY
+                            </Badge>
+                          )}
+                        </div>
+                        
+                        {/* Show contents preview if box has items */}
+                        {box.items_list.length > 0 && (
+                          <div className="mt-2 pl-6 text-xs text-muted-foreground space-y-0.5">
+                            {box.items_list.slice(0, 3).map((item, idx) => (
+                              <div key={idx} className="flex justify-between">
+                                <span>{item.product_sku}</span>
+                                <span>× {item.quantity}</span>
+                              </div>
+                            ))}
+                            {box.items_list.length > 3 && (
+                              <div className="text-muted-foreground/70">
+                                +{box.items_list.length - 3} more...
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </ScrollArea>
             )}
+            
+            <p className="text-xs text-muted-foreground">
+              {boxes.length} extra box(es) available • Multiple batches can share the same box
+            </p>
           </div>
         )}
 
@@ -156,7 +274,7 @@ export function ExtraBoxSelectionDialog({
             Cancel
           </Button>
           <Button onClick={handleConfirm} disabled={!selectedBoxId || loading}>
-            Assign Box
+            {selectedBox ? `Select ${selectedBox.box_code}` : 'Select Box'}
           </Button>
         </DialogFooter>
       </DialogContent>
