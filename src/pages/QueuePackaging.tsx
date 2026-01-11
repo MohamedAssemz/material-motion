@@ -33,7 +33,7 @@ export default function QueuePackaging() {
 
     const channel = supabase
       .channel('packaging-queue')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'batches' }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_batches' }, () => {
         fetchOrders();
       })
       .subscribe();
@@ -51,9 +51,9 @@ export default function QueuePackaging() {
           id,
           order_number,
           created_at,
-          batches!inner(current_state, quantity)
+          order_batches!inner(current_state, quantity)
         `)
-        .or('current_state.eq.ready_for_packaging,current_state.eq.in_packaging', { foreignTable: 'batches' });
+        .or('current_state.eq.ready_for_packaging,current_state.eq.in_packaging', { foreignTable: 'order_batches' });
 
       if (error) throw error;
 
@@ -61,10 +61,10 @@ export default function QueuePackaging() {
         id: order.id,
         order_number: order.order_number,
         created_at: order.created_at,
-        ready_for_packaging_count: order.batches
+        ready_for_packaging_count: order.order_batches
           .filter((b: any) => b.current_state === 'ready_for_packaging')
           .reduce((sum: number, b: any) => sum + b.quantity, 0),
-        packaging_count: order.batches
+        packaging_count: order.order_batches
           .filter((b: any) => b.current_state === 'in_packaging')
           .reduce((sum: number, b: any) => sum + b.quantity, 0),
       })).filter((order: Order) => 

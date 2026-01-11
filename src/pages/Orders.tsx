@@ -80,7 +80,7 @@ export default function Orders() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
         fetchOrders();
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'batches' }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_batches' }, () => {
         fetchOrders();
       })
       .subscribe();
@@ -113,7 +113,7 @@ export default function Orders() {
       const ordersWithStatus = await Promise.all(
         (ordersData || []).map(async (order) => {
           const { data: batches } = await supabase
-            .from('batches')
+            .from('order_batches')
             .select('current_state, quantity')
             .eq('order_id', order.id)
             .eq('is_terminated', false);
