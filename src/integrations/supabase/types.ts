@@ -77,6 +77,7 @@ export type Database = {
           id: string
           inventory_state: string
           order_id: string | null
+          order_item_id: string | null
           product_id: string
           qr_code_data: string | null
           quantity: number
@@ -90,6 +91,7 @@ export type Database = {
           id?: string
           inventory_state?: string
           order_id?: string | null
+          order_item_id?: string | null
           product_id: string
           qr_code_data?: string | null
           quantity?: number
@@ -103,6 +105,7 @@ export type Database = {
           id?: string
           inventory_state?: string
           order_id?: string | null
+          order_item_id?: string | null
           product_id?: string
           qr_code_data?: string | null
           quantity?: number
@@ -121,6 +124,13 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "extra_batches_order_item_id_fkey"
+            columns: ["order_item_id"]
+            isOneToOne: false
+            referencedRelation: "order_items"
             referencedColumns: ["id"]
           },
           {
