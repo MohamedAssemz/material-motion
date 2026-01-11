@@ -838,14 +838,47 @@ export default function OrderDetail() {
 
       {/* Dialogs */}
       <RawMaterialsDialog open={rawMaterialsOpen} onOpenChange={setRawMaterialsOpen} orderId={id!} />
-      <FlaggedItemsDialog open={flaggedItemsOpen} onOpenChange={setFlaggedItemsOpen} orderId={id!} />
-      <ShipmentDialog open={shipmentDialogOpen} onOpenChange={setShipmentDialogOpen} orderId={id!} />
+      <FlaggedItemsDialog 
+        open={flaggedItemsOpen} 
+        onOpenChange={setFlaggedItemsOpen} 
+        orderId={id!}
+        batches={(order?.batches || []).filter(b => b.is_flagged || b.is_redo).map(b => ({
+          id: b.id,
+          batch_code: b.qr_code_data,
+          product_name: b.product.name,
+          product_sku: b.product.sku,
+          quantity: b.quantity,
+          current_state: b.current_state,
+          is_flagged: b.is_flagged || false,
+          is_redo: b.is_redo || false,
+        }))}
+        onRefresh={() => fetchOrder()}
+      />
+      <ShipmentDialog 
+        open={shipmentDialogOpen} 
+        onOpenChange={setShipmentDialogOpen} 
+        orderId={id!}
+        orderNumber={order?.order_number || ''}
+        receivedBatches={(order?.batches || []).filter(b => b.current_state === 'received').map(b => ({
+          id: b.id,
+          batch_code: b.qr_code_data,
+          product_id: b.product_id,
+          product_name: b.product.name,
+          product_sku: b.product.sku,
+          quantity: b.quantity,
+        }))}
+        onRefresh={() => fetchOrder()}
+      />
       <ExtraInventoryDialog 
         open={extraInventoryOpen} 
         onOpenChange={setExtraInventoryOpen} 
         orderId={id!}
         phase={selectedExtraPhase}
-        onAssign={() => {
+        orderItems={orderItems.map(item => ({
+          product_id: item.product_id,
+          quantity: item.quantity,
+        }))}
+        onItemsSelected={(selections) => {
           fetchOrder();
           fetchExtraInventoryCounts();
         }}

@@ -879,8 +879,8 @@ export default function OrderBoxing() {
         <TabsContent value="extra">
           <ExtraItemsTab 
             orderId={id!} 
-            targetPhase="boxing" 
-            onAssign={() => fetchData()} 
+            phase="boxing" 
+            onRefresh={() => fetchData()} 
           />
         </TabsContent>
 

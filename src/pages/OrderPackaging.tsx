@@ -643,8 +643,8 @@ export default function OrderPackaging() {
         <TabsContent value="extra">
           <ExtraItemsTab 
             orderId={id!} 
-            targetPhase="packaging" 
-            onAssign={() => fetchData()} 
+            phase="packaging" 
+            onRefresh={() => fetchData()} 
           />
         </TabsContent>
 
