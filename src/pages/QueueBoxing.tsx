@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, Box } from 'lucide-react';
+import { ArrowLeft, Box, Package } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
@@ -25,9 +25,10 @@ interface Order {
   boxing_count: number;
   ready_for_receiving_count: number;
   shipped_count: number;
+  extra_boxing_count: number;
 }
 
-type StatusFilter = 'all' | 'ready_for_boxing' | 'in_boxing' | 'ready_for_receiving' | 'shipped';
+type StatusFilter = 'all' | 'ready_for_boxing' | 'in_boxing' | 'ready_for_receiving' | 'shipped' | 'extra';
 
 export default function QueueBoxing() {
   const navigate = useNavigate();
@@ -44,6 +45,9 @@ export default function QueueBoxing() {
         fetchOrders();
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'shipments' }, () => {
+        fetchOrders();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'extra_batches' }, () => {
         fetchOrders();
       })
       .subscribe();
@@ -64,8 +68,20 @@ export default function QueueBoxing() {
 
       if (batchError) throw batchError;
 
-      // Get unique order IDs
-      const orderIds = [...new Set(batchesData?.map(b => b.order_id).filter(Boolean) || [])];
+      // Fetch orders with reserved extra_batches in extra_boxing state
+      const { data: extraBatchesData, error: extraError } = await supabase
+        .from('extra_batches')
+        .select('order_id, current_state, quantity')
+        .eq('current_state', 'extra_boxing')
+        .eq('inventory_state', 'RESERVED')
+        .not('order_id', 'is', null);
+
+      if (extraError) throw extraError;
+
+      // Combine order IDs from both sources
+      const orderBatchOrderIds = batchesData?.map(b => b.order_id).filter(Boolean) || [];
+      const extraBatchOrderIds = extraBatchesData?.map(b => b.order_id).filter(Boolean) || [];
+      const orderIds = [...new Set([...orderBatchOrderIds, ...extraBatchOrderIds])];
       
       if (orderIds.length === 0) {
         setOrders([]);
@@ -94,6 +110,8 @@ export default function QueueBoxing() {
 
       const ordersWithCounts = (ordersData || []).map((order: any) => {
         const orderBatches = batchesData?.filter(b => b.order_id === order.id) || [];
+        const extraBatches = extraBatchesData?.filter(b => b.order_id === order.id) || [];
+
         return {
           id: order.id,
           order_number: order.order_number,
@@ -108,6 +126,8 @@ export default function QueueBoxing() {
             .filter((b: any) => b.current_state === 'ready_for_receiving')
             .reduce((sum: number, b: any) => sum + b.quantity, 0),
           shipped_count: shipmentCounts.get(order.id) || 0,
+          extra_boxing_count: extraBatches
+            .reduce((sum: number, b: any) => sum + b.quantity, 0),
         };
       });
 
@@ -125,7 +145,8 @@ export default function QueueBoxing() {
         o.ready_for_boxing_count > 0 || 
         o.boxing_count > 0 || 
         o.ready_for_receiving_count > 0 ||
-        o.shipped_count > 0
+        o.shipped_count > 0 ||
+        o.extra_boxing_count > 0
       );
     }
 
@@ -139,6 +160,8 @@ export default function QueueBoxing() {
           return order.ready_for_receiving_count > 0;
         case 'shipped':
           return order.shipped_count > 0;
+        case 'extra':
+          return order.extra_boxing_count > 0;
         default:
           return true;
       }
@@ -177,6 +200,7 @@ export default function QueueBoxing() {
                   <SelectItem value="in_boxing">In Boxing</SelectItem>
                   <SelectItem value="ready_for_receiving">Ready for Shipment</SelectItem>
                   <SelectItem value="shipped">Has Shipments</SelectItem>
+                  <SelectItem value="extra">Has Extra Items</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -198,6 +222,7 @@ export default function QueueBoxing() {
                   <TableHead>Order Number</TableHead>
                   <TableHead>Ready for Boxing</TableHead>
                   <TableHead>In Boxing</TableHead>
+                  <TableHead>Extra Items</TableHead>
                   <TableHead>Ready for Shipment</TableHead>
                   <TableHead>Shipments</TableHead>
                   <TableHead>Created Date</TableHead>
@@ -216,6 +241,14 @@ export default function QueueBoxing() {
                     <TableCell>
                       {order.boxing_count > 0 && (
                         <Badge className="bg-cyan-500">{order.boxing_count} items</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {order.extra_boxing_count > 0 && (
+                        <Badge variant="outline" className="border-amber-500 text-amber-600">
+                          <Package className="h-3 w-3 mr-1" />
+                          {order.extra_boxing_count} extra
+                        </Badge>
                       )}
                     </TableCell>
                     <TableCell>
