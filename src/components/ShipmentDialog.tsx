@@ -149,13 +149,13 @@ export function ShipmentDialog({
           // Update batch - mark as fulfilled or split
           if (take === batch.quantity) {
             await supabase
-              .from('batches')
+              .from('order_batches')
               .update({ current_state: 'received' }) // Already received, now in shipment
               .eq('id', batch.id);
           } else {
             // Split batch - reduce original, shipment item tracks what was taken
             await supabase
-              .from('batches')
+              .from('order_batches')
               .update({ quantity: batch.quantity - take })
               .eq('id', batch.id);
           }

@@ -100,7 +100,7 @@ export function FlaggedItemsDialog({
           // Mark as redo - move back to pending_rm
           if (qty === batch.quantity) {
             await supabase
-              .from('batches')
+              .from('order_batches')
               .update({
                 current_state: 'pending_rm',
                 is_redo: true,
@@ -112,13 +112,13 @@ export function FlaggedItemsDialog({
           } else {
             // Split batch
             await supabase
-              .from('batches')
+              .from('order_batches')
               .update({ quantity: batch.quantity - qty })
               .eq('id', batchId);
 
             const { data: batchCode } = await supabase.rpc('generate_batch_code');
-            await supabase.from('batches').insert({
-              batch_code: batchCode,
+            await supabase.from('order_batches').insert({
+              qr_code_data: batchCode,
               order_id: orderId,
               product_id: batch.id,
               current_state: 'pending_rm',
@@ -133,7 +133,7 @@ export function FlaggedItemsDialog({
           // Mark as terminated
           if (qty === batch.quantity) {
             await supabase
-              .from('batches')
+              .from('order_batches')
               .update({
                 is_terminated: true,
                 terminated_reason: reason.trim(),
@@ -144,13 +144,13 @@ export function FlaggedItemsDialog({
           } else {
             // Split batch
             await supabase
-              .from('batches')
+              .from('order_batches')
               .update({ quantity: batch.quantity - qty })
               .eq('id', batchId);
 
             const { data: batchCode } = await supabase.rpc('generate_batch_code');
-            await supabase.from('batches').insert({
-              batch_code: batchCode,
+            await supabase.from('order_batches').insert({
+              qr_code_data: batchCode,
               order_id: orderId,
               product_id: batch.id,
               current_state: batch.current_state,

@@ -15,7 +15,7 @@ interface BoxWithBatch {
   box_code: string;
   batch?: {
     id: string;
-    batch_code: string;
+    qr_code_data: string | null;
     current_state: string;
     quantity: number;
     product: {
@@ -94,7 +94,7 @@ export function BoxScanDialog({
 
         // Get boxes that have active batches
         const { data: occupiedBatches } = await supabase
-          .from('batches')
+          .from('order_batches')
           .select('box_id')
           .not('box_id', 'is', null)
           .eq('is_terminated', false);
@@ -107,10 +107,10 @@ export function BoxScanDialog({
       } else {
         // Get boxes containing batches in the specified state
         const { data: batches } = await supabase
-          .from('batches')
+          .from('order_batches')
           .select(`
             id,
-            batch_code,
+            qr_code_data,
             current_state,
             quantity,
             box_id,
@@ -141,7 +141,7 @@ export function BoxScanDialog({
             box_code: boxMap.get(b.box_id!)!.box_code,
             batch: {
               id: b.id,
-              batch_code: b.batch_code,
+              qr_code_data: b.qr_code_data,
               current_state: b.current_state,
               quantity: b.quantity,
               product: b.product as any,
@@ -195,7 +195,7 @@ export function BoxScanDialog({
       if (mode === 'assign') {
         // Check if box is empty
         const { data: existingBatch } = await supabase
-          .from('batches')
+          .from('order_batches')
           .select('id')
           .eq('box_id', box.id)
           .eq('is_terminated', false)
@@ -214,10 +214,10 @@ export function BoxScanDialog({
       } else {
         // Check if box has batch in correct state
         const { data: batch } = await supabase
-          .from('batches')
+          .from('order_batches')
           .select(`
             id,
-            batch_code,
+            qr_code_data,
             current_state,
             quantity,
             product:products(name, sku)
@@ -240,7 +240,7 @@ export function BoxScanDialog({
           ...box,
           batch: {
             id: batch.id,
-            batch_code: batch.batch_code,
+            qr_code_data: batch.qr_code_data,
             current_state: batch.current_state,
             quantity: batch.quantity,
             product: batch.product as any,

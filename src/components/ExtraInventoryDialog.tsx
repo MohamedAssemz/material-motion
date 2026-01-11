@@ -12,7 +12,7 @@ import { Search, Box, Package, Loader2, Printer } from 'lucide-react';
 
 interface ExtraBatch {
   id: string;
-  batch_code: string;
+  qr_code_data: string | null;
   product_id: string;
   quantity: number;
   current_state: string;
@@ -58,10 +58,10 @@ interface ExtraInventoryDialogProps {
 
 // Map phase to the current_state that extra batches should have to be available
 const PHASE_CURRENT_STATE_MAP: Record<string, string> = {
-  manufacturing: 'ready_for_finishing',
-  finishing: 'ready_for_packaging',
-  packaging: 'ready_for_boxing',
-  boxing: 'ready_for_receiving',
+  manufacturing: 'extra_finishing',
+  finishing: 'extra_packaging',
+  packaging: 'extra_boxing',
+  boxing: 'extra_boxing',
 };
 
 const PHASE_LABELS: Record<string, string> = {
@@ -111,10 +111,10 @@ export function ExtraInventoryDialog({
       // Fetch available extra inventory batches that match the phase's current_state
       // and contain products from this order
       const { data, error } = await supabase
-        .from('batches')
+        .from('extra_batches')
         .select(`
           id,
-          batch_code,
+          qr_code_data,
           product_id,
           quantity,
           current_state,
@@ -122,31 +122,35 @@ export function ExtraInventoryDialog({
           box_id,
           product:products(id, name, sku)
         `)
-        .eq('batch_type', 'EXTRA')
         .eq('inventory_state', 'AVAILABLE')
-        .eq('is_terminated', false)
         .eq('current_state', targetCurrentState)
         .is('order_id', null)
         .in('product_id', orderProductIds);
 
       if (error) throw error;
 
-      // Fetch box info
+      // Fetch box info from extra_boxes
       const boxIds = data?.filter(b => b.box_id).map(b => b.box_id) || [];
-      let boxMap = new Map();
+      let boxMap = new Map<string, { id: string; box_code: string }>();
       if (boxIds.length > 0) {
         const { data: boxesData } = await supabase
-          .from('boxes')
+          .from('extra_boxes')
           .select('id, box_code')
           .in('id', [...new Set(boxIds)]);
         boxesData?.forEach(box => boxMap.set(box.id, box));
       }
 
-      const batchesWithBoxes = data?.map(batch => ({
-        ...batch,
+      const batchesWithBoxes: ExtraBatch[] = (data || []).map(batch => ({
+        id: batch.id,
+        qr_code_data: batch.qr_code_data,
+        product_id: batch.product_id,
+        quantity: batch.quantity,
+        current_state: batch.current_state,
+        inventory_state: batch.inventory_state,
+        box_id: batch.box_id,
         product: batch.product as unknown as { id: string; name: string; sku: string },
         box: batch.box_id ? boxMap.get(batch.box_id) : null,
-      })) || [];
+      }));
 
       setBatches(batchesWithBoxes);
     } catch (error: any) {
@@ -246,10 +250,9 @@ export function ExtraInventoryDialog({
 
         // If using entire batch quantity, update the existing batch to assign to order
         if (quantity === batch.quantity) {
-          // Move entire batch to the order - change batch_type to ORDER and assign order_id
-          await supabase.from('batches').update({
+          // Move entire batch to the order - assign order_id and mark as RESERVED
+          await supabase.from('extra_batches').update({
             order_id: orderId,
-            batch_type: 'ORDER', // Now part of the order
             inventory_state: 'RESERVED',
           }).eq('id', batchId);
 
@@ -260,20 +263,18 @@ export function ExtraInventoryDialog({
           });
         } else {
           // Using partial quantity - create a new batch for the order and subtract from source
-          const { data: batchCode } = await supabase.rpc('generate_batch_code');
+          const { data: batchCode } = await supabase.rpc('generate_extra_batch_code');
           
-          // New batch keeps the same current_state as source batch, but becomes ORDER type
-          const { data: newBatch, error: insertError } = await supabase.from('batches').insert({
-            batch_code: batchCode || `EX-${Date.now()}`,
+          // New batch keeps the same current_state as source batch
+          const { data: newBatch, error: insertError } = await supabase.from('extra_batches').insert({
+            qr_code_data: batchCode || `EX-${Date.now()}`,
             order_id: orderId,
             product_id: batch.product_id,
-            current_state: batch.current_state, // Keep the same state
+            current_state: batch.current_state,
             quantity: quantity,
             box_id: null, // New batch doesn't inherit box - needs to be assigned
-            batch_type: 'ORDER', // Now part of the order
             inventory_state: 'RESERVED',
             created_by: user?.id,
-            parent_batch_id_split: batchId,
           }).select('id').single();
 
           if (insertError) throw insertError;
@@ -282,9 +283,9 @@ export function ExtraInventoryDialog({
           const newQuantity = batch.quantity - quantity;
           if (newQuantity <= 0) {
             // Delete the source batch if quantity is zero
-            await supabase.from('batches').delete().eq('id', batchId);
+            await supabase.from('extra_batches').delete().eq('id', batchId);
           } else {
-            await supabase.from('batches').update({
+            await supabase.from('extra_batches').update({
               quantity: newQuantity,
             }).eq('id', batchId);
           }
@@ -488,8 +489,8 @@ export function ExtraInventoryDialog({
             Cancel
           </Button>
           <Button onClick={handleConfirm} disabled={totalSelected === 0 || submitting}>
-            {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
-            Add to Order
+            {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+            Add to Order ({totalSelected})
           </Button>
         </DialogFooter>
       </DialogContent>

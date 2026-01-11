@@ -62,7 +62,7 @@ export default function Dashboard() {
 
     const channel = supabase
       .channel('dashboard-batches')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'batches' }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_batches' }, () => {
         fetchStats();
       })
       .subscribe();
@@ -76,7 +76,7 @@ export default function Dashboard() {
     try {
       const [ordersRes, batchesRes] = await Promise.all([
         supabase.from('orders').select('id', { count: 'exact', head: true }),
-        supabase.from('batches').select('current_state, quantity').eq('is_terminated', false),
+        supabase.from('order_batches').select('current_state, quantity').eq('is_terminated', false),
       ]);
 
       const batchesByState = batchesRes.data?.reduce((acc, batch) => {
