@@ -53,7 +53,7 @@ import {
 
 interface Batch {
   id: string;
-  batch_code: string;
+  qr_code_data: string;
   current_state: string;
   quantity: number;
   product_id: string;
@@ -146,14 +146,14 @@ export default function OrderDetail() {
 
     const channel = supabase
       .channel(`order-${id}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "batches", filter: `order_id=eq.${id}` }, () => {
+      .on("postgres_changes", { event: "*", schema: "public", table: "order_batches", filter: `order_id=eq.${id}` }, () => {
         fetchOrder();
       })
       .subscribe();
 
     const extraChannel = supabase
       .channel('extra-inventory-counts')
-      .on("postgres_changes", { event: "*", schema: "public", table: "batches" }, () => {
+      .on("postgres_changes", { event: "*", schema: "public", table: "extra_batches" }, () => {
         fetchExtraInventoryCounts();
       })
       .subscribe();
@@ -173,11 +173,7 @@ export default function OrderDetail() {
           .select(
             `
             *,
-            customer:customers(name, code),
-            batches(
-              id, batch_code, current_state, quantity, product_id, order_item_id, eta, lead_time_days, box_id, is_terminated, is_redo, is_flagged,
-              product:products(id, name, sku, needs_packing)
-            )
+            customer:customers(name, code)
           `,
           )
           .eq("id", id)
@@ -195,8 +191,16 @@ export default function OrderDetail() {
         return;
       }
 
+      // Fetch batches separately
+      const { data: batchesData, error: batchesError } = await supabase
+        .from("order_batches")
+        .select("id, qr_code_data, current_state, quantity, product_id, order_item_id, eta, lead_time_days, box_id, is_terminated, is_redo, is_flagged, product:products(id, name, sku, needs_packing)")
+        .eq("order_id", id);
+
+      if (batchesError) throw batchesError;
+
       // Fetch box info for batches with box_id
-      const boxIds = orderData.batches?.filter((b: any) => b.box_id).map((b: any) => b.box_id) || [];
+      const boxIds = batchesData?.filter((b: any) => b.box_id).map((b: any) => b.box_id) || [];
       let boxMap = new Map();
 
       if (boxIds.length > 0) {
@@ -205,7 +209,7 @@ export default function OrderDetail() {
       }
 
       const batchesWithBoxes =
-        orderData.batches?.map((batch: any) => ({
+        batchesData?.map((batch: any) => ({
           ...batch,
           product: batch.product,
           box: batch.box_id ? boxMap.get(batch.box_id) : null,
@@ -235,21 +239,19 @@ export default function OrderDetail() {
   const fetchExtraInventoryCounts = async () => {
     try {
       const states = [
-        { phase: 'manufacturing', state: 'ready_for_finishing' },
-        { phase: 'finishing', state: 'ready_for_packaging' },
-        { phase: 'packaging', state: 'ready_for_boxing' },
-        { phase: 'boxing', state: 'ready_for_receiving' },
+        { phase: 'manufacturing', state: 'extra_ready_for_finishing' },
+        { phase: 'finishing', state: 'extra_ready_for_packaging' },
+        { phase: 'packaging', state: 'extra_ready_for_boxing' },
+        { phase: 'boxing', state: 'extra_ready_for_receiving' },
       ];
 
       const counts: Record<string, number> = {};
 
       for (const { phase, state } of states) {
         const { data, error } = await supabase
-          .from('batches')
+          .from('extra_batches')
           .select('quantity')
-          .eq('batch_type', 'EXTRA')
           .eq('inventory_state', 'AVAILABLE')
-          .eq('is_terminated', false)
           .eq('current_state', state);
 
         if (!error && data) {
@@ -265,7 +267,7 @@ export default function OrderDetail() {
 
   const handleDeleteOrder = async () => {
     try {
-      await supabase.from("batches").delete().eq("order_id", id);
+      await supabase.from("order_batches").delete().eq("order_id", id);
       await supabase.from("order_items").delete().eq("order_id", id);
       await supabase.from("raw_material_versions").delete().eq("order_id", id);
       await supabase.from("notifications").delete().eq("order_id", id);
@@ -454,7 +456,7 @@ export default function OrderDetail() {
     .filter((b) => b.current_state === "received")
     .map((b) => ({
       id: b.id,
-      batch_code: b.batch_code,
+      qr_code_data: b.qr_code_data,
       product_id: b.product_id,
       product_name: b.product?.name || "Unknown",
       product_sku: b.product?.sku || "N/A",
@@ -502,16 +504,14 @@ export default function OrderDetail() {
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Delete Order?</AlertDialogTitle>
+                  <AlertDialogTitle>Delete Order</AlertDialogTitle>
                   <AlertDialogDescription>
-                    This will permanently delete {order.order_number} and all related data.
+                    This will permanently delete the order and all associated data. This action cannot be undone.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleDeleteOrder} className="bg-destructive">
-                    Delete
-                  </AlertDialogAction>
+                  <AlertDialogAction onClick={handleDeleteOrder}>Delete</AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
@@ -519,398 +519,312 @@ export default function OrderDetail() {
         </div>
       </div>
 
-      {/* Order Summary - Full Width Horizontal Card */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-4 text-sm">
-            <div>
-              <span className="text-muted-foreground block mb-1">Order #</span>
-              <span className="font-mono font-medium">{order.order_number}</span>
-            </div>
-            <div>
-              <span className="text-muted-foreground block mb-1">Status</span>
-              <Badge variant={orderState === "Fulfilled" ? "default" : "secondary"}>{orderState}</Badge>
-            </div>
-            <div>
-              <span className="text-muted-foreground block mb-1">Priority</span>
-              <Badge variant={order.priority === "high" ? "destructive" : "secondary"} className="text-xs">
-                {order.priority}
-              </Badge>
-            </div>
-            <div>
-              <span className="text-muted-foreground block mb-1">EFT</span>
-              <span>{order.estimated_fulfillment_time ? format(new Date(order.estimated_fulfillment_time), "PP") : "N/A"}</span>
-            </div>
-            <div>
-              <span className="text-muted-foreground block mb-1">Customer</span>
-              <span>{order.customer?.name || "N/A"}</span>
-            </div>
-            <div>
-              <span className="text-muted-foreground block mb-1">Shipping</span>
-              <span className="flex items-center gap-1">
-                {order.shipping_type === "international" ? (
-                  <Plane className="h-3 w-3" />
-                ) : (
-                  <Truck className="h-3 w-3" />
-                )}
-                {order.shipping_type === "international" ? "International" : "Domestic"}
-              </span>
-            </div>
-            <div>
-              <span className="text-muted-foreground block mb-1">Created</span>
-              <span>{format(new Date(order.created_at), "PP")}</span>
-            </div>
-            <div>
-              <span className="text-muted-foreground block mb-1">Created By</span>
-              <span className="truncate">{order.profile.full_name}</span>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Order Summary */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-sm text-muted-foreground">Total Items</p>
+            <p className="text-2xl font-bold">{totalItems}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-sm text-muted-foreground">Received</p>
+            <p className="text-2xl font-bold text-green-600">{receivedItems}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-sm text-muted-foreground">Shipping</p>
+            <p className="text-2xl font-bold flex items-center gap-2">
+              {order.shipping_type === "international" ? (
+                <>
+                  <Plane className="h-5 w-5" /> International
+                </>
+              ) : (
+                <>
+                  <Truck className="h-5 w-5" /> Domestic
+                </>
+              )}
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-sm text-muted-foreground">EFT</p>
+            <p className="text-2xl font-bold">
+              {order.estimated_fulfillment_time
+                ? format(new Date(order.estimated_fulfillment_time), "MMM d")
+                : "Not set"}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
 
-      {/* Notes & Alerts Row */}
+      {/* Notes & Alerts */}
       {(order.notes || flaggedCount > 0 || redoCount > 0) && (
-        <div className="flex flex-wrap gap-4">
+        <div className="space-y-2">
           {order.notes && (
-            <Card className="flex-1 min-w-[200px]">
+            <Card>
               <CardContent className="p-4">
-                <span className="text-sm font-medium">Notes:</span>
-                <p className="text-sm text-muted-foreground mt-1">{order.notes}</p>
+                <p className="text-sm font-medium">Notes</p>
+                <p className="text-sm text-muted-foreground">{order.notes}</p>
               </CardContent>
             </Card>
           )}
           {(flaggedCount > 0 || redoCount > 0) && (
-            <Card
-              className="border-warning/50 bg-warning/5 cursor-pointer hover:bg-warning/10 transition-colors"
-              onClick={() => setFlaggedItemsOpen(true)}
-            >
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <AlertTriangle className="h-5 w-5 text-warning" />
-                  <div>
-                    {flaggedCount > 0 && <p className="font-medium">{flaggedCount} Flagged Items</p>}
-                    {redoCount > 0 && <p className="font-medium">{redoCount} Redo Required</p>}
-                  </div>
+            <Card className="border-warning">
+              <CardContent className="p-4 flex items-center gap-4">
+                <AlertTriangle className="h-5 w-5 text-warning" />
+                <div className="flex-1">
+                  {flaggedCount > 0 && (
+                    <span className="text-sm">
+                      {flaggedCount} flagged item(s)
+                    </span>
+                  )}
+                  {flaggedCount > 0 && redoCount > 0 && <span className="mx-2">·</span>}
+                  {redoCount > 0 && (
+                    <span className="text-sm">
+                      {redoCount} redo item(s)
+                    </span>
+                  )}
                 </div>
+                <Button variant="outline" size="sm" onClick={() => setFlaggedItemsOpen(true)}>
+                  View Details
+                </Button>
               </CardContent>
             </Card>
           )}
         </div>
       )}
 
-      {/* Middle Section - Two Cards Side by Side */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Left Card - Production Timeline */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg">Production Timeline</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {[
-                {
-                  label: "Manufacturing",
-                  in: "in_manufacturing",
-                  ready: "pending_rm",
-                  stats: manufacturingStats,
-                  icon: Factory,
-                  color: "blue",
-                },
-                {
-                  label: "Finishing",
-                  in: "in_finishing",
-                  ready: "ready_for_finishing",
-                  stats: finishingStats,
-                  icon: Sparkles,
-                  color: "purple",
-                },
-                {
-                  label: "Packaging",
-                  in: "in_packaging",
-                  ready: "ready_for_packaging",
-                  stats: packagingStats,
-                  icon: Package,
-                  color: "indigo",
-                },
-                {
-                  label: "Boxing",
-                  in: "in_boxing",
-                  ready: "ready_for_boxing",
-                  stats: boxingStats,
-                  icon: Box,
-                  color: "cyan",
-                },
-              ].map((phase, idx) => {
-                const Icon = phase.icon;
-                const total = phase.stats.waiting + phase.stats.inProgress + phase.stats.completed;
-                const progress = totalItems > 0 ? (phase.stats.completed / totalItems) * 100 : 0;
-
-                return (
-                  <div key={phase.label} className="flex items-center gap-3">
-                    <div
-                      className={`flex items-center justify-center w-8 h-8 rounded-full bg-${phase.color}-100 dark:bg-${phase.color}-900/30`}
-                    >
-                      <Icon className={`h-4 w-4 text-${phase.color}-600 dark:text-${phase.color}-400`} />
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="font-medium">{phase.label}</span>
-                        <span className="text-muted-foreground">
-                          {phase.stats.waiting > 0 && (
-                            <span className="text-warning">{phase.stats.waiting} waiting · </span>
-                          )}
-                          {phase.stats.inProgress > 0 && (
-                            <span className="text-primary">{phase.stats.inProgress} active · </span>
-                          )}
-                          {phase.stats.completed}/{totalItems} done
-                        </span>
-                      </div>
-                      <div className="h-1.5 bg-secondary rounded-full mt-1 overflow-hidden">
-                        <div
-                          className="h-full bg-primary rounded-full transition-all"
-                          style={{ width: `${progress}%` }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-
-              {/* Fulfilled */}
-              <div className="flex items-center gap-3 pt-2 border-t">
-                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-green-100 dark:bg-green-900/30">
-                  <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="font-medium">Fulfilled</span>
-                    <span className="text-green-600 font-medium">
-                      {receivedItems}/{totalItems}
-                    </span>
-                  </div>
-                  <div className="h-1.5 bg-secondary rounded-full mt-1 overflow-hidden">
-                    <div
-                      className="h-full bg-green-500 rounded-full transition-all"
-                      style={{ width: `${(receivedItems / totalItems) * 100}%` }}
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-        </CardContent>
-        </Card>
-
-        {/* Right Card - Extra Inventory */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg">Extra Inventory</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
-              {([
-                { phase: 'manufacturing', label: 'Manufacturing', icon: Factory, color: 'blue' },
-                { phase: 'finishing', label: 'Finishing', icon: Sparkles, color: 'purple' },
-                { phase: 'packaging', label: 'Packaging', icon: Package, color: 'indigo' },
-                { phase: 'boxing', label: 'Boxing', icon: Box, color: 'cyan' },
-              ] as const).map((item) => {
-                const Icon = item.icon;
-                const count = extraInventoryCounts[item.phase] || 0;
-                return (
-                  <div
-                    key={item.phase}
-                    className="flex items-center gap-3 p-3 rounded-lg border cursor-pointer hover:border-primary/50 transition-colors"
-                    onClick={() => {
-                      setSelectedExtraPhase(item.phase);
-                      setExtraInventoryOpen(true);
-                    }}
-                  >
-                    <div className={`p-2 rounded-lg bg-${item.color}-100 dark:bg-${item.color}-900/30`}>
-                      <Icon className={`h-5 w-5 text-${item.color}-600 dark:text-${item.color}-400`} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm">{item.label}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {count > 0 ? <span className="text-green-600">{count} available</span> : 'No items'}
-                      </p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Production Phases - Full Width */}
+      {/* Production Timeline */}
       <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg">Production Phases</CardTitle>
+        <CardHeader>
+          <CardTitle>Production Timeline</CardTitle>
+          <CardDescription>Track progress through each phase</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {[
-                {
-                  label: "Manufacturing",
-                  href: `/orders/${id}/manufacturing`,
-                  in: "in_manufacturing",
-                  ready: "pending_rm",
-                  icon: Factory,
-                  color: "blue",
-                },
-                {
-                  label: "Finishing",
-                  href: `/orders/${id}/finishing`,
-                  in: "in_finishing",
-                  ready: "ready_for_finishing",
-                  icon: Sparkles,
-                  color: "purple",
-                },
-                {
-                  label: "Packaging",
-                  href: `/orders/${id}/packaging`,
-                  in: "in_packaging",
-                  ready: "ready_for_packaging",
-                  icon: Package,
-                  color: "indigo",
-                },
-                {
-                  label: "Boxing",
-                  href: `/orders/${id}/boxing`,
-                  in: "in_boxing",
-                  ready: "ready_for_boxing",
-                  icon: Box,
-                  color: "cyan",
-                },
-              ].map((phase) => {
-                const Icon = phase.icon;
-                const waiting = activeBatches
-                  .filter((b) => b.current_state === phase.ready)
-                  .reduce((sum, b) => sum + b.quantity, 0);
-                const inProgress = activeBatches
-                  .filter((b) => b.current_state === phase.in)
-                  .reduce((sum, b) => sum + b.quantity, 0);
-
-                return (
-                  <div
-                    key={phase.label}
-                    className="flex items-center gap-3 p-3 rounded-lg border cursor-pointer hover:border-primary/50 transition-colors"
-                    onClick={() => navigate(phase.href)}
-                  >
-                    <div className={`p-2 rounded-lg bg-${phase.color}-100 dark:bg-${phase.color}-900/30`}>
-                      <Icon className={`h-5 w-5 text-${phase.color}-600 dark:text-${phase.color}-400`} />
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Link to={`/orders/${id}/manufacturing`} className="block">
+              <Card className="hover:border-primary transition-colors cursor-pointer">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/30">
+                      <Factory className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm">{phase.label}</p>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {waiting > 0 && <span className="text-warning">{waiting} wait</span>}
-                        {waiting > 0 && inProgress > 0 && " · "}
-                        {inProgress > 0 && <span className="text-primary">{inProgress} active</span>}
-                        {waiting === 0 && inProgress === 0 && <span>No active</span>}
-                      </p>
+                    <p className="font-medium">Manufacturing</p>
+                  </div>
+                  <div className="space-y-1 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Waiting</span>
+                      <span className="font-medium text-warning">{manufacturingStats.waiting}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">In Progress</span>
+                      <span className="font-medium text-primary">{manufacturingStats.inProgress}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Completed</span>
+                      <span className="font-medium text-green-600">{manufacturingStats.completed}</span>
                     </div>
                   </div>
-                );
-              })}
-            </div>
+                </CardContent>
+              </Card>
+            </Link>
 
-            {/* Shipments */}
-            <div
-              className="flex items-center gap-3 p-3 rounded-lg border border-green-200 dark:border-green-800 cursor-pointer hover:border-primary/50 transition-colors"
-              onClick={() => navigate(`/orders/${id}/boxing?tab=shipments`)}
-            >
-              <div className="p-2 rounded-lg bg-green-100 dark:bg-green-900/30">
-                <Truck className="h-5 w-5 text-green-600 dark:text-green-400" />
-              </div>
-              <div className="flex-1">
-                <p className="font-medium">Shipments</p>
-                <p className="text-sm text-muted-foreground">{receivedItems} items fulfilled</p>
-              </div>
-              <ArrowLeft className="h-4 w-4 rotate-180 text-muted-foreground" />
-            </div>
-          </CardContent>
-        </Card>
+            <Link to={`/orders/${id}/finishing`} className="block">
+              <Card className="hover:border-primary transition-colors cursor-pointer">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-900/30">
+                      <Sparkles className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                    </div>
+                    <p className="font-medium">Finishing</p>
+                  </div>
+                  <div className="space-y-1 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Waiting</span>
+                      <span className="font-medium text-warning">{finishingStats.waiting}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">In Progress</span>
+                      <span className="font-medium text-primary">{finishingStats.inProgress}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Completed</span>
+                      <span className="font-medium text-green-600">{finishingStats.completed}</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
 
-      {/* Order Items - Full Width Section */}
+            <Link to={`/orders/${id}/packaging`} className="block">
+              <Card className="hover:border-primary transition-colors cursor-pointer">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="p-2 rounded-lg bg-indigo-100 dark:bg-indigo-900/30">
+                      <Package className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                    </div>
+                    <p className="font-medium">Packaging</p>
+                  </div>
+                  <div className="space-y-1 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Waiting</span>
+                      <span className="font-medium text-warning">{packagingStats.waiting}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">In Progress</span>
+                      <span className="font-medium text-primary">{packagingStats.inProgress}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Completed</span>
+                      <span className="font-medium text-green-600">{packagingStats.completed}</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+
+            <Link to={`/orders/${id}/boxing`} className="block">
+              <Card className="hover:border-primary transition-colors cursor-pointer">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="p-2 rounded-lg bg-cyan-100 dark:bg-cyan-900/30">
+                      <Box className="h-5 w-5 text-cyan-600 dark:text-cyan-400" />
+                    </div>
+                    <p className="font-medium">Boxing</p>
+                  </div>
+                  <div className="space-y-1 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Waiting</span>
+                      <span className="font-medium text-warning">{boxingStats.waiting}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">In Progress</span>
+                      <span className="font-medium text-primary">{boxingStats.inProgress}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Completed</span>
+                      <span className="font-medium text-green-600">{boxingStats.completed}</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Extra Inventory */}
       <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg flex items-center justify-between">
-            Order Items
-            <Badge variant="secondary">{totalItems} total</Badge>
-          </CardTitle>
+        <CardHeader>
+          <CardTitle>Extra Inventory</CardTitle>
+          <CardDescription>Available extra items that can be used for this order</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {(['manufacturing', 'finishing', 'packaging', 'boxing'] as const).map((phase) => (
+              <Button
+                key={phase}
+                variant="outline"
+                className="h-auto py-4 flex flex-col items-center gap-2"
+                onClick={() => {
+                  setSelectedExtraPhase(phase);
+                  setExtraInventoryOpen(true);
+                }}
+              >
+                <span className="text-2xl font-bold text-primary">{extraInventoryCounts[phase] || 0}</span>
+                <span className="text-xs text-muted-foreground capitalize">{phase}</span>
+              </Button>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Shipments */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle>Shipments</CardTitle>
+            <CardDescription>View and manage order shipments</CardDescription>
+          </div>
+          <Button variant="outline" onClick={() => setShipmentDialogOpen(true)}>
+            View Shipments
+          </Button>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <CheckCircle className="h-5 w-5 text-green-600" />
+              <span className="text-sm">
+                {receivedItems} / {totalItems} items received
+              </span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Order Items Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Order Items</CardTitle>
+          <CardDescription>Products included in this order</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full">
               <thead>
-                <tr className="border-b text-muted-foreground">
-                  <th className="text-left py-2">Product</th>
-                  <th className="text-center py-2">Qty</th>
-                  <th className="text-center py-2">Packing</th>
-                  <th className="text-center py-2">Boxing</th>
-                  <th className="text-right py-2">Progress</th>
+                <tr className="border-b">
+                  <th className="text-left p-3 font-medium">Product</th>
+                  <th className="text-left p-3 font-medium">SKU</th>
+                  <th className="text-center p-3 font-medium">Quantity</th>
+                  <th className="text-center p-3 font-medium">Packing</th>
+                  <th className="text-center p-3 font-medium">Boxing</th>
+                  <th className="text-center p-3 font-medium">Progress</th>
                 </tr>
               </thead>
               <tbody>
                 {orderItems.map((item) => {
-                  // Find batches for this specific order item (not just product)
                   const itemBatches = activeBatches.filter((b) => b.order_item_id === item.id);
-                  const totalQty = itemBatches.reduce((sum, b) => sum + b.quantity, 0);
-                  const receivedQty = itemBatches
+                  const itemReceived = itemBatches
                     .filter((b) => b.current_state === "received")
                     .reduce((sum, b) => sum + b.quantity, 0);
-                  const progressPct = totalQty > 0 ? Math.round((receivedQty / totalQty) * 100) : 0;
-                  const stateBreakdown = getAllStates()
-                    .map((s) => ({
-                      state: s,
-                      qty: itemBatches.filter((b) => b.current_state === s).reduce((sum, b) => sum + b.quantity, 0),
-                    }))
-                    .filter((s) => s.qty > 0);
+                  const progress = item.quantity > 0 ? Math.round((itemReceived / item.quantity) * 100) : 0;
 
                   return (
-                    <tr key={item.id} className="border-b last:border-0">
-                      <td className="py-3">
-                        <p className="font-medium">{item.product?.name || "Unknown"}</p>
-                        <p className="text-xs text-muted-foreground">{item.product?.sku || "N/A"}</p>
-                      </td>
-                      <td className="text-center font-medium">{item.quantity}</td>
-                      <td className="text-center">
+                    <tr key={item.id} className="border-b hover:bg-muted/50">
+                      <td className="p-3">{item.product?.name || "Unknown"}</td>
+                      <td className="p-3 font-mono text-sm">{item.product?.sku || "N/A"}</td>
+                      <td className="p-3 text-center">{item.quantity}</td>
+                      <td className="p-3 text-center">
                         {item.product?.needs_packing ? (
-                          <Badge variant="outline" className="text-xs">
+                          <Badge variant="outline" className="bg-primary/10">
                             Yes
                           </Badge>
                         ) : (
-                          <Badge variant="secondary" className="text-xs">
-                            No
-                          </Badge>
+                          <Badge variant="secondary">No</Badge>
                         )}
                       </td>
-                      <td className="text-center">
+                      <td className="p-3 text-center">
                         {item.needs_boxing ? (
-                          <Badge variant="outline" className="text-xs bg-primary/10">
+                          <Badge variant="outline" className="bg-primary/10">
                             Yes
                           </Badge>
                         ) : (
-                          <Badge variant="secondary" className="text-xs">
-                            No
-                          </Badge>
+                          <Badge variant="secondary">No</Badge>
                         )}
                       </td>
-                      <td className="text-right">
-                        <div className="flex flex-col items-end gap-1">
-                          <span className="font-medium">{progressPct}%</span>
-                          <div className="text-xs text-muted-foreground max-w-[140px] text-right">
-                            {stateBreakdown.slice(0, 2).map((s, i) => (
-                              <span key={s.state}>
-                                {i > 0 && ", "}
-                                {s.qty}{" "}
-                                {getStateLabel(s.state as UnitState)
-                                  .split(" ")
-                                  .slice(0, 2)
-                                  .join(" ")}
-                              </span>
-                            ))}
-                            {stateBreakdown.length > 2 && <span> +{stateBreakdown.length - 2}</span>}
+                      <td className="p-3">
+                        <div className="flex items-center gap-2 justify-center">
+                          <div className="w-24 h-2 bg-muted rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-green-600 transition-all"
+                              style={{ width: `${progress}%` }}
+                            />
                           </div>
+                          <span className="text-xs text-muted-foreground">{progress}%</span>
                         </div>
                       </td>
                     </tr>
@@ -924,45 +838,16 @@ export default function OrderDetail() {
 
       {/* Dialogs */}
       <RawMaterialsDialog open={rawMaterialsOpen} onOpenChange={setRawMaterialsOpen} orderId={id!} />
-
-      <FlaggedItemsDialog
-        open={flaggedItemsOpen}
-        onOpenChange={setFlaggedItemsOpen}
+      <FlaggedItemsDialog open={flaggedItemsOpen} onOpenChange={setFlaggedItemsOpen} orderId={id!} />
+      <ShipmentDialog open={shipmentDialogOpen} onOpenChange={setShipmentDialogOpen} orderId={id!} />
+      <ExtraInventoryDialog 
+        open={extraInventoryOpen} 
+        onOpenChange={setExtraInventoryOpen} 
         orderId={id!}
-        batches={activeBatches
-          .filter((b) => b.is_flagged || b.is_redo)
-          .map((b) => ({
-            id: b.id,
-            batch_code: b.batch_code,
-            product_name: b.product?.name || "Unknown",
-            product_sku: b.product?.sku || "N/A",
-            quantity: b.quantity,
-            current_state: b.current_state,
-            is_flagged: b.is_flagged || false,
-            is_redo: b.is_redo || false,
-          }))}
-        onRefresh={fetchOrder}
-      />
-
-      <ShipmentDialog
-        open={shipmentDialogOpen}
-        onOpenChange={setShipmentDialogOpen}
-        orderId={id!}
-        orderNumber={order.order_number}
-        receivedBatches={receivedBatches}
-        onRefresh={fetchOrder}
-      />
-
-      <ExtraInventoryDialog
-        open={extraInventoryOpen}
-        onOpenChange={setExtraInventoryOpen}
         phase={selectedExtraPhase}
-        orderId={id!}
-        orderItems={orderItems.map(oi => ({ product_id: oi.product_id, quantity: oi.quantity }))}
-        onItemsSelected={async (selections) => {
-          // Handle the extra inventory selection - this will be processed in the phase pages
-          toast.success(`Selected ${selections.reduce((sum, s) => sum + s.quantity, 0)} extra items`);
+        onAssign={() => {
           fetchOrder();
+          fetchExtraInventoryCounts();
         }}
       />
     </div>

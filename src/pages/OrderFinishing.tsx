@@ -38,7 +38,7 @@ import {
 
 interface Batch {
   id: string;
-  batch_code: string;
+  qr_code_data: string;
   current_state: string;
   quantity: number;
   product_id: string;
@@ -114,7 +114,7 @@ export default function OrderFinishing() {
     fetchData();
     const channel = supabase
       .channel(`order-finishing-${id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'batches', filter: `order_id=eq.${id}` }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_batches', filter: `order_id=eq.${id}` }, () => {
         fetchData();
       })
       .subscribe();
@@ -125,14 +125,14 @@ export default function OrderFinishing() {
     try {
       const [orderRes, batchesRes, completedRes] = await Promise.all([
         supabase.from('orders').select('id, order_number, priority, customer:customers(name)').eq('id', id).single(),
-        supabase.from('batches')
-          .select('id, batch_code, current_state, quantity, product_id, order_item_id, box_id, product:products(id, name, sku, needs_packing)')
+        supabase.from('order_batches')
+          .select('id, qr_code_data, current_state, quantity, product_id, order_item_id, box_id, product:products(id, name, sku, needs_packing)')
           .eq('order_id', id)
           .eq('is_terminated', false)
           .in('current_state', ['ready_for_finishing', 'in_finishing']),
         // Fetch completed items for this phase (moved to next phases)
-        supabase.from('batches')
-          .select('id, batch_code, current_state, quantity, product_id, order_item_id, box_id, product:products(id, name, sku, needs_packing)')
+        supabase.from('order_batches')
+          .select('id, qr_code_data, current_state, quantity, product_id, order_item_id, box_id, product:products(id, name, sku, needs_packing)')
           .eq('order_id', id)
           .eq('is_terminated', false)
           .in('current_state', ['ready_for_packaging', 'in_packaging', 'ready_for_boxing', 'in_boxing', 'ready_for_receiving', 'received'])
@@ -184,7 +184,7 @@ export default function OrderFinishing() {
     setLoadingBoxes(true);
     try {
       const { data: allBoxes } = await supabase.from('boxes').select('id, box_code').eq('is_active', true).order('box_code');
-      const { data: occupiedBatches } = await supabase.from('batches').select('box_id').not('box_id', 'is', null).eq('is_terminated', false);
+      const { data: occupiedBatches } = await supabase.from('order_batches').select('box_id').not('box_id', 'is', null).eq('is_terminated', false);
       const occupiedIds = new Set(occupiedBatches?.map(b => b.box_id) || []);
       setAvailableBoxes(allBoxes?.filter(box => !occupiedIds.has(box.id)) || []);
     } catch (error: any) {
@@ -210,7 +210,7 @@ export default function OrderFinishing() {
       }
       
       const { data: existingBatch } = await supabase
-        .from('batches')
+        .from('order_batches')
         .select('id')
         .eq('box_id', box.id)
         .eq('is_terminated', false)
@@ -346,7 +346,7 @@ export default function OrderFinishing() {
         .map(b => b.id);
       
       // Clear box_id when receiving - boxes become available again
-      await supabase.from('batches').update({
+      await supabase.from('order_batches').update({
         current_state: 'in_finishing',
         eta: etaDate.toISOString(),
         lead_time_days: parseInt(etaDays) || 1,
@@ -422,7 +422,7 @@ export default function OrderFinishing() {
           remainingQty -= useQty;
           
           if (useQty === batch.quantity) {
-            await supabase.from('batches').update({
+            await supabase.from('order_batches').update({
               current_state: nextState,
               box_id: selectedBox.id,
             }).eq('id', batch.id);
@@ -437,9 +437,9 @@ export default function OrderFinishing() {
               needs_boxing: group.needs_boxing,
             });
           } else {
-            const { data: batchCode } = await supabase.rpc('generate_batch_code');
-            const { data: newBatch } = await supabase.from('batches').insert({
-              batch_code: batchCode,
+            const { data: qrCode } = await supabase.rpc('generate_extra_batch_code');
+            const { data: newBatch } = await supabase.from('order_batches').insert({
+              qr_code_data: qrCode,
               order_id: id,
               product_id: batch.product_id,
               order_item_id: batch.order_item_id,
@@ -447,10 +447,9 @@ export default function OrderFinishing() {
               quantity: useQty,
               box_id: selectedBox.id,
               created_by: user?.id,
-              parent_batch_id_split: batch.id,
             }).select('id').single();
             
-            await supabase.from('batches').update({ quantity: batch.quantity - useQty }).eq('id', batch.id);
+            await supabase.from('order_batches').update({ quantity: batch.quantity - useQty }).eq('id', batch.id);
             
             newItems.push({
               product_id: group.product_id,
@@ -699,38 +698,24 @@ export default function OrderFinishing() {
                       <div>
                         <p className="font-medium">{group.product_name}</p>
                         <p className="text-sm text-muted-foreground">
-                          {group.product_sku}
-                          <Badge variant="outline" className="ml-2 text-xs">
-                            {group.needs_packing ? '→ Packaging' : '→ Boxing'}
-                          </Badge>
-                          <Badge variant={group.needs_boxing ? 'default' : 'secondary'} className="ml-1 text-xs">
-                            {group.needs_boxing ? 'Boxing' : 'No Boxing'}
-                          </Badge>
+                          {group.product_sku} · {group.needs_packing ? 'Needs Packing' : 'No Packing'} · {group.needs_boxing ? 'Needs Boxing' : 'No Boxing'}
                         </p>
                       </div>
                       <div className="flex items-center gap-4">
-                        <div className="text-center">
-                          <p className="text-lg font-semibold">{group.quantity}</p>
-                          <p className="text-xs text-muted-foreground">In Finishing</p>
-                        </div>
+                        <Badge variant="secondary">{group.quantity} available</Badge>
                         {canManage && (
-                          <div className="w-24">
-                            <Label className="text-xs">Select Qty</Label>
+                          <div className="flex items-center gap-2">
+                            <Label className="text-xs text-muted-foreground">Select</Label>
                             <Input
                               type="number"
                               min={0}
                               max={group.quantity}
-                              value={productSelections.get(key) || ''}
+                              value={productSelections.get(key) || 0}
                               onChange={(e) => {
-                                const qty = Math.max(0, Math.min(parseInt(e.target.value) || 0, group.quantity));
-                                setProductSelections(prev => {
-                                  const next = new Map(prev);
-                                  if (qty > 0) next.set(key, qty);
-                                  else next.delete(key);
-                                  return next;
-                                });
+                                const val = Math.min(Math.max(0, parseInt(e.target.value) || 0), group.quantity);
+                                setProductSelections(prev => new Map(prev).set(key, val));
                               }}
-                              placeholder="0"
+                              className="w-20 h-8"
                             />
                           </div>
                         )}
@@ -738,49 +723,42 @@ export default function OrderFinishing() {
                     </div>
                   </CardContent>
                 </Card>
-              )})
+              );})
             )}
           </div>
         </TabsContent>
 
-        {/* Completed Tab */}
+        <TabsContent value="extra">
+          <ExtraItemsTab 
+            orderId={id!} 
+            targetPhase="finishing" 
+            onAssign={() => fetchData()} 
+          />
+        </TabsContent>
+
         <TabsContent value="completed" className="space-y-4">
           <div className="space-y-3">
             {completedGroups.length === 0 ? (
-              <Card><CardContent className="p-8 text-center text-muted-foreground">No items completed in finishing yet</CardContent></Card>
+              <Card><CardContent className="p-8 text-center text-muted-foreground">No completed items yet</CardContent></Card>
             ) : (
               completedGroups.map(group => {
                 const key = group.order_item_id || group.product_id;
                 return (
-                <Card key={key}>
-                  <CardContent className="p-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium">{group.product_name}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {group.product_sku}
-                          <Badge variant="outline" className="ml-2 text-xs bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                            Completed
-                          </Badge>
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <div className="text-center">
-                          <p className="text-lg font-semibold text-green-600">{group.quantity}</p>
-                          <p className="text-xs text-muted-foreground">Completed</p>
+                  <Card key={key}>
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-medium">{group.product_name}</p>
+                          <p className="text-sm text-muted-foreground">{group.product_sku}</p>
                         </div>
+                        <Badge variant="default" className="bg-green-600">{group.quantity} completed</Badge>
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              )})
+                    </CardContent>
+                  </Card>
+                );
+              })
             )}
           </div>
-        </TabsContent>
-
-        {/* Extra Tab */}
-        <TabsContent value="extra">
-          <ExtraItemsTab orderId={id!} phase="finishing" onRefresh={fetchData} />
         </TabsContent>
       </Tabs>
 
@@ -790,24 +768,15 @@ export default function OrderFinishing() {
           <DialogHeader>
             <DialogTitle>Accept Boxes into Finishing</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
-            <p>Accept {selectedBoxes.size} box(es) into finishing with ETA of {etaDays} day(s)?</p>
-            <div className="max-h-[200px] overflow-y-auto space-y-2">
-              {Array.from(selectedBoxes).map(boxId => {
-                const group = readyBoxGroups.find(g => g.box_id === boxId);
-                return group ? (
-                  <div key={boxId} className="flex items-center justify-between p-2 bg-muted rounded">
-                    <span className="font-mono">{group.box_code}</span>
-                    <span className="text-sm text-muted-foreground">{group.totalQty} items</span>
-                  </div>
-                ) : null;
-              })}
-            </div>
+          <div className="py-4">
+            <p className="text-sm text-muted-foreground">
+              You are about to accept {selectedBoxes.size} box(es) into the finishing phase with an ETA of {etaDays} day(s).
+            </p>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAcceptDialogOpen(false)}>Cancel</Button>
             <Button onClick={handleAcceptBoxes} disabled={submitting}>
-              {submitting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Accept
             </Button>
           </DialogFooter>
@@ -816,90 +785,69 @@ export default function OrderFinishing() {
 
       {/* Box Assignment Dialog */}
       <Dialog open={boxAssignDialogOpen} onOpenChange={setBoxAssignDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Box className="h-5 w-5" />
-              Assign to Box
-            </DialogTitle>
+            <DialogTitle>Assign to Box</DialogTitle>
           </DialogHeader>
-
-          <div className="space-y-4">
-            <div className="p-3 bg-muted/50 rounded-lg">
-              <p className="text-sm font-medium">Items to assign: {totalSelected}</p>
-              <div className="text-xs text-muted-foreground mt-1">
-                {Array.from(productSelections.entries()).map(([key, qty]) => {
-                  const group = inFinishingGroups.find(g => (g.order_item_id || g.product_id) === key);
-                  return group ? (
-                    <div key={key}>
-                      {group.product_sku}: {qty} → {group.needs_packing ? 'Packaging' : 'Boxing'} ({group.needs_boxing ? 'Boxing' : 'No Boxing'})
-                    </div>
-                  ) : null;
-                })}
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Scan or Enter Box Code</Label>
-              <div className="flex gap-2">
-                <div className="flex-1 relative">
-                  <QrCode className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    value={boxSearchCode}
-                    onChange={(e) => setBoxSearchCode(e.target.value.toUpperCase())}
-                    placeholder="e.g., BOX-0001"
-                    className="pl-10"
-                    onKeyDown={(e) => e.key === 'Enter' && searchBox()}
-                  />
-                </div>
-                <Button onClick={searchBox} disabled={!boxSearchCode.trim()}>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label>Search Box by Code</Label>
+              <div className="flex gap-2 mt-2">
+                <Input 
+                  value={boxSearchCode}
+                  onChange={(e) => setBoxSearchCode(e.target.value)}
+                  placeholder="BOX-0001"
+                  onKeyDown={(e) => e.key === 'Enter' && searchBox()}
+                />
+                <Button variant="outline" onClick={searchBox}>
                   <Search className="h-4 w-4" />
                 </Button>
               </div>
             </div>
 
-            <Button variant="outline" onClick={createNewBox} disabled={creatingBox} className="w-full">
+            {selectedBox && (
+              <div className="p-3 border rounded-lg bg-primary/5">
+                <p className="font-medium">{selectedBox.box_code}</p>
+                <p className="text-sm text-muted-foreground">Selected</p>
+              </div>
+            )}
+
+            <div className="flex items-center gap-2">
+              <div className="flex-1 h-px bg-border" />
+              <span className="text-xs text-muted-foreground">OR</span>
+              <div className="flex-1 h-px bg-border" />
+            </div>
+
+            <div>
+              <Label>Select Available Box</Label>
+              <Select 
+                value={selectedBox?.id || ''} 
+                onValueChange={(val) => {
+                  const box = availableBoxes.find(b => b.id === val);
+                  setSelectedBox(box || null);
+                }}
+              >
+                <SelectTrigger className="mt-2">
+                  <SelectValue placeholder={loadingBoxes ? 'Loading...' : 'Select a box'} />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableBoxes.map(box => (
+                    <SelectItem key={box.id} value={box.id}>{box.box_code}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <Button variant="outline" className="w-full" onClick={createNewBox} disabled={creatingBox}>
               {creatingBox ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
               Create New Box
             </Button>
-
-            {selectedBox && (
-              <Card className="border-primary bg-primary/5">
-                <CardContent className="p-3 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <Box className="h-5 w-5 text-primary" />
-                    <span className="font-mono font-bold text-lg">{selectedBox.box_code}</span>
-                  </div>
-                  <Badge className="bg-primary">Selected</Badge>
-                </CardContent>
-              </Card>
-            )}
-
-            {!selectedBox && !loadingBoxes && availableBoxes.length > 0 && (
-              <div className="space-y-2">
-                <Label>Available Boxes ({availableBoxes.length})</Label>
-                <div className="grid grid-cols-3 gap-2 max-h-[120px] overflow-y-auto">
-                  {availableBoxes.slice(0, 9).map(box => (
-                    <Button key={box.id} variant="outline" size="sm" className="font-mono" onClick={() => setSelectedBox(box)}>
-                      {box.box_code}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {loadingBoxes && (
-              <div className="flex justify-center py-4">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-              </div>
-            )}
           </div>
-
           <DialogFooter>
             <Button variant="outline" onClick={() => setBoxAssignDialogOpen(false)}>Cancel</Button>
             <Button onClick={handleAssignToBox} disabled={!selectedBox || submitting}>
-              {submitting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-              Assign to {selectedBox?.box_code || 'Box'}
+              {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Assign {totalSelected} Items
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -19,7 +19,7 @@ import { format } from "date-fns";
 
 interface Batch {
   id: string;
-  batch_code: string;
+  qr_code_data: string;
   current_state: string;
   quantity: number;
   product_id: string;
@@ -60,7 +60,7 @@ interface ShipmentItem {
   quantity: number;
   batch: {
     id: string;
-    batch_code: string;
+    qr_code_data: string;
     order_item_id: string | null;
     product: { id: string; name: string; sku: string };
   };
@@ -116,7 +116,7 @@ export default function OrderBoxing() {
     fetchData();
     const channel = supabase
       .channel(`order-boxing-${id}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "batches", filter: `order_id=eq.${id}` }, () => {
+      .on("postgres_changes", { event: "*", schema: "public", table: "order_batches", filter: `order_id=eq.${id}` }, () => {
         fetchData();
       })
       .subscribe();
@@ -130,9 +130,9 @@ export default function OrderBoxing() {
       const [orderRes, batchesRes] = await Promise.all([
         supabase.from("orders").select("id, order_number, priority, customer:customers(name)").eq("id", id).single(),
         supabase
-          .from("batches")
+          .from("order_batches")
           .select(
-            "id, batch_code, current_state, quantity, product_id, order_item_id, box_id, product:products(id, name, sku, needs_packing)",
+            "id, qr_code_data, current_state, quantity, product_id, order_item_id, box_id, product:products(id, name, sku, needs_packing)",
           )
           .eq("order_id", id)
           .eq("is_terminated", false)
@@ -197,9 +197,9 @@ export default function OrderBoxing() {
           .select(`
             id,
             quantity,
-            batch:batches(
+            batch:order_batches(
               id,
-              batch_code,
+              qr_code_data,
               order_item_id,
               product:products(id, name, sku)
             )
@@ -352,7 +352,7 @@ export default function OrderBoxing() {
       // Clear box_id when receiving - boxes become available again
       if (batchesToBoxing.length > 0) {
         await supabase
-          .from("batches")
+          .from("order_batches")
           .update({
             current_state: "in_boxing",
             eta: etaDate.toISOString(),
@@ -367,7 +367,7 @@ export default function OrderBoxing() {
 
       if (batchesToShipment.length > 0) {
         await supabase
-          .from("batches")
+          .from("order_batches")
           .update({
             current_state: "ready_for_receiving",
             box_id: null, // Free up the box
@@ -418,26 +418,25 @@ export default function OrderBoxing() {
 
           if (useQty === batch.quantity) {
             await supabase
-              .from("batches")
+              .from("order_batches")
               .update({
                 current_state: "ready_for_receiving",
                 box_id: null,
               })
               .eq("id", batch.id);
           } else {
-            const { data: batchCode } = await supabase.rpc("generate_batch_code");
-            await supabase.from("batches").insert({
-              batch_code: batchCode,
+            const { data: qrCode } = await supabase.rpc("generate_extra_batch_code");
+            await supabase.from("order_batches").insert({
+              qr_code_data: qrCode,
               order_id: id,
               product_id: batch.product_id,
               order_item_id: batch.order_item_id,
               current_state: "ready_for_receiving",
               quantity: useQty,
               created_by: user?.id,
-              parent_batch_id_split: batch.id,
             });
             await supabase
-              .from("batches")
+              .from("order_batches")
               .update({ quantity: batch.quantity - useQty })
               .eq("id", batch.id);
           }
@@ -500,21 +499,20 @@ export default function OrderBoxing() {
           });
 
           if (useQty === batch.quantity) {
-            await supabase.from("batches").update({ current_state: "received" }).eq("id", batch.id);
+            await supabase.from("order_batches").update({ current_state: "received" }).eq("id", batch.id);
           } else {
-            const { data: batchCode } = await supabase.rpc("generate_batch_code");
-            await supabase.from("batches").insert({
-              batch_code: batchCode,
+            const { data: qrCode } = await supabase.rpc("generate_extra_batch_code");
+            await supabase.from("order_batches").insert({
+              qr_code_data: qrCode,
               order_id: id,
               product_id: batch.product_id,
               order_item_id: batch.order_item_id,
               current_state: "received",
               quantity: useQty,
               created_by: user?.id,
-              parent_batch_id_split: batch.id,
             });
             await supabase
-              .from("batches")
+              .from("order_batches")
               .update({ quantity: batch.quantity - useQty })
               .eq("id", batch.id);
           }
@@ -710,7 +708,6 @@ export default function OrderBoxing() {
           <TabsTrigger value="shipments">Shipments ({shipments.length})</TabsTrigger>
         </TabsList>
 
-        {/* Tab 1: Receive Boxes */}
         <TabsContent value="receive" className="space-y-4">
           {canManage && readyBoxGroups.length > 0 && (
             <Card>
@@ -743,17 +740,18 @@ export default function OrderBoxing() {
             </Card>
           )}
 
+          {/* Search Box */}
           <Card>
             <CardContent className="p-4">
               <Label>Search by Box Code, Product SKU, or Name</Label>
               <div className="flex gap-2 mt-2">
                 <div className="flex-1 relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
+                  <Input 
                     value={receiveSearchQuery}
                     onChange={(e) => setReceiveSearchQuery(e.target.value)}
-                    placeholder="Type to filter boxes..."
-                    className="pl-10"
+                    placeholder="Type to filter boxes..." 
+                    className="pl-10" 
                   />
                 </div>
                 {receiveSearchQuery && (
@@ -792,17 +790,13 @@ export default function OrderBoxing() {
                           }}
                         />
                       )}
-                      <Box className="h-5 w-5 text-muted-foreground" />
-                      <span className="font-mono font-bold">{group.box_code}</span>
+                      <div className="flex items-center gap-3">
+                        <Box className="h-5 w-5 text-muted-foreground" />
+                        <span className="font-mono font-bold">{group.box_code}</span>
+                      </div>
                       <Badge variant="secondary">{group.totalQty} items</Badge>
                       <div className="flex-1 text-sm text-muted-foreground">
-                        {group.batches.slice(0, 3).map((b, i) => (
-                          <span key={b.id}>
-                            {i > 0 && ", "}
-                            {b.product?.sku} - {b.product?.name} × {b.quantity}
-                          </span>
-                        ))}
-                        {group.batches.length > 3 && <span> +{group.batches.length - 3} more</span>}
+                        {group.batches.map((b) => `${b.product?.sku} - ${b.product?.name} (${b.quantity})`).join(", ")}
                       </div>
                     </div>
                   </CardContent>
@@ -812,14 +806,15 @@ export default function OrderBoxing() {
           </div>
         </TabsContent>
 
-        {/* Tab 2: Process Items (In Boxing -> Ready for Shipment) */}
         <TabsContent value="process" className="space-y-4">
-          {canManage && totalSelected > 0 && (
+          {canManage && (
             <Card>
               <CardContent className="p-4 flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">{totalSelected} items selected</span>
-                <Button onClick={() => setMoveToReadyDialogOpen(true)}>
-                  <Truck className="h-4 w-4 mr-2" />
+                <Badge variant="secondary" className="text-lg px-3 py-1">
+                  {totalSelected} selected
+                </Badge>
+                <Button onClick={() => setMoveToReadyDialogOpen(true)} disabled={totalSelected === 0}>
+                  <Package className="h-4 w-4 mr-2" />
                   Move to Ready for Shipment
                 </Button>
               </CardContent>
@@ -832,68 +827,72 @@ export default function OrderBoxing() {
                 <CardContent className="p-8 text-center text-muted-foreground">No items in boxing</CardContent>
               </Card>
             ) : (
-              inBoxingGroups.map((group) => (
-                <Card key={group.order_item_id || group.product_id}>
-                  <CardContent className="p-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium">{group.product_name}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {group.product_sku}
-                          <Badge variant="outline" className="ml-2 text-xs">
-                            {group.needs_boxing ? "Needs Boxing" : "No Boxing"}
-                          </Badge>
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <div className="text-right">
-                          <p className="text-sm text-muted-foreground">Available</p>
-                          <p className="text-lg font-semibold">{group.quantity}</p>
-                        </div>
-                        {canManage && (
-                          <div className="w-24">
-                            <Label className="text-xs">Select</Label>
-                            <Input
-                              type="number"
-                              min={0}
-                              max={group.quantity}
-                              value={productSelections.get(group.order_item_id || group.product_id) || ""}
-                              onChange={(e) => {
-                                const key = group.order_item_id || group.product_id;
-                                const qty = Math.max(0, Math.min(parseInt(e.target.value) || 0, group.quantity));
-                                setProductSelections((prev) => {
-                                  const next = new Map(prev);
-                                  if (qty > 0) next.set(key, qty);
-                                  else next.delete(key);
-                                  return next;
-                                });
-                              }}
-                              placeholder="0"
-                            />
+              inBoxingGroups.map((group) => {
+                const key = group.order_item_id || group.product_id;
+                return (
+                  <Card key={key}>
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium">{group.product_name}</p>
+                            {group.needs_boxing ? (
+                              <Badge variant="outline" className="text-xs bg-primary/10">
+                                Boxing
+                              </Badge>
+                            ) : (
+                              <Badge variant="secondary" className="text-xs">
+                                No Boxing
+                              </Badge>
+                            )}
                           </div>
-                        )}
+                          <p className="text-sm text-muted-foreground">{group.product_sku}</p>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <Badge variant="secondary">{group.quantity} available</Badge>
+                          {canManage && (
+                            <div className="flex items-center gap-2">
+                              <Label className="text-xs text-muted-foreground">Select</Label>
+                              <Input
+                                type="number"
+                                min={0}
+                                max={group.quantity}
+                                value={productSelections.get(key) || 0}
+                                onChange={(e) => {
+                                  const val = Math.min(Math.max(0, parseInt(e.target.value) || 0), group.quantity);
+                                  setProductSelections((prev) => new Map(prev).set(key, val));
+                                }}
+                                className="w-20 h-8"
+                              />
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))
+                    </CardContent>
+                  </Card>
+                );
+              })
             )}
           </div>
         </TabsContent>
 
-        {/* Tab 3: Ready for Shipment -> Create Kartona */}
+        <TabsContent value="extra">
+          <ExtraItemsTab 
+            orderId={id!} 
+            targetPhase="boxing" 
+            onAssign={() => fetchData()} 
+          />
+        </TabsContent>
+
         <TabsContent value="ready" className="space-y-4">
-          {canManage && totalSelectedForShipment > 0 && (
+          {canManage && readyForShipmentGroups.length > 0 && (
             <Card>
               <CardContent className="p-4 flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">{totalSelectedForShipment} items selected</span>
-                <Button
-                  onClick={() => {
-                    if (readyForShipmentSelections.size === 0) return;
-                    setKartonaDialogOpen(true);
-                  }}
-                >
-                  <Package className="h-4 w-4 mr-2" />
+                <Badge variant="secondary" className="text-lg px-3 py-1">
+                  {totalSelectedForShipment} selected
+                </Badge>
+                <Button onClick={() => setKartonaDialogOpen(true)} disabled={totalSelectedForShipment === 0}>
+                  <Truck className="h-4 w-4 mr-2" />
                   Create Kartona
                 </Button>
               </CardContent>
@@ -906,47 +905,104 @@ export default function OrderBoxing() {
                 <CardContent className="p-8 text-center text-muted-foreground">No items ready for shipment</CardContent>
               </Card>
             ) : (
-              readyForShipmentGroups.map((group) => (
-                <Card key={group.order_item_id || group.product_id}>
-                  <CardContent className="p-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium">{group.product_name}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {group.product_sku}
-                          <Badge variant="outline" className="ml-2 text-xs">
-                            {group.needs_boxing ? "Boxed" : "Not Boxed"}
-                          </Badge>
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <div className="text-right">
-                          <p className="text-sm text-muted-foreground">Available</p>
-                          <p className="text-lg font-semibold text-green-600">{group.quantity}</p>
-                        </div>
-                        {canManage && (
-                          <div className="w-24">
-                            <Label className="text-xs">Select</Label>
-                            <Input
-                              type="number"
-                              min={0}
-                              max={group.quantity}
-                              value={readyForShipmentSelections.get(group.order_item_id || group.product_id) || ""}
-                              onChange={(e) => {
-                                const key = group.order_item_id || group.product_id;
-                                const qty = Math.max(0, Math.min(parseInt(e.target.value) || 0, group.quantity));
-                                setReadyForShipmentSelections((prev) => {
-                                  const next = new Map(prev);
-                                  if (qty > 0) next.set(key, qty);
-                                  else next.delete(key);
-                                  return next;
-                                });
-                              }}
-                              placeholder="0"
-                            />
+              readyForShipmentGroups.map((group) => {
+                const key = group.order_item_id || group.product_id;
+                return (
+                  <Card key={key}>
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium">{group.product_name}</p>
+                            {group.needs_boxing ? (
+                              <Badge variant="outline" className="text-xs bg-primary/10">
+                                Boxed
+                              </Badge>
+                            ) : (
+                              <Badge variant="secondary" className="text-xs">
+                                Not Boxed
+                              </Badge>
+                            )}
                           </div>
-                        )}
+                          <p className="text-sm text-muted-foreground">{group.product_sku}</p>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <Badge variant="default" className="bg-green-600">
+                            {group.quantity} ready
+                          </Badge>
+                          {canManage && (
+                            <div className="flex items-center gap-2">
+                              <Label className="text-xs text-muted-foreground">Select</Label>
+                              <Input
+                                type="number"
+                                min={0}
+                                max={group.quantity}
+                                value={readyForShipmentSelections.get(key) || 0}
+                                onChange={(e) => {
+                                  const val = Math.min(Math.max(0, parseInt(e.target.value) || 0), group.quantity);
+                                  setReadyForShipmentSelections((prev) => new Map(prev).set(key, val));
+                                }}
+                                className="w-20 h-8"
+                              />
+                            </div>
+                          )}
+                        </div>
                       </div>
+                    </CardContent>
+                  </Card>
+                );
+              })
+            )}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="shipments" className="space-y-4">
+          <Card>
+            <CardContent className="p-4 flex items-center justify-between">
+              <p className="text-sm text-muted-foreground">
+                {shipments.length} Kartona(s) created for this order
+              </p>
+              <Button variant="outline" onClick={exportShipments} disabled={shipments.length === 0}>
+                <Download className="h-4 w-4 mr-2" />
+                Export CSV
+              </Button>
+            </CardContent>
+          </Card>
+
+          <div className="space-y-3">
+            {shipments.length === 0 ? (
+              <Card>
+                <CardContent className="p-8 text-center text-muted-foreground">No shipments yet</CardContent>
+              </Card>
+            ) : (
+              shipments.map((shipment) => (
+                <Card key={shipment.id}>
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-3">
+                        <Truck className="h-5 w-5 text-muted-foreground" />
+                        <span className="font-mono font-bold">{shipment.shipment_code}</span>
+                        <Badge variant={shipment.status === "sealed" ? "default" : "secondary"}>
+                          {shipment.status}
+                        </Badge>
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        {format(new Date(shipment.created_at), "PPP")}
+                      </div>
+                    </div>
+                    {shipment.notes && (
+                      <p className="text-sm text-muted-foreground mb-3">{shipment.notes}</p>
+                    )}
+                    <div className="space-y-1">
+                      {shipment.items.map((item) => (
+                        <div key={item.id} className="flex items-center justify-between text-sm">
+                          <div className="flex items-center gap-2">
+                            <span>{item.batch?.product?.sku}</span>
+                            <span className="text-muted-foreground">- {item.batch?.product?.name}</span>
+                          </div>
+                          <Badge variant="outline">{item.quantity}</Badge>
+                        </div>
+                      ))}
                     </div>
                   </CardContent>
                 </Card>
@@ -954,145 +1010,25 @@ export default function OrderBoxing() {
             )}
           </div>
         </TabsContent>
-
-        {/* Extra Tab */}
-        <TabsContent value="extra">
-          <ExtraItemsTab orderId={id!} phase="boxing" onRefresh={fetchData} />
-        </TabsContent>
-
-        {/* Tab 4: Shipments (Kartonas) */}
-        <TabsContent value="shipments" className="space-y-4">
-          {/* Export Button */}
-          {shipments.length > 0 && (
-            <div className="flex justify-end">
-              <Button variant="outline" onClick={exportShipments}>
-                <Download className="h-4 w-4 mr-2" />
-                Export Shipments
-              </Button>
-            </div>
-          )}
-          {shipments.length === 0 ? (
-            <Card>
-              <CardContent className="p-8 text-center text-muted-foreground">
-                No kartonas created for this order yet
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-4">
-              {shipments.map((shipment) => {
-                const totalItems = shipment.items.reduce((sum, item) => sum + item.quantity, 0);
-
-                // Group items by product_id + needs_boxing
-                const groupedItems = new Map<
-                  string,
-                  { productName: string; productSku: string; needsBoxing: boolean; totalQty: number }
-                >();
-                shipment.items.forEach((item) => {
-                  const needsBoxing = item.order_item?.needs_boxing ?? true;
-                  const key = `${item.batch?.product?.id || "unknown"}-${needsBoxing ? "boxed" : "not-boxed"}`;
-
-                  if (!groupedItems.has(key)) {
-                    groupedItems.set(key, {
-                      productName: item.batch?.product?.name || "Unknown",
-                      productSku: item.batch?.product?.sku || "N/A",
-                      needsBoxing,
-                      totalQty: 0,
-                    });
-                  }
-                  const group = groupedItems.get(key)!;
-                  group.totalQty += item.quantity;
-                });
-
-                return (
-                  <Card key={shipment.id}>
-                    <CardHeader className="pb-3">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <Package className="h-5 w-5 text-green-600" />
-                          <div>
-                            <CardTitle className="text-lg font-mono">{shipment.shipment_code}</CardTitle>
-                            <p className="text-sm text-muted-foreground">
-                              Created {format(new Date(shipment.created_at), "PPP p")}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Badge
-                            variant="secondary"
-                            className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                          >
-                            {totalItems} items
-                          </Badge>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              const items = Array.from(groupedItems.values()).map((g) => ({
-                                sku: g.productSku,
-                                name: g.productName,
-                                qty: g.totalQty,
-                                needsBoxing: g.needsBoxing,
-                              }));
-                              printKartonaLabel(shipment.shipment_code, items, totalItems, shipment.notes || "");
-                            }}
-                          >
-                            <Printer className="h-4 w-4 mr-1" />
-                            Reprint
-                          </Button>
-                        </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-2">
-                        <p className="text-sm font-medium text-muted-foreground">Contents:</p>
-                        <div className="grid gap-2">
-                          {Array.from(groupedItems.entries()).map(([key, group]) => (
-                            <div key={key} className="flex items-center justify-between p-2 bg-muted/50 rounded-lg">
-                              <div>
-                                <p className="font-medium">{group.productName}</p>
-                                <p className="text-sm text-muted-foreground">
-                                  {group.productSku}
-                                  <Badge variant="outline" className="ml-2 text-xs">
-                                    {group.needsBoxing ? "Boxed" : "Not Boxed"}
-                                  </Badge>
-                                </p>
-                              </div>
-                              <span className="font-semibold">× {group.totalQty}</span>
-                            </div>
-                          ))}
-                        </div>
-                        {shipment.notes && (
-                          <div className="mt-3 p-2 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
-                            <p className="text-sm">
-                              <strong>Notes:</strong> {shipment.notes}
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          )}
-        </TabsContent>
-
       </Tabs>
 
-      {/* Accept Boxes Dialog */}
+      {/* Accept Dialog */}
       <Dialog open={acceptDialogOpen} onOpenChange={setAcceptDialogOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Accept Boxes into Boxing</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Accept {selectedBoxes.size} box(es) with{" "}
-              {batches
-                .filter((b) => b.current_state === "ready_for_boxing" && b.box_id && selectedBoxes.has(b.box_id))
-                .reduce((sum, b) => sum + b.quantity, 0)}{" "}
-              items into boxing.
+          <div className="py-4">
+            <p className="text-sm text-muted-foreground mb-4">
+              You are about to accept {selectedBoxes.size} box(es) into the boxing phase.
             </p>
+            <p className="text-sm text-muted-foreground">
+              Items will be routed based on their "needs boxing" setting:
+            </p>
+            <ul className="list-disc list-inside text-sm text-muted-foreground mt-2">
+              <li>Needs Boxing = Yes → Processing tab</li>
+              <li>Needs Boxing = No → Ready for Shipment tab</li>
+            </ul>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAcceptDialogOpen(false)}>
@@ -1106,32 +1042,16 @@ export default function OrderBoxing() {
         </DialogContent>
       </Dialog>
 
-      {/* Move to Ready for Shipment Dialog */}
+      {/* Move to Ready Dialog */}
       <Dialog open={moveToReadyDialogOpen} onOpenChange={setMoveToReadyDialogOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Move to Ready for Shipment</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
+          <div className="py-4">
             <p className="text-sm text-muted-foreground">
-              Move {totalSelected} items to Ready for Shipment status. They will be available to include in a Kartona.
+              You are about to move {totalSelected} item(s) to the Ready for Shipment stage.
             </p>
-            <div className="p-3 bg-muted/50 rounded-lg space-y-1">
-              {Array.from(productSelections.entries()).map(([key, qty]) => {
-                const group = inBoxingGroups.find((g) => (g.order_item_id || g.product_id) === key);
-                return (
-                  <div key={key} className="flex justify-between text-sm">
-                    <span>
-                      {group?.product_sku} - {group?.product_name}
-                      <Badge variant="outline" className="ml-2 text-xs">
-                        {group?.needs_boxing ? "Boxed" : "Not Boxed"}
-                      </Badge>
-                    </span>
-                    <span className="font-medium">× {qty}</span>
-                  </div>
-                );
-              })}
-            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setMoveToReadyDialogOpen(false)}>
@@ -1139,55 +1059,29 @@ export default function OrderBoxing() {
             </Button>
             <Button onClick={handleMoveToReadyForShipment} disabled={submitting}>
               {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Move to Ready
+              Move
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Create Kartona Dialog */}
-      <Dialog
-        open={kartonaDialogOpen}
-        onOpenChange={(open) => {
-          if (!open) {
-            setKartonaDialogOpen(false);
-          }
-        }}
-      >
+      <Dialog open={kartonaDialogOpen} onOpenChange={setKartonaDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Package className="h-5 w-5" />
-              Create Kartona
-            </DialogTitle>
+            <DialogTitle>Create Kartona (Shipment)</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
+          <div className="py-4 space-y-4">
             <p className="text-sm text-muted-foreground">
-              Create a Kartona with {totalSelectedForShipment} items. This will mark them as fulfilled.
+              Creating a Kartona for {totalSelectedForShipment} item(s).
             </p>
-            <div className="p-3 bg-muted/50 rounded-lg space-y-1">
-              {Array.from(readyForShipmentSelections.entries()).map(([key, qty]) => {
-                const group = readyForShipmentGroups.find((g) => (g.order_item_id || g.product_id) === key);
-                return (
-                  <div key={key} className="flex justify-between text-sm">
-                    <span>
-                      {group?.product_sku} - {group?.product_name}
-                      <Badge variant="outline" className="ml-2 text-xs">
-                        {group?.needs_boxing ? "Boxed" : "Not Boxed"}
-                      </Badge>
-                    </span>
-                    <span className="font-medium">× {qty}</span>
-                  </div>
-                );
-              })}
-            </div>
             <div>
               <Label>Notes (optional)</Label>
               <Textarea
                 value={shipmentNotes}
                 onChange={(e) => setShipmentNotes(e.target.value)}
-                placeholder="Add any notes for this Kartona..."
-                rows={3}
+                placeholder="Add any notes for this shipment..."
+                className="mt-2"
               />
             </div>
           </div>
@@ -1196,61 +1090,48 @@ export default function OrderBoxing() {
               Cancel
             </Button>
             <Button onClick={handleCreateKartona} disabled={submitting}>
-              {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Printer className="h-4 w-4 mr-2" />}
+              {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Create & Print
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Hidden Printable Area - Only visible when printing */}
+      {/* Hidden Printable Area */}
       {printData && (
-        <div id="print-area" className="hidden print:block fixed inset-0 bg-white p-8 z-[9999]">
-          <div className="max-w-md mx-auto">
-            {/* Header */}
-            <div className="text-center border-b-2 border-black pb-3 mb-4">
-              <p className="text-3xl font-bold font-mono text-black">{printData.shipmentCode}</p>
-              <p className="text-lg mt-1 text-black">{order?.order_number || "N/A"}</p>
-              <p className="text-gray-600">{order?.customer?.name || "N/A"}</p>
+        <div className="hidden print:block print:fixed print:inset-0 print:bg-white print:z-50 print:p-8">
+          <div className="text-center mb-8">
+            <h1 className="text-4xl font-bold">{printData.shipmentCode}</h1>
+            <p className="text-lg mt-2">{order.order_number}</p>
+          </div>
+          <table className="w-full border-collapse">
+            <thead>
+              <tr className="border-b-2 border-black">
+                <th className="text-left p-2">SKU</th>
+                <th className="text-left p-2">Product</th>
+                <th className="text-center p-2">Qty</th>
+                <th className="text-center p-2">Boxed</th>
+              </tr>
+            </thead>
+            <tbody>
+              {printData.items.map((item, idx) => (
+                <tr key={idx} className="border-b">
+                  <td className="p-2 font-mono">{item.sku}</td>
+                  <td className="p-2">{item.name}</td>
+                  <td className="p-2 text-center font-bold">{item.qty}</td>
+                  <td className="p-2 text-center">{item.needsBoxing ? "Yes" : "No"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div className="mt-8 flex justify-between items-center">
+            <div>
+              <p className="font-bold">Total Items: {printData.totalItems}</p>
+              {printData.notes && <p className="mt-2">Notes: {printData.notes}</p>}
             </div>
-
-            {/* Contents */}
-            <div className="space-y-3">
-              <p className="text-xs text-gray-600 uppercase tracking-wide">Contents:</p>
-              <div className="space-y-2">
-                {printData.items.map((item, idx) => (
-                  <div key={idx} className="flex items-start justify-between py-2 border-b border-gray-300">
-                    <div className="flex gap-3">
-                      <span className="font-mono text-sm w-20 text-black">{item.sku}</span>
-                      <div>
-                        <span className="text-sm text-black">{item.name}</span>
-                        <p className="text-xs text-gray-500">
-                          {item.needsBoxing ? "Boxed" : "Not Boxed"}
-                        </p>
-                      </div>
-                    </div>
-                    <span className="font-semibold text-black">{item.qty}</span>
-                  </div>
-                ))}
-                <div className="flex justify-between pt-2 border-t-2 border-black font-bold text-black">
-                  <span>Total Items</span>
-                  <span>{printData.totalItems}</span>
-                </div>
-              </div>
+            <div className="text-right text-sm text-gray-500">
+              Printed: {format(new Date(), "PPP p")}
             </div>
-
-            {/* Notes */}
-            {printData.notes && (
-              <div className="mt-4">
-                <p className="text-xs text-gray-600 uppercase tracking-wide">Notes:</p>
-                <p className="mt-1 text-sm text-black">{printData.notes}</p>
-              </div>
-            )}
-
-            {/* Date */}
-            <p className="text-center text-xs text-gray-600 mt-6">
-              Created: {format(new Date(), "PPP p")}
-            </p>
           </div>
         </div>
       )}

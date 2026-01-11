@@ -44,7 +44,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface Batch {
   id: string;
-  batch_code: string;
+  qr_code_data: string;
   current_state: string;
   quantity: number;
   product_id: string;
@@ -117,7 +117,7 @@ export default function OrderManufacturing() {
     fetchData();
     const channel = supabase
       .channel(`order-manufacturing-${id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'batches', filter: `order_id=eq.${id}` }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_batches', filter: `order_id=eq.${id}` }, () => {
         fetchData();
       })
       .subscribe();
@@ -128,14 +128,14 @@ export default function OrderManufacturing() {
     try {
       const [orderRes, batchesRes, completedRes] = await Promise.all([
         supabase.from('orders').select('id, order_number, priority, customer:customers(name)').eq('id', id).single(),
-        supabase.from('batches')
-          .select('id, batch_code, current_state, quantity, product_id, order_item_id, eta, lead_time_days, box_id, is_flagged, is_redo, product:products(id, name, sku, needs_packing), order_item:order_items(needs_boxing)')
+        supabase.from('order_batches')
+          .select('id, qr_code_data, current_state, quantity, product_id, order_item_id, eta, lead_time_days, box_id, is_flagged, is_redo, product:products(id, name, sku, needs_packing), order_item:order_items(needs_boxing)')
           .eq('order_id', id)
           .eq('is_terminated', false)
           .in('current_state', ['pending_rm', 'in_manufacturing']),
         // Fetch completed items for this phase (moved to next phases)
-        supabase.from('batches')
-          .select('id, batch_code, current_state, quantity, product_id, order_item_id, eta, lead_time_days, box_id, is_flagged, is_redo, product:products(id, name, sku, needs_packing), order_item:order_items(needs_boxing)')
+        supabase.from('order_batches')
+          .select('id, qr_code_data, current_state, quantity, product_id, order_item_id, eta, lead_time_days, box_id, is_flagged, is_redo, product:products(id, name, sku, needs_packing), order_item:order_items(needs_boxing)')
           .eq('order_id', id)
           .eq('is_terminated', false)
           .in('current_state', ['ready_for_finishing', 'in_finishing', 'ready_for_packaging', 'in_packaging', 'ready_for_boxing', 'in_boxing', 'ready_for_receiving', 'received'])
@@ -145,8 +145,8 @@ export default function OrderManufacturing() {
       if (batchesRes.error) throw batchesRes.error;
       
       setOrder(orderRes.data as Order);
-      setBatches(batchesRes.data as Batch[] || []);
-      setCompletedBatches(completedRes.data as Batch[] || []);
+      setBatches((batchesRes.data || []) as unknown as Batch[]);
+      setCompletedBatches((completedRes.data || []) as unknown as Batch[]);
     } catch (error: any) {
       toast.error(error.message);
     } finally {
@@ -158,7 +158,7 @@ export default function OrderManufacturing() {
     setLoadingBoxes(true);
     try {
       const { data: allBoxes } = await supabase.from('boxes').select('id, box_code').eq('is_active', true).order('box_code');
-      const { data: occupiedBatches } = await supabase.from('batches').select('box_id').not('box_id', 'is', null).eq('is_terminated', false);
+      const { data: occupiedBatches } = await supabase.from('order_batches').select('box_id').not('box_id', 'is', null).eq('is_terminated', false);
       const occupiedIds = new Set(occupiedBatches?.map(b => b.box_id) || []);
       setAvailableBoxes(allBoxes?.filter(box => !occupiedIds.has(box.id)) || []);
     } catch (error: any) {
@@ -184,7 +184,7 @@ export default function OrderManufacturing() {
       }
       
       const { data: existingBatch } = await supabase
-        .from('batches')
+        .from('order_batches')
         .select('id')
         .eq('box_id', box.id)
         .eq('is_terminated', false)
@@ -338,7 +338,7 @@ export default function OrderManufacturing() {
           
           if (useQty === batch.quantity) {
             // Update entire batch - no ETA here, set when receiving
-            await supabase.from('batches').update({
+            await supabase.from('order_batches').update({
               current_state: 'ready_for_finishing',
               box_id: selectedBox.id,
             }).eq('id', batch.id);
@@ -356,11 +356,11 @@ export default function OrderManufacturing() {
             });
           } else {
             // Split batch
-            const { data: batchCode } = await supabase.rpc('generate_batch_code');
+            const { data: qrCode } = await supabase.rpc('generate_extra_batch_code');
             
             // Create new batch with selected quantity - no ETA here
-            const { data: newBatch } = await supabase.from('batches').insert({
-              batch_code: batchCode,
+            const { data: newBatch } = await supabase.from('order_batches').insert({
+              qr_code_data: qrCode,
               order_id: id,
               product_id: batch.product_id,
               order_item_id: batch.order_item_id,
@@ -368,11 +368,10 @@ export default function OrderManufacturing() {
               quantity: useQty,
               box_id: selectedBox.id,
               created_by: user?.id,
-              parent_batch_id_split: batch.id,
             }).select('id').single();
             
             // Reduce original batch
-            await supabase.from('batches').update({
+            await supabase.from('order_batches').update({
               quantity: batch.quantity - useQty,
             }).eq('id', batch.id);
             
@@ -430,16 +429,16 @@ export default function OrderManufacturing() {
           remainingQty -= useQty;
           
           if (useQty === batch.quantity) {
-            await supabase.from('batches').update({
+            await supabase.from('order_batches').update({
               is_terminated: true,
               terminated_by: user?.id,
               terminated_reason: terminateReason.trim(),
             }).eq('id', batch.id);
           } else {
             // Create terminated batch
-            const { data: batchCode } = await supabase.rpc('generate_batch_code');
-            await supabase.from('batches').insert({
-              batch_code: batchCode,
+            const { data: qrCode } = await supabase.rpc('generate_extra_batch_code');
+            await supabase.from('order_batches').insert({
+              qr_code_data: qrCode,
               order_id: id,
               product_id: batch.product_id,
               order_item_id: batch.order_item_id,
@@ -449,10 +448,9 @@ export default function OrderManufacturing() {
               terminated_by: user?.id,
               terminated_reason: terminateReason.trim(),
               created_by: user?.id,
-              parent_batch_id_split: batch.id,
             });
             
-            await supabase.from('batches').update({
+            await supabase.from('order_batches').update({
               quantity: batch.quantity - useQty,
             }).eq('id', batch.id);
           }
@@ -460,8 +458,9 @@ export default function OrderManufacturing() {
       }
       
       // Update order termination counter
+      const { data: orderData } = await supabase.from('orders').select('termination_counter').eq('id', id).single();
       await supabase.from('orders').update({
-        termination_counter: (await supabase.from('orders').select('termination_counter').eq('id', id).single()).data?.termination_counter + totalSelected
+        termination_counter: (orderData?.termination_counter || 0) + totalSelected
       }).eq('id', id);
       
       toast.success(`Terminated ${totalSelected} items`);
@@ -497,20 +496,19 @@ export default function OrderManufacturing() {
           remainingQty -= useQty;
           
           if (useQty === batch.quantity) {
-            await supabase.from('batches').update({
+            await supabase.from('order_batches').update({
               is_redo: true,
               is_flagged: true,
               redo_by: user?.id,
               redo_reason: redoReason.trim(),
               flagged_by: user?.id,
-              flagged_at: new Date().toISOString(),
               flagged_reason: redoReason.trim(),
             }).eq('id', batch.id);
           } else {
             // Create redo batch
-            const { data: batchCode } = await supabase.rpc('generate_batch_code');
-            await supabase.from('batches').insert({
-              batch_code: batchCode,
+            const { data: qrCode } = await supabase.rpc('generate_extra_batch_code');
+            await supabase.from('order_batches').insert({
+              qr_code_data: qrCode,
               order_id: id,
               product_id: batch.product_id,
               order_item_id: batch.order_item_id,
@@ -521,13 +519,11 @@ export default function OrderManufacturing() {
               redo_by: user?.id,
               redo_reason: redoReason.trim(),
               flagged_by: user?.id,
-              flagged_at: new Date().toISOString(),
               flagged_reason: redoReason.trim(),
               created_by: user?.id,
-              parent_batch_id_split: batch.id,
             });
             
-            await supabase.from('batches').update({
+            await supabase.from('order_batches').update({
               quantity: batch.quantity - useQty,
             }).eq('id', batch.id);
           }
@@ -535,8 +531,9 @@ export default function OrderManufacturing() {
       }
       
       // Update order redo counter
+      const { data: orderData } = await supabase.from('orders').select('redo_counter').eq('id', id).single();
       await supabase.from('orders').update({
-        redo_counter: (await supabase.from('orders').select('redo_counter').eq('id', id).single()).data?.redo_counter + totalSelected
+        redo_counter: (orderData?.redo_counter || 0) + totalSelected
       }).eq('id', id);
       
       toast.success(`Marked ${totalSelected} items for redo`);
@@ -700,42 +697,27 @@ export default function OrderManufacturing() {
                             <p className="text-lg font-semibold text-warning">{group.pendingRm}</p>
                           </div>
                           <div className="text-center">
-                            <p className="text-xs text-muted-foreground">In Manufacturing</p>
+                            <p className="text-xs text-muted-foreground">In Mfg</p>
                             <p className="text-lg font-semibold text-primary">{group.inManufacturing}</p>
                           </div>
                           {canManage && (
-                            <div className="w-24">
-                              <Label className="text-xs">Select Qty</Label>
+                            <div className="flex items-center gap-2">
+                              <Label className="text-xs text-muted-foreground">Select</Label>
                               <Input
                                 type="number"
                                 min={0}
                                 max={group.pendingRm + group.inManufacturing}
-                                value={productSelections.get(groupKey) || ''}
+                                value={productSelections.get(groupKey) || 0}
                                 onChange={(e) => {
-                                  const qty = Math.max(0, Math.min(parseInt(e.target.value) || 0, group.pendingRm + group.inManufacturing));
-                                  setProductSelections(prev => {
-                                    const next = new Map(prev);
-                                    if (qty > 0) next.set(groupKey, qty);
-                                    else next.delete(groupKey);
-                                    return next;
-                                  });
+                                  const val = Math.min(Math.max(0, parseInt(e.target.value) || 0), group.pendingRm + group.inManufacturing);
+                                  setProductSelections(prev => new Map(prev).set(groupKey, val));
                                 }}
-                                placeholder="0"
+                                className="w-20 h-8"
                               />
                             </div>
                           )}
                         </div>
                       </div>
-                      
-                      {/* Show redo/flagged batches */}
-                      {group.batches.filter(b => b.is_flagged || b.is_redo).length > 0 && (
-                        <Alert variant="destructive" className="mt-3">
-                          <AlertTriangle className="h-4 w-4" />
-                          <AlertDescription>
-                            {group.batches.filter(b => b.is_redo).reduce((sum, b) => sum + b.quantity, 0)} items need redo
-                          </AlertDescription>
-                        </Alert>
-                      )}
                     </CardContent>
                   </Card>
                 );
@@ -744,125 +726,106 @@ export default function OrderManufacturing() {
           </div>
         </TabsContent>
 
+        <TabsContent value="extra">
+          <ExtraItemsTab 
+            orderId={id!} 
+            targetPhase="manufacturing" 
+            onAssign={() => fetchData()} 
+          />
+        </TabsContent>
+
         <TabsContent value="completed" className="space-y-4">
           <div className="space-y-3">
             {completedGroups.length === 0 ? (
-              <Card><CardContent className="p-8 text-center text-muted-foreground">No items completed in manufacturing yet</CardContent></Card>
+              <Card><CardContent className="p-8 text-center text-muted-foreground">No completed items yet</CardContent></Card>
             ) : (
               completedGroups.map(group => {
                 const key = group.order_item_id || group.product_id;
                 const totalQty = group.batches.reduce((sum, b) => sum + b.quantity, 0);
                 return (
-                <Card key={key}>
-                  <CardContent className="p-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium">{group.product_name}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {group.product_sku}
-                          <Badge variant="outline" className="ml-2 text-xs bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                            <CheckCircle className="h-3 w-3 mr-1" />
-                            Completed
-                          </Badge>
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <div className="text-center">
-                          <p className="text-lg font-semibold text-green-600">{totalQty}</p>
-                          <p className="text-xs text-muted-foreground">Completed</p>
+                  <Card key={key}>
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-medium">{group.product_name}</p>
+                          <p className="text-sm text-muted-foreground">{group.product_sku}</p>
                         </div>
+                        <Badge variant="default" className="bg-green-600">{totalQty} completed</Badge>
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              )})
+                    </CardContent>
+                  </Card>
+                );
+              })
             )}
           </div>
-        </TabsContent>
-
-        {/* Extra Tab */}
-        <TabsContent value="extra">
-          <ExtraItemsTab orderId={id!} phase="manufacturing" onRefresh={fetchData} />
         </TabsContent>
       </Tabs>
 
       {/* Box Assignment Dialog */}
       <Dialog open={boxDialogOpen} onOpenChange={setBoxDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Box className="h-5 w-5" />
-              Assign to Box
-            </DialogTitle>
+            <DialogTitle>Assign to Box</DialogTitle>
           </DialogHeader>
-
-          <div className="space-y-4">
-            <div className="p-3 bg-muted/50 rounded-lg">
-              <p className="text-sm font-medium">Items to assign: {totalSelected}</p>
-            </div>
-
-
-            <div className="space-y-2">
-              <Label>Scan or Enter Box Code</Label>
-              <div className="flex gap-2">
-                <div className="flex-1 relative">
-                  <QrCode className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    value={boxSearchCode}
-                    onChange={(e) => setBoxSearchCode(e.target.value.toUpperCase())}
-                    placeholder="e.g., BOX-0001"
-                    className="pl-10"
-                    onKeyDown={(e) => e.key === 'Enter' && searchBox()}
-                  />
-                </div>
-                <Button onClick={searchBox} disabled={!boxSearchCode.trim()}>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label>Search Box by Code</Label>
+              <div className="flex gap-2 mt-2">
+                <Input 
+                  value={boxSearchCode}
+                  onChange={(e) => setBoxSearchCode(e.target.value)}
+                  placeholder="BOX-0001"
+                  onKeyDown={(e) => e.key === 'Enter' && searchBox()}
+                />
+                <Button variant="outline" onClick={searchBox}>
                   <Search className="h-4 w-4" />
                 </Button>
               </div>
             </div>
 
-            <Button variant="outline" onClick={createNewBox} disabled={creatingBox} className="w-full">
+            {selectedBox && (
+              <div className="p-3 border rounded-lg bg-primary/5">
+                <p className="font-medium">{selectedBox.box_code}</p>
+                <p className="text-sm text-muted-foreground">Selected</p>
+              </div>
+            )}
+
+            <div className="flex items-center gap-2">
+              <div className="flex-1 h-px bg-border" />
+              <span className="text-xs text-muted-foreground">OR</span>
+              <div className="flex-1 h-px bg-border" />
+            </div>
+
+            <div>
+              <Label>Select Available Box</Label>
+              <Select 
+                value={selectedBox?.id || ''} 
+                onValueChange={(val) => {
+                  const box = availableBoxes.find(b => b.id === val);
+                  setSelectedBox(box || null);
+                }}
+              >
+                <SelectTrigger className="mt-2">
+                  <SelectValue placeholder={loadingBoxes ? 'Loading...' : 'Select a box'} />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableBoxes.map(box => (
+                    <SelectItem key={box.id} value={box.id}>{box.box_code}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <Button variant="outline" className="w-full" onClick={createNewBox} disabled={creatingBox}>
               {creatingBox ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
               Create New Box
             </Button>
-
-            {selectedBox && (
-              <Card className="border-primary bg-primary/5">
-                <CardContent className="p-3 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <Box className="h-5 w-5 text-primary" />
-                    <span className="font-mono font-bold text-lg">{selectedBox.box_code}</span>
-                  </div>
-                  <Badge className="bg-primary">Selected</Badge>
-                </CardContent>
-              </Card>
-            )}
-
-            {!selectedBox && !loadingBoxes && availableBoxes.length > 0 && (
-              <div className="space-y-2">
-                <Label>Available Boxes ({availableBoxes.length})</Label>
-                <div className="grid grid-cols-3 gap-2 max-h-[120px] overflow-y-auto">
-                  {availableBoxes.slice(0, 9).map(box => (
-                    <Button key={box.id} variant="outline" size="sm" className="font-mono" onClick={() => setSelectedBox(box)}>
-                      {box.box_code}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {loadingBoxes && (
-              <div className="flex justify-center py-4">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-              </div>
-            )}
           </div>
-
           <DialogFooter>
             <Button variant="outline" onClick={() => setBoxDialogOpen(false)}>Cancel</Button>
             <Button onClick={handleAssignToBox} disabled={!selectedBox || submitting}>
               {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Assign to {selectedBox?.box_code || 'Box'}
+              Assign {totalSelected} Items
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -872,22 +835,22 @@ export default function OrderManufacturing() {
       <Dialog open={terminateDialogOpen} onOpenChange={setTerminateDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-destructive">
-              <XCircle className="h-5 w-5" />
-              Terminate Items
-            </DialogTitle>
+            <DialogTitle>Terminate Items</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              This will terminate {totalSelected} items. They will be removed from the order.
-            </p>
+          <div className="space-y-4 py-4">
+            <Alert variant="destructive">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>
+                Terminating {totalSelected} item(s). This action cannot be undone.
+              </AlertDescription>
+            </Alert>
             <div>
-              <Label>Reason *</Label>
+              <Label>Reason for Termination</Label>
               <Textarea
                 value={terminateReason}
                 onChange={(e) => setTerminateReason(e.target.value)}
-                placeholder="Reason for termination..."
-                rows={3}
+                placeholder="Enter reason..."
+                className="mt-2"
               />
             </div>
           </div>
@@ -895,7 +858,7 @@ export default function OrderManufacturing() {
             <Button variant="outline" onClick={() => setTerminateDialogOpen(false)}>Cancel</Button>
             <Button variant="destructive" onClick={handleTerminate} disabled={!terminateReason.trim() || submitting}>
               {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Terminate {totalSelected} Items
+              Terminate
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -905,22 +868,19 @@ export default function OrderManufacturing() {
       <Dialog open={redoDialogOpen} onOpenChange={setRedoDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-warning">
-              <RotateCcw className="h-5 w-5" />
-              Mark for Redo
-            </DialogTitle>
+            <DialogTitle>Mark Items for Redo</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
+          <div className="space-y-4 py-4">
             <p className="text-sm text-muted-foreground">
-              This will flag {totalSelected} items as needing redo. They will remain in Pending RM with a redo flag.
+              Marking {totalSelected} item(s) for redo. They will be flagged and reset to pending raw materials.
             </p>
             <div>
-              <Label>Reason *</Label>
+              <Label>Reason for Redo</Label>
               <Textarea
                 value={redoReason}
                 onChange={(e) => setRedoReason(e.target.value)}
-                placeholder="Reason for redo..."
-                rows={3}
+                placeholder="Enter reason..."
+                className="mt-2"
               />
             </div>
           </div>
@@ -928,7 +888,7 @@ export default function OrderManufacturing() {
             <Button variant="outline" onClick={() => setRedoDialogOpen(false)}>Cancel</Button>
             <Button onClick={handleMarkRedo} disabled={!redoReason.trim() || submitting}>
               {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Mark {totalSelected} for Redo
+              Mark Redo
             </Button>
           </DialogFooter>
         </DialogContent>
