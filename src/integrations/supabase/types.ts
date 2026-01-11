@@ -29,6 +29,7 @@ export type Database = {
           id: string
           inventory_state: string | null
           is_flagged: boolean | null
+          is_from_extra: boolean | null
           is_redo: boolean | null
           is_terminated: boolean | null
           lead_time_days: number | null
@@ -59,6 +60,7 @@ export type Database = {
           id?: string
           inventory_state?: string | null
           is_flagged?: boolean | null
+          is_from_extra?: boolean | null
           is_redo?: boolean | null
           is_terminated?: boolean | null
           lead_time_days?: number | null
@@ -89,6 +91,7 @@ export type Database = {
           id?: string
           inventory_state?: string | null
           is_flagged?: boolean | null
+          is_from_extra?: boolean | null
           is_redo?: boolean | null
           is_terminated?: boolean | null
           lead_time_days?: number | null
