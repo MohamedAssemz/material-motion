@@ -890,6 +890,7 @@ export default function OrderDetail() {
         orderId={id!}
         phase={selectedExtraPhase}
         orderItems={orderItems.map(item => ({
+          id: item.id,
           product_id: item.product_id,
           quantity: item.quantity,
         }))}

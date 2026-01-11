@@ -43,6 +43,7 @@ interface ProductGroup {
 }
 
 interface OrderItem {
+  id: string;
   product_id: string;
   quantity: number;
 }
@@ -206,8 +207,16 @@ export function ExtraInventoryDialog({
 
   // Get max quantity for a product based on order items
   const getMaxForProduct = (productId: string): number => {
+    // Sum all order items for this product (there could be multiple)
+    return orderItems
+      .filter(oi => oi.product_id === productId)
+      .reduce((sum, oi) => sum + oi.quantity, 0);
+  };
+  
+  // Get order item ID for a product (first matching one)
+  const getOrderItemIdForProduct = (productId: string): string | null => {
     const orderItem = orderItems.find(oi => oi.product_id === productId);
-    return orderItem?.quantity || 0;
+    return orderItem?.id || null;
   };
 
   const handleQuantityChange = (batchId: string, value: number, maxAvailable: number, productId: string) => {
@@ -276,6 +285,13 @@ export function ExtraInventoryDialog({
         const batch = batches.find(b => b.id === batchId);
         if (!batch) continue;
         
+        // Get the order_item_id for this product
+        const orderItemId = getOrderItemIdForProduct(batch.product_id);
+        if (!orderItemId) {
+          console.warn(`No order item found for product ${batch.product_id}`);
+          continue;
+        }
+        
         // Track total quantity per product for order batch reduction
         productQuantities.set(
           batch.product_id,
@@ -289,6 +305,7 @@ export function ExtraInventoryDialog({
             .update({
               inventory_state: 'RESERVED',
               order_id: orderId,
+              order_item_id: orderItemId,
             })
             .eq('id', batchId);
 
@@ -309,6 +326,7 @@ export function ExtraInventoryDialog({
             .insert({
               qr_code_data: newBatchCode || `EB-${Date.now()}`,
               order_id: orderId,
+              order_item_id: orderItemId,
               product_id: batch.product_id,
               current_state: batch.current_state,
               quantity: quantity,
