@@ -24,6 +24,7 @@ import { ShipmentDialog } from "@/components/ShipmentDialog";
 import { BoxAssignmentDialog } from "@/components/BoxAssignmentDialog";
 import { LeadTimeDialog } from "@/components/LeadTimeDialog";
 import { ExtraInventoryDialog } from "@/components/ExtraInventoryDialog";
+import { StartOrderDialog } from "@/components/StartOrderDialog";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import {
@@ -41,6 +42,7 @@ import {
   RotateCcw,
   Truck,
   Plane,
+  Play,
 } from "lucide-react";
 import {
   getNextState,
@@ -132,6 +134,7 @@ export default function OrderDetail() {
   const [boxAssignDialogOpen, setBoxAssignDialogOpen] = useState(false);
   const [leadTimeDialogOpen, setLeadTimeDialogOpen] = useState(false);
   const [extraInventoryOpen, setExtraInventoryOpen] = useState(false);
+  const [startOrderOpen, setStartOrderOpen] = useState(false);
   const [selectedExtraPhase, setSelectedExtraPhase] = useState<'manufacturing' | 'finishing' | 'packaging' | 'boxing'>('manufacturing');
   const [extraInventoryCounts, setExtraInventoryCounts] = useState<Record<string, number>>({});
 
@@ -388,6 +391,10 @@ export default function OrderDetail() {
     .reduce((sum, b) => sum + b.quantity, 0);
   const flaggedCount = activeBatches.filter((b) => b.is_flagged).reduce((sum, b) => sum + b.quantity, 0);
   const redoCount = activeBatches.filter((b) => b.is_redo).reduce((sum, b) => sum + b.quantity, 0);
+  
+  // Check if order is pending (all batches in pending_rm state)
+  const isPendingOrder = activeBatches.length > 0 && 
+    activeBatches.every((b) => b.current_state === "pending_rm");
 
   // Calculate phase stats
   const getPhaseStats = (inState: string, readyState?: string): PhaseStats => {
@@ -487,6 +494,12 @@ export default function OrderDetail() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {isPendingOrder && canUpdate && (
+            <Button onClick={() => setStartOrderOpen(true)}>
+              <Play className="h-4 w-4 mr-1" />
+              Start Order
+            </Button>
+          )}
           <Button variant="outline" size="sm" onClick={handlePrintOrder}>
             <Printer className="h-4 w-4 mr-1" />
             Print
@@ -879,6 +892,20 @@ export default function OrderDetail() {
           quantity: item.quantity,
         }))}
         onItemsSelected={(selections) => {
+          fetchOrder();
+          fetchExtraInventoryCounts();
+        }}
+      />
+      <StartOrderDialog
+        open={startOrderOpen}
+        onOpenChange={setStartOrderOpen}
+        orderId={id!}
+        orderItems={orderItems.map(item => ({
+          product_id: item.product_id,
+          quantity: item.quantity,
+          product: item.product,
+        }))}
+        onOrderStarted={() => {
           fetchOrder();
           fetchExtraInventoryCounts();
         }}
