@@ -11,11 +11,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Plus, Package, Loader2, Box, QrCode, Printer } from 'lucide-react';
+import { ArrowLeft, Plus, Package, Loader2, Box, Printer } from 'lucide-react';
 import { format } from 'date-fns';
-import { getStateLabel, getStateColor as getStateColorFn, type UnitState } from '@/lib/stateMachine';
-import { BoxSelectionDialog } from '@/components/BoxSelectionDialog';
-import { BatchCardPrintable } from '@/components/BatchCardPrintable';
+import { ExtraBoxSelectionDialog } from '@/components/ExtraBoxSelectionDialog';
 
 interface Product {
   id: string;
@@ -25,19 +23,33 @@ interface Product {
 
 interface ExtraBatch {
   id: string;
-  batch_code: string;
   product_id: string;
   quantity: number;
   current_state: string;
   inventory_state: string;
   created_at: string;
   box_id: string | null;
+  qr_code_data: string | null;
   product: Product;
   box?: {
     id: string;
     box_code: string;
   } | null;
 }
+
+const EXTRA_STATE_LABELS: Record<string, string> = {
+  extra_manufacturing: 'Extra Manufacturing',
+  extra_finishing: 'Extra Finishing',
+  extra_packaging: 'Extra Packaging',
+  extra_boxing: 'Extra Boxing',
+};
+
+const EXTRA_STATE_COLORS: Record<string, string> = {
+  extra_manufacturing: 'bg-blue-500 text-white',
+  extra_finishing: 'bg-purple-500 text-white',
+  extra_packaging: 'bg-orange-500 text-white',
+  extra_boxing: 'bg-cyan-500 text-white',
+};
 
 export default function ExtraInventory() {
   const { user, hasRole } = useAuth();
@@ -52,7 +64,7 @@ export default function ExtraInventory() {
   const [formData, setFormData] = useState({
     product_id: '',
     quantity: 1,
-    current_state: 'ready_for_finishing',
+    current_state: 'extra_manufacturing',
   });
 
   const canManage = hasRole('manufacture_lead') || hasRole('admin');
@@ -66,7 +78,7 @@ export default function ExtraInventory() {
 
     const channel = supabase
       .channel('extra-batches')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'batches' }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'extra_batches' }, () => {
         fetchData();
       })
       .subscribe();
@@ -81,33 +93,31 @@ export default function ExtraInventory() {
       const [productsRes, batchesRes] = await Promise.all([
         supabase.from('products').select('id, sku, name').order('sku'),
         supabase
-          .from('batches')
+          .from('extra_batches')
           .select(`
             id,
-            batch_code,
             product_id,
             quantity,
             current_state,
             inventory_state,
             created_at,
             box_id,
+            qr_code_data,
             product:products(id, sku, name)
           `)
-          .eq('batch_type', 'EXTRA')
-          .eq('is_terminated', false)
           .order('created_at', { ascending: false }),
       ]);
 
       if (productsRes.error) throw productsRes.error;
       if (batchesRes.error) throw batchesRes.error;
 
-      // Fetch box info for batches with box_id
+      // Fetch box info for batches with box_id from extra_boxes
       const boxIds = batchesRes.data?.filter(b => b.box_id).map(b => b.box_id) || [];
       let boxMap = new Map();
       
       if (boxIds.length > 0) {
         const { data: boxesData } = await supabase
-          .from('boxes')
+          .from('extra_boxes')
           .select('id, box_code')
           .in('id', boxIds);
         
@@ -146,16 +156,14 @@ export default function ExtraInventory() {
     }
 
     try {
-      const { data: batchCode } = await supabase.rpc('generate_batch_code');
+      const { data: qrCode } = await supabase.rpc('generate_extra_batch_code');
 
-      const { error } = await supabase.from('batches').insert({
-        batch_code: batchCode || `B-${Date.now()}`,
-        order_id: null as any, // Extra batches don't belong to orders initially
+      const { error } = await supabase.from('extra_batches').insert({
         product_id: formData.product_id,
         quantity: formData.quantity,
         current_state: formData.current_state,
-        batch_type: 'EXTRA',
         inventory_state: 'AVAILABLE',
+        qr_code_data: qrCode || `EB-${Date.now()}`,
         created_by: user?.id,
       });
 
@@ -167,7 +175,7 @@ export default function ExtraInventory() {
       });
 
       setDialogOpen(false);
-      setFormData({ product_id: '', quantity: 1, current_state: 'ready_for_finishing' });
+      setFormData({ product_id: '', quantity: 1, current_state: 'extra_manufacturing' });
       fetchData();
     } catch (error: any) {
       toast({
@@ -178,7 +186,7 @@ export default function ExtraInventory() {
     }
   };
 
-  const handleAssignBox = async (boxId: string, isExistingExtraBox?: boolean) => {
+  const handleAssignBox = async (boxId: string) => {
     if (!selectedBatchForBox) return;
 
     const batch = batches.find(b => b.id === selectedBatchForBox);
@@ -187,7 +195,7 @@ export default function ExtraInventory() {
     try {
       // Update batch with box_id
       const { error: batchError } = await supabase
-        .from('batches')
+        .from('extra_batches')
         .update({ box_id: boxId })
         .eq('id', selectedBatchForBox);
 
@@ -195,7 +203,7 @@ export default function ExtraInventory() {
 
       // Get current box data to update items_list
       const { data: boxData } = await supabase
-        .from('boxes')
+        .from('extra_boxes')
         .select('items_list')
         .eq('id', boxId)
         .single();
@@ -209,14 +217,13 @@ export default function ExtraInventory() {
         product_sku: batch.product.sku,
         quantity: batch.quantity,
         batch_id: batch.id,
-        batch_type: 'EXTRA',
       };
 
       const updatedItems = [...currentItems, newItem];
 
-      // Update box with new items_list and content_type
+      // Update box with new items_list
       const { error: boxError } = await supabase
-        .from('boxes')
+        .from('extra_boxes')
         .update({ 
           items_list: updatedItems,
           content_type: 'EXTRA'
@@ -227,9 +234,10 @@ export default function ExtraInventory() {
 
       toast({
         title: 'Success',
-        description: isExistingExtraBox ? 'Batch added to existing box' : 'Box assigned to batch',
+        description: 'Box assigned to batch',
       });
       setSelectedBatchForBox(null);
+      setBoxDialogOpen(false);
       fetchData();
     } catch (error: any) {
       toast({
@@ -240,20 +248,16 @@ export default function ExtraInventory() {
     }
   };
 
-  const getStateColor = getStateColorFn;
-
   const getInventoryStateColor = (state: string) => {
     switch (state) {
       case 'AVAILABLE': return 'text-green-600 border-green-600';
       case 'RESERVED': return 'text-amber-600 border-amber-600';
-      case 'CONSUMED': return 'text-muted-foreground border-muted';
       default: return '';
     }
   };
 
   const availableBatches = batches.filter(b => b.inventory_state === 'AVAILABLE');
   const reservedBatches = batches.filter(b => b.inventory_state === 'RESERVED');
-  const consumedBatches = batches.filter(b => b.inventory_state === 'CONSUMED');
 
   const totalAvailable = availableBatches.reduce((sum, b) => sum + b.quantity, 0);
 
@@ -330,10 +334,10 @@ export default function ExtraInventory() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="ready_for_finishing">Ready for Finishing</SelectItem>
-                      <SelectItem value="ready_for_packaging">Ready for Packaging</SelectItem>
-                      <SelectItem value="ready_for_boxing">Ready for Boxing</SelectItem>
-                      <SelectItem value="ready_for_receiving">Ready for Receiving</SelectItem>
+                      <SelectItem value="extra_manufacturing">Extra Manufacturing</SelectItem>
+                      <SelectItem value="extra_finishing">Extra Finishing</SelectItem>
+                      <SelectItem value="extra_packaging">Extra Packaging</SelectItem>
+                      <SelectItem value="extra_boxing">Extra Boxing</SelectItem>
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-muted-foreground mt-1">
@@ -354,7 +358,7 @@ export default function ExtraInventory() {
 
       <div className="container mx-auto p-6 space-y-6">
         {/* Stats */}
-        <div className="grid gap-4 md:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-3">
           <Card>
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
@@ -388,17 +392,6 @@ export default function ExtraInventory() {
               </div>
             </CardContent>
           </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Consumed</p>
-                  <p className="text-2xl font-bold text-muted-foreground">{consumedBatches.length}</p>
-                </div>
-                <Package className="h-8 w-8 text-muted-foreground opacity-50" />
-              </div>
-            </CardContent>
-          </Card>
         </div>
 
         {/* Batches Table */}
@@ -417,7 +410,7 @@ export default function ExtraInventory() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Batch Code</TableHead>
+                    <TableHead>QR Code</TableHead>
                     <TableHead>Product</TableHead>
                     <TableHead>Quantity</TableHead>
                     <TableHead>Current State</TableHead>
@@ -429,8 +422,8 @@ export default function ExtraInventory() {
                 </TableHeader>
                 <TableBody>
                   {batches.map((batch) => (
-                    <TableRow key={batch.id} className={batch.inventory_state === 'CONSUMED' ? 'opacity-50' : ''}>
-                      <TableCell className="font-mono font-medium">{batch.batch_code}</TableCell>
+                    <TableRow key={batch.id}>
+                      <TableCell className="font-mono font-medium">{batch.qr_code_data || '-'}</TableCell>
                       <TableCell>
                         <div>
                           <p className="font-medium">{batch.product.name}</p>
@@ -439,8 +432,8 @@ export default function ExtraInventory() {
                       </TableCell>
                       <TableCell className="font-bold">{batch.quantity}</TableCell>
                       <TableCell>
-                        <Badge className={getStateColor(batch.current_state)}>
-                          {getStateLabel(batch.current_state)}
+                        <Badge className={EXTRA_STATE_COLORS[batch.current_state] || 'bg-gray-500'}>
+                          {EXTRA_STATE_LABELS[batch.current_state] || batch.current_state}
                         </Badge>
                       </TableCell>
                       <TableCell>
@@ -462,7 +455,7 @@ export default function ExtraInventory() {
                               setSelectedBatchForBox(batch.id);
                               setBoxDialogOpen(true);
                             }}
-                            disabled={batch.inventory_state === 'CONSUMED'}
+                            disabled={batch.inventory_state === 'RESERVED'}
                           >
                             <Box className="h-4 w-4 mr-1" />
                             Assign
@@ -471,15 +464,9 @@ export default function ExtraInventory() {
                       </TableCell>
                       <TableCell>{format(new Date(batch.created_at), 'PP')}</TableCell>
                       <TableCell className="text-right">
-                        <BatchCardPrintable
-                          batchCode={batch.batch_code}
-                          productName={batch.product.name}
-                          productSku={batch.product.sku}
-                          state={batch.current_state as UnitState}
-                          quantity={batch.quantity}
-                          batchType="EXTRA"
-                          boxCode={batch.box?.box_code}
-                        />
+                        <Button variant="ghost" size="sm">
+                          <Printer className="h-4 w-4" />
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -490,12 +477,11 @@ export default function ExtraInventory() {
         </Card>
       </div>
 
-      <BoxSelectionDialog
+      <ExtraBoxSelectionDialog
         open={boxDialogOpen}
         onOpenChange={setBoxDialogOpen}
         onConfirm={handleAssignBox}
-        title="Assign Box to Extra Batch"
-        allowExtraBoxes={true}
+        title="Assign Extra Box"
       />
     </div>
   );
