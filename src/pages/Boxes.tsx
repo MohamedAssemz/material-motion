@@ -109,10 +109,15 @@ export default function Boxes() {
         }
       });
 
-      const orderBoxesWithBatches = orderBoxesData?.map(box => ({
-        ...box,
+      const orderBoxesWithBatches: OrderBoxData[] = (orderBoxesData || []).map(box => ({
+        id: box.id,
+        box_code: box.box_code,
+        is_active: box.is_active,
+        created_at: box.created_at,
+        content_type: box.content_type || 'EMPTY',
+        items_list: Array.isArray(box.items_list) ? box.items_list : [],
         current_batch: batchByBox.get(box.id) || null,
-      })) || [];
+      }));
 
       setOrderBoxes(orderBoxesWithBatches);
 
@@ -124,7 +129,16 @@ export default function Boxes() {
 
       if (extraBoxesError) throw extraBoxesError;
 
-      setExtraBoxes(extraBoxesData || []);
+      const extraBoxesMapped: ExtraBoxData[] = (extraBoxesData || []).map(box => ({
+        id: box.id,
+        box_code: box.box_code,
+        is_active: box.is_active,
+        created_at: box.created_at,
+        content_type: box.content_type || 'EMPTY',
+        items_list: Array.isArray(box.items_list) ? box.items_list : [],
+      }));
+
+      setExtraBoxes(extraBoxesMapped);
     } catch (error: any) {
       toast({
         title: 'Error',

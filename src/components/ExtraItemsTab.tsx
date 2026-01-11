@@ -25,7 +25,7 @@ import {
 
 interface ExtraBatch {
   id: string;
-  batch_code: string;
+  qr_code_data: string | null;
   product_id: string;
   quantity: number;
   current_state: string;
@@ -57,19 +57,18 @@ interface ExtraItemsTabProps {
 }
 
 // Map phase to the current_state for extra items assigned to this order
-// Extra items keep their current_state when assigned, they're just filtered by order_id
 const PHASE_CURRENT_STATE_MAP: Record<string, string> = {
-  manufacturing: 'ready_for_finishing',
-  finishing: 'ready_for_packaging',
-  packaging: 'ready_for_boxing',
-  boxing: 'ready_for_receiving',
+  manufacturing: 'extra_finishing',
+  finishing: 'extra_packaging',
+  packaging: 'extra_boxing',
+  boxing: 'extra_boxing',
 };
 
 const PHASE_NEXT_STATE_MAP: Record<string, string> = {
-  manufacturing: 'ready_for_finishing',
-  finishing: 'ready_for_packaging',
-  packaging: 'ready_for_boxing',
-  boxing: 'ready_for_receiving',
+  manufacturing: 'extra_finishing',
+  finishing: 'extra_packaging',
+  packaging: 'extra_boxing',
+  boxing: 'extra_boxing',
 };
 
 const PHASE_LABELS: Record<string, string> = {
@@ -102,7 +101,7 @@ export function ExtraItemsTab({ orderId, phase, onRefresh }: ExtraItemsTabProps)
       .on('postgres_changes', { 
         event: '*', 
         schema: 'public', 
-        table: 'batches', 
+        table: 'extra_batches', 
         filter: `order_id=eq.${orderId}` 
       }, () => {
         fetchExtraBatches();
@@ -120,34 +119,37 @@ export function ExtraItemsTab({ orderId, phase, onRefresh }: ExtraItemsTabProps)
       const targetState = PHASE_CURRENT_STATE_MAP[phase];
       
       const { data, error } = await supabase
-        .from('batches')
+        .from('extra_batches')
         .select(`
-          id, batch_code, product_id, quantity, current_state, box_id,
+          id, qr_code_data, product_id, quantity, current_state, box_id,
           product:products(id, name, sku)
         `)
         .eq('order_id', orderId)
-        .eq('batch_type', 'EXTRA')
-        .eq('current_state', targetState)
-        .eq('is_terminated', false);
+        .eq('current_state', targetState);
       
       if (error) throw error;
       
-      // Fetch box info
+      // Fetch box info from extra_boxes
       const boxIds = data?.filter(b => b.box_id).map(b => b.box_id) || [];
-      let boxMap = new Map();
+      let boxMap = new Map<string, { id: string; box_code: string }>();
       if (boxIds.length > 0) {
         const { data: boxesData } = await supabase
-          .from('boxes')
+          .from('extra_boxes')
           .select('id, box_code')
           .in('id', [...new Set(boxIds)]);
         boxesData?.forEach(box => boxMap.set(box.id, box));
       }
       
-      const batchesWithBox = data?.map(batch => ({
-        ...batch,
+      const batchesWithBox: ExtraBatch[] = (data || []).map(batch => ({
+        id: batch.id,
+        qr_code_data: batch.qr_code_data,
+        product_id: batch.product_id,
+        quantity: batch.quantity,
+        current_state: batch.current_state,
+        box_id: batch.box_id,
         product: batch.product as ExtraBatch['product'],
         box: batch.box_id ? boxMap.get(batch.box_id) : null,
-      })) || [];
+      }));
       
       setExtraBatches(batchesWithBox);
     } catch (error: any) {
@@ -161,15 +163,14 @@ export function ExtraItemsTab({ orderId, phase, onRefresh }: ExtraItemsTabProps)
     setLoadingBoxes(true);
     try {
       const { data: allBoxes } = await supabase
-        .from('boxes')
+        .from('extra_boxes')
         .select('id, box_code')
         .eq('is_active', true)
         .order('box_code');
       const { data: occupiedBatches } = await supabase
-        .from('batches')
+        .from('extra_batches')
         .select('box_id')
-        .not('box_id', 'is', null)
-        .eq('is_terminated', false);
+        .not('box_id', 'is', null);
       const occupiedIds = new Set(occupiedBatches?.map(b => b.box_id) || []);
       setAvailableBoxes(allBoxes?.filter(box => !occupiedIds.has(box.id)) || []);
     } catch (error: any) {
@@ -183,7 +184,7 @@ export function ExtraItemsTab({ orderId, phase, onRefresh }: ExtraItemsTabProps)
     if (!boxSearchCode.trim()) return;
     try {
       const { data: box } = await supabase
-        .from('boxes')
+        .from('extra_boxes')
         .select('id, box_code')
         .eq('box_code', boxSearchCode.trim().toUpperCase())
         .eq('is_active', true)
@@ -195,10 +196,9 @@ export function ExtraItemsTab({ orderId, phase, onRefresh }: ExtraItemsTabProps)
       }
       
       const { data: existingBatch } = await supabase
-        .from('batches')
+        .from('extra_batches')
         .select('id')
         .eq('box_id', box.id)
-        .eq('is_terminated', false)
         .maybeSingle();
       
       if (existingBatch) {
@@ -216,10 +216,10 @@ export function ExtraItemsTab({ orderId, phase, onRefresh }: ExtraItemsTabProps)
   const createNewBox = async () => {
     setCreatingBox(true);
     try {
-      const { data: code } = await supabase.rpc('generate_box_code');
+      const { data: code } = await supabase.rpc('generate_extra_box_code');
       const { data: newBox, error } = await supabase
-        .from('boxes')
-        .insert({ box_code: code || `BOX-${Date.now()}` })
+        .from('extra_boxes')
+        .insert({ box_code: code || `EBOX-${Date.now()}` })
         .select()
         .single();
       if (error) throw error;
@@ -277,7 +277,7 @@ export function ExtraItemsTab({ orderId, phase, onRefresh }: ExtraItemsTabProps)
       const nextState = PHASE_NEXT_STATE_MAP[phase];
       
       const { data: boxData } = await supabase
-        .from('boxes')
+        .from('extra_boxes')
         .select('items_list')
         .eq('id', selectedBox.id)
         .single();
@@ -289,7 +289,6 @@ export function ExtraItemsTab({ orderId, phase, onRefresh }: ExtraItemsTabProps)
         product_sku: string;
         quantity: number;
         batch_id: string;
-        batch_type: string;
       }> = [];
       
       for (const [productId, quantity] of productSelections.entries()) {
@@ -306,7 +305,7 @@ export function ExtraItemsTab({ orderId, phase, onRefresh }: ExtraItemsTabProps)
           remainingQty -= useQty;
           
           if (useQty === batch.quantity) {
-            await supabase.from('batches').update({
+            await supabase.from('extra_batches').update({
               current_state: nextState,
               box_id: selectedBox.id,
             }).eq('id', batch.id);
@@ -317,23 +316,20 @@ export function ExtraItemsTab({ orderId, phase, onRefresh }: ExtraItemsTabProps)
               product_sku: group.product_sku,
               quantity: useQty,
               batch_id: batch.id,
-              batch_type: 'EXTRA',
             });
           } else {
-            const { data: batchCode } = await supabase.rpc('generate_batch_code');
-            const { data: newBatch } = await supabase.from('batches').insert({
-              batch_code: batchCode,
+            const { data: batchCode } = await supabase.rpc('generate_extra_batch_code');
+            const { data: newBatch } = await supabase.from('extra_batches').insert({
+              qr_code_data: batchCode,
               order_id: orderId,
               product_id: batch.product_id,
               current_state: nextState,
               quantity: useQty,
               box_id: selectedBox.id,
-              batch_type: 'EXTRA',
               created_by: user?.id,
-              parent_batch_id_split: batch.id,
             }).select('id').single();
             
-            await supabase.from('batches').update({
+            await supabase.from('extra_batches').update({
               quantity: batch.quantity - useQty,
             }).eq('id', batch.id);
             
@@ -343,14 +339,13 @@ export function ExtraItemsTab({ orderId, phase, onRefresh }: ExtraItemsTabProps)
               product_sku: group.product_sku,
               quantity: useQty,
               batch_id: newBatch?.id || batch.id,
-              batch_type: 'EXTRA',
             });
           }
         }
       }
       
       const updatedItems = [...currentItems, ...newItems];
-      await supabase.from('boxes').update({
+      await supabase.from('extra_boxes').update({
         items_list: updatedItems,
         content_type: 'EXTRA',
       }).eq('id', selectedBox.id);
@@ -498,37 +493,41 @@ export function ExtraItemsTab({ orderId, phase, onRefresh }: ExtraItemsTabProps)
                     <div className="flex items-center gap-2">
                       <p className="font-medium">{group.product_name}</p>
                       <Badge variant="outline" className="text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400">
-                        Extra
+                        EXTRA
                       </Badge>
                     </div>
-                    <p className="text-sm text-muted-foreground">
-                      {group.product_sku}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Source: {group.batches.map(b => b.box?.box_code || 'No Box').filter((v, i, a) => a.indexOf(v) === i).join(', ')}
-                    </p>
+                    <p className="text-sm text-muted-foreground">{group.product_sku}</p>
+                    <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
+                      <Box className="h-3 w-3" />
+                      <span>{group.source_box_code}</span>
+                    </div>
                   </div>
                   <div className="flex items-center gap-4">
-                    <div className="text-center">
+                    <div className="text-right">
                       <p className="text-lg font-semibold">{group.quantity}</p>
-                      <p className="text-xs text-muted-foreground">Available</p>
+                      <p className="text-xs text-muted-foreground">available</p>
                     </div>
-                    <div className="w-24">
-                      <Label className="text-xs">Select Qty</Label>
+                    <div className="flex items-center gap-2">
+                      <Label className="text-xs">Select:</Label>
                       <Input
                         type="number"
-                        min={0}
+                        min="0"
                         max={group.quantity}
                         value={productSelections.get(group.product_id) || ''}
-                        onChange={(e) => {
-                          const qty = Math.max(0, Math.min(parseInt(e.target.value) || 0, group.quantity));
+                        onChange={e => {
+                          const val = parseInt(e.target.value) || 0;
+                          const clamped = Math.max(0, Math.min(val, group.quantity));
                           setProductSelections(prev => {
-                            const next = new Map(prev);
-                            if (qty > 0) next.set(group.product_id, qty);
-                            else next.delete(group.product_id);
-                            return next;
+                            const newMap = new Map(prev);
+                            if (clamped > 0) {
+                              newMap.set(group.product_id, clamped);
+                            } else {
+                              newMap.delete(group.product_id);
+                            }
+                            return newMap;
                           });
                         }}
+                        className="w-20 h-8"
                         placeholder="0"
                       />
                     </div>
@@ -542,43 +541,48 @@ export function ExtraItemsTab({ orderId, phase, onRefresh }: ExtraItemsTabProps)
 
       {/* Box Assignment Dialog */}
       <Dialog open={boxDialogOpen} onOpenChange={setBoxDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Assign Extra Items to Box</DialogTitle>
+            <DialogTitle>Assign to Box</DialogTitle>
           </DialogHeader>
           
           <div className="space-y-4">
-            <div>
-              <Label>Search Box</Label>
-              <div className="flex gap-2 mt-1">
-                <Input
-                  value={boxSearchCode}
-                  onChange={(e) => setBoxSearchCode(e.target.value)}
-                  placeholder="Enter box code..."
-                  onKeyDown={(e) => e.key === 'Enter' && searchBox()}
-                />
-                <Button variant="outline" onClick={searchBox}>
-                  <Search className="h-4 w-4" />
-                </Button>
-              </div>
+            {/* Search Box */}
+            <div className="flex gap-2">
+              <Input
+                placeholder="Enter box code..."
+                value={boxSearchCode}
+                onChange={e => setBoxSearchCode(e.target.value.toUpperCase())}
+                onKeyDown={e => e.key === 'Enter' && searchBox()}
+              />
+              <Button variant="outline" onClick={searchBox}>
+                <Search className="h-4 w-4" />
+              </Button>
             </div>
 
-            <div>
-              <Label>Or Select Available Box</Label>
-              {loadingBoxes ? (
-                <div className="flex items-center gap-2 mt-2">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span className="text-sm text-muted-foreground">Loading boxes...</span>
-                </div>
-              ) : (
-                <Select
-                  value={selectedBox?.id || ''}
-                  onValueChange={(value) => {
-                    const box = availableBoxes.find(b => b.id === value);
-                    setSelectedBox(box || null);
+            {/* Selected Box */}
+            {selectedBox && (
+              <div className="p-3 border rounded-lg bg-primary/5 border-primary">
+                <p className="font-medium">Selected: {selectedBox.box_code}</p>
+              </div>
+            )}
+
+            {/* Available Boxes */}
+            {loadingBoxes ? (
+              <div className="flex justify-center py-4">
+                <Loader2 className="h-5 w-5 animate-spin" />
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label>Or select an available box:</Label>
+                <Select 
+                  value={selectedBox?.id || ''} 
+                  onValueChange={val => {
+                    const box = availableBoxes.find(b => b.id === val);
+                    if (box) setSelectedBox(box);
                   }}
                 >
-                  <SelectTrigger className="mt-1">
+                  <SelectTrigger>
                     <SelectValue placeholder="Select a box" />
                   </SelectTrigger>
                   <SelectContent>
@@ -589,26 +593,35 @@ export function ExtraItemsTab({ orderId, phase, onRefresh }: ExtraItemsTabProps)
                     ))}
                   </SelectContent>
                 </Select>
-              )}
-            </div>
-
-            <Button variant="outline" onClick={createNewBox} disabled={creatingBox} className="w-full">
-              {creatingBox ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Plus className="h-4 w-4 mr-2" />}
-              Create New Box
-            </Button>
-
-            {selectedBox && (
-              <div className="p-3 bg-muted rounded-lg">
-                <p className="text-sm font-medium">Selected: {selectedBox.box_code}</p>
               </div>
             )}
+
+            {/* Create New Box */}
+            <Button 
+              variant="outline" 
+              className="w-full" 
+              onClick={createNewBox}
+              disabled={creatingBox}
+            >
+              {creatingBox ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <Plus className="h-4 w-4 mr-2" />
+              )}
+              Create New Box
+            </Button>
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setBoxDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleAssignToBox} disabled={!selectedBox || submitting}>
-              {submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              Assign {totalSelected} Items
+            <Button variant="outline" onClick={() => setBoxDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleAssignToBox} 
+              disabled={!selectedBox || submitting}
+            >
+              {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Assign ({totalSelected})
             </Button>
           </DialogFooter>
         </DialogContent>
