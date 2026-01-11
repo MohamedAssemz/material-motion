@@ -731,8 +731,8 @@ export default function OrderFinishing() {
         <TabsContent value="extra">
           <ExtraItemsTab 
             orderId={id!} 
-            targetPhase="finishing" 
-            onAssign={() => fetchData()} 
+            phase="finishing" 
+            onRefresh={() => fetchData()} 
           />
         </TabsContent>
 

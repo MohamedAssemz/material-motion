@@ -729,8 +729,8 @@ export default function OrderManufacturing() {
         <TabsContent value="extra">
           <ExtraItemsTab 
             orderId={id!} 
-            targetPhase="manufacturing" 
-            onAssign={() => fetchData()} 
+            phase="manufacturing" 
+            onRefresh={() => fetchData()} 
           />
         </TabsContent>
 
