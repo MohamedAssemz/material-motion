@@ -163,15 +163,19 @@ export function ExtraItemsTab({ orderId, phase, onRefresh }: ExtraItemsTabProps)
   const fetchEmptyBoxes = async () => {
     setLoadingBoxes(true);
     try {
+      // Fetch ORDER boxes (not extra_boxes) for assigning extra items during order processing
       const { data: allBoxes } = await supabase
-        .from('extra_boxes')
+        .from('boxes')
         .select('id, box_code')
         .eq('is_active', true)
         .order('box_code');
+      
+      // Check which boxes already have order batches assigned
       const { data: occupiedBatches } = await supabase
-        .from('extra_batches')
+        .from('order_batches')
         .select('box_id')
         .not('box_id', 'is', null);
+      
       const occupiedIds = new Set(occupiedBatches?.map(b => b.box_id) || []);
       setAvailableBoxes(allBoxes?.filter(box => !occupiedIds.has(box.id)) || []);
     } catch (error: any) {
@@ -184,8 +188,9 @@ export function ExtraItemsTab({ orderId, phase, onRefresh }: ExtraItemsTabProps)
   const searchBox = async () => {
     if (!boxSearchCode.trim()) return;
     try {
+      // Search in ORDER boxes (not extra_boxes)
       const { data: box } = await supabase
-        .from('extra_boxes')
+        .from('boxes')
         .select('id, box_code')
         .eq('box_code', boxSearchCode.trim().toUpperCase())
         .eq('is_active', true)
@@ -196,8 +201,9 @@ export function ExtraItemsTab({ orderId, phase, onRefresh }: ExtraItemsTabProps)
         return;
       }
       
+      // Check if box is occupied by any order_batches
       const { data: existingBatch } = await supabase
-        .from('extra_batches')
+        .from('order_batches')
         .select('id')
         .eq('box_id', box.id)
         .maybeSingle();
@@ -217,10 +223,11 @@ export function ExtraItemsTab({ orderId, phase, onRefresh }: ExtraItemsTabProps)
   const createNewBox = async () => {
     setCreatingBox(true);
     try {
-      const { data: code } = await supabase.rpc('generate_extra_box_code');
+      // Create ORDER box (not extra_box)
+      const { data: code } = await supabase.rpc('generate_box_code');
       const { data: newBox, error } = await supabase
-        .from('extra_boxes')
-        .insert({ box_code: code || `EBOX-${Date.now()}` })
+        .from('boxes')
+        .insert({ box_code: code || `BOX-${Date.now()}` })
         .select()
         .single();
       if (error) throw error;
@@ -275,10 +282,20 @@ export function ExtraItemsTab({ orderId, phase, onRefresh }: ExtraItemsTabProps)
     setSubmitting(true);
     
     try {
-      const nextState = PHASE_NEXT_STATE_MAP[phase];
+      // Get the next order_batch state based on the phase
+      // Extra items assigned to order boxes should become regular order_batches
+      const PHASE_TO_ORDER_STATE: Record<string, string> = {
+        manufacturing: 'ready_for_finishing',
+        finishing: 'ready_for_packaging',
+        packaging: 'ready_for_boxing',
+        boxing: 'ready_for_receiving',
+      };
       
+      const nextOrderState = PHASE_TO_ORDER_STATE[phase];
+      
+      // Fetch current box items_list
       const { data: boxData } = await supabase
-        .from('extra_boxes')
+        .from('boxes')
         .select('items_list')
         .eq('id', selectedBox.id)
         .single();
@@ -305,50 +322,52 @@ export function ExtraItemsTab({ orderId, phase, onRefresh }: ExtraItemsTabProps)
           const useQty = Math.min(batch.quantity, remainingQty);
           remainingQty -= useQty;
           
-          if (useQty === batch.quantity) {
-            await supabase.from('extra_batches').update({
-              current_state: nextState,
-              box_id: selectedBox.id,
-            }).eq('id', batch.id);
-            
-            newItems.push({
-              product_id: group.product_id,
-              product_name: group.product_name,
-              product_sku: group.product_sku,
-              quantity: useQty,
-              batch_id: batch.id,
-            });
-          } else {
-            const { data: batchCode } = await supabase.rpc('generate_extra_batch_code');
-            const { data: newBatch } = await supabase.from('extra_batches').insert({
-              qr_code_data: batchCode,
+          // Create an order_batch from the extra batch
+          const { data: batchCode } = await supabase.rpc('generate_extra_batch_code');
+          const { data: newOrderBatch, error: insertError } = await supabase
+            .from('order_batches')
+            .insert({
+              qr_code_data: batchCode || `OB-${Date.now()}`,
               order_id: orderId,
               product_id: batch.product_id,
-              current_state: nextState,
+              current_state: nextOrderState,
               quantity: useQty,
               box_id: selectedBox.id,
               created_by: user?.id,
-            }).select('id').single();
-            
-            await supabase.from('extra_batches').update({
-              quantity: batch.quantity - useQty,
-            }).eq('id', batch.id);
-            
-            newItems.push({
-              product_id: group.product_id,
-              product_name: group.product_name,
-              product_sku: group.product_sku,
-              quantity: useQty,
-              batch_id: newBatch?.id || batch.id,
-            });
+            })
+            .select('id')
+            .single();
+          
+          if (insertError) throw insertError;
+          
+          newItems.push({
+            product_id: group.product_id,
+            product_name: group.product_name,
+            product_sku: group.product_sku,
+            quantity: useQty,
+            batch_id: newOrderBatch?.id || '',
+          });
+          
+          // Update or delete the extra_batch
+          if (useQty === batch.quantity) {
+            // Full quantity used - mark as consumed or delete
+            await supabase.from('extra_batches')
+              .update({ inventory_state: 'CONSUMED' })
+              .eq('id', batch.id);
+          } else {
+            // Partial quantity used - reduce the extra_batch
+            await supabase.from('extra_batches')
+              .update({ quantity: batch.quantity - useQty })
+              .eq('id', batch.id);
           }
         }
       }
       
+      // Update the order box's items_list
       const updatedItems = [...currentItems, ...newItems];
-      await supabase.from('extra_boxes').update({
+      await supabase.from('boxes').update({
         items_list: updatedItems,
-        content_type: 'EXTRA',
+        content_type: 'ORDER',
       }).eq('id', selectedBox.id);
       
       toast.success(`Assigned ${totalSelected} extra items to ${selectedBox.box_code}`);
