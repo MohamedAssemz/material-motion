@@ -13,7 +13,6 @@ import { useToast } from '@/hooks/use-toast';
 
 interface BoxBatch {
   id: string;
-  batch_code: string;
   product_id: string;
   product_name: string;
   product_sku: string;
@@ -85,10 +84,9 @@ export function BoxReceiveDialog({
     try {
       // Get batches in the specified state for this order
       const { data: batches, error } = await supabase
-        .from('batches')
+        .from('order_batches')
         .select(`
           id,
-          batch_code,
           product_id,
           quantity,
           box_id,
@@ -138,7 +136,6 @@ export function BoxReceiveDialog({
         const group = boxGroups.get(batch.box_id)!;
         group.batches.push({
           id: batch.id,
-          batch_code: batch.batch_code,
           product_id: batch.product_id,
           product_name: (batch.product as any)?.name || 'Unknown',
           product_sku: (batch.product as any)?.sku || 'N/A',
@@ -188,10 +185,9 @@ export function BoxReceiveDialog({
 
         // Check if box has batches in the correct state for this order
         const { data: batches } = await supabase
-          .from('batches')
+          .from('order_batches')
           .select(`
             id,
-            batch_code,
             product_id,
             quantity,
             product:products(id, name, sku)
@@ -215,7 +211,6 @@ export function BoxReceiveDialog({
           box_code: box.box_code,
           batches: batches.map(b => ({
             id: b.id,
-            batch_code: b.batch_code,
             product_id: b.product_id,
             product_name: (b.product as any)?.name || 'Unknown',
             product_sku: (b.product as any)?.sku || 'N/A',
@@ -229,10 +224,9 @@ export function BoxReceiveDialog({
       } else {
         // Search by product SKU or name - find boxes containing matching products
         const { data: matchingBatches } = await supabase
-          .from('batches')
+          .from('order_batches')
           .select(`
             id,
-            batch_code,
             product_id,
             quantity,
             box_id,
@@ -283,7 +277,6 @@ export function BoxReceiveDialog({
             box_code: box.box_code,
             batches: boxBatches.map(b => ({
               id: b.id,
-              batch_code: b.batch_code,
               product_id: b.product_id,
               product_name: (b.product as any)?.name || 'Unknown',
               product_sku: (b.product as any)?.sku || 'N/A',
