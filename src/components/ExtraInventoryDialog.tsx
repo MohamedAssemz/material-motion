@@ -235,6 +235,25 @@ export function ExtraInventoryDialog({
 
   const totalSelected = Array.from(selections.values()).reduce((a, b) => a + b, 0);
 
+  /**
+   * Extra Inventory Consumption Logic:
+   * 
+   * Invariant: Quantities are owned by batches, not boxes or products.
+   * A box can contain multiple batches of different products.
+   * 
+   * When a user selects a subset of an AVAILABLE extra batch:
+   * 
+   * 1. If selected quantity < batch quantity (partial):
+   *    - Split the batch into two:
+   *      a) Original batch keeps remaining quantity, stays AVAILABLE
+   *      b) New batch is created with selected quantity, state = RESERVED
+   *    - BOTH batches remain linked to the same EBox (preserve box_id)
+   * 
+   * 2. If selected quantity == batch quantity (full):
+   *    - Do NOT create a new batch
+   *    - Update existing batch: inventory_state AVAILABLE → RESERVED
+   *    - Preserve box linkage
+   */
   const handleConfirm = async () => {
     if (totalSelected === 0) return;
     setSubmitting(true);
@@ -248,13 +267,18 @@ export function ExtraInventoryDialog({
         const batch = batches.find(b => b.id === batchId);
         if (!batch) continue;
 
-        // If using entire batch quantity, update the existing batch to assign to order
         if (quantity === batch.quantity) {
-          // Move entire batch to the order - assign order_id and mark as RESERVED
-          await supabase.from('extra_batches').update({
-            order_id: orderId,
-            inventory_state: 'RESERVED',
-          }).eq('id', batchId);
+          // FULL QUANTITY: Update existing batch state from AVAILABLE → RESERVED
+          // Preserve box linkage, do NOT assign order_id yet (that happens on actual consumption)
+          const { error: updateError } = await supabase
+            .from('extra_batches')
+            .update({
+              inventory_state: 'RESERVED',
+              order_id: orderId, // Link to order for tracking
+            })
+            .eq('id', batchId);
+
+          if (updateError) throw updateError;
 
           selectedItems.push({
             batch_id: batchId,
@@ -262,33 +286,42 @@ export function ExtraInventoryDialog({
             product_id: batch.product_id,
           });
         } else {
-          // Using partial quantity - create a new batch for the order and subtract from source
-          const { data: batchCode } = await supabase.rpc('generate_extra_batch_code');
+          // PARTIAL QUANTITY: Split the batch
+          // Original batch keeps remaining quantity, stays AVAILABLE in same box
+          // New batch gets selected quantity, marked RESERVED, stays in same box
           
-          // New batch keeps the same current_state as source batch
-          const { data: newBatch, error: insertError } = await supabase.from('extra_batches').insert({
-            qr_code_data: batchCode || `EX-${Date.now()}`,
-            order_id: orderId,
-            product_id: batch.product_id,
-            current_state: batch.current_state,
-            quantity: quantity,
-            box_id: null, // New batch doesn't inherit box - needs to be assigned
-            inventory_state: 'RESERVED',
-            created_by: user?.id,
-          }).select('id').single();
+          const { data: newBatchCode } = await supabase.rpc('generate_extra_batch_code');
+          
+          // Create new batch with selected quantity - PRESERVE box_id linkage
+          const { data: newBatch, error: insertError } = await supabase
+            .from('extra_batches')
+            .insert({
+              qr_code_data: newBatchCode || `EB-${Date.now()}`,
+              order_id: orderId, // Link to order for tracking
+              product_id: batch.product_id,
+              current_state: batch.current_state, // Preserve same production state
+              quantity: quantity,
+              box_id: batch.box_id, // CRITICAL: Preserve box linkage
+              inventory_state: 'RESERVED',
+              created_by: user?.id,
+            })
+            .select('id')
+            .single();
 
           if (insertError) throw insertError;
 
-          // Subtract quantity from source batch (stays AVAILABLE in extra inventory)
-          const newQuantity = batch.quantity - quantity;
-          if (newQuantity <= 0) {
-            // Delete the source batch if quantity is zero
-            await supabase.from('extra_batches').delete().eq('id', batchId);
-          } else {
-            await supabase.from('extra_batches').update({
-              quantity: newQuantity,
-            }).eq('id', batchId);
-          }
+          // Update original batch: reduce quantity, stays AVAILABLE, stays in same box
+          const remainingQuantity = batch.quantity - quantity;
+          const { error: updateError } = await supabase
+            .from('extra_batches')
+            .update({
+              quantity: remainingQuantity,
+              // inventory_state stays 'AVAILABLE'
+              // box_id stays the same
+            })
+            .eq('id', batchId);
+
+          if (updateError) throw updateError;
 
           selectedItems.push({
             batch_id: newBatch?.id || batchId,
@@ -298,7 +331,7 @@ export function ExtraInventoryDialog({
         }
       }
 
-      toast.success(`Added ${totalSelected} extra items to order`);
+      toast.success(`Reserved ${totalSelected} extra items for order`);
       onItemsSelected(selectedItems);
       onOpenChange(false);
     } catch (error: any) {
