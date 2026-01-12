@@ -33,7 +33,7 @@ interface Order {
     email: string | null;
   };
   unit_count?: number;
-  received_count?: number;
+  shipped_count?: number;
   computed_status?: OrderStatus;
   customer?: {
     name: string;
@@ -141,8 +141,8 @@ export default function Orders() {
             .eq('is_terminated', false);
 
           const batchTotalCount = batches?.reduce((sum, b) => sum + b.quantity, 0) || 0;
-          const receivedCount = batches?.filter(b => b.current_state === 'received').reduce((sum, b) => sum + b.quantity, 0) || 0;
-          const inProgressCount = batches?.filter(b => b.current_state !== 'waiting_for_rm' && b.current_state !== 'received').reduce((sum, b) => sum + b.quantity, 0) || 0;
+          const shippedCount = batches?.filter(b => b.current_state === 'shipped').reduce((sum, b) => sum + b.quantity, 0) || 0;
+          const inProgressCount = batches?.filter(b => b.current_state !== 'pending_rm' && b.current_state !== 'shipped').reduce((sum, b) => sum + b.quantity, 0) || 0;
 
           // Compute status based on order.status field
           let computed_status: OrderStatus = 'pending';
@@ -159,7 +159,7 @@ export default function Orders() {
             ...order,
             profiles: order.created_by ? profilesMap.get(order.created_by) : null,
             unit_count: unitCount,
-            received_count: receivedCount,
+            shipped_count: shippedCount,
             computed_status,
           };
         })
@@ -250,7 +250,7 @@ export default function Orders() {
 
   const exportOrders = () => {
     // Build CSV content
-    const headers = ['Order Number', 'Customer', 'Priority', 'Status', 'Total Items', 'Received', 'Created At', 'EFT', 'Notes', 'Item SKU', 'Item Name', 'Item Quantity'];
+    const headers = ['Order Number', 'Customer', 'Priority', 'Status', 'Total Items', 'Shipped', 'Created At', 'EFT', 'Notes', 'Item SKU', 'Item Name', 'Item Quantity'];
     const rows: string[][] = [];
 
     filteredOrders.forEach(order => {
@@ -262,7 +262,7 @@ export default function Orders() {
           order.priority,
           order.computed_status || '',
           String(order.unit_count || 0),
-          String(order.received_count || 0),
+          String(order.shipped_count || 0),
           format(new Date(order.created_at), 'yyyy-MM-dd HH:mm'),
           order.estimated_fulfillment_time ? format(new Date(order.estimated_fulfillment_time), 'yyyy-MM-dd') : '',
           order.notes || '',
@@ -276,7 +276,7 @@ export default function Orders() {
             idx === 0 ? order.priority : '',
             idx === 0 ? (order.computed_status || '') : '',
             idx === 0 ? String(order.unit_count || 0) : '',
-            idx === 0 ? String(order.received_count || 0) : '',
+            idx === 0 ? String(order.shipped_count || 0) : '',
             idx === 0 ? format(new Date(order.created_at), 'yyyy-MM-dd HH:mm') : '',
             idx === 0 && order.estimated_fulfillment_time ? format(new Date(order.estimated_fulfillment_time), 'yyyy-MM-dd') : '',
             idx === 0 ? (order.notes || '') : '',
@@ -551,7 +551,7 @@ export default function Orders() {
                               <TableCell>
                                 {order.computed_status === 'completed' 
                                   ? order.unit_count
-                                  : `${order.received_count || 0}/${order.unit_count}`
+                                  : `${order.shipped_count || 0}/${order.unit_count}`
                                 }
                               </TableCell>
                               <TableCell>
