@@ -170,51 +170,55 @@ export default function ExtraInventory() {
 
     setSubmitting(true);
     try {
-      const { data: qrCode } = await supabase.rpc('generate_extra_batch_code');
+      // Check if an existing extra_batch with same product, box, and state exists
+      const { data: existingBatch } = await supabase
+        .from('extra_batches')
+        .select('id, quantity')
+        .eq('product_id', formData.product_id)
+        .eq('box_id', formData.box_id)
+        .eq('current_state', formData.current_state)
+        .eq('inventory_state', 'AVAILABLE')
+        .maybeSingle();
 
-      // Get product info for box items_list
-      const selectedProduct = products.find(p => p.id === formData.product_id);
+      if (existingBatch) {
+        // Merge: update existing batch quantity
+        const { error } = await supabase
+          .from('extra_batches')
+          .update({ 
+            quantity: existingBatch.quantity + formData.quantity,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existingBatch.id);
 
-      const { data: newBatch, error } = await supabase.from('extra_batches').insert({
-        product_id: formData.product_id,
-        quantity: formData.quantity,
-        current_state: formData.current_state,
-        inventory_state: 'AVAILABLE',
-        qr_code_data: qrCode || `EB-${Date.now()}`,
-        box_id: formData.box_id,
-        created_by: user?.id,
-      }).select('id').single();
+        if (error) throw error;
 
-      if (error) throw error;
+        toast({
+          title: 'Success',
+          description: `Added ${formData.quantity} units to existing batch (total: ${existingBatch.quantity + formData.quantity})`,
+        });
+      } else {
+        // Create new batch
+        const { data: qrCode } = await supabase.rpc('generate_extra_batch_code');
 
-      // Update box items_list
-      const { data: boxData } = await supabase
-        .from('extra_boxes')
-        .select('items_list')
-        .eq('id', formData.box_id)
-        .single();
+        const { error } = await supabase.from('extra_batches').insert({
+          product_id: formData.product_id,
+          quantity: formData.quantity,
+          current_state: formData.current_state,
+          inventory_state: 'AVAILABLE',
+          qr_code_data: qrCode || `EB-${Date.now()}`,
+          box_id: formData.box_id,
+          created_by: user?.id,
+        });
 
-      const currentItems = Array.isArray(boxData?.items_list) ? boxData.items_list : [];
-      const newItem = {
-        product_id: formData.product_id,
-        product_name: selectedProduct?.name || 'Unknown',
-        product_sku: selectedProduct?.sku || 'N/A',
-        quantity: formData.quantity,
-        batch_id: newBatch?.id,
-      };
+        if (error) throw error;
 
-      await supabase
-        .from('extra_boxes')
-        .update({ 
-          items_list: [...currentItems, newItem],
-          content_type: 'EXTRA'
-        })
-        .eq('id', formData.box_id);
+        toast({
+          title: 'Success',
+          description: 'Extra inventory batch created',
+        });
+      }
 
-      toast({
-        title: 'Success',
-        description: 'Extra inventory batch created',
-      });
+      // Note: EBox items_list is automatically updated by database trigger
 
       setDialogOpen(false);
       setFormData({ product_id: '', quantity: 1, current_state: 'extra_manufacturing', box_id: '' });
@@ -238,49 +242,58 @@ export default function ExtraInventory() {
     if (!batch) return;
 
     try {
-      // Update batch with box_id
-      const { error: batchError } = await supabase
+      // Check if target box already has a batch with same product and state
+      const { data: existingBatch } = await supabase
         .from('extra_batches')
-        .update({ box_id: boxId })
-        .eq('id', selectedBatchForBox);
+        .select('id, quantity')
+        .eq('product_id', batch.product_id)
+        .eq('box_id', boxId)
+        .eq('current_state', batch.current_state)
+        .eq('inventory_state', batch.inventory_state)
+        .neq('id', batch.id) // Exclude current batch
+        .maybeSingle();
 
-      if (batchError) throw batchError;
+      if (existingBatch) {
+        // Merge into existing batch and delete the current one
+        const { error: updateError } = await supabase
+          .from('extra_batches')
+          .update({ 
+            quantity: existingBatch.quantity + batch.quantity,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existingBatch.id);
 
-      // Get current box data to update items_list
-      const { data: boxData } = await supabase
-        .from('extra_boxes')
-        .select('items_list')
-        .eq('id', boxId)
-        .single();
+        if (updateError) throw updateError;
 
-      const currentItems = Array.isArray(boxData?.items_list) ? boxData.items_list : [];
-      
-      // Add new item to the list
-      const newItem = {
-        product_id: batch.product_id,
-        product_name: batch.product.name,
-        product_sku: batch.product.sku,
-        quantity: batch.quantity,
-        batch_id: batch.id,
-      };
+        // Delete the batch being moved (it's merged)
+        const { error: deleteError } = await supabase
+          .from('extra_batches')
+          .delete()
+          .eq('id', selectedBatchForBox);
 
-      const updatedItems = [...currentItems, newItem];
+        if (deleteError) throw deleteError;
 
-      // Update box with new items_list
-      const { error: boxError } = await supabase
-        .from('extra_boxes')
-        .update({ 
-          items_list: updatedItems,
-          content_type: 'EXTRA'
-        })
-        .eq('id', boxId);
+        toast({
+          title: 'Success',
+          description: `Merged ${batch.quantity} units into existing batch`,
+        });
+      } else {
+        // Just update batch with new box_id
+        const { error: batchError } = await supabase
+          .from('extra_batches')
+          .update({ box_id: boxId })
+          .eq('id', selectedBatchForBox);
 
-      if (boxError) throw boxError;
+        if (batchError) throw batchError;
 
-      toast({
-        title: 'Success',
-        description: 'Box assigned to batch',
-      });
+        toast({
+          title: 'Success',
+          description: 'Box assigned to batch',
+        });
+      }
+
+      // Note: EBox items_list is automatically updated by database trigger
+
       setSelectedBatchForBox(null);
       setBoxDialogOpen(false);
       fetchData();
