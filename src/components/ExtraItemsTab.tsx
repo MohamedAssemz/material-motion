@@ -291,6 +291,13 @@ export function ExtraItemsTab({ orderId, phase, onRefresh }: ExtraItemsTabProps)
     setSubmitting(true);
     
     try {
+      // Collect all operations to perform
+      const operations: Array<{
+        batch: ExtraBatch;
+        useQty: number;
+      }> = [];
+      
+      // First pass: determine which batches to process and how much from each
       for (const [productId, quantity] of productSelections.entries()) {
         if (quantity <= 0) continue;
         
@@ -304,37 +311,50 @@ export function ExtraItemsTab({ orderId, phase, onRefresh }: ExtraItemsTabProps)
           const useQty = Math.min(batch.quantity, remainingQty);
           remainingQty -= useQty;
           
-          // Create an order_batch in ready_for_shipment state (no box_id needed)
-          // Use order_item_id directly from the batch object
-          const { data: batchCode } = await supabase.rpc('generate_extra_batch_code');
-          const { error: insertError } = await supabase
-            .from('order_batches')
-            .insert({
-              qr_code_data: batchCode || `OB-${Date.now()}`,
-              order_id: orderId,
-              order_item_id: batch.order_item_id,
-              product_id: batch.product_id,
-              current_state: 'ready_for_shipment',
-              quantity: useQty,
-              box_id: null,
-              created_by: user?.id,
-            });
-          
-          if (insertError) throw insertError;
-          
-          // Update or delete the extra_batch
-          const extraBoxId = batch.box_id;
-          if (useQty === batch.quantity) {
-            await supabase.from('extra_batches').delete().eq('id', batch.id);
-          } else {
-            await supabase.from('extra_batches')
-              .update({ quantity: batch.quantity - useQty })
-              .eq('id', batch.id);
-          }
-          
-          if (extraBoxId) {
-            await updateExtraBoxItemsList(extraBoxId);
-          }
+          operations.push({ batch, useQty });
+        }
+      }
+      
+      // Second pass: execute all operations
+      for (const { batch, useQty } of operations) {
+        // Create an order_batch in ready_for_shipment state (no box_id needed)
+        const { data: batchCode } = await supabase.rpc('generate_extra_batch_code');
+        const { error: insertError } = await supabase
+          .from('order_batches')
+          .insert({
+            qr_code_data: batchCode || `OB-${Date.now()}`,
+            order_id: orderId,
+            order_item_id: batch.order_item_id,
+            product_id: batch.product_id,
+            current_state: 'ready_for_shipment',
+            quantity: useQty,
+            box_id: null,
+            created_by: user?.id,
+          });
+        
+        if (insertError) throw insertError;
+        
+        // Delete or reduce the extra_batch
+        const extraBoxId = batch.box_id;
+        if (useQty >= batch.quantity) {
+          // Full quantity used - delete the extra batch entirely
+          const { error: deleteError } = await supabase
+            .from('extra_batches')
+            .delete()
+            .eq('id', batch.id);
+          if (deleteError) throw deleteError;
+        } else {
+          // Partial quantity used - reduce the extra_batch quantity
+          const { error: updateError } = await supabase
+            .from('extra_batches')
+            .update({ quantity: batch.quantity - useQty })
+            .eq('id', batch.id);
+          if (updateError) throw updateError;
+        }
+        
+        // Update the source EBox's items_list
+        if (extraBoxId) {
+          await updateExtraBoxItemsList(extraBoxId);
         }
       }
       
@@ -355,8 +375,6 @@ export function ExtraItemsTab({ orderId, phase, onRefresh }: ExtraItemsTabProps)
     
     try {
       // Get the next order_batch state based on the phase
-      // Extra items assigned to order boxes should become regular order_batches
-      // For boxing phase, items go directly to ready_for_shipment (no receive/process needed)
       const PHASE_TO_ORDER_STATE: Record<string, string> = {
         manufacturing: 'ready_for_finishing',
         finishing: 'ready_for_packaging',
@@ -382,6 +400,13 @@ export function ExtraItemsTab({ orderId, phase, onRefresh }: ExtraItemsTabProps)
         batch_id: string;
       }> = [];
       
+      // Collect all operations first
+      const operations: Array<{
+        batch: ExtraBatch;
+        useQty: number;
+        group: ProductGroup;
+      }> = [];
+      
       for (const [productId, quantity] of productSelections.entries()) {
         if (quantity <= 0) continue;
         
@@ -395,53 +420,60 @@ export function ExtraItemsTab({ orderId, phase, onRefresh }: ExtraItemsTabProps)
           const useQty = Math.min(batch.quantity, remainingQty);
           remainingQty -= useQty;
           
-          // Create an order_batch from the extra batch (including order_item_id)
-          const { data: batchCode } = await supabase.rpc('generate_extra_batch_code');
-          const { data: newOrderBatch, error: insertError } = await supabase
-            .from('order_batches')
-            .insert({
-              qr_code_data: batchCode || `OB-${Date.now()}`,
-              order_id: orderId,
-              order_item_id: batch.order_item_id,
-              product_id: batch.product_id,
-              current_state: nextOrderState,
-              quantity: useQty,
-              box_id: selectedBox.id,
-              created_by: user?.id,
-            })
-            .select('id')
-            .single();
-          
-          if (insertError) throw insertError;
-          
-          newItems.push({
-            product_id: group.product_id,
-            product_name: group.product_name,
-            product_sku: group.product_sku,
+          operations.push({ batch, useQty, group });
+        }
+      }
+      
+      // Execute all operations
+      for (const { batch, useQty, group } of operations) {
+        // Create an order_batch from the extra batch
+        const { data: batchCode } = await supabase.rpc('generate_extra_batch_code');
+        const { data: newOrderBatch, error: insertError } = await supabase
+          .from('order_batches')
+          .insert({
+            qr_code_data: batchCode || `OB-${Date.now()}`,
+            order_id: orderId,
+            order_item_id: batch.order_item_id,
+            product_id: batch.product_id,
+            current_state: nextOrderState,
             quantity: useQty,
-            batch_id: newOrderBatch?.id || '',
-          });
-          
-          // Update or delete the extra_batch
-          // CRITICAL: Delete the extra_batch to prevent it from being double-counted
-          // The quantity is now represented by the new order_batch
-          const extraBoxId = batch.box_id;
-          if (useQty === batch.quantity) {
-            // Full quantity used - delete the extra batch entirely
-            await supabase.from('extra_batches')
-              .delete()
-              .eq('id', batch.id);
-          } else {
-            // Partial quantity used - reduce the extra_batch quantity
-            await supabase.from('extra_batches')
-              .update({ quantity: batch.quantity - useQty })
-              .eq('id', batch.id);
-          }
-          
-          // Update the source EBox's items_list after modifying the extra batch
-          if (extraBoxId) {
-            await updateExtraBoxItemsList(extraBoxId);
-          }
+            box_id: selectedBox.id,
+            created_by: user?.id,
+          })
+          .select('id')
+          .single();
+        
+        if (insertError) throw insertError;
+        
+        newItems.push({
+          product_id: group.product_id,
+          product_name: group.product_name,
+          product_sku: group.product_sku,
+          quantity: useQty,
+          batch_id: newOrderBatch?.id || '',
+        });
+        
+        // Delete or reduce the extra_batch
+        const extraBoxId = batch.box_id;
+        if (useQty >= batch.quantity) {
+          // Full quantity used - delete the extra batch entirely
+          const { error: deleteError } = await supabase
+            .from('extra_batches')
+            .delete()
+            .eq('id', batch.id);
+          if (deleteError) throw deleteError;
+        } else {
+          // Partial quantity used - reduce the extra_batch quantity
+          const { error: updateError } = await supabase
+            .from('extra_batches')
+            .update({ quantity: batch.quantity - useQty })
+            .eq('id', batch.id);
+          if (updateError) throw updateError;
+        }
+        
+        // Update the source EBox's items_list
+        if (extraBoxId) {
+          await updateExtraBoxItemsList(extraBoxId);
         }
       }
       
