@@ -26,8 +26,8 @@ interface StateStats {
   in_packaging: number;
   ready_for_boxing: number;
   in_boxing: number;
-  ready_for_receiving: number;
-  received: number;
+  ready_for_shipment: number;
+  shipped: number;
 }
 
 interface QueueData {
@@ -51,8 +51,8 @@ export default function Dashboard() {
     in_packaging: 0,
     ready_for_boxing: 0,
     in_boxing: 0,
-    ready_for_receiving: 0,
-    received: 0,
+    ready_for_shipment: 0,
+    shipped: 0,
   });
   const [orderCount, setOrderCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -93,8 +93,8 @@ export default function Dashboard() {
         in_packaging: batchesByState.in_packaging || 0,
         ready_for_boxing: batchesByState.ready_for_boxing || 0,
         in_boxing: batchesByState.in_boxing || 0,
-        ready_for_receiving: batchesByState.ready_for_receiving || 0,
-        received: batchesByState.received || 0,
+        ready_for_shipment: batchesByState.ready_for_shipment || 0,
+        shipped: batchesByState.shipped || 0,
       });
       setOrderCount(ordersRes.count || 0);
     } catch (error) {
@@ -105,7 +105,7 @@ export default function Dashboard() {
   };
 
   const totalInProgress = stats.in_manufacturing + stats.in_finishing + stats.in_packaging + stats.in_boxing;
-  const totalWaiting = stats.pending_rm + stats.ready_for_finishing + stats.ready_for_packaging + stats.ready_for_boxing + stats.ready_for_receiving;
+  const totalWaiting = stats.pending_rm + stats.ready_for_finishing + stats.ready_for_packaging + stats.ready_for_boxing + stats.ready_for_shipment;
 
   const queues: QueueData[] = [
     {
@@ -216,7 +216,7 @@ export default function Dashboard() {
             <CheckCircle className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-green-500">{stats.received}</div>
+            <div className="text-3xl font-bold text-green-500">{stats.shipped}</div>
             <p className="text-xs text-muted-foreground">Completed items</p>
           </CardContent>
         </Card>
@@ -263,23 +263,23 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Ready for Receiving */}
-      {stats.ready_for_receiving > 0 && (
+      {/* Ready for Shipment */}
+      {stats.ready_for_shipment > 0 && (
         <Card className="border-teal-200 dark:border-teal-800 bg-teal-50/50 dark:bg-teal-900/10">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <CardTitle className="text-base flex items-center gap-2">
                 <CheckCircle className="h-5 w-5 text-teal-600" />
-                Ready for Receiving
+                Ready for Shipment
               </CardTitle>
               <Badge className="bg-teal-100 text-teal-700 dark:bg-teal-900 dark:text-teal-300">
-                {stats.ready_for_receiving} items
+                {stats.ready_for_shipment} items
               </Badge>
             </div>
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground">
-              Items waiting to be received from boxing into final inventory
+              Items ready to be added to a Kartona for shipping
             </p>
           </CardContent>
         </Card>
@@ -302,8 +302,8 @@ export default function Dashboard() {
               { state: 'in_packaging', label: 'Packaging', count: stats.in_packaging, color: 'bg-indigo-500' },
               { state: 'ready_for_boxing', label: 'Ready Boxing', count: stats.ready_for_boxing, color: 'bg-cyan-300' },
               { state: 'in_boxing', label: 'Boxing', count: stats.in_boxing, color: 'bg-cyan-500' },
-              { state: 'ready_for_receiving', label: 'Ready Receiving', count: stats.ready_for_receiving, color: 'bg-teal-300' },
-              { state: 'received', label: 'Received', count: stats.received, color: 'bg-green-500' },
+              { state: 'ready_for_shipment', label: 'Ready Shipment', count: stats.ready_for_shipment, color: 'bg-teal-300' },
+              { state: 'shipped', label: 'Shipped', count: stats.shipped, color: 'bg-green-500' },
             ].map((item) => (
               <div 
                 key={item.state}

@@ -132,7 +132,7 @@ export default function OrderPackaging() {
           .select('id, qr_code_data, current_state, quantity, product_id, order_item_id, box_id, product:products(id, name, sku)')
           .eq('order_id', id)
           .eq('is_terminated', false)
-          .in('current_state', ['ready_for_boxing', 'in_boxing', 'ready_for_receiving', 'received'])
+          .in('current_state', ['ready_for_boxing', 'in_boxing', 'ready_for_shipment', 'shipped'])
       ]);
       
       if (orderRes.error) throw orderRes.error;
@@ -427,8 +427,8 @@ export default function OrderPackaging() {
         const group = inPackagingGroups.find(g => g.groupKey === key);
         if (!group) continue;
         
-        // Route based on needs_boxing: true -> in_boxing, false -> ready_for_receiving
-        const nextState = group.needs_boxing ? 'in_boxing' : 'ready_for_receiving';
+        // Route based on needs_boxing: true -> in_boxing, false -> ready_for_shipment
+        const nextState = group.needs_boxing ? 'in_boxing' : 'ready_for_shipment';
         
         let remainingQty = quantity;
         for (const batch of group.batches) {

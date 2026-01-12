@@ -372,8 +372,8 @@ export function StateGroupView({
             </>
           )}
           
-          {/* Received state - show products summary */}
-          {state === 'received' && products.length > 0 && (
+          {/* Shipped state - show products summary */}
+          {state === 'shipped' && products.length > 0 && (
             <div className="space-y-2">
               {products.map((product) => (
                 <div 
@@ -405,8 +405,8 @@ function getStateColor(state: string): string {
     'in_packaging': 'bg-indigo-500',
     'ready_for_boxing': 'bg-cyan-300',
     'in_boxing': 'bg-cyan-500',
-    'ready_for_receiving': 'bg-teal-300',
-    'received': 'bg-green-500',
+    'ready_for_shipment': 'bg-teal-300',
+    'shipped': 'bg-green-500',
   };
   return colors[state] || 'bg-gray-500';
 }

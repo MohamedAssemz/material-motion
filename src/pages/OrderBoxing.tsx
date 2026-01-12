@@ -137,7 +137,7 @@ export default function OrderBoxing() {
           )
           .eq("order_id", id)
           .eq("is_terminated", false)
-          .in("current_state", ["ready_for_boxing", "in_boxing", "ready_for_receiving", "received"]),
+          .in("current_state", ["ready_for_boxing", "in_boxing", "ready_for_shipment", "shipped"]),
       ]);
 
       if (orderRes.error) throw orderRes.error;
@@ -288,11 +288,11 @@ export default function OrderBoxing() {
   orderItemMap.forEach((g) => inBoxingGroups.push(g));
   inBoxingGroups.sort((a, b) => a.product_name.localeCompare(b.product_name));
 
-  // Group ready_for_receiving by product + needs_boxing
+  // Group ready_for_shipment by product + needs_boxing
   const readyForShipmentGroups: OrderItemGroup[] = [];
   const readyShipmentMap = new Map<string, OrderItemGroup>();
   batches
-    .filter((b) => b.current_state === "ready_for_receiving")
+    .filter((b) => b.current_state === "ready_for_shipment")
     .forEach((batch) => {
       const needsBoxing = batch.order_item?.needs_boxing ?? true;
       const groupKey = `${batch.product_id}-${needsBoxing ? 'boxing' : 'no-boxing'}`;
@@ -321,7 +321,7 @@ export default function OrderBoxing() {
   const totalReadyForBoxing = readyBoxGroups.reduce((sum, g) => sum + g.totalQty, 0);
   const totalInBoxing = inBoxingGroups.reduce((sum, g) => sum + g.quantity, 0);
   const totalReadyForShipment = readyForShipmentGroups.reduce((sum, g) => sum + g.quantity, 0);
-  const totalReceived = batches.filter((b) => b.current_state === "received").reduce((sum, b) => sum + b.quantity, 0);
+  const totalShippedBatches = batches.filter((b) => b.current_state === "shipped").reduce((sum, b) => sum + b.quantity, 0);
   const totalSelected = Array.from(productSelections.values()).reduce((a, b) => a + b, 0);
   const totalSelectedForShipment = Array.from(readyForShipmentSelections.values()).reduce((a, b) => a + b, 0);
   const totalShipped = shipments.reduce((sum, s) => sum + s.items.reduce((iSum, item) => iSum + item.quantity, 0), 0);
@@ -357,7 +357,7 @@ export default function OrderBoxing() {
 
       // Route based on needs_boxing flag per batch:
       // needs_boxing = true -> in_boxing (Processing)
-      // needs_boxing = false -> ready_for_receiving (Ready for Shipment)
+      // needs_boxing = false -> ready_for_shipment (Ready for Shipment)
       const batchesToBoxing = selectedBatches.filter((b) => b.order_item?.needs_boxing !== false);
       const batchesToShipment = selectedBatches.filter((b) => b.order_item?.needs_boxing === false);
 
@@ -381,7 +381,7 @@ export default function OrderBoxing() {
         await supabase
           .from("order_batches")
           .update({
-            current_state: "ready_for_receiving",
+            current_state: "ready_for_shipment",
             box_id: null, // Free up the box
           })
           .in(
@@ -435,7 +435,7 @@ export default function OrderBoxing() {
             const { error: updateError } = await supabase
               .from("order_batches")
               .update({
-                current_state: "ready_for_receiving",
+                current_state: "ready_for_shipment",
                 box_id: null,
               })
               .eq("id", batch.id);
@@ -452,7 +452,7 @@ export default function OrderBoxing() {
               order_id: id,
               product_id: batch.product_id,
               order_item_id: batch.order_item_id,
-              current_state: "ready_for_receiving",
+              current_state: "ready_for_shipment",
               quantity: useQty,
               created_by: user?.id,
             });
@@ -530,7 +530,7 @@ export default function OrderBoxing() {
           });
 
           if (useQty === batch.quantity) {
-            await supabase.from("order_batches").update({ current_state: "received" }).eq("id", batch.id);
+            await supabase.from("order_batches").update({ current_state: "shipped" }).eq("id", batch.id);
           } else {
             const { data: qrCode } = await supabase.rpc("generate_extra_batch_code");
             await supabase.from("order_batches").insert({
@@ -538,7 +538,7 @@ export default function OrderBoxing() {
               order_id: id,
               product_id: batch.product_id,
               order_item_id: batch.order_item_id,
-              current_state: "received",
+              current_state: "shipped",
               quantity: useQty,
               created_by: user?.id,
             });
