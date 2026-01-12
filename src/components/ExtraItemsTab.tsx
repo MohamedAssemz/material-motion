@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { Box, Loader2, Plus, Search, Printer } from 'lucide-react';
+import { Box, Loader2, Plus, Search, Printer, ArrowRight } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -272,10 +272,85 @@ export function ExtraItemsTab({ orderId, phase, onRefresh }: ExtraItemsTabProps)
       toast.error('Please select items first');
       return;
     }
+    // For boxing phase, skip box dialog and move directly
+    if (phase === 'boxing') {
+      handleMoveToReady();
+      return;
+    }
     setSelectedBox(null);
     setBoxSearchCode('');
     fetchEmptyBoxes();
     setBoxDialogOpen(true);
+  };
+
+  // Direct move to ready_for_shipment for boxing phase (no box needed)
+  const handleMoveToReady = async () => {
+    if (totalSelected === 0) return;
+    setSubmitting(true);
+    
+    try {
+      for (const [productId, quantity] of productSelections.entries()) {
+        if (quantity <= 0) continue;
+        
+        const group = productGroups.find(g => g.product_id === productId);
+        if (!group) continue;
+        
+        let remainingQty = quantity;
+        for (const batch of group.batches) {
+          if (remainingQty <= 0) break;
+          
+          const useQty = Math.min(batch.quantity, remainingQty);
+          remainingQty -= useQty;
+          
+          // Get order_item_id from the extra batch
+          const { data: extraBatchData } = await supabase
+            .from('extra_batches')
+            .select('order_item_id')
+            .eq('id', batch.id)
+            .single();
+          
+          // Create an order_batch in ready_for_shipment state (no box_id needed)
+          const { data: batchCode } = await supabase.rpc('generate_extra_batch_code');
+          const { error: insertError } = await supabase
+            .from('order_batches')
+            .insert({
+              qr_code_data: batchCode || `OB-${Date.now()}`,
+              order_id: orderId,
+              order_item_id: extraBatchData?.order_item_id,
+              product_id: batch.product_id,
+              current_state: 'ready_for_shipment',
+              quantity: useQty,
+              box_id: null,
+              created_by: user?.id,
+            });
+          
+          if (insertError) throw insertError;
+          
+          // Update or delete the extra_batch
+          const extraBoxId = batch.box_id;
+          if (useQty === batch.quantity) {
+            await supabase.from('extra_batches').delete().eq('id', batch.id);
+          } else {
+            await supabase.from('extra_batches')
+              .update({ quantity: batch.quantity - useQty })
+              .eq('id', batch.id);
+          }
+          
+          if (extraBoxId) {
+            await updateExtraBoxItemsList(extraBoxId);
+          }
+        }
+      }
+      
+      toast.success(`Moved ${totalSelected} items to Ready for Shipment`);
+      setProductSelections(new Map());
+      fetchExtraBatches();
+      onRefresh?.();
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleAssignToBox = async () => {
@@ -498,9 +573,18 @@ export function ExtraItemsTab({ orderId, phase, onRefresh }: ExtraItemsTabProps)
               <Printer className="h-4 w-4 mr-2" />
               Print Guide
             </Button>
-            <Button onClick={handleOpenBoxDialog} disabled={totalSelected === 0}>
-              <Box className="h-4 w-4 mr-2" />
-              Assign to Box
+            <Button onClick={handleOpenBoxDialog} disabled={totalSelected === 0 || submitting}>
+              {phase === 'boxing' ? (
+                <>
+                  {submitting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ArrowRight className="h-4 w-4 mr-2" />}
+                  Move to Ready
+                </>
+              ) : (
+                <>
+                  <Box className="h-4 w-4 mr-2" />
+                  Assign to Box
+                </>
+              )}
             </Button>
           </div>
         </CardContent>
