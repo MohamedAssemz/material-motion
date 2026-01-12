@@ -763,11 +763,14 @@ export default function OrderBoxing() {
     totalItems: number,
     notes: string,
   ) => {
-    // Set print data and trigger print after render
+    // Set print data and trigger print after render is complete
     setPrintData({ shipmentCode, items, totalItems, notes });
-    setTimeout(() => {
-      window.print();
-    }, 100);
+    // Use requestAnimationFrame to ensure DOM has updated before printing
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        window.print();
+      });
+    });
   };
 
   if (loading) {
