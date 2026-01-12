@@ -349,13 +349,15 @@ export function ExtraItemsTab({ orderId, phase, onRefresh }: ExtraItemsTabProps)
           });
           
           // Update or delete the extra_batch
+          // CRITICAL: Delete the extra_batch to prevent it from being double-counted
+          // The quantity is now represented by the new order_batch
           if (useQty === batch.quantity) {
-            // Full quantity used - mark as consumed or delete
+            // Full quantity used - delete the extra batch entirely
             await supabase.from('extra_batches')
-              .update({ inventory_state: 'CONSUMED' })
+              .delete()
               .eq('id', batch.id);
           } else {
-            // Partial quantity used - reduce the extra_batch
+            // Partial quantity used - reduce the extra_batch quantity
             await supabase.from('extra_batches')
               .update({ quantity: batch.quantity - useQty })
               .eq('id', batch.id);
