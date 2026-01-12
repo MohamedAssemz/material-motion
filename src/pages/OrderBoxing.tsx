@@ -1144,8 +1144,27 @@ export default function OrderBoxing() {
                           {shipment.status}
                         </Badge>
                       </div>
-                      <div className="text-sm text-muted-foreground">
-                        {format(new Date(shipment.created_at), "PPP")}
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm text-muted-foreground">
+                          {format(new Date(shipment.created_at), "PPP")}
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const items = shipment.items.map(item => ({
+                              sku: item.batch?.product?.sku || '',
+                              name: item.batch?.product?.name || '',
+                              qty: item.quantity,
+                              needsBoxing: item.order_item?.needs_boxing ?? true,
+                            }));
+                            const total = items.reduce((sum, i) => sum + i.qty, 0);
+                            printKartonaLabel(shipment.shipment_code, items, total, shipment.notes || '');
+                          }}
+                        >
+                          <Printer className="h-4 w-4 mr-1" />
+                          Reprint
+                        </Button>
                       </div>
                     </div>
                     {shipment.notes && (
