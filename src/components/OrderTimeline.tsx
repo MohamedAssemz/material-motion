@@ -1,9 +1,10 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { CheckCircle, Circle, Clock, AlertTriangle } from 'lucide-react';
+import { CheckCircle, Circle, Clock, AlertTriangle, PlayCircle } from 'lucide-react';
 import type { BatchInfo } from './BatchCard';
 
 interface OrderTimelineProps {
   batches: BatchInfo[];
+  orderStatus?: string;
 }
 
 const STAGES = [
@@ -19,8 +20,12 @@ const STAGES = [
   { key: 'received', label: 'Received', icon: CheckCircle },
 ];
 
-export function OrderTimeline({ batches }: OrderTimelineProps) {
+export function OrderTimeline({ batches, orderStatus }: OrderTimelineProps) {
   const totalItems = batches.reduce((sum, b) => sum + b.total_quantity, 0);
+  
+  // Check if all batches are in pending_rm state (order not started)
+  const isPending = orderStatus === 'pending' || 
+    (batches.length > 0 && batches.every(b => b.state === 'pending_rm'));
 
   const getStageStatus = (stageKey: string) => {
     const itemsInStage = batches
@@ -48,6 +53,35 @@ export function OrderTimeline({ batches }: OrderTimelineProps) {
       leadTimeDays
     };
   };
+
+  // Show inactive state when order hasn't started
+  if (isPending) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-muted-foreground">
+            <PlayCircle className="h-5 w-5" />
+            Order Progress
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col items-center justify-center py-8 text-center">
+            <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-4">
+              <Clock className="h-6 w-6 text-muted-foreground" />
+            </div>
+            <p className="text-muted-foreground font-medium">Timeline Inactive</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              Start the order to begin tracking progress
+            </p>
+            <div className="mt-4 text-sm">
+              <span className="font-medium">{totalItems}</span>
+              <span className="text-muted-foreground"> items planned</span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>

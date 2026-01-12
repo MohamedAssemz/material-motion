@@ -616,119 +616,135 @@ export default function OrderDetail() {
       {/* Production Timeline */}
       <Card>
         <CardHeader>
-          <CardTitle>Production Timeline</CardTitle>
-          <CardDescription>Track progress through each phase</CardDescription>
+          <CardTitle className={isPendingOrder ? 'text-muted-foreground' : ''}>
+            Production Timeline
+          </CardTitle>
+          <CardDescription>
+            {isPendingOrder ? 'Start the order to begin tracking progress' : 'Track progress through each phase'}
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <Link to={`/orders/${id}/manufacturing`} className="block">
-              <Card className="hover:border-primary transition-colors cursor-pointer">
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/30">
-                      <Factory className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+          {isPendingOrder ? (
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-4">
+                <Clock className="h-6 w-6 text-muted-foreground" />
+              </div>
+              <p className="text-muted-foreground font-medium">Timeline Inactive</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                Click "Start Order" to begin production
+              </p>
+              <div className="mt-4 text-sm">
+                <span className="font-medium">{totalItems}</span>
+                <span className="text-muted-foreground"> items planned</span>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <Link to={`/orders/${id}/manufacturing`} className="block">
+                <Card className="hover:border-primary transition-colors cursor-pointer">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/30">
+                        <Factory className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                      </div>
+                      <p className="font-medium">Manufacturing</p>
                     </div>
-                    <p className="font-medium">Manufacturing</p>
-                  </div>
-                  <div className="space-y-1 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Waiting</span>
-                      <span className="font-medium text-warning">{manufacturingStats.waiting}</span>
+                    <div className="space-y-1 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">In Progress</span>
+                        <span className="font-medium text-primary">{manufacturingStats.inProgress}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Completed</span>
+                        <span className="font-medium text-green-600">{manufacturingStats.completed}</span>
+                      </div>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">In Progress</span>
-                      <span className="font-medium text-primary">{manufacturingStats.inProgress}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Completed</span>
-                      <span className="font-medium text-green-600">{manufacturingStats.completed}</span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
+                  </CardContent>
+                </Card>
+              </Link>
 
-            <Link to={`/orders/${id}/finishing`} className="block">
-              <Card className="hover:border-primary transition-colors cursor-pointer">
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-900/30">
-                      <Sparkles className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+              <Link to={`/orders/${id}/finishing`} className="block">
+                <Card className="hover:border-primary transition-colors cursor-pointer">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-900/30">
+                        <Sparkles className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                      </div>
+                      <p className="font-medium">Finishing</p>
                     </div>
-                    <p className="font-medium">Finishing</p>
-                  </div>
-                  <div className="space-y-1 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Waiting</span>
-                      <span className="font-medium text-warning">{finishingStats.waiting}</span>
+                    <div className="space-y-1 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Waiting</span>
+                        <span className="font-medium text-warning">{finishingStats.waiting}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">In Progress</span>
+                        <span className="font-medium text-primary">{finishingStats.inProgress}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Completed</span>
+                        <span className="font-medium text-green-600">{finishingStats.completed}</span>
+                      </div>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">In Progress</span>
-                      <span className="font-medium text-primary">{finishingStats.inProgress}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Completed</span>
-                      <span className="font-medium text-green-600">{finishingStats.completed}</span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
+                  </CardContent>
+                </Card>
+              </Link>
 
-            <Link to={`/orders/${id}/packaging`} className="block">
-              <Card className="hover:border-primary transition-colors cursor-pointer">
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="p-2 rounded-lg bg-indigo-100 dark:bg-indigo-900/30">
-                      <Package className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+              <Link to={`/orders/${id}/packaging`} className="block">
+                <Card className="hover:border-primary transition-colors cursor-pointer">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="p-2 rounded-lg bg-indigo-100 dark:bg-indigo-900/30">
+                        <Package className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                      </div>
+                      <p className="font-medium">Packaging</p>
                     </div>
-                    <p className="font-medium">Packaging</p>
-                  </div>
-                  <div className="space-y-1 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Waiting</span>
-                      <span className="font-medium text-warning">{packagingStats.waiting}</span>
+                    <div className="space-y-1 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Waiting</span>
+                        <span className="font-medium text-warning">{packagingStats.waiting}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">In Progress</span>
+                        <span className="font-medium text-primary">{packagingStats.inProgress}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Completed</span>
+                        <span className="font-medium text-green-600">{packagingStats.completed}</span>
+                      </div>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">In Progress</span>
-                      <span className="font-medium text-primary">{packagingStats.inProgress}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Completed</span>
-                      <span className="font-medium text-green-600">{packagingStats.completed}</span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
+                  </CardContent>
+                </Card>
+              </Link>
 
-            <Link to={`/orders/${id}/boxing`} className="block">
-              <Card className="hover:border-primary transition-colors cursor-pointer">
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="p-2 rounded-lg bg-cyan-100 dark:bg-cyan-900/30">
-                      <Box className="h-5 w-5 text-cyan-600 dark:text-cyan-400" />
+              <Link to={`/orders/${id}/boxing`} className="block">
+                <Card className="hover:border-primary transition-colors cursor-pointer">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="p-2 rounded-lg bg-cyan-100 dark:bg-cyan-900/30">
+                        <Box className="h-5 w-5 text-cyan-600 dark:text-cyan-400" />
+                      </div>
+                      <p className="font-medium">Boxing</p>
                     </div>
-                    <p className="font-medium">Boxing</p>
-                  </div>
-                  <div className="space-y-1 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Waiting</span>
-                      <span className="font-medium text-warning">{boxingStats.waiting}</span>
+                    <div className="space-y-1 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Waiting</span>
+                        <span className="font-medium text-warning">{boxingStats.waiting}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">In Progress</span>
+                        <span className="font-medium text-primary">{boxingStats.inProgress}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Completed</span>
+                        <span className="font-medium text-green-600">{boxingStats.completed}</span>
+                      </div>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">In Progress</span>
-                      <span className="font-medium text-primary">{boxingStats.inProgress}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Completed</span>
-                      <span className="font-medium text-green-600">{boxingStats.completed}</span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-          </div>
+                  </CardContent>
+                </Card>
+              </Link>
+            </div>
+          )}
         </CardContent>
       </Card>
 
