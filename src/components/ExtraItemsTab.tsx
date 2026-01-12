@@ -22,6 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { updateExtraBoxItemsList } from '@/lib/extraInventoryOperations';
 
 interface ExtraBatch {
   id: string;
@@ -351,6 +352,7 @@ export function ExtraItemsTab({ orderId, phase, onRefresh }: ExtraItemsTabProps)
           // Update or delete the extra_batch
           // CRITICAL: Delete the extra_batch to prevent it from being double-counted
           // The quantity is now represented by the new order_batch
+          const extraBoxId = batch.box_id;
           if (useQty === batch.quantity) {
             // Full quantity used - delete the extra batch entirely
             await supabase.from('extra_batches')
@@ -361,6 +363,11 @@ export function ExtraItemsTab({ orderId, phase, onRefresh }: ExtraItemsTabProps)
             await supabase.from('extra_batches')
               .update({ quantity: batch.quantity - useQty })
               .eq('id', batch.id);
+          }
+          
+          // Update the source EBox's items_list after modifying the extra batch
+          if (extraBoxId) {
+            await updateExtraBoxItemsList(extraBoxId);
           }
         }
       }
