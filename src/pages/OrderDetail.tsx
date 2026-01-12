@@ -137,6 +137,7 @@ export default function OrderDetail() {
   const [startOrderOpen, setStartOrderOpen] = useState(false);
   const [selectedExtraPhase, setSelectedExtraPhase] = useState<'manufacturing' | 'finishing' | 'packaging' | 'boxing'>('manufacturing');
   const [extraInventoryCounts, setExtraInventoryCounts] = useState<Record<string, number>>({});
+  const [reservedExtraCounts, setReservedExtraCounts] = useState<Record<string, number>>({});
 
   // Selection states for inline actions
   const [productSelections, setProductSelections] = useState<Map<string, number>>(new Map());
@@ -146,6 +147,7 @@ export default function OrderDetail() {
   useEffect(() => {
     fetchOrder();
     fetchExtraInventoryCounts();
+    fetchReservedExtraCounts();
 
     const channel = supabase
       .channel(`order-${id}`)
@@ -158,6 +160,7 @@ export default function OrderDetail() {
       .channel('extra-inventory-counts')
       .on("postgres_changes", { event: "*", schema: "public", table: "extra_batches" }, () => {
         fetchExtraInventoryCounts();
+        fetchReservedExtraCounts();
       })
       .subscribe();
 
@@ -267,6 +270,47 @@ export default function OrderDetail() {
       setExtraInventoryCounts(counts);
     } catch (error) {
       console.error('Error fetching extra inventory counts:', error);
+    }
+  };
+
+  const fetchReservedExtraCounts = async () => {
+    if (!id) return;
+    
+    try {
+      // Fetch reserved extra batches for this specific order
+      const { data, error } = await supabase
+        .from('extra_batches')
+        .select('current_state, quantity')
+        .eq('order_id', id)
+        .eq('inventory_state', 'RESERVED');
+
+      if (error) throw error;
+
+      // Map extra batch states to phase names
+      const phaseMap: Record<string, string> = {
+        'extra_manufacturing': 'manufacturing',
+        'extra_finishing': 'finishing',
+        'extra_packaging': 'packaging',
+        'extra_boxing': 'boxing',
+      };
+
+      const counts: Record<string, number> = {
+        manufacturing: 0,
+        finishing: 0,
+        packaging: 0,
+        boxing: 0,
+      };
+
+      (data || []).forEach((batch) => {
+        const phase = phaseMap[batch.current_state];
+        if (phase) {
+          counts[phase] += batch.quantity;
+        }
+      });
+
+      setReservedExtraCounts(counts);
+    } catch (error) {
+      console.error('Error fetching reserved extra counts:', error);
     }
   };
 
@@ -655,6 +699,12 @@ export default function OrderDetail() {
                         <span className="text-muted-foreground">In Progress</span>
                         <span className="font-medium text-primary">{manufacturingStats.inProgress}</span>
                       </div>
+                      {reservedExtraCounts.manufacturing > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">In Extra</span>
+                          <span className="font-medium text-amber-600">{reservedExtraCounts.manufacturing}</span>
+                        </div>
+                      )}
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Completed</span>
                         <span className="font-medium text-green-600">{manufacturingStats.completed}</span>
@@ -682,6 +732,12 @@ export default function OrderDetail() {
                         <span className="text-muted-foreground">In Progress</span>
                         <span className="font-medium text-primary">{finishingStats.inProgress}</span>
                       </div>
+                      {reservedExtraCounts.finishing > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">In Extra</span>
+                          <span className="font-medium text-amber-600">{reservedExtraCounts.finishing}</span>
+                        </div>
+                      )}
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Completed</span>
                         <span className="font-medium text-green-600">{finishingStats.completed}</span>
@@ -709,6 +765,12 @@ export default function OrderDetail() {
                         <span className="text-muted-foreground">In Progress</span>
                         <span className="font-medium text-primary">{packagingStats.inProgress}</span>
                       </div>
+                      {reservedExtraCounts.packaging > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">In Extra</span>
+                          <span className="font-medium text-amber-600">{reservedExtraCounts.packaging}</span>
+                        </div>
+                      )}
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Completed</span>
                         <span className="font-medium text-green-600">{packagingStats.completed}</span>
@@ -736,6 +798,12 @@ export default function OrderDetail() {
                         <span className="text-muted-foreground">In Progress</span>
                         <span className="font-medium text-primary">{boxingStats.inProgress}</span>
                       </div>
+                      {reservedExtraCounts.boxing > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">In Extra</span>
+                          <span className="font-medium text-amber-600">{reservedExtraCounts.boxing}</span>
+                        </div>
+                      )}
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Completed</span>
                         <span className="font-medium text-green-600">{boxingStats.completed}</span>
