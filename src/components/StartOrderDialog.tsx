@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { Play, Package, Loader2, ChevronRight, Sparkles } from "lucide-react";
 
 interface OrderItem {
+  id: string; // order_item_id
   product_id: string;
   quantity: number;
   product: {
@@ -56,7 +57,7 @@ export function StartOrderDialog({
   const [step, setStep] = useState<'choose' | 'extra' | 'confirm'>('choose');
   const [loading, setLoading] = useState(false);
   const [extraBatches, setExtraBatches] = useState<ExtraBatch[]>([]);
-  const [selectedExtras, setSelectedExtras] = useState<Map<string, { batchId: string; quantity: number }[]>>(new Map());
+  const [selectedExtras, setSelectedExtras] = useState<Map<string, { batchId: string; quantity: number }[]>>(new Map()); // key is order_item_id
   const [fetchingExtras, setFetchingExtras] = useState(false);
 
   const fetchAvailableExtras = async () => {
@@ -94,7 +95,11 @@ export function StartOrderDialog({
     setLoading(true);
     try {
       // First, process any selected extra inventory
-      for (const [productId, selections] of selectedExtras.entries()) {
+      // selectedExtras is now keyed by order_item_id
+      for (const [orderItemId, selections] of selectedExtras.entries()) {
+        const orderItem = orderItems.find(item => item.id === orderItemId);
+        if (!orderItem) continue;
+
         for (const selection of selections) {
           // Get the extra batch
           const { data: extraBatch, error: fetchError } = await supabase
@@ -113,7 +118,7 @@ export function StartOrderDialog({
               .update({ quantity: extraBatch.quantity - selection.quantity })
               .eq('id', selection.batchId);
 
-            // Create reserved batch for the order
+            // Create reserved batch for the order with order_item_id
             await supabase
               .from('extra_batches')
               .insert({
@@ -123,25 +128,27 @@ export function StartOrderDialog({
                 current_state: extraBatch.current_state,
                 inventory_state: 'RESERVED',
                 order_id: orderId,
+                order_item_id: orderItemId,
                 created_by: user?.id,
               });
           } else {
-            // Reserve the entire batch
+            // Reserve the entire batch with order_item_id
             await supabase
               .from('extra_batches')
               .update({ 
                 inventory_state: 'RESERVED',
                 order_id: orderId,
+                order_item_id: orderItemId,
               })
               .eq('id', selection.batchId);
           }
 
-          // Reduce the order batch quantity for this product
+          // Reduce the order batch quantity for this specific order_item_id
           const { data: orderBatches } = await supabase
             .from('order_batches')
-            .select('id, quantity, order_item_id')
+            .select('id, quantity')
             .eq('order_id', orderId)
-            .eq('product_id', productId)
+            .eq('order_item_id', orderItemId)
             .eq('current_state', 'pending_rm');
 
           if (orderBatches && orderBatches.length > 0) {
@@ -211,23 +218,23 @@ export function StartOrderDialog({
     return extraBatches.filter(b => b.product_id === productId);
   };
 
-  const getSelectedQuantityForProduct = (productId: string) => {
-    const selections = selectedExtras.get(productId) || [];
+  const getSelectedQuantityForOrderItem = (orderItemId: string) => {
+    const selections = selectedExtras.get(orderItemId) || [];
     return selections.reduce((sum, s) => sum + s.quantity, 0);
   };
 
-  const toggleBatchSelection = (productId: string, batchId: string, maxQty: number) => {
+  const toggleBatchSelection = (orderItemId: string, batchId: string, maxQty: number) => {
     const current = new Map(selectedExtras);
-    const productSelections = current.get(productId) || [];
+    const itemSelections = current.get(orderItemId) || [];
     
-    const existingIndex = productSelections.findIndex(s => s.batchId === batchId);
+    const existingIndex = itemSelections.findIndex(s => s.batchId === batchId);
     if (existingIndex >= 0) {
-      productSelections.splice(existingIndex, 1);
+      itemSelections.splice(existingIndex, 1);
     } else {
-      productSelections.push({ batchId, quantity: maxQty });
+      itemSelections.push({ batchId, quantity: maxQty });
     }
     
-    current.set(productId, productSelections);
+    current.set(orderItemId, itemSelections);
     setSelectedExtras(current);
   };
 
@@ -317,12 +324,12 @@ export function StartOrderDialog({
                 <div className="max-h-[300px] overflow-y-auto space-y-4">
                   {orderItems.map(item => {
                     const available = getAvailableForProduct(item.product_id);
-                    const selectedQty = getSelectedQuantityForProduct(item.product_id);
+                    const selectedQty = getSelectedQuantityForOrderItem(item.id);
                     
                     if (available.length === 0) return null;
 
                     return (
-                      <div key={item.product_id} className="border rounded-lg p-3">
+                      <div key={item.id} className="border rounded-lg p-3">
                         <div className="flex items-center justify-between mb-2">
                           <div>
                             <p className="font-medium">{item.product.name}</p>
@@ -335,7 +342,7 @@ export function StartOrderDialog({
                         
                         <div className="space-y-2">
                           {available.map(batch => {
-                            const isSelected = (selectedExtras.get(item.product_id) || [])
+                            const isSelected = (selectedExtras.get(item.id) || [])
                               .some(s => s.batchId === batch.id);
                             
                             return (
@@ -346,7 +353,7 @@ export function StartOrderDialog({
                                     ? 'border-primary bg-primary/5' 
                                     : 'hover:border-muted-foreground/50'
                                 }`}
-                                onClick={() => toggleBatchSelection(item.product_id, batch.id, batch.quantity)}
+                                onClick={() => toggleBatchSelection(item.id, batch.id, batch.quantity)}
                               >
                                 <div className="flex items-center justify-between">
                                   <span className="text-sm">Available: {batch.quantity} units</span>
@@ -393,11 +400,11 @@ export function StartOrderDialog({
               <p className="text-sm font-medium mb-2">Order Items:</p>
               <ul className="space-y-1">
                 {orderItems.map(item => {
-                  const extraUsed = getSelectedQuantityForProduct(item.product_id);
+                  const extraUsed = getSelectedQuantityForOrderItem(item.id);
                   const toManufacture = Math.max(0, item.quantity - extraUsed);
                   
                   return (
-                    <li key={item.product_id} className="text-sm flex justify-between">
+                    <li key={item.id} className="text-sm flex justify-between">
                       <span>{item.product.name}</span>
                       <span className="text-muted-foreground">
                         {extraUsed > 0 
