@@ -100,12 +100,34 @@ export default function Orders() {
 
       if (error) throw error;
 
+      // Fetch order items to calculate total units per order
+      const { data: itemsData } = await supabase
+        .from('order_items')
+        .select('id, order_id, quantity, product:products(name, sku)')
+        .in('order_id', ordersData?.map(o => o.id) || []);
+
+      // Build items map and calculate total units per order
+      const itemsMap = new Map<string, OrderItem[]>();
+      const orderUnitCounts = new Map<string, number>();
+      (itemsData || []).forEach((item: any) => {
+        const existing = itemsMap.get(item.order_id) || [];
+        existing.push(item);
+        itemsMap.set(item.order_id, existing);
+        
+        // Sum quantities for unit count
+        orderUnitCounts.set(
+          item.order_id, 
+          (orderUnitCounts.get(item.order_id) || 0) + item.quantity
+        );
+      });
+      setOrderItems(itemsMap);
+
       // Get creator profiles
-      const orderIds = ordersData?.map(o => o.created_by).filter(Boolean) || [];
+      const creatorIds = ordersData?.map(o => o.created_by).filter(Boolean) || [];
       const { data: profilesData } = await supabase
         .from('profiles')
         .select('id, full_name, email')
-        .in('id', orderIds);
+        .in('id', creatorIds);
 
       const profilesMap = new Map(profilesData?.map(p => [p.id, p]) || []);
 
@@ -118,22 +140,25 @@ export default function Orders() {
             .eq('order_id', order.id)
             .eq('is_terminated', false);
 
-          const totalCount = batches?.reduce((sum, b) => sum + b.quantity, 0) || 0;
+          const batchTotalCount = batches?.reduce((sum, b) => sum + b.quantity, 0) || 0;
           const receivedCount = batches?.filter(b => b.current_state === 'received').reduce((sum, b) => sum + b.quantity, 0) || 0;
           const inProgressCount = batches?.filter(b => b.current_state !== 'waiting_for_rm' && b.current_state !== 'received').reduce((sum, b) => sum + b.quantity, 0) || 0;
 
-          // Compute status
+          // Compute status based on order.status field
           let computed_status: OrderStatus = 'pending';
-          if (totalCount > 0 && receivedCount === totalCount) {
+          if (order.status === 'completed') {
             computed_status = 'completed';
-          } else if (inProgressCount > 0 || receivedCount > 0) {
+          } else if (order.status === 'in_progress') {
             computed_status = 'in_progress';
           }
+
+          // Unit count comes from order_items, not batches
+          const unitCount = orderUnitCounts.get(order.id) || 0;
 
           return {
             ...order,
             profiles: order.created_by ? profilesMap.get(order.created_by) : null,
-            unit_count: totalCount,
+            unit_count: unitCount,
             received_count: receivedCount,
             computed_status,
           };
@@ -141,20 +166,6 @@ export default function Orders() {
       );
 
       setOrders(ordersWithStatus);
-
-      // Fetch order items for export
-      const { data: itemsData } = await supabase
-        .from('order_items')
-        .select('id, order_id, quantity, product:products(name, sku)')
-        .in('order_id', ordersData?.map(o => o.id) || []);
-
-      const itemsMap = new Map<string, OrderItem[]>();
-      (itemsData || []).forEach((item: any) => {
-        const existing = itemsMap.get(item.order_id) || [];
-        existing.push(item);
-        itemsMap.set(item.order_id, existing);
-      });
-      setOrderItems(itemsMap);
 
     } catch (error) {
       console.error('Error fetching orders:', error);
