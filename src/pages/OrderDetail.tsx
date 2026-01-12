@@ -777,28 +777,30 @@ export default function OrderDetail() {
         </Card>
       )}
 
-      {/* Shipments */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div>
-            <CardTitle>Shipments</CardTitle>
-            <CardDescription>View and manage order shipments</CardDescription>
-          </div>
-          <Button variant="outline" onClick={() => navigate(`/orders/${id}/boxing?tab=shipments`)}>
-            View Shipments
-          </Button>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <CheckCircle className="h-5 w-5 text-green-600" />
-              <span className="text-sm">
-                {shippedItems} / {totalItems} items shipped
-              </span>
+      {/* Shipments - Only show after order starts */}
+      {!isPendingOrder && (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>Shipments</CardTitle>
+              <CardDescription>View and manage order shipments</CardDescription>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+            <Button variant="outline" onClick={() => navigate(`/orders/${id}/boxing?tab=shipments`)}>
+              View Shipments
+            </Button>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <CheckCircle className="h-5 w-5 text-green-600" />
+                <span className="text-sm">
+                  {shippedItems} / {totalItems} items shipped
+                </span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Order Items Table */}
       <Card>
