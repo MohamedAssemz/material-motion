@@ -285,11 +285,12 @@ export function ExtraItemsTab({ orderId, phase, onRefresh }: ExtraItemsTabProps)
     try {
       // Get the next order_batch state based on the phase
       // Extra items assigned to order boxes should become regular order_batches
+      // For boxing phase, items go to ready_for_boxing first (to be received/processed)
       const PHASE_TO_ORDER_STATE: Record<string, string> = {
         manufacturing: 'ready_for_finishing',
         finishing: 'ready_for_packaging',
         packaging: 'ready_for_boxing',
-        boxing: 'ready_for_shipment',
+        boxing: 'ready_for_boxing',
       };
       
       const nextOrderState = PHASE_TO_ORDER_STATE[phase];
