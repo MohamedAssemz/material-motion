@@ -904,6 +904,7 @@ export default function OrderDetail() {
         onOpenChange={setStartOrderOpen}
         orderId={id!}
         orderItems={orderItems.map(item => ({
+          id: item.id,
           product_id: item.product_id,
           quantity: item.quantity,
           product: item.product,
