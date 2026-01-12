@@ -1273,15 +1273,45 @@ export default function OrderBoxing() {
                       <p className="text-sm text-muted-foreground mb-3">{shipment.notes}</p>
                     )}
                     <div className="space-y-1">
-                      {shipment.items.map((item) => (
-                        <div key={item.id} className="flex items-center justify-between text-sm">
-                          <div className="flex items-center gap-2">
-                            <span>{item.batch?.product?.sku}</span>
-                            <span className="text-muted-foreground">- {item.batch?.product?.name}</span>
+                      {(() => {
+                        // Group items by order_item_id
+                        const groupedItems = new Map<string, {
+                          order_item_id: string;
+                          product_sku: string;
+                          product_name: string;
+                          total_quantity: number;
+                          needs_boxing: boolean;
+                        }>();
+                        
+                        shipment.items.forEach(item => {
+                          const orderItemId = item.batch?.order_item_id || 'unknown';
+                          const existing = groupedItems.get(orderItemId);
+                          if (existing) {
+                            existing.total_quantity += item.quantity;
+                          } else {
+                            groupedItems.set(orderItemId, {
+                              order_item_id: orderItemId,
+                              product_sku: item.batch?.product?.sku || 'N/A',
+                              product_name: item.batch?.product?.name || 'Unknown',
+                              total_quantity: item.quantity,
+                              needs_boxing: item.order_item?.needs_boxing ?? true,
+                            });
+                          }
+                        });
+                        
+                        return Array.from(groupedItems.values()).map((group) => (
+                          <div key={group.order_item_id} className="flex items-center justify-between text-sm">
+                            <div className="flex items-center gap-2">
+                              <span>{group.product_sku}</span>
+                              <span className="text-muted-foreground">- {group.product_name}</span>
+                              {!group.needs_boxing && (
+                                <Badge variant="secondary" className="text-xs">No Boxing</Badge>
+                              )}
+                            </div>
+                            <Badge variant="outline">{group.total_quantity}</Badge>
                           </div>
-                          <Badge variant="outline">{item.quantity}</Badge>
-                        </div>
-                      ))}
+                        ));
+                      })()}
                     </div>
                   </CardContent>
                 </Card>
