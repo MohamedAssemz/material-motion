@@ -213,10 +213,9 @@ export function ExtraInventoryDialog({
       .reduce((sum, oi) => sum + oi.quantity, 0);
   };
   
-  // Get order item ID for a product (first matching one)
-  const getOrderItemIdForProduct = (productId: string): string | null => {
-    const orderItem = orderItems.find(oi => oi.product_id === productId);
-    return orderItem?.id || null;
+  // Get order items for a product sorted by creation (first ones get filled first)
+  const getOrderItemsForProduct = (productId: string): OrderItem[] => {
+    return orderItems.filter(oi => oi.product_id === productId);
   };
 
   const handleQuantityChange = (batchId: string, value: number, maxAvailable: number, productId: string) => {
@@ -276,96 +275,118 @@ export function ExtraInventoryDialog({
     try {
       const selectedItems: Array<{ batch_id: string; quantity: number; product_id: string }> = [];
       
-      // Group selections by product for batch reduction
-      const productQuantities = new Map<string, number>();
+      // Track remaining capacity per order_item_id for distribution
+      // This ensures we distribute extra batches across all matching order items
+      const orderItemCapacity = new Map<string, { remaining: number; productId: string }>();
+      orderItems.forEach(oi => {
+        orderItemCapacity.set(oi.id, { remaining: oi.quantity, productId: oi.product_id });
+      });
       
+      // Track quantities to reduce from order batches per order_item_id
+      const orderItemReductions = new Map<string, number>();
+      
+      // Process each selection and distribute to order items
       for (const [batchId, quantity] of selections.entries()) {
         if (quantity <= 0) continue;
         
         const batch = batches.find(b => b.id === batchId);
         if (!batch) continue;
         
-        // Get the order_item_id for this product
-        const orderItemId = getOrderItemIdForProduct(batch.product_id);
-        if (!orderItemId) {
-          console.warn(`No order item found for product ${batch.product_id}`);
-          continue;
+        // Find order items for this product that have remaining capacity
+        const matchingOrderItems = getOrderItemsForProduct(batch.product_id);
+        
+        let remainingToAssign = quantity;
+        
+        for (const orderItem of matchingOrderItems) {
+          if (remainingToAssign <= 0) break;
+          
+          const capacity = orderItemCapacity.get(orderItem.id);
+          if (!capacity || capacity.remaining <= 0) continue;
+          
+          // Determine how much to assign to this order item
+          const assignQty = Math.min(remainingToAssign, capacity.remaining);
+          
+          if (assignQty > 0) {
+            // Track the reduction for this order item
+            orderItemReductions.set(
+              orderItem.id,
+              (orderItemReductions.get(orderItem.id) || 0) + assignQty
+            );
+            
+            // Create or update extra batch with this order_item_id
+            if (assignQty === batch.quantity && remainingToAssign === quantity) {
+              // FULL QUANTITY: Update existing batch
+              const { error: updateError } = await supabase
+                .from('extra_batches')
+                .update({
+                  inventory_state: 'RESERVED',
+                  order_id: orderId,
+                  order_item_id: orderItem.id,
+                })
+                .eq('id', batchId);
+
+              if (updateError) throw updateError;
+
+              selectedItems.push({
+                batch_id: batchId,
+                quantity: assignQty,
+                product_id: batch.product_id,
+              });
+            } else {
+              // PARTIAL or SPLIT: Create new batch for this portion
+              const { data: newBatchCode } = await supabase.rpc('generate_extra_batch_code');
+              
+              const { data: newBatch, error: insertError } = await supabase
+                .from('extra_batches')
+                .insert({
+                  qr_code_data: newBatchCode || `EB-${Date.now()}`,
+                  order_id: orderId,
+                  order_item_id: orderItem.id,
+                  product_id: batch.product_id,
+                  current_state: batch.current_state,
+                  quantity: assignQty,
+                  box_id: batch.box_id,
+                  inventory_state: 'RESERVED',
+                  created_by: user?.id,
+                })
+                .select('id')
+                .single();
+
+              if (insertError) throw insertError;
+
+              selectedItems.push({
+                batch_id: newBatch?.id || batchId,
+                quantity: assignQty,
+                product_id: batch.product_id,
+              });
+            }
+            
+            // Update capacity tracking
+            capacity.remaining -= assignQty;
+            remainingToAssign -= assignQty;
+          }
         }
         
-        // Track total quantity per product for order batch reduction
-        productQuantities.set(
-          batch.product_id,
-          (productQuantities.get(batch.product_id) || 0) + quantity
-        );
+        // If we split the batch, update the original batch's remaining quantity
+        if (remainingToAssign < quantity) {
+          const usedFromBatch = quantity - remainingToAssign;
+          if (usedFromBatch < batch.quantity) {
+            // Original batch still has remaining AVAILABLE quantity
+            const { error: updateError } = await supabase
+              .from('extra_batches')
+              .update({ quantity: batch.quantity - usedFromBatch })
+              .eq('id', batchId);
 
-        if (quantity === batch.quantity) {
-          // FULL QUANTITY: Update existing batch state from AVAILABLE → RESERVED
-          const { error: updateError } = await supabase
-            .from('extra_batches')
-            .update({
-              inventory_state: 'RESERVED',
-              order_id: orderId,
-              order_item_id: orderItemId,
-            })
-            .eq('id', batchId);
-
-          if (updateError) throw updateError;
-
-          selectedItems.push({
-            batch_id: batchId,
-            quantity,
-            product_id: batch.product_id,
-          });
-        } else {
-          // PARTIAL QUANTITY: Split the batch
-          const { data: newBatchCode } = await supabase.rpc('generate_extra_batch_code');
-          
-          // Create new batch with selected quantity - PRESERVE box_id linkage
-          const { data: newBatch, error: insertError } = await supabase
-            .from('extra_batches')
-            .insert({
-              qr_code_data: newBatchCode || `EB-${Date.now()}`,
-              order_id: orderId,
-              order_item_id: orderItemId,
-              product_id: batch.product_id,
-              current_state: batch.current_state,
-              quantity: quantity,
-              box_id: batch.box_id,
-              inventory_state: 'RESERVED',
-              created_by: user?.id,
-            })
-            .select('id')
-            .single();
-
-          if (insertError) throw insertError;
-
-          // Update original batch: reduce quantity, stays AVAILABLE
-          const remainingQuantity = batch.quantity - quantity;
-          const { error: updateError } = await supabase
-            .from('extra_batches')
-            .update({ quantity: remainingQuantity })
-            .eq('id', batchId);
-
-          if (updateError) throw updateError;
-
-          selectedItems.push({
-            batch_id: newBatch?.id || batchId,
-            quantity,
-            product_id: batch.product_id,
-          });
+            if (updateError) throw updateError;
+          }
         }
       }
 
-      // CRITICAL: Reduce order batches for each product to maintain quantity invariant
-      // Extra inventory replaces order batches, it does NOT add to them
-      // The order item quantity remains unchanged because:
-      // - We add reserved extra batches (with order_item_id) → trigger adds their qty
-      // - We reduce order batches → trigger subtracts their qty
-      // Net effect: order_items.quantity stays the same
-      for (const [productId, quantityToReduce] of productQuantities.entries()) {
-        const orderItemId = getOrderItemIdForProduct(productId);
-        if (orderItemId) {
-          await reduceOrderBatchesForProduct(orderId, productId, quantityToReduce, orderItemId);
+      // CRITICAL: Reduce order batches for each order_item to maintain quantity invariant
+      for (const [orderItemId, quantityToReduce] of orderItemReductions.entries()) {
+        const capacity = orderItemCapacity.get(orderItemId);
+        if (capacity) {
+          await reduceOrderBatchesForOrderItem(orderId, orderItemId, quantityToReduce);
         }
       }
 
@@ -380,33 +401,30 @@ export function ExtraInventoryDialog({
   };
 
   /**
-   * Reduces order batches for a specific product by the given quantity.
+   * Reduces order batches for a specific order item by the given quantity.
    * This ensures the order item quantity remains unchanged when extra inventory is used.
    * 
    * @param orderId - The order to reduce batches for
-   * @param productId - The product whose batches should be reduced
+   * @param orderItemId - The order item ID to reduce batches for
    * @param quantityToReduce - The amount to reduce
-   * @param orderItemId - The order item ID to prioritize when reducing batches
    */
-  const reduceOrderBatchesForProduct = async (
+  const reduceOrderBatchesForOrderItem = async (
     orderId: string,
-    productId: string,
-    quantityToReduce: number,
-    orderItemId: string
+    orderItemId: string,
+    quantityToReduce: number
   ) => {
-    // Fetch order batches for this product, prioritizing the specific order_item_id
+    // Fetch order batches for this specific order_item_id
     const { data: orderBatches, error: fetchError } = await supabase
       .from('order_batches')
       .select('id, quantity, current_state, order_item_id')
       .eq('order_id', orderId)
-      .eq('product_id', productId)
       .eq('order_item_id', orderItemId)
       .eq('is_terminated', false)
       .order('created_at', { ascending: true });
 
     if (fetchError) throw fetchError;
     if (!orderBatches || orderBatches.length === 0) {
-      console.warn(`No order batches found for product ${productId} in order ${orderId}`);
+      console.warn(`No order batches found for order_item ${orderItemId} in order ${orderId}`);
       return;
     }
 
@@ -437,7 +455,7 @@ export function ExtraInventoryDialog({
     }
 
     if (remaining > 0) {
-      console.warn(`Could not reduce all ${quantityToReduce} units for product ${productId}. ${remaining} units remaining.`);
+      console.warn(`Could not reduce all ${quantityToReduce} units for order_item ${orderItemId}. ${remaining} units remaining.`);
     }
   };
 
