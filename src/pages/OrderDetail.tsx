@@ -387,7 +387,8 @@ export default function OrderDetail() {
   }
 
   const activeBatches = order.batches.filter((b) => !b.is_terminated);
-  const totalItems = activeBatches.reduce((sum, b) => sum + b.quantity, 0);
+  // Total items = planned order quantity from order_items (not affected by extra inventory reservation)
+  const totalItems = orderItems.reduce((sum, item) => sum + item.quantity, 0);
   const receivedItems = activeBatches
     .filter((b) => b.current_state === "received")
     .reduce((sum, b) => sum + b.quantity, 0);
