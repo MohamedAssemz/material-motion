@@ -103,13 +103,6 @@ export default function OrderBoxing() {
   const [shipmentNotes, setShipmentNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  // Print data for hidden printable area
-  const [printData, setPrintData] = useState<{
-    shipmentCode: string;
-    items: Array<{ sku: string; name: string; qty: number; needsBoxing: boolean }>;
-    totalItems: number;
-    notes: string;
-  } | null>(null);
 
   const canManage = hasRole("boxing_manager") || hasRole("boxer") || hasRole("admin");
 
@@ -763,14 +756,123 @@ export default function OrderBoxing() {
     totalItems: number,
     notes: string,
   ) => {
-    // Set print data and trigger print after render is complete
-    setPrintData({ shipmentCode, items, totalItems, notes });
-    // Use requestAnimationFrame to ensure DOM has updated before printing
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        window.print();
-      });
-    });
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      toast.error('Could not open print window. Please allow popups.');
+      return;
+    }
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Shipment Label - ${shipmentCode}</title>
+          <style>
+            body { 
+              font-family: Arial, sans-serif; 
+              padding: 20px;
+              max-width: 600px;
+              margin: 0 auto;
+            }
+            .header { 
+              text-align: center; 
+              border-bottom: 3px solid black; 
+              padding-bottom: 15px;
+              margin-bottom: 20px;
+            }
+            .shipment-code { 
+              font-size: 36px; 
+              font-weight: bold; 
+              font-family: monospace;
+            }
+            .order-info { 
+              font-size: 18px; 
+              margin-top: 10px;
+            }
+            table { 
+              width: 100%; 
+              border-collapse: collapse; 
+              margin: 20px 0;
+            }
+            th, td { 
+              text-align: left; 
+              padding: 8px; 
+              border-bottom: 1px solid #ccc;
+            }
+            th { 
+              background: #f5f5f5; 
+              font-weight: bold;
+            }
+            .total-row {
+              font-weight: bold;
+              border-top: 2px solid #333;
+            }
+            .notes { 
+              margin-top: 20px; 
+              padding: 10px;
+              background: #f5f5f5;
+              border-radius: 4px;
+            }
+            .footer { 
+              margin-top: 30px; 
+              text-align: center;
+              font-size: 12px;
+              color: #666;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="shipment-code">${shipmentCode}</div>
+            <div class="order-info">Order: ${order?.order_number || ''}</div>
+            <div style="margin-top: 5px; color: #666;">
+              ${format(new Date(), 'PPP p')}
+            </div>
+          </div>
+          
+          <table>
+            <thead>
+              <tr>
+                <th>SKU</th>
+                <th>Product</th>
+                <th style="text-align: center;">Qty</th>
+                <th style="text-align: center;">Boxed</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${items.map(item => `
+                <tr>
+                  <td style="font-family: monospace;">${item.sku}</td>
+                  <td>${item.name}</td>
+                  <td style="text-align: center; font-weight: bold;">${item.qty}</td>
+                  <td style="text-align: center;">${item.needsBoxing ? 'Yes' : 'No'}</td>
+                </tr>
+              `).join('')}
+              <tr class="total-row">
+                <td colspan="2">Total</td>
+                <td style="text-align: center;">${totalItems}</td>
+                <td></td>
+              </tr>
+            </tbody>
+          </table>
+
+          ${notes ? `
+            <div class="notes">
+              <strong>Notes:</strong> ${notes}
+            </div>
+          ` : ''}
+
+          <div class="footer">
+            Miracle Medical Products Factory
+          </div>
+          
+          <script>window.print();</script>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(html);
+    printWindow.document.close();
   };
 
   if (loading) {
@@ -1273,45 +1375,6 @@ export default function OrderBoxing() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* Hidden Printable Area */}
-      {printData && (
-        <div className="hidden print:block print:fixed print:inset-0 print:bg-white print:z-50 print:p-8">
-          <div className="text-center mb-8">
-            <h1 className="text-4xl font-bold">{printData.shipmentCode}</h1>
-            <p className="text-lg mt-2">{order.order_number}</p>
-          </div>
-          <table className="w-full border-collapse">
-            <thead>
-              <tr className="border-b-2 border-black">
-                <th className="text-left p-2">SKU</th>
-                <th className="text-left p-2">Product</th>
-                <th className="text-center p-2">Qty</th>
-                <th className="text-center p-2">Boxed</th>
-              </tr>
-            </thead>
-            <tbody>
-              {printData.items.map((item, idx) => (
-                <tr key={idx} className="border-b">
-                  <td className="p-2 font-mono">{item.sku}</td>
-                  <td className="p-2">{item.name}</td>
-                  <td className="p-2 text-center font-bold">{item.qty}</td>
-                  <td className="p-2 text-center">{item.needsBoxing ? "Yes" : "No"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <div className="mt-8 flex justify-between items-center">
-            <div>
-              <p className="font-bold">Total Items: {printData.totalItems}</p>
-              {printData.notes && <p className="mt-2">Notes: {printData.notes}</p>}
-            </div>
-            <div className="text-right text-sm text-gray-500">
-              Printed: {format(new Date(), "PPP p")}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
