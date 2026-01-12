@@ -425,39 +425,93 @@ export default function OrderBoxing() {
         if (!group) continue;
 
         let remainingQty = quantity;
+        
+        // Check if there's an existing batch in ready_for_shipment for this product/order_item combo
+        // to consolidate into instead of creating new batches
+        const orderItemId = group.order_item_ids[0]; // Use first order_item_id for consolidation
+        
         for (const batch of group.batches) {
           if (remainingQty <= 0) break;
           const useQty = Math.min(batch.quantity, remainingQty);
           remainingQty -= useQty;
 
           if (useQty === batch.quantity) {
-            // Move entire batch
-            const { error: updateError } = await supabase
+            // Move entire batch - check if we can consolidate with existing ready_for_shipment batch
+            const { data: existingBatch } = await supabase
               .from("order_batches")
-              .update({
-                current_state: "ready_for_shipment",
-                box_id: null,
-              })
-              .eq("id", batch.id);
+              .select("id, quantity")
+              .eq("order_id", id)
+              .eq("product_id", batch.product_id)
+              .eq("order_item_id", batch.order_item_id)
+              .eq("current_state", "ready_for_shipment")
+              .eq("is_terminated", false)
+              .limit(1)
+              .single();
             
-            if (updateError) throw updateError;
+            if (existingBatch) {
+              // Consolidate: add quantity to existing batch and delete current batch
+              const { error: updateError } = await supabase
+                .from("order_batches")
+                .update({ quantity: existingBatch.quantity + batch.quantity })
+                .eq("id", existingBatch.id);
+              if (updateError) throw updateError;
+              
+              // Mark current batch as terminated (soft delete)
+              const { error: terminateError } = await supabase
+                .from("order_batches")
+                .update({ is_terminated: true, terminated_reason: "Consolidated" })
+                .eq("id", batch.id);
+              if (terminateError) throw terminateError;
+            } else {
+              // No existing batch to consolidate, just update state
+              const { error: updateError } = await supabase
+                .from("order_batches")
+                .update({
+                  current_state: "ready_for_shipment",
+                  box_id: null,
+                })
+                .eq("id", batch.id);
+              if (updateError) throw updateError;
+            }
             movedCount += useQty;
           } else {
-            // Split batch: create new batch for moved quantity
-            const { data: qrCode, error: qrError } = await supabase.rpc("generate_extra_batch_code");
-            if (qrError) throw qrError;
+            // Partial move - check if we can consolidate with existing ready_for_shipment batch
+            const { data: existingBatch } = await supabase
+              .from("order_batches")
+              .select("id, quantity")
+              .eq("order_id", id)
+              .eq("product_id", batch.product_id)
+              .eq("order_item_id", batch.order_item_id)
+              .eq("current_state", "ready_for_shipment")
+              .eq("is_terminated", false)
+              .limit(1)
+              .single();
             
-            const { error: insertError } = await supabase.from("order_batches").insert({
-              qr_code_data: qrCode,
-              order_id: id,
-              product_id: batch.product_id,
-              order_item_id: batch.order_item_id,
-              current_state: "ready_for_shipment",
-              quantity: useQty,
-              created_by: user?.id,
-            });
-            if (insertError) throw insertError;
+            if (existingBatch) {
+              // Consolidate: add quantity to existing batch
+              const { error: updateError } = await supabase
+                .from("order_batches")
+                .update({ quantity: existingBatch.quantity + useQty })
+                .eq("id", existingBatch.id);
+              if (updateError) throw updateError;
+            } else {
+              // Create new batch for the moved quantity
+              const { data: qrCode, error: qrError } = await supabase.rpc("generate_extra_batch_code");
+              if (qrError) throw qrError;
+              
+              const { error: insertError } = await supabase.from("order_batches").insert({
+                qr_code_data: qrCode,
+                order_id: id,
+                product_id: batch.product_id,
+                order_item_id: batch.order_item_id,
+                current_state: "ready_for_shipment",
+                quantity: useQty,
+                created_by: user?.id,
+              });
+              if (insertError) throw insertError;
+            }
             
+            // Reduce source batch quantity
             const { error: reduceError } = await supabase
               .from("order_batches")
               .update({ quantity: batch.quantity - useQty })
@@ -491,7 +545,8 @@ export default function OrderBoxing() {
 
     try {
       // Generate shipment code
-      const { data: shipmentCode } = await supabase.rpc("generate_shipment_code");
+      const { data: shipmentCode, error: codeError } = await supabase.rpc("generate_shipment_code");
+      if (codeError) throw codeError;
 
       // Create shipment
       const { data: shipment, error: shipmentError } = await supabase
@@ -510,8 +565,10 @@ export default function OrderBoxing() {
 
       if (shipmentError) throw shipmentError;
 
-      // Process each order item selection (key is order_item_id or product_id)
-      const shipmentItems = [];
+      // Process each order item selection (key is groupKey)
+      const shipmentItems: { shipment_id: string; batch_id: string; quantity: number }[] = [];
+      let shippedCount = 0;
+      
       for (const [key, quantity] of readyForShipmentSelections.entries()) {
         if (quantity <= 0) continue;
         const group = readyForShipmentGroups.find((g) => g.groupKey === key);
@@ -530,31 +587,97 @@ export default function OrderBoxing() {
           });
 
           if (useQty === batch.quantity) {
-            await supabase.from("order_batches").update({ current_state: "shipped" }).eq("id", batch.id);
+            // Ship entire batch - check if we can consolidate with existing shipped batch
+            const { data: existingBatch } = await supabase
+              .from("order_batches")
+              .select("id, quantity")
+              .eq("order_id", id)
+              .eq("product_id", batch.product_id)
+              .eq("order_item_id", batch.order_item_id)
+              .eq("current_state", "shipped")
+              .eq("is_terminated", false)
+              .limit(1)
+              .single();
+            
+            if (existingBatch) {
+              // Consolidate: add quantity to existing shipped batch
+              const { error: updateError } = await supabase
+                .from("order_batches")
+                .update({ quantity: existingBatch.quantity + batch.quantity })
+                .eq("id", existingBatch.id);
+              if (updateError) throw updateError;
+              
+              // Mark current batch as terminated
+              const { error: terminateError } = await supabase
+                .from("order_batches")
+                .update({ is_terminated: true, terminated_reason: "Consolidated into shipment" })
+                .eq("id", batch.id);
+              if (terminateError) throw terminateError;
+            } else {
+              // No existing batch to consolidate, just update state
+              const { error: updateError } = await supabase
+                .from("order_batches")
+                .update({ current_state: "shipped" })
+                .eq("id", batch.id);
+              if (updateError) throw updateError;
+            }
+            shippedCount += useQty;
           } else {
-            const { data: qrCode } = await supabase.rpc("generate_extra_batch_code");
-            await supabase.from("order_batches").insert({
-              qr_code_data: qrCode,
-              order_id: id,
-              product_id: batch.product_id,
-              order_item_id: batch.order_item_id,
-              current_state: "shipped",
-              quantity: useQty,
-              created_by: user?.id,
-            });
-            await supabase
+            // Partial ship - check if we can consolidate with existing shipped batch
+            const { data: existingBatch } = await supabase
+              .from("order_batches")
+              .select("id, quantity")
+              .eq("order_id", id)
+              .eq("product_id", batch.product_id)
+              .eq("order_item_id", batch.order_item_id)
+              .eq("current_state", "shipped")
+              .eq("is_terminated", false)
+              .limit(1)
+              .single();
+            
+            if (existingBatch) {
+              // Consolidate: add quantity to existing shipped batch
+              const { error: updateError } = await supabase
+                .from("order_batches")
+                .update({ quantity: existingBatch.quantity + useQty })
+                .eq("id", existingBatch.id);
+              if (updateError) throw updateError;
+            } else {
+              // Create new shipped batch
+              const { data: qrCode, error: qrError } = await supabase.rpc("generate_extra_batch_code");
+              if (qrError) throw qrError;
+              
+              const { error: insertError } = await supabase.from("order_batches").insert({
+                qr_code_data: qrCode,
+                order_id: id,
+                product_id: batch.product_id,
+                order_item_id: batch.order_item_id,
+                current_state: "shipped",
+                quantity: useQty,
+                created_by: user?.id,
+              });
+              if (insertError) throw insertError;
+            }
+            
+            // Reduce source batch quantity
+            const { error: reduceError } = await supabase
               .from("order_batches")
               .update({ quantity: batch.quantity - useQty })
               .eq("id", batch.id);
+            if (reduceError) throw reduceError;
+            
+            shippedCount += useQty;
           }
         }
       }
 
+      // Insert shipment items
       if (shipmentItems.length > 0) {
-        await supabase.from("shipment_items").insert(shipmentItems);
+        const { error: itemsError } = await supabase.from("shipment_items").insert(shipmentItems);
+        if (itemsError) throw itemsError;
       }
 
-      toast.success(`Created Kartona ${shipment.shipment_code}`);
+      toast.success(`Created Kartona ${shipment.shipment_code} with ${shippedCount} items`);
 
       // Capture print data BEFORE clearing state (so print is always correct)
       const printItems = Array.from(readyForShipmentSelections.entries())
@@ -581,9 +704,10 @@ export default function OrderBoxing() {
       }, 0);
 
       // Refresh after
-      fetchData();
+      await fetchData();
     } catch (error: any) {
-      toast.error(error.message);
+      console.error("Error creating kartona:", error);
+      toast.error(error.message || "Failed to create shipment");
       setSubmitting(false);
     }
   };
