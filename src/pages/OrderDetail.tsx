@@ -784,7 +784,7 @@ export default function OrderDetail() {
             <CardTitle>Shipments</CardTitle>
             <CardDescription>View and manage order shipments</CardDescription>
           </div>
-          <Button variant="outline" onClick={() => setShipmentDialogOpen(true)}>
+          <Button variant="outline" onClick={() => navigate(`/orders/${id}/boxing?tab=shipments`)}>
             View Shipments
           </Button>
         </CardHeader>
