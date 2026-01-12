@@ -23,12 +23,12 @@ interface Order {
   created_at: string;
   ready_for_boxing_count: number;
   boxing_count: number;
-  ready_for_receiving_count: number;
+  ready_for_shipment_count: number;
   shipped_count: number;
   extra_boxing_count: number;
 }
 
-type StatusFilter = 'all' | 'ready_for_boxing' | 'in_boxing' | 'ready_for_receiving' | 'shipped' | 'extra';
+type StatusFilter = 'all' | 'ready_for_boxing' | 'in_boxing' | 'ready_for_shipment' | 'shipped' | 'extra';
 
 export default function QueueBoxing() {
   const navigate = useNavigate();
@@ -63,7 +63,7 @@ export default function QueueBoxing() {
       const { data: batchesData, error: batchError } = await supabase
         .from('order_batches')
         .select('order_id, current_state, quantity')
-        .in('current_state', ['ready_for_boxing', 'in_boxing', 'ready_for_receiving', 'received'])
+        .in('current_state', ['ready_for_boxing', 'in_boxing', 'ready_for_shipment', 'shipped'])
         .eq('is_terminated', false);
 
       if (batchError) throw batchError;
@@ -122,8 +122,8 @@ export default function QueueBoxing() {
           boxing_count: orderBatches
             .filter((b: any) => b.current_state === 'in_boxing')
             .reduce((sum: number, b: any) => sum + b.quantity, 0),
-          ready_for_receiving_count: orderBatches
-            .filter((b: any) => b.current_state === 'ready_for_receiving')
+          ready_for_shipment_count: orderBatches
+            .filter((b: any) => b.current_state === 'ready_for_shipment')
             .reduce((sum: number, b: any) => sum + b.quantity, 0),
           shipped_count: shipmentCounts.get(order.id) || 0,
           extra_boxing_count: extraBatches
@@ -144,7 +144,7 @@ export default function QueueBoxing() {
       return orders.filter(o => 
         o.ready_for_boxing_count > 0 || 
         o.boxing_count > 0 || 
-        o.ready_for_receiving_count > 0 ||
+        o.ready_for_shipment_count > 0 ||
         o.shipped_count > 0 ||
         o.extra_boxing_count > 0
       );
@@ -156,8 +156,8 @@ export default function QueueBoxing() {
           return order.ready_for_boxing_count > 0;
         case 'in_boxing':
           return order.boxing_count > 0;
-        case 'ready_for_receiving':
-          return order.ready_for_receiving_count > 0;
+        case 'ready_for_shipment':
+          return order.ready_for_shipment_count > 0;
         case 'shipped':
           return order.shipped_count > 0;
         case 'extra':
@@ -198,7 +198,7 @@ export default function QueueBoxing() {
                   <SelectItem value="all">All Statuses</SelectItem>
                   <SelectItem value="ready_for_boxing">Ready for Boxing</SelectItem>
                   <SelectItem value="in_boxing">In Boxing</SelectItem>
-                  <SelectItem value="ready_for_receiving">Ready for Shipment</SelectItem>
+                  <SelectItem value="ready_for_shipment">Ready for Shipment</SelectItem>
                   <SelectItem value="shipped">Has Shipments</SelectItem>
                   <SelectItem value="extra">Has Extra Items</SelectItem>
                 </SelectContent>
@@ -252,8 +252,8 @@ export default function QueueBoxing() {
                       )}
                     </TableCell>
                     <TableCell>
-                      {order.ready_for_receiving_count > 0 && (
-                        <Badge className="bg-green-500">{order.ready_for_receiving_count} items</Badge>
+                      {order.ready_for_shipment_count > 0 && (
+                        <Badge className="bg-green-500">{order.ready_for_shipment_count} items</Badge>
                       )}
                     </TableCell>
                     <TableCell>

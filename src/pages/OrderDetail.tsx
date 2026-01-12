@@ -389,8 +389,8 @@ export default function OrderDetail() {
   const activeBatches = order.batches.filter((b) => !b.is_terminated);
   // Total items = planned order quantity from order_items (not affected by extra inventory reservation)
   const totalItems = orderItems.reduce((sum, item) => sum + item.quantity, 0);
-  const receivedItems = activeBatches
-    .filter((b) => b.current_state === "received")
+  const shippedItems = activeBatches
+    .filter((b) => b.current_state === "shipped")
     .reduce((sum, b) => sum + b.quantity, 0);
   const flaggedCount = activeBatches.filter((b) => b.is_flagged).reduce((sum, b) => sum + b.quantity, 0);
   const redoCount = activeBatches.filter((b) => b.is_redo).reduce((sum, b) => sum + b.quantity, 0);
@@ -462,8 +462,8 @@ export default function OrderDetail() {
     return Array.from(boxData.entries());
   };
 
-  const receivedBatches = activeBatches
-    .filter((b) => b.current_state === "received")
+  const shippedBatches = activeBatches
+    .filter((b) => b.current_state === "shipped")
     .map((b) => ({
       id: b.id,
       qr_code_data: b.qr_code_data,
@@ -475,7 +475,7 @@ export default function OrderDetail() {
 
   // Order state
   const orderState =
-    receivedItems === totalItems && totalItems > 0 ? "Fulfilled" : receivedItems > 0 ? "In Progress" : "Pending";
+    shippedItems === totalItems && totalItems > 0 ? "Fulfilled" : shippedItems > 0 ? "In Progress" : "Pending";
 
   return (
     <div className="p-6 space-y-6">
@@ -545,8 +545,8 @@ export default function OrderDetail() {
         </Card>
         <Card>
           <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Received</p>
-            <p className="text-2xl font-bold text-green-600">{receivedItems}</p>
+            <p className="text-sm text-muted-foreground">Shipped</p>
+            <p className="text-2xl font-bold text-green-600">{shippedItems}</p>
           </CardContent>
         </Card>
         <Card>
@@ -791,7 +791,7 @@ export default function OrderDetail() {
             <div className="flex items-center gap-2">
               <CheckCircle className="h-5 w-5 text-green-600" />
               <span className="text-sm">
-                {receivedItems} / {totalItems} items received
+                {shippedItems} / {totalItems} items shipped
               </span>
             </div>
           </div>
@@ -820,10 +820,10 @@ export default function OrderDetail() {
               <tbody>
                 {orderItems.map((item) => {
                   const itemBatches = activeBatches.filter((b) => b.order_item_id === item.id);
-                  const itemReceived = itemBatches
-                    .filter((b) => b.current_state === "received")
+                  const itemShipped = itemBatches
+                    .filter((b) => b.current_state === "shipped")
                     .reduce((sum, b) => sum + b.quantity, 0);
-                  const progress = item.quantity > 0 ? Math.round((itemReceived / item.quantity) * 100) : 0;
+                  const progress = item.quantity > 0 ? Math.round((itemShipped / item.quantity) * 100) : 0;
 
                   return (
                     <tr key={item.id} className="border-b hover:bg-muted/50">
@@ -891,7 +891,7 @@ export default function OrderDetail() {
         onOpenChange={setShipmentDialogOpen} 
         orderId={id!}
         orderNumber={order?.order_number || ''}
-        receivedBatches={(order?.batches || []).filter(b => b.current_state === 'received').map(b => ({
+        receivedBatches={(order?.batches || []).filter(b => b.current_state === 'shipped').map(b => ({
           id: b.id,
           batch_code: b.qr_code_data,
           product_id: b.product_id,

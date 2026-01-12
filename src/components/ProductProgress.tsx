@@ -20,8 +20,8 @@ const STATE_COLORS: Record<string, string> = {
   'in_packaging': 'bg-indigo-500',
   'ready_for_boxing': 'bg-cyan-300',
   'in_boxing': 'bg-cyan-500',
-  'ready_for_receiving': 'bg-teal-300',
-  'received': 'bg-green-500',
+  'ready_for_shipment': 'bg-teal-300',
+  'shipped': 'bg-green-500',
 };
 
 export function ProductProgress({ totalUnits, stateCounts }: ProductProgressProps) {

@@ -139,7 +139,7 @@ export default function OrderManufacturing() {
           .select('id, qr_code_data, current_state, quantity, product_id, order_item_id, eta, lead_time_days, box_id, is_flagged, is_redo, product:products(id, name, sku, needs_packing), order_item:order_items(needs_boxing)')
           .eq('order_id', id)
           .eq('is_terminated', false)
-          .in('current_state', ['ready_for_finishing', 'in_finishing', 'ready_for_packaging', 'in_packaging', 'ready_for_boxing', 'in_boxing', 'ready_for_receiving', 'received'])
+          .in('current_state', ['ready_for_finishing', 'in_finishing', 'ready_for_packaging', 'in_packaging', 'ready_for_boxing', 'in_boxing', 'ready_for_shipment', 'shipped'])
       ]);
       
       if (orderRes.error) throw orderRes.error;

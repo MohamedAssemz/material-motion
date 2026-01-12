@@ -289,7 +289,7 @@ export function ExtraItemsTab({ orderId, phase, onRefresh }: ExtraItemsTabProps)
         manufacturing: 'ready_for_finishing',
         finishing: 'ready_for_packaging',
         packaging: 'ready_for_boxing',
-        boxing: 'ready_for_receiving',
+        boxing: 'ready_for_shipment',
       };
       
       const nextOrderState = PHASE_TO_ORDER_STATE[phase];

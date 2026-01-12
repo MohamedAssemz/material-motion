@@ -16,8 +16,8 @@ const STAGES = [
   { key: 'in_packaging', label: 'In Packaging', icon: Circle },
   { key: 'ready_for_boxing', label: 'Ready for Boxing', icon: CheckCircle },
   { key: 'in_boxing', label: 'In Boxing', icon: Circle },
-  { key: 'ready_for_receiving', label: 'Ready for Receiving', icon: CheckCircle },
-  { key: 'received', label: 'Received', icon: CheckCircle },
+  { key: 'ready_for_shipment', label: 'Ready for Shipment', icon: CheckCircle },
+  { key: 'shipped', label: 'Shipped', icon: CheckCircle },
 ];
 
 export function OrderTimeline({ batches, orderStatus }: OrderTimelineProps) {
