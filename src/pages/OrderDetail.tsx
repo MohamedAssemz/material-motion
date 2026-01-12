@@ -749,31 +749,33 @@ export default function OrderDetail() {
         </CardContent>
       </Card>
 
-      {/* Extra Inventory */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Extra Inventory</CardTitle>
-          <CardDescription>Available extra items that can be used for this order</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {(['manufacturing', 'finishing', 'packaging', 'boxing'] as const).map((phase) => (
-              <Button
-                key={phase}
-                variant="outline"
-                className="h-auto py-4 flex flex-col items-center gap-2"
-                onClick={() => {
-                  setSelectedExtraPhase(phase);
-                  setExtraInventoryOpen(true);
-                }}
-              >
-                <span className="text-2xl font-bold text-primary">{extraInventoryCounts[phase] || 0}</span>
-                <span className="text-xs text-muted-foreground capitalize">{phase}</span>
-              </Button>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+      {/* Extra Inventory - Only show for pending orders */}
+      {isPendingOrder && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Extra Inventory</CardTitle>
+            <CardDescription>Available extra items that can be used for this order</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {(['manufacturing', 'finishing', 'packaging', 'boxing'] as const).map((phase) => (
+                <Button
+                  key={phase}
+                  variant="outline"
+                  className="h-auto py-4 flex flex-col items-center gap-2"
+                  onClick={() => {
+                    setSelectedExtraPhase(phase);
+                    setExtraInventoryOpen(true);
+                  }}
+                >
+                  <span className="text-2xl font-bold text-primary">{extraInventoryCounts[phase] || 0}</span>
+                  <span className="text-xs text-muted-foreground capitalize">{phase}</span>
+                </Button>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Shipments */}
       <Card>
