@@ -342,6 +342,7 @@ export type Database = {
           quantity: number
           redo_by: string | null
           redo_reason: string | null
+          shipment_id: string | null
           terminated_by: string | null
           terminated_reason: string | null
           updated_at: string
@@ -366,6 +367,7 @@ export type Database = {
           quantity?: number
           redo_by?: string | null
           redo_reason?: string | null
+          shipment_id?: string | null
           terminated_by?: string | null
           terminated_reason?: string | null
           updated_at?: string
@@ -390,6 +392,7 @@ export type Database = {
           quantity?: number
           redo_by?: string | null
           redo_reason?: string | null
+          shipment_id?: string | null
           terminated_by?: string | null
           terminated_reason?: string | null
           updated_at?: string
@@ -421,6 +424,13 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_batches_shipment_id_fkey"
+            columns: ["shipment_id"]
+            isOneToOne: false
+            referencedRelation: "shipments"
             referencedColumns: ["id"]
           },
         ]
@@ -855,45 +865,6 @@ export type Database = {
           unit?: string | null
         }
         Relationships: []
-      }
-      shipment_items: {
-        Row: {
-          batch_id: string
-          created_at: string
-          id: string
-          quantity: number
-          shipment_id: string
-        }
-        Insert: {
-          batch_id: string
-          created_at?: string
-          id?: string
-          quantity: number
-          shipment_id: string
-        }
-        Update: {
-          batch_id?: string
-          created_at?: string
-          id?: string
-          quantity?: number
-          shipment_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "shipment_items_batch_id_fkey"
-            columns: ["batch_id"]
-            isOneToOne: false
-            referencedRelation: "order_batches"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "shipment_items_shipment_id_fkey"
-            columns: ["shipment_id"]
-            isOneToOne: false
-            referencedRelation: "shipments"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       shipments: {
         Row: {

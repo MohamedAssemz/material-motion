@@ -130,7 +130,7 @@ export function ShipmentDialog({
 
       if (shipmentError) throw shipmentError;
 
-      // Create shipment items and update batch states
+      // Update batch states and link to shipment
       for (const product of selectedProducts) {
         let remaining = product.selected_quantity;
         
@@ -138,26 +138,34 @@ export function ShipmentDialog({
           if (remaining <= 0) break;
           
           const take = Math.min(remaining, batch.quantity);
-          
-          // Create shipment item
-          await supabase.from('shipment_items').insert({
-            shipment_id: shipment.id,
-            batch_id: batch.id,
-            quantity: take,
-          });
 
-          // Update batch - mark as fulfilled or split
+          // Update batch - mark as shipped and link to shipment
           if (take === batch.quantity) {
             await supabase
               .from('order_batches')
-              .update({ current_state: 'received' }) // Already received, now in shipment
+              .update({ 
+                current_state: 'shipped',
+                shipment_id: shipment.id,
+              })
               .eq('id', batch.id);
           } else {
-            // Split batch - reduce original, shipment item tracks what was taken
+            // Split batch - reduce original, create new shipped batch
             await supabase
               .from('order_batches')
               .update({ quantity: batch.quantity - take })
               .eq('id', batch.id);
+            
+            // Create new batch for shipped quantity
+            const { data: qrCode } = await supabase.rpc('generate_extra_batch_code');
+            await supabase.from('order_batches').insert({
+              qr_code_data: qrCode,
+              order_id: orderId,
+              product_id: product.product_id,
+              current_state: 'shipped',
+              quantity: take,
+              created_by: user?.id,
+              shipment_id: shipment.id,
+            });
           }
 
           remaining -= take;
