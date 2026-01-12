@@ -821,7 +821,11 @@ export default function OrderDetail() {
               </thead>
               <tbody>
                 {orderItems.map((item) => {
-                  const itemBatches = activeBatches.filter((b) => b.order_item_id === item.id);
+                  // Match batches by order_item_id, or fall back to product_id for legacy batches
+                  const itemBatches = activeBatches.filter((b) => 
+                    b.order_item_id === item.id || 
+                    (b.order_item_id === null && b.product_id === item.product_id)
+                  );
                   const itemShipped = itemBatches
                     .filter((b) => b.current_state === "shipped")
                     .reduce((sum, b) => sum + b.quantity, 0);
