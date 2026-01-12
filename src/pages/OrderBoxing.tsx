@@ -416,7 +416,9 @@ export default function OrderBoxing() {
     setSubmitting(true);
 
     try {
-      // Use order_item_id or product_id as key (matching how groups are created)
+      let movedCount = 0;
+      
+      // Use groupKey as key (matching how groups are created)
       for (const [key, quantity] of productSelections.entries()) {
         if (quantity <= 0) continue;
         const group = inBoxingGroups.find((g) => g.groupKey === key);
@@ -429,16 +431,23 @@ export default function OrderBoxing() {
           remainingQty -= useQty;
 
           if (useQty === batch.quantity) {
-            await supabase
+            // Move entire batch
+            const { error: updateError } = await supabase
               .from("order_batches")
               .update({
                 current_state: "ready_for_receiving",
                 box_id: null,
               })
               .eq("id", batch.id);
+            
+            if (updateError) throw updateError;
+            movedCount += useQty;
           } else {
-            const { data: qrCode } = await supabase.rpc("generate_extra_batch_code");
-            await supabase.from("order_batches").insert({
+            // Split batch: create new batch for moved quantity
+            const { data: qrCode, error: qrError } = await supabase.rpc("generate_extra_batch_code");
+            if (qrError) throw qrError;
+            
+            const { error: insertError } = await supabase.from("order_batches").insert({
               qr_code_data: qrCode,
               order_id: id,
               product_id: batch.product_id,
@@ -447,20 +456,30 @@ export default function OrderBoxing() {
               quantity: useQty,
               created_by: user?.id,
             });
-            await supabase
+            if (insertError) throw insertError;
+            
+            const { error: reduceError } = await supabase
               .from("order_batches")
               .update({ quantity: batch.quantity - useQty })
               .eq("id", batch.id);
+            if (reduceError) throw reduceError;
+            
+            movedCount += useQty;
           }
         }
       }
 
-      toast.success(`Moved ${totalSelected} items to Ready for Shipment`);
+      if (movedCount > 0) {
+        toast.success(`Moved ${movedCount} items to Ready for Shipment`);
+      } else {
+        toast.warning("No items were moved");
+      }
       setMoveToReadyDialogOpen(false);
       setProductSelections(new Map());
-      fetchData();
+      await fetchData();
     } catch (error: any) {
-      toast.error(error.message);
+      console.error("Error moving to ready for shipment:", error);
+      toast.error(error.message || "Failed to move items");
     } finally {
       setSubmitting(false);
     }
