@@ -19,7 +19,6 @@ interface Order {
   id: string;
   order_number: string;
   created_at: string;
-  waiting_for_rm_count: number;
   manufacturing_count: number;
   extra_manufacturing_count: number;
 }
@@ -49,11 +48,11 @@ export default function QueueManufacturing() {
 
   const fetchOrders = async () => {
     try {
-      // Fetch orders with order_batches in manufacturing states
+      // Fetch orders with order_batches in active manufacturing state only (not pending_rm)
       const { data: orderBatchesData, error: batchError } = await supabase
         .from('order_batches')
         .select('order_id, current_state, quantity')
-        .in('current_state', ['pending_rm', 'in_manufacturing'])
+        .eq('current_state', 'in_manufacturing')
         .eq('is_terminated', false);
 
       if (batchError) throw batchError;
@@ -79,11 +78,12 @@ export default function QueueManufacturing() {
         return;
       }
 
-      // Fetch order details
+      // Fetch order details - only orders that are in_progress (started)
       const { data: ordersData, error: ordersError } = await supabase
         .from('orders')
         .select('id, order_number, created_at')
-        .in('id', allOrderIds);
+        .in('id', allOrderIds)
+        .eq('status', 'in_progress');
 
       if (ordersError) throw ordersError;
 
@@ -95,9 +95,7 @@ export default function QueueManufacturing() {
           id: order.id,
           order_number: order.order_number,
           created_at: order.created_at,
-          waiting_for_rm_count: orderBatches
-            .filter((b: any) => b.current_state === 'pending_rm')
-            .reduce((sum: number, b: any) => sum + b.quantity, 0),
+          waiting_for_rm_count: 0, // No longer shown in queue
           manufacturing_count: orderBatches
             .filter((b: any) => b.current_state === 'in_manufacturing')
             .reduce((sum: number, b: any) => sum + b.quantity, 0),
@@ -105,7 +103,6 @@ export default function QueueManufacturing() {
             .reduce((sum: number, b: any) => sum + b.quantity, 0),
         };
       }).filter((order: Order) => 
-        order.waiting_for_rm_count > 0 || 
         order.manufacturing_count > 0 || 
         order.extra_manufacturing_count > 0
       );
@@ -152,7 +149,6 @@ export default function QueueManufacturing() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Order Number</TableHead>
-                  <TableHead>Pending RM</TableHead>
                   <TableHead>In Manufacturing</TableHead>
                   <TableHead>Extra Items</TableHead>
                   <TableHead>Created Date</TableHead>
@@ -163,11 +159,6 @@ export default function QueueManufacturing() {
                 {orders.map((order) => (
                   <TableRow key={order.id}>
                     <TableCell className="font-medium">{order.order_number}</TableCell>
-                    <TableCell>
-                      {order.waiting_for_rm_count > 0 && (
-                        <Badge className="bg-yellow-500">{order.waiting_for_rm_count} items</Badge>
-                      )}
-                    </TableCell>
                     <TableCell>
                       {order.manufacturing_count > 0 && (
                         <Badge className="bg-blue-500">{order.manufacturing_count} items</Badge>
