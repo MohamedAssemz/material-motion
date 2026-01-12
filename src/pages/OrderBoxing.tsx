@@ -600,10 +600,14 @@ export default function OrderBoxing() {
                 .eq("id", existingBatch.id);
               if (updateError) throw updateError;
               
-              // Mark current batch as terminated
+              // Mark current batch as terminated and update state to shipped
               const { error: terminateError } = await supabase
                 .from("order_batches")
-                .update({ is_terminated: true, terminated_reason: "Consolidated into shipment" })
+                .update({ 
+                  is_terminated: true, 
+                  terminated_reason: "Consolidated into shipment",
+                  current_state: "shipped"
+                })
                 .eq("id", batch.id);
               if (terminateError) throw terminateError;
             } else {
