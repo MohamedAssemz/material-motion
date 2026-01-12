@@ -170,6 +170,23 @@ export default function ExtraInventory() {
 
     setSubmitting(true);
     try {
+      // Validate: Check if the box already has batches with a different state
+      const { data: boxBatches } = await supabase
+        .from('extra_batches')
+        .select('current_state')
+        .eq('box_id', formData.box_id)
+        .limit(1);
+
+      if (boxBatches && boxBatches.length > 0 && boxBatches[0].current_state !== formData.current_state) {
+        toast({
+          title: 'State Mismatch',
+          description: `This EBox already contains batches in "${EXTRA_STATE_LABELS[boxBatches[0].current_state]}" state. All batches in an EBox must have the same state.`,
+          variant: 'destructive',
+        });
+        setSubmitting(false);
+        return;
+      }
+
       // Check if an existing extra_batch with same product, box, and state exists
       const { data: existingBatch } = await supabase
         .from('extra_batches')
@@ -242,6 +259,23 @@ export default function ExtraInventory() {
     if (!batch) return;
 
     try {
+      // Validate: Check if the target box already has batches with a different state
+      const { data: boxBatches } = await supabase
+        .from('extra_batches')
+        .select('current_state')
+        .eq('box_id', boxId)
+        .neq('id', batch.id) // Exclude current batch if it's already in this box
+        .limit(1);
+
+      if (boxBatches && boxBatches.length > 0 && boxBatches[0].current_state !== batch.current_state) {
+        toast({
+          title: 'State Mismatch',
+          description: `This EBox contains batches in "${EXTRA_STATE_LABELS[boxBatches[0].current_state]}" state. Cannot add a batch with "${EXTRA_STATE_LABELS[batch.current_state]}" state.`,
+          variant: 'destructive',
+        });
+        return;
+      }
+
       // Check if target box already has a batch with same product and state
       const { data: existingBatch } = await supabase
         .from('extra_batches')
