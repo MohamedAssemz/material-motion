@@ -44,15 +44,16 @@ interface BoxGroup {
   totalQty: number;
 }
 
-// Group by order_item_id to preserve order item identity (same product with different needs_boxing stays separate)
+// Group by product + needs_boxing to combine same product items
 interface OrderItemGroup {
-  order_item_id: string;
+  groupKey: string; // product_id + needs_boxing
   product_id: string;
   product_name: string;
   product_sku: string;
   needs_boxing: boolean;
   quantity: number;
   batches: Batch[];
+  order_item_ids: string[];
 }
 
 interface ShipmentItem {
@@ -257,54 +258,65 @@ export default function OrderBoxing() {
     });
   boxGroupMap.forEach((g) => readyBoxGroups.push(g));
 
-  // Group in_boxing by order_item_id to preserve identity (same product with different needs_boxing stays separate)
+  // Group in_boxing by product + needs_boxing
   const inBoxingGroups: OrderItemGroup[] = [];
   const orderItemMap = new Map<string, OrderItemGroup>();
   batches
     .filter((b) => b.current_state === "in_boxing")
     .forEach((batch) => {
-      // Use order_item_id as key, or fall back to product_id for legacy data
-      const key = batch.order_item_id || batch.product_id;
-      if (!orderItemMap.has(key)) {
-        orderItemMap.set(key, {
-          order_item_id: batch.order_item_id || "",
+      const needsBoxing = batch.order_item?.needs_boxing ?? true;
+      const groupKey = `${batch.product_id}-${needsBoxing ? 'boxing' : 'no-boxing'}`;
+      if (!orderItemMap.has(groupKey)) {
+        orderItemMap.set(groupKey, {
+          groupKey,
           product_id: batch.product_id,
           product_name: batch.product?.name || "Unknown",
           product_sku: batch.product?.sku || "N/A",
-          needs_boxing: batch.order_item?.needs_boxing ?? true,
+          needs_boxing: needsBoxing,
           quantity: 0,
           batches: [],
+          order_item_ids: [],
         });
       }
-      const group = orderItemMap.get(key)!;
+      const group = orderItemMap.get(groupKey)!;
       group.batches.push(batch);
       group.quantity += batch.quantity;
+      if (batch.order_item_id && !group.order_item_ids.includes(batch.order_item_id)) {
+        group.order_item_ids.push(batch.order_item_id);
+      }
     });
   orderItemMap.forEach((g) => inBoxingGroups.push(g));
+  inBoxingGroups.sort((a, b) => a.product_name.localeCompare(b.product_name));
 
-  // Group ready_for_receiving (ready for shipment) by order_item_id
+  // Group ready_for_receiving by product + needs_boxing
   const readyForShipmentGroups: OrderItemGroup[] = [];
   const readyShipmentMap = new Map<string, OrderItemGroup>();
   batches
     .filter((b) => b.current_state === "ready_for_receiving")
     .forEach((batch) => {
-      const key = batch.order_item_id || batch.product_id;
-      if (!readyShipmentMap.has(key)) {
-        readyShipmentMap.set(key, {
-          order_item_id: batch.order_item_id || "",
+      const needsBoxing = batch.order_item?.needs_boxing ?? true;
+      const groupKey = `${batch.product_id}-${needsBoxing ? 'boxing' : 'no-boxing'}`;
+      if (!readyShipmentMap.has(groupKey)) {
+        readyShipmentMap.set(groupKey, {
+          groupKey,
           product_id: batch.product_id,
           product_name: batch.product?.name || "Unknown",
           product_sku: batch.product?.sku || "N/A",
-          needs_boxing: batch.order_item?.needs_boxing ?? true,
+          needs_boxing: needsBoxing,
           quantity: 0,
           batches: [],
+          order_item_ids: [],
         });
       }
-      const group = readyShipmentMap.get(key)!;
+      const group = readyShipmentMap.get(groupKey)!;
       group.batches.push(batch);
       group.quantity += batch.quantity;
+      if (batch.order_item_id && !group.order_item_ids.includes(batch.order_item_id)) {
+        group.order_item_ids.push(batch.order_item_id);
+      }
     });
   readyShipmentMap.forEach((g) => readyForShipmentGroups.push(g));
+  readyForShipmentGroups.sort((a, b) => a.product_name.localeCompare(b.product_name));
 
   const totalReadyForBoxing = readyBoxGroups.reduce((sum, g) => sum + g.totalQty, 0);
   const totalInBoxing = inBoxingGroups.reduce((sum, g) => sum + g.quantity, 0);
@@ -407,7 +419,7 @@ export default function OrderBoxing() {
       // Use order_item_id or product_id as key (matching how groups are created)
       for (const [key, quantity] of productSelections.entries()) {
         if (quantity <= 0) continue;
-        const group = inBoxingGroups.find((g) => (g.order_item_id || g.product_id) === key);
+        const group = inBoxingGroups.find((g) => g.groupKey === key);
         if (!group) continue;
 
         let remainingQty = quantity;
@@ -483,7 +495,7 @@ export default function OrderBoxing() {
       const shipmentItems = [];
       for (const [key, quantity] of readyForShipmentSelections.entries()) {
         if (quantity <= 0) continue;
-        const group = readyForShipmentGroups.find((g) => (g.order_item_id || g.product_id) === key);
+        const group = readyForShipmentGroups.find((g) => g.groupKey === key);
         if (!group) continue;
 
         let remainingQty = quantity;
@@ -528,7 +540,7 @@ export default function OrderBoxing() {
       // Capture print data BEFORE clearing state (so print is always correct)
       const printItems = Array.from(readyForShipmentSelections.entries())
         .map(([key, qty]) => {
-          const group = readyForShipmentGroups.find((g) => (g.order_item_id || g.product_id) === key);
+          const group = readyForShipmentGroups.find((g) => g.groupKey === key);
           return group
             ? { sku: group.product_sku, name: group.product_name, qty, needsBoxing: group.needs_boxing }
             : null;
