@@ -31,6 +31,7 @@ interface ExtraBatch {
   quantity: number;
   current_state: string;
   box_id: string | null;
+  order_item_id: string | null;
   product: {
     id: string;
     name: string;
@@ -123,7 +124,7 @@ export function ExtraItemsTab({ orderId, phase, onRefresh }: ExtraItemsTabProps)
       const { data, error } = await supabase
         .from('extra_batches')
         .select(`
-          id, qr_code_data, product_id, quantity, current_state, box_id,
+          id, qr_code_data, product_id, quantity, current_state, box_id, order_item_id,
           product:products(id, name, sku)
         `)
         .eq('order_id', orderId)
@@ -149,6 +150,7 @@ export function ExtraItemsTab({ orderId, phase, onRefresh }: ExtraItemsTabProps)
         quantity: batch.quantity,
         current_state: batch.current_state,
         box_id: batch.box_id,
+        order_item_id: batch.order_item_id,
         product: batch.product as ExtraBatch['product'],
         box: batch.box_id ? boxMap.get(batch.box_id) : null,
       }));
@@ -302,21 +304,15 @@ export function ExtraItemsTab({ orderId, phase, onRefresh }: ExtraItemsTabProps)
           const useQty = Math.min(batch.quantity, remainingQty);
           remainingQty -= useQty;
           
-          // Get order_item_id from the extra batch
-          const { data: extraBatchData } = await supabase
-            .from('extra_batches')
-            .select('order_item_id')
-            .eq('id', batch.id)
-            .single();
-          
           // Create an order_batch in ready_for_shipment state (no box_id needed)
+          // Use order_item_id directly from the batch object
           const { data: batchCode } = await supabase.rpc('generate_extra_batch_code');
           const { error: insertError } = await supabase
             .from('order_batches')
             .insert({
               qr_code_data: batchCode || `OB-${Date.now()}`,
               order_id: orderId,
-              order_item_id: extraBatchData?.order_item_id,
+              order_item_id: batch.order_item_id,
               product_id: batch.product_id,
               current_state: 'ready_for_shipment',
               quantity: useQty,
@@ -399,13 +395,14 @@ export function ExtraItemsTab({ orderId, phase, onRefresh }: ExtraItemsTabProps)
           const useQty = Math.min(batch.quantity, remainingQty);
           remainingQty -= useQty;
           
-          // Create an order_batch from the extra batch
+          // Create an order_batch from the extra batch (including order_item_id)
           const { data: batchCode } = await supabase.rpc('generate_extra_batch_code');
           const { data: newOrderBatch, error: insertError } = await supabase
             .from('order_batches')
             .insert({
               qr_code_data: batchCode || `OB-${Date.now()}`,
               order_id: orderId,
+              order_item_id: batch.order_item_id,
               product_id: batch.product_id,
               current_state: nextOrderState,
               quantity: useQty,
