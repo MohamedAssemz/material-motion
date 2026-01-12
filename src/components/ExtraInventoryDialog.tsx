@@ -358,8 +358,15 @@ export function ExtraInventoryDialog({
 
       // CRITICAL: Reduce order batches for each product to maintain quantity invariant
       // Extra inventory replaces order batches, it does NOT add to them
+      // The order item quantity remains unchanged because:
+      // - We add reserved extra batches (with order_item_id) → trigger adds their qty
+      // - We reduce order batches → trigger subtracts their qty
+      // Net effect: order_items.quantity stays the same
       for (const [productId, quantityToReduce] of productQuantities.entries()) {
-        await reduceOrderBatchesForProduct(orderId, productId, quantityToReduce);
+        const orderItemId = getOrderItemIdForProduct(productId);
+        if (orderItemId) {
+          await reduceOrderBatchesForProduct(orderId, productId, quantityToReduce, orderItemId);
+        }
       }
 
       toast.success(`Reserved ${totalSelected} extra items for order`);
@@ -379,18 +386,21 @@ export function ExtraInventoryDialog({
    * @param orderId - The order to reduce batches for
    * @param productId - The product whose batches should be reduced
    * @param quantityToReduce - The amount to reduce
+   * @param orderItemId - The order item ID to prioritize when reducing batches
    */
   const reduceOrderBatchesForProduct = async (
     orderId: string,
     productId: string,
-    quantityToReduce: number
+    quantityToReduce: number,
+    orderItemId: string
   ) => {
-    // Fetch order batches for this product (prioritize earlier states)
+    // Fetch order batches for this product, prioritizing the specific order_item_id
     const { data: orderBatches, error: fetchError } = await supabase
       .from('order_batches')
       .select('id, quantity, current_state, order_item_id')
       .eq('order_id', orderId)
       .eq('product_id', productId)
+      .eq('order_item_id', orderItemId)
       .eq('is_terminated', false)
       .order('created_at', { ascending: true });
 
