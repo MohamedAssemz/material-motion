@@ -73,7 +73,7 @@ interface Order {
 }
 
 interface ProductGroup {
-  order_item_id: string;
+  groupKey: string; // product_id + needs_boxing
   product_id: string;
   product_name: string;
   product_sku: string;
@@ -82,6 +82,7 @@ interface ProductGroup {
   pendingRm: number;
   inManufacturing: number;
   batches: Batch[];
+  order_item_ids: string[]; // Track all order_item_ids in this group
 }
 
 export default function OrderManufacturing() {
@@ -223,24 +224,26 @@ export default function OrderManufacturing() {
     }
   };
 
-  // Group batches by order_item_id (not just product_id) to keep items with different needs_boxing separate
+  // Group batches by product_id + needs_boxing to combine same product items with same boxing requirements
   const productGroups: ProductGroup[] = [];
   const groupMap = new Map<string, ProductGroup>();
   
   batches.forEach(batch => {
-    // Use order_item_id as the key to keep order items separate
-    const groupKey = batch.order_item_id || batch.product_id;
+    const needsBoxing = batch.order_item?.needs_boxing ?? true;
+    const groupKey = `${batch.product_id}-${needsBoxing ? 'boxing' : 'no-boxing'}`;
+    
     if (!groupMap.has(groupKey)) {
       groupMap.set(groupKey, {
-        order_item_id: batch.order_item_id || '',
+        groupKey,
         product_id: batch.product_id,
         product_name: batch.product?.name || 'Unknown',
         product_sku: batch.product?.sku || 'N/A',
         needs_packing: batch.product?.needs_packing ?? true,
-        needs_boxing: batch.order_item?.needs_boxing ?? true,
+        needs_boxing: needsBoxing,
         pendingRm: 0,
         inManufacturing: 0,
         batches: [],
+        order_item_ids: [],
       });
     }
     const group = groupMap.get(groupKey)!;
@@ -250,33 +253,46 @@ export default function OrderManufacturing() {
     } else {
       group.inManufacturing += batch.quantity;
     }
+    // Track unique order_item_ids
+    if (batch.order_item_id && !group.order_item_ids.includes(batch.order_item_id)) {
+      group.order_item_ids.push(batch.order_item_id);
+    }
   });
   
   groupMap.forEach(g => productGroups.push(g));
+  // Sort by product name for consistent ordering
+  productGroups.sort((a, b) => a.product_name.localeCompare(b.product_name));
 
-  // Group completed items by order_item_id
+  // Group completed items by product + needs_boxing
   const completedGroups: ProductGroup[] = [];
   const completedGroupMap = new Map<string, ProductGroup>();
   completedBatches.forEach(batch => {
-    const groupKey = batch.order_item_id || batch.product_id;
+    const needsBoxing = batch.order_item?.needs_boxing ?? true;
+    const groupKey = `${batch.product_id}-${needsBoxing ? 'boxing' : 'no-boxing'}`;
+    
     if (!completedGroupMap.has(groupKey)) {
       completedGroupMap.set(groupKey, {
-        order_item_id: batch.order_item_id || '',
+        groupKey,
         product_id: batch.product_id,
         product_name: batch.product?.name || 'Unknown',
         product_sku: batch.product?.sku || 'N/A',
         needs_packing: batch.product?.needs_packing ?? true,
-        needs_boxing: batch.order_item?.needs_boxing ?? true,
+        needs_boxing: needsBoxing,
         pendingRm: 0,
         inManufacturing: 0,
         batches: [],
+        order_item_ids: [],
       });
     }
     const group = completedGroupMap.get(groupKey)!;
     group.batches.push(batch);
     group.inManufacturing += batch.quantity; // reusing field for total
+    if (batch.order_item_id && !group.order_item_ids.includes(batch.order_item_id)) {
+      group.order_item_ids.push(batch.order_item_id);
+    }
   });
   completedGroupMap.forEach(g => completedGroups.push(g));
+  completedGroups.sort((a, b) => a.product_name.localeCompare(b.product_name));
 
   const totalCompleted = completedGroups.reduce((sum, g) => g.batches.reduce((s, b) => s + b.quantity, 0) + sum, 0);
   const totalSelected = Array.from(productSelections.values()).reduce((a, b) => a + b, 0);
@@ -320,7 +336,7 @@ export default function OrderManufacturing() {
       for (const [groupKey, quantity] of productSelections.entries()) {
         if (quantity <= 0) continue;
         
-        const group = productGroups.find(g => (g.order_item_id || g.product_id) === groupKey);
+        const group = productGroups.find(g => g.groupKey === groupKey);
         if (!group) continue;
         
         let remainingQty = quantity;
@@ -348,7 +364,7 @@ export default function OrderManufacturing() {
               product_id: group.product_id,
               product_name: group.product_name,
               product_sku: group.product_sku,
-              order_item_id: group.order_item_id,
+              order_item_id: batch.order_item_id || '',
               needs_boxing: group.needs_boxing,
               quantity: useQty,
               batch_id: batch.id,
@@ -380,7 +396,7 @@ export default function OrderManufacturing() {
               product_id: group.product_id,
               product_name: group.product_name,
               product_sku: group.product_sku,
-              order_item_id: group.order_item_id,
+              order_item_id: batch.order_item_id || '',
               needs_boxing: group.needs_boxing,
               quantity: useQty,
               batch_id: newBatch?.id || batch.id,
@@ -416,7 +432,7 @@ export default function OrderManufacturing() {
       for (const [groupKey, quantity] of productSelections.entries()) {
         if (quantity <= 0) continue;
         
-        const group = productGroups.find(g => (g.order_item_id || g.product_id) === groupKey);
+        const group = productGroups.find(g => g.groupKey === groupKey);
         if (!group) continue;
         
         let remainingQty = quantity;
@@ -483,7 +499,7 @@ export default function OrderManufacturing() {
       for (const [groupKey, quantity] of productSelections.entries()) {
         if (quantity <= 0) continue;
         
-        const group = productGroups.find(g => (g.order_item_id || g.product_id) === groupKey);
+        const group = productGroups.find(g => g.groupKey === groupKey);
         if (!group) continue;
         
         let remainingQty = quantity;
@@ -672,10 +688,8 @@ export default function OrderManufacturing() {
                 </CardContent>
               </Card>
             ) : (
-              productGroups.map(group => {
-                const groupKey = group.order_item_id || group.product_id;
-                return (
-                  <Card key={groupKey}>
+              productGroups.map(group => (
+                  <Card key={group.groupKey}>
                     <CardContent className="p-4">
                       <div className="flex items-center justify-between">
                         <div className="flex-1">
@@ -707,10 +721,10 @@ export default function OrderManufacturing() {
                                 type="number"
                                 min={0}
                                 max={group.pendingRm + group.inManufacturing}
-                                value={productSelections.get(groupKey) || 0}
+                                value={productSelections.get(group.groupKey) || 0}
                                 onChange={(e) => {
                                   const val = Math.min(Math.max(0, parseInt(e.target.value) || 0), group.pendingRm + group.inManufacturing);
-                                  setProductSelections(prev => new Map(prev).set(groupKey, val));
+                                  setProductSelections(prev => new Map(prev).set(group.groupKey, val));
                                 }}
                                 className="w-20 h-8"
                               />
@@ -720,8 +734,7 @@ export default function OrderManufacturing() {
                       </div>
                     </CardContent>
                   </Card>
-                );
-              })
+              ))
             )}
           </div>
         </TabsContent>
@@ -740,10 +753,9 @@ export default function OrderManufacturing() {
               <Card><CardContent className="p-8 text-center text-muted-foreground">No completed items yet</CardContent></Card>
             ) : (
               completedGroups.map(group => {
-                const key = group.order_item_id || group.product_id;
                 const totalQty = group.batches.reduce((sum, b) => sum + b.quantity, 0);
                 return (
-                  <Card key={key}>
+                  <Card key={group.groupKey}>
                     <CardContent className="p-4">
                       <div className="flex items-center justify-between">
                         <div>
