@@ -840,7 +840,7 @@ export default function OrderBoxing() {
               </Card>
             ) : (
               inBoxingGroups.map((group) => {
-                const key = group.order_item_id || group.product_id;
+                const key = group.groupKey;
                 return (
                   <Card key={key}>
                     <CardContent className="p-4">
@@ -918,7 +918,7 @@ export default function OrderBoxing() {
               </Card>
             ) : (
               readyForShipmentGroups.map((group) => {
-                const key = group.order_item_id || group.product_id;
+                const key = group.groupKey;
                 return (
                   <Card key={key}>
                     <CardContent className="p-4">
