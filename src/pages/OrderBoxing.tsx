@@ -56,15 +56,12 @@ interface OrderItemGroup {
   order_item_ids: string[];
 }
 
-interface ShipmentItem {
+interface ShippedBatch {
   id: string;
+  qr_code_data: string;
   quantity: number;
-  batch: {
-    id: string;
-    qr_code_data: string;
-    order_item_id: string | null;
-    product: { id: string; name: string; sku: string };
-  };
+  order_item_id: string | null;
+  product: { id: string; name: string; sku: string };
   order_item?: { needs_boxing: boolean } | null;
 }
 
@@ -75,7 +72,7 @@ interface Shipment {
   notes: string | null;
   created_at: string;
   sealed_at: string | null;
-  items: ShipmentItem[];
+  batches: ShippedBatch[];
 }
 
 export default function OrderBoxing() {
@@ -184,48 +181,48 @@ export default function OrderBoxing() {
 
       if (shipmentsError) throw shipmentsError;
 
-      const shipmentsWithItems: Shipment[] = [];
+      const shipmentsWithBatches: Shipment[] = [];
       for (const shipment of shipmentsData || []) {
-        const { data: itemsData } = await supabase
-          .from("shipment_items")
+        // Fetch batches that belong to this shipment
+        const { data: batchesData } = await supabase
+          .from("order_batches")
           .select(`
             id,
+            qr_code_data,
             quantity,
-            batch:order_batches(
-              id,
-              qr_code_data,
-              order_item_id,
-              product:products(id, name, sku)
-            )
+            order_item_id,
+            product:products(id, name, sku)
           `)
           .eq("shipment_id", shipment.id);
 
-        const itemsWithOrderItem: ShipmentItem[] = [];
-        for (const item of itemsData || []) {
+        const batchesWithOrderItem: ShippedBatch[] = [];
+        for (const batch of batchesData || []) {
           let orderItem = null;
-          if ((item.batch as any)?.order_item_id) {
+          if (batch.order_item_id) {
             const { data: oiData } = await supabase
               .from("order_items")
               .select("needs_boxing")
-              .eq("id", (item.batch as any).order_item_id)
+              .eq("id", batch.order_item_id)
               .single();
             orderItem = oiData;
           }
-          itemsWithOrderItem.push({
-            id: item.id,
-            quantity: item.quantity,
-            batch: item.batch as any,
+          batchesWithOrderItem.push({
+            id: batch.id,
+            qr_code_data: batch.qr_code_data || '',
+            quantity: batch.quantity,
+            order_item_id: batch.order_item_id,
+            product: batch.product as any,
             order_item: orderItem,
           });
         }
 
-        shipmentsWithItems.push({
+        shipmentsWithBatches.push({
           ...shipment,
-          items: itemsWithOrderItem,
+          batches: batchesWithOrderItem,
         });
       }
 
-      setShipments(shipmentsWithItems);
+      setShipments(shipmentsWithBatches);
     } catch (error: any) {
       console.error("Error fetching shipments:", error);
     }
@@ -317,7 +314,7 @@ export default function OrderBoxing() {
   const totalShippedBatches = batches.filter((b) => b.current_state === "shipped").reduce((sum, b) => sum + b.quantity, 0);
   const totalSelected = Array.from(productSelections.values()).reduce((a, b) => a + b, 0);
   const totalSelectedForShipment = Array.from(readyForShipmentSelections.values()).reduce((a, b) => a + b, 0);
-  const totalShipped = shipments.reduce((sum, s) => sum + s.items.reduce((iSum, item) => iSum + item.quantity, 0), 0);
+  const totalShipped = shipments.reduce((sum, s) => sum + s.batches.reduce((bSum, batch) => bSum + batch.quantity, 0), 0);
 
   // Filter boxes based on search query (box code, product SKU, or product name)
   const filteredReadyBoxGroups = receiveSearchQuery.trim()
@@ -559,7 +556,6 @@ export default function OrderBoxing() {
       if (shipmentError) throw shipmentError;
 
       // Process each order item selection (key is groupKey)
-      const shipmentItems: { shipment_id: string; batch_id: string; quantity: number }[] = [];
       let shippedCount = 0;
       
       for (const [key, quantity] of readyForShipmentSelections.entries()) {
@@ -573,12 +569,6 @@ export default function OrderBoxing() {
           const useQty = Math.min(batch.quantity, remainingQty);
           remainingQty -= useQty;
 
-          shipmentItems.push({
-            shipment_id: shipment.id,
-            batch_id: batch.id,
-            quantity: useQty,
-          });
-
           if (useQty === batch.quantity) {
             // Ship entire batch - check if we can consolidate with existing shipped batch
             const { data: existingBatch } = await supabase
@@ -588,6 +578,7 @@ export default function OrderBoxing() {
               .eq("product_id", batch.product_id)
               .eq("order_item_id", batch.order_item_id)
               .eq("current_state", "shipped")
+              .eq("shipment_id", shipment.id)
               .eq("is_terminated", false)
               .limit(1)
               .single();
@@ -606,15 +597,19 @@ export default function OrderBoxing() {
                 .update({ 
                   is_terminated: true, 
                   terminated_reason: "Consolidated into shipment",
-                  current_state: "shipped"
+                  current_state: "shipped",
+                  shipment_id: shipment.id,
                 })
                 .eq("id", batch.id);
               if (terminateError) throw terminateError;
             } else {
-              // No existing batch to consolidate, just update state
+              // No existing batch to consolidate, just update state and link to shipment
               const { error: updateError } = await supabase
                 .from("order_batches")
-                .update({ current_state: "shipped" })
+                .update({ 
+                  current_state: "shipped",
+                  shipment_id: shipment.id,
+                })
                 .eq("id", batch.id);
               if (updateError) throw updateError;
             }
@@ -640,7 +635,7 @@ export default function OrderBoxing() {
                 .eq("id", existingBatch.id);
               if (updateError) throw updateError;
             } else {
-              // Create new shipped batch
+              // Create new shipped batch linked to shipment
               const { data: qrCode, error: qrError } = await supabase.rpc("generate_extra_batch_code");
               if (qrError) throw qrError;
               
@@ -652,6 +647,7 @@ export default function OrderBoxing() {
                 current_state: "shipped",
                 quantity: useQty,
                 created_by: user?.id,
+                shipment_id: shipment.id,
               });
               if (insertError) throw insertError;
             }
@@ -668,11 +664,6 @@ export default function OrderBoxing() {
         }
       }
 
-      // Insert shipment items
-      if (shipmentItems.length > 0) {
-        const { error: itemsError } = await supabase.from("shipment_items").insert(shipmentItems);
-        if (itemsError) throw itemsError;
-      }
 
       toast.success(`Created Kartona ${shipment.shipment_code} with ${shippedCount} items`);
 
@@ -716,8 +707,8 @@ export default function OrderBoxing() {
     const rows: string[][] = [];
 
     shipments.forEach(shipment => {
-      const items = shipment.items || [];
-      if (items.length === 0) {
+      const batchList = shipment.batches || [];
+      if (batchList.length === 0) {
         rows.push([
           shipment.shipment_code,
           shipment.status,
@@ -727,17 +718,17 @@ export default function OrderBoxing() {
           '', '', '', ''
         ]);
       } else {
-        items.forEach((item, idx) => {
+        batchList.forEach((batch, idx) => {
           rows.push([
             idx === 0 ? shipment.shipment_code : '',
             idx === 0 ? shipment.status : '',
             idx === 0 ? format(new Date(shipment.created_at), 'yyyy-MM-dd HH:mm') : '',
             idx === 0 && shipment.sealed_at ? format(new Date(shipment.sealed_at), 'yyyy-MM-dd HH:mm') : '',
             idx === 0 ? (shipment.notes || '') : '',
-            item.batch?.product?.sku || '',
-            item.batch?.product?.name || '',
-            String(item.quantity),
-            (item.order_item?.needs_boxing ?? true) ? 'Yes' : 'No'
+            batch.product?.sku || '',
+            batch.product?.name || '',
+            String(batch.quantity),
+            (batch.order_item?.needs_boxing ?? true) ? 'Yes' : 'No'
           ]);
         });
       }
@@ -1258,11 +1249,11 @@ export default function OrderBoxing() {
                           variant="outline"
                           size="sm"
                           onClick={() => {
-                            const items = shipment.items.map(item => ({
-                              sku: item.batch?.product?.sku || '',
-                              name: item.batch?.product?.name || '',
-                              qty: item.quantity,
-                              needsBoxing: item.order_item?.needs_boxing ?? true,
+                            const items = shipment.batches.map(batch => ({
+                              sku: batch.product?.sku || '',
+                              name: batch.product?.name || '',
+                              qty: batch.quantity,
+                              needsBoxing: batch.order_item?.needs_boxing ?? true,
                             }));
                             const total = items.reduce((sum, i) => sum + i.qty, 0);
                             printKartonaLabel(shipment.shipment_code, items, total, shipment.notes || '');
@@ -1278,7 +1269,7 @@ export default function OrderBoxing() {
                     )}
                     <div className="space-y-1">
                       {(() => {
-                        // Group items by order_item_id
+                        // Group batches by order_item_id
                         const groupedItems = new Map<string, {
                           order_item_id: string;
                           product_sku: string;
@@ -1287,18 +1278,18 @@ export default function OrderBoxing() {
                           needs_boxing: boolean;
                         }>();
                         
-                        shipment.items.forEach(item => {
-                          const orderItemId = item.batch?.order_item_id || 'unknown';
+                        shipment.batches.forEach(batch => {
+                          const orderItemId = batch.order_item_id || 'unknown';
                           const existing = groupedItems.get(orderItemId);
                           if (existing) {
-                            existing.total_quantity += item.quantity;
+                            existing.total_quantity += batch.quantity;
                           } else {
                             groupedItems.set(orderItemId, {
                               order_item_id: orderItemId,
-                              product_sku: item.batch?.product?.sku || 'N/A',
-                              product_name: item.batch?.product?.name || 'Unknown',
-                              total_quantity: item.quantity,
-                              needs_boxing: item.order_item?.needs_boxing ?? true,
+                              product_sku: batch.product?.sku || 'N/A',
+                              product_name: batch.product?.name || 'Unknown',
+                              total_quantity: batch.quantity,
+                              needs_boxing: batch.order_item?.needs_boxing ?? true,
                             });
                           }
                         });
