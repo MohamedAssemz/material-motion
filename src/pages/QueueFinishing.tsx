@@ -79,11 +79,12 @@ export default function QueueFinishing() {
         return;
       }
 
-      // Fetch order details
+      // Fetch order details - only orders that are in_progress (started)
       const { data: ordersData, error: ordersError } = await supabase
         .from('orders')
         .select('id, order_number, created_at')
-        .in('id', allOrderIds);
+        .in('id', allOrderIds)
+        .eq('status', 'in_progress');
 
       if (ordersError) throw ordersError;
 

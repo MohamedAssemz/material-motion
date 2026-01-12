@@ -90,10 +90,12 @@ export default function QueueBoxing() {
       }
 
       // Get order details
+      // Only show orders that are in_progress (started)
       const { data: ordersData, error: ordersError } = await supabase
         .from('orders')
         .select('id, order_number, created_at')
-        .in('id', orderIds);
+        .in('id', orderIds)
+        .eq('status', 'in_progress');
 
       if (ordersError) throw ordersError;
 
