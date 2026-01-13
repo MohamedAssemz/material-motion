@@ -453,7 +453,8 @@ export default function OrderDetail() {
   
   // Check if order is pending based on order status, not batch states
   // This ensures the UI remains consistent even when all order batches are deleted/replaced by extra inventory
-  const isPendingOrder = order.status === "pending";
+  // Order can be "pending" or "waiting_for_rm" before being started
+  const isPendingOrder = order.status === "pending" || order.status === "waiting_for_rm";
 
   // Calculate phase stats
   const getPhaseStats = (inState: string, readyState?: string): PhaseStats => {
