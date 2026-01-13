@@ -144,16 +144,20 @@ export default function Orders() {
           const shippedCount = batches?.filter(b => b.current_state === 'shipped').reduce((sum, b) => sum + b.quantity, 0) || 0;
           const inProgressCount = batches?.filter(b => b.current_state !== 'pending_rm' && b.current_state !== 'shipped').reduce((sum, b) => sum + b.quantity, 0) || 0;
 
-          // Compute status based on order.status field
+          // Unit count comes from order_items, not batches
+          const unitCount = orderUnitCounts.get(order.id) || 0;
+
+          // Compute status based on actual fulfillment:
+          // - If all items are shipped, order is completed
+          // - If order.status is 'completed', order is completed
+          // - If order.status is 'in_progress' and not fully shipped, order is in_progress
+          // - Otherwise, order is pending
           let computed_status: OrderStatus = 'pending';
-          if (order.status === 'completed') {
+          if (order.status === 'completed' || (unitCount > 0 && shippedCount >= unitCount)) {
             computed_status = 'completed';
           } else if (order.status === 'in_progress') {
             computed_status = 'in_progress';
           }
-
-          // Unit count comes from order_items, not batches
-          const unitCount = orderUnitCounts.get(order.id) || 0;
 
           return {
             ...order,
