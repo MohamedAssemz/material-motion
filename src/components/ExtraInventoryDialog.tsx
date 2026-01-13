@@ -313,9 +313,47 @@ export function ExtraInventoryDialog({
               (orderItemReductions.get(orderItem.id) || 0) + assignQty
             );
             
-            // Create or update extra batch with this order_item_id
-            if (assignQty === batch.quantity && remainingToAssign === quantity) {
-              // FULL QUANTITY: Update existing batch
+            // Check if there's an existing RESERVED batch for this order_item, product, and box
+            // If so, increase its quantity instead of creating a new batch
+            const { data: existingReserved } = await supabase
+              .from('extra_batches')
+              .select('id, quantity')
+              .eq('order_id', orderId)
+              .eq('order_item_id', orderItem.id)
+              .eq('product_id', batch.product_id)
+              .eq('box_id', batch.box_id)
+              .eq('inventory_state', 'RESERVED')
+              .eq('current_state', batch.current_state)
+              .maybeSingle();
+            
+            if (existingReserved) {
+              // MERGE: Add quantity to existing reserved batch
+              const { error: updateError } = await supabase
+                .from('extra_batches')
+                .update({ quantity: existingReserved.quantity + assignQty })
+                .eq('id', existingReserved.id);
+
+              if (updateError) throw updateError;
+
+              selectedItems.push({
+                batch_id: existingReserved.id,
+                quantity: assignQty,
+                product_id: batch.product_id,
+              });
+              
+              // Reduce the source batch
+              if (assignQty === batch.quantity) {
+                // Delete the source batch entirely
+                await supabase.from('extra_batches').delete().eq('id', batchId);
+              } else {
+                // Reduce the source batch quantity
+                await supabase
+                  .from('extra_batches')
+                  .update({ quantity: batch.quantity - assignQty })
+                  .eq('id', batchId);
+              }
+            } else if (assignQty === batch.quantity && remainingToAssign === quantity) {
+              // FULL QUANTITY & NO EXISTING: Update existing batch to RESERVED
               const { error: updateError } = await supabase
                 .from('extra_batches')
                 .update({
@@ -333,7 +371,7 @@ export function ExtraInventoryDialog({
                 product_id: batch.product_id,
               });
             } else {
-              // PARTIAL or SPLIT: Create new batch for this portion
+              // PARTIAL or SPLIT & NO EXISTING: Create new reserved batch
               const { data: newBatchCode } = await supabase.rpc('generate_extra_batch_code');
               
               const { data: newBatch, error: insertError } = await supabase
@@ -367,17 +405,28 @@ export function ExtraInventoryDialog({
           }
         }
         
-        // If we split the batch, update the original batch's remaining quantity
+        // If we used a partial quantity and didn't merge into existing, update the original batch's remaining quantity
+        // Note: The merge case already handles reducing the source batch, so we only do this for the non-merge cases
         if (remainingToAssign < quantity) {
           const usedFromBatch = quantity - remainingToAssign;
-          if (usedFromBatch < batch.quantity) {
-            // Original batch still has remaining AVAILABLE quantity
+          // Only reduce if we didn't already handle it in the else branches above
+          // Check if the batch still exists and has remaining quantity
+          const { data: currentBatch } = await supabase
+            .from('extra_batches')
+            .select('quantity, inventory_state')
+            .eq('id', batchId)
+            .maybeSingle();
+          
+          if (currentBatch && currentBatch.inventory_state === 'AVAILABLE' && currentBatch.quantity > usedFromBatch) {
             const { error: updateError } = await supabase
               .from('extra_batches')
-              .update({ quantity: batch.quantity - usedFromBatch })
+              .update({ quantity: currentBatch.quantity - usedFromBatch })
               .eq('id', batchId);
 
             if (updateError) throw updateError;
+          } else if (currentBatch && currentBatch.inventory_state === 'AVAILABLE' && currentBatch.quantity <= usedFromBatch) {
+            // Delete the batch if we've used all of it
+            await supabase.from('extra_batches').delete().eq('id', batchId);
           }
         }
       }

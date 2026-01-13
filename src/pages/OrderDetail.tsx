@@ -253,14 +253,26 @@ export default function OrderDetail() {
         { phase: 'boxing', state: 'extra_boxing' },
       ];
 
+      // Get product IDs from order items to filter extra inventory
+      const orderProductIds = orderItems.map(oi => oi.product_id);
+
       const counts: Record<string, number> = {};
 
       for (const { phase, state } of states) {
-        const { data, error } = await supabase
+        // Build query for ALL available extra batches in this state
+        let query = supabase
           .from('extra_batches')
           .select('quantity')
           .eq('inventory_state', 'AVAILABLE')
           .eq('current_state', state);
+        
+        // Only filter by product if we have order items loaded
+        // This shows the TOTAL available for products in this order
+        if (orderProductIds.length > 0) {
+          query = query.in('product_id', orderProductIds);
+        }
+
+        const { data, error } = await query;
 
         if (!error && data) {
           counts[phase] = data.reduce((sum, b) => sum + b.quantity, 0);
@@ -439,9 +451,9 @@ export default function OrderDetail() {
   const flaggedCount = activeBatches.filter((b) => b.is_flagged).reduce((sum, b) => sum + b.quantity, 0);
   const redoCount = activeBatches.filter((b) => b.is_redo).reduce((sum, b) => sum + b.quantity, 0);
   
-  // Check if order is pending (all batches in pending_rm state)
-  const isPendingOrder = activeBatches.length > 0 && 
-    activeBatches.every((b) => b.current_state === "pending_rm");
+  // Check if order is pending based on order status, not batch states
+  // This ensures the UI remains consistent even when all order batches are deleted/replaced by extra inventory
+  const isPendingOrder = order.status === "pending";
 
   // Calculate phase stats
   const getPhaseStats = (inState: string, readyState?: string): PhaseStats => {
