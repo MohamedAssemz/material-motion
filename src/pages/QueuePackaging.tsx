@@ -77,30 +77,37 @@ export default function QueuePackaging() {
 
       if (extraError) throw extraError;
 
-      // Get unique order IDs that have packaging-related batches
-      const packagingOrderIds = new Set<string>();
+      // Get unique order IDs that have packaging-related batches (for active orders)
+      // OR any batches at all (for completed orders that went through this phase)
+      const activePackagingOrderIds = new Set<string>();
+      const allOrderIds = new Set<string>();
+      
       orderBatchesData?.forEach(b => {
-        if ((b.current_state === 'ready_for_packaging' || b.current_state === 'in_packaging') && b.order_id) {
-          packagingOrderIds.add(b.order_id);
+        if (b.order_id) {
+          allOrderIds.add(b.order_id);
+          if (b.current_state === 'ready_for_packaging' || b.current_state === 'in_packaging') {
+            activePackagingOrderIds.add(b.order_id);
+          }
         }
       });
       extraBatchesData?.forEach(b => {
         if (b.order_id) {
-          packagingOrderIds.add(b.order_id);
+          activePackagingOrderIds.add(b.order_id);
+          allOrderIds.add(b.order_id);
         }
       });
 
-      if (packagingOrderIds.size === 0) {
+      if (allOrderIds.size === 0) {
         setOrders([]);
         setLoading(false);
         return;
       }
 
-      // Fetch order details
+      // Fetch order details for all orders that have batches
       const { data: ordersData, error: ordersError } = await supabase
         .from('orders')
         .select('id, order_number, created_at, status')
-        .in('id', Array.from(packagingOrderIds));
+        .in('id', Array.from(allOrderIds));
 
       if (ordersError) throw ordersError;
 
@@ -108,7 +115,7 @@ export default function QueuePackaging() {
       const { data: orderItemsData } = await supabase
         .from('order_items')
         .select('order_id, quantity')
-        .in('order_id', Array.from(packagingOrderIds));
+        .in('order_id', Array.from(allOrderIds));
 
       const orderUnitCounts = new Map<string, number>();
       orderItemsData?.forEach(item => {
@@ -127,6 +134,7 @@ export default function QueuePackaging() {
           .reduce((sum: number, b: any) => sum + b.quantity, 0);
 
         const totalUnits = orderUnitCounts.get(order.id) || 0;
+        const isCompleted = order.status === 'completed' || (totalUnits > 0 && shippedCount >= totalUnits);
 
         return {
           id: order.id,
@@ -143,11 +151,12 @@ export default function QueuePackaging() {
             .reduce((sum: number, b: any) => sum + b.quantity, 0),
           total_units: totalUnits,
           shipped_count: shippedCount,
+          _isCompleted: isCompleted,
+          _hasActivePackaging: activePackagingOrderIds.has(order.id),
         };
-      }).filter((order: Order) => 
-        order.ready_for_packaging_count > 0 || 
-        order.packaging_count > 0 || 
-        order.extra_packaging_count > 0
+      }).filter((order: any) => 
+        // Include if has active packaging items OR is completed
+        order._hasActivePackaging || order._isCompleted
       );
 
       setOrders(ordersWithCounts);

@@ -58,7 +58,7 @@ export default function QueueManufacturing() {
 
   const fetchOrders = async () => {
     try {
-      // Fetch all order_batches in manufacturing-related states
+      // Fetch all order_batches
       const { data: orderBatchesData, error: batchError } = await supabase
         .from('order_batches')
         .select('order_id, current_state, quantity')
@@ -76,30 +76,37 @@ export default function QueueManufacturing() {
 
       if (extraError) throw extraError;
 
-      // Get unique order IDs that have manufacturing-related batches
-      const manufacturingOrderIds = new Set<string>();
+      // Get unique order IDs that have manufacturing-related batches (for active orders)
+      // OR any batches at all (for completed orders that went through this phase)
+      const activeManufacturingOrderIds = new Set<string>();
+      const allOrderIds = new Set<string>();
+      
       orderBatchesData?.forEach(b => {
-        if (b.current_state === 'in_manufacturing' && b.order_id) {
-          manufacturingOrderIds.add(b.order_id);
+        if (b.order_id) {
+          allOrderIds.add(b.order_id);
+          if (b.current_state === 'in_manufacturing') {
+            activeManufacturingOrderIds.add(b.order_id);
+          }
         }
       });
       extraBatchesData?.forEach(b => {
         if (b.order_id) {
-          manufacturingOrderIds.add(b.order_id);
+          activeManufacturingOrderIds.add(b.order_id);
+          allOrderIds.add(b.order_id);
         }
       });
 
-      if (manufacturingOrderIds.size === 0) {
+      if (allOrderIds.size === 0) {
         setOrders([]);
         setLoading(false);
         return;
       }
 
-      // Fetch order details
+      // Fetch order details for all orders that have batches
       const { data: ordersData, error: ordersError } = await supabase
         .from('orders')
         .select('id, order_number, created_at, status')
-        .in('id', Array.from(manufacturingOrderIds));
+        .in('id', Array.from(allOrderIds));
 
       if (ordersError) throw ordersError;
 
@@ -107,7 +114,7 @@ export default function QueueManufacturing() {
       const { data: orderItemsData } = await supabase
         .from('order_items')
         .select('order_id, quantity')
-        .in('order_id', Array.from(manufacturingOrderIds));
+        .in('order_id', Array.from(allOrderIds));
 
       const orderUnitCounts = new Map<string, number>();
       orderItemsData?.forEach(item => {
@@ -126,6 +133,7 @@ export default function QueueManufacturing() {
           .reduce((sum: number, b: any) => sum + b.quantity, 0);
 
         const totalUnits = orderUnitCounts.get(order.id) || 0;
+        const isCompleted = order.status === 'completed' || (totalUnits > 0 && shippedCount >= totalUnits);
 
         return {
           id: order.id,
@@ -139,10 +147,12 @@ export default function QueueManufacturing() {
             .reduce((sum: number, b: any) => sum + b.quantity, 0),
           total_units: totalUnits,
           shipped_count: shippedCount,
+          _isCompleted: isCompleted,
+          _hasActiveManufacturing: activeManufacturingOrderIds.has(order.id),
         };
-      }).filter((order: Order) => 
-        order.manufacturing_count > 0 || 
-        order.extra_manufacturing_count > 0
+      }).filter((order: any) => 
+        // Include if has active manufacturing items OR is completed
+        order._hasActiveManufacturing || order._isCompleted
       );
 
       setOrders(ordersWithCounts);

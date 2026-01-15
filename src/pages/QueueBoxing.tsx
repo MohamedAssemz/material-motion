@@ -85,30 +85,37 @@ export default function QueueBoxing() {
 
       if (extraError) throw extraError;
 
-      // Get unique order IDs that have boxing-related batches
-      const boxingOrderIds = new Set<string>();
+      // Get unique order IDs that have boxing-related batches (for active orders)
+      // OR any batches at all (for completed orders that went through this phase)
+      const activeBoxingOrderIds = new Set<string>();
+      const allOrderIds = new Set<string>();
+      
       batchesData?.forEach(b => {
-        if (['ready_for_boxing', 'in_boxing', 'ready_for_shipment', 'shipped'].includes(b.current_state) && b.order_id) {
-          boxingOrderIds.add(b.order_id);
+        if (b.order_id) {
+          allOrderIds.add(b.order_id);
+          if (['ready_for_boxing', 'in_boxing', 'ready_for_shipment', 'shipped'].includes(b.current_state)) {
+            activeBoxingOrderIds.add(b.order_id);
+          }
         }
       });
       extraBatchesData?.forEach(b => {
         if (b.order_id) {
-          boxingOrderIds.add(b.order_id);
+          activeBoxingOrderIds.add(b.order_id);
+          allOrderIds.add(b.order_id);
         }
       });
       
-      if (boxingOrderIds.size === 0) {
+      if (allOrderIds.size === 0) {
         setOrders([]);
         setLoading(false);
         return;
       }
 
-      // Get order details
+      // Get order details for all orders that have batches
       const { data: ordersData, error: ordersError } = await supabase
         .from('orders')
         .select('id, order_number, created_at, status')
-        .in('id', Array.from(boxingOrderIds));
+        .in('id', Array.from(allOrderIds));
 
       if (ordersError) throw ordersError;
 
@@ -116,7 +123,7 @@ export default function QueueBoxing() {
       const { data: orderItemsData } = await supabase
         .from('order_items')
         .select('order_id, quantity')
-        .in('order_id', Array.from(boxingOrderIds));
+        .in('order_id', Array.from(allOrderIds));
 
       const orderUnitCounts = new Map<string, number>();
       orderItemsData?.forEach(item => {
@@ -130,7 +137,7 @@ export default function QueueBoxing() {
       const { data: shipmentsData } = await supabase
         .from('shipments')
         .select('order_id')
-        .in('order_id', Array.from(boxingOrderIds));
+        .in('order_id', Array.from(allOrderIds));
 
       const shipmentCounts = new Map<string, number>();
       (shipmentsData || []).forEach((s: any) => {
@@ -146,6 +153,7 @@ export default function QueueBoxing() {
           .reduce((sum: number, b: any) => sum + b.quantity, 0);
 
         const totalUnits = orderUnitCounts.get(order.id) || 0;
+        const isCompleted = order.status === 'completed' || (totalUnits > 0 && shippedCount >= totalUnits);
 
         return {
           id: order.id,
@@ -165,13 +173,12 @@ export default function QueueBoxing() {
           extra_boxing_count: extraBatches
             .reduce((sum: number, b: any) => sum + b.quantity, 0),
           total_units: totalUnits,
+          _isCompleted: isCompleted,
+          _hasActiveBoxing: activeBoxingOrderIds.has(order.id),
         };
-      }).filter((order: Order) => 
-        order.ready_for_boxing_count > 0 || 
-        order.boxing_count > 0 || 
-        order.ready_for_shipment_count > 0 ||
-        order.shipped_count > 0 ||
-        order.extra_boxing_count > 0
+      }).filter((order: any) => 
+        // Include if has active boxing items OR is completed
+        order._hasActiveBoxing || order._isCompleted
       );
 
       setOrders(ordersWithCounts);

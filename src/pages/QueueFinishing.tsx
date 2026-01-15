@@ -77,30 +77,37 @@ export default function QueueFinishing() {
 
       if (extraError) throw extraError;
 
-      // Get unique order IDs that have finishing-related batches
-      const finishingOrderIds = new Set<string>();
+      // Get unique order IDs that have finishing-related batches (for active orders)
+      // OR any batches at all (for completed orders that went through this phase)
+      const activeFinishingOrderIds = new Set<string>();
+      const allOrderIds = new Set<string>();
+      
       orderBatchesData?.forEach(b => {
-        if ((b.current_state === 'ready_for_finishing' || b.current_state === 'in_finishing') && b.order_id) {
-          finishingOrderIds.add(b.order_id);
+        if (b.order_id) {
+          allOrderIds.add(b.order_id);
+          if (b.current_state === 'ready_for_finishing' || b.current_state === 'in_finishing') {
+            activeFinishingOrderIds.add(b.order_id);
+          }
         }
       });
       extraBatchesData?.forEach(b => {
         if (b.order_id) {
-          finishingOrderIds.add(b.order_id);
+          activeFinishingOrderIds.add(b.order_id);
+          allOrderIds.add(b.order_id);
         }
       });
 
-      if (finishingOrderIds.size === 0) {
+      if (allOrderIds.size === 0) {
         setOrders([]);
         setLoading(false);
         return;
       }
 
-      // Fetch order details
+      // Fetch order details for all orders that have batches
       const { data: ordersData, error: ordersError } = await supabase
         .from('orders')
         .select('id, order_number, created_at, status')
-        .in('id', Array.from(finishingOrderIds));
+        .in('id', Array.from(allOrderIds));
 
       if (ordersError) throw ordersError;
 
@@ -108,7 +115,7 @@ export default function QueueFinishing() {
       const { data: orderItemsData } = await supabase
         .from('order_items')
         .select('order_id, quantity')
-        .in('order_id', Array.from(finishingOrderIds));
+        .in('order_id', Array.from(allOrderIds));
 
       const orderUnitCounts = new Map<string, number>();
       orderItemsData?.forEach(item => {
@@ -127,6 +134,7 @@ export default function QueueFinishing() {
           .reduce((sum: number, b: any) => sum + b.quantity, 0);
 
         const totalUnits = orderUnitCounts.get(order.id) || 0;
+        const isCompleted = order.status === 'completed' || (totalUnits > 0 && shippedCount >= totalUnits);
 
         return {
           id: order.id,
@@ -143,11 +151,12 @@ export default function QueueFinishing() {
             .reduce((sum: number, b: any) => sum + b.quantity, 0),
           total_units: totalUnits,
           shipped_count: shippedCount,
+          _isCompleted: isCompleted,
+          _hasActiveFinishing: activeFinishingOrderIds.has(order.id),
         };
-      }).filter((order: Order) => 
-        order.ready_for_finishing_count > 0 || 
-        order.in_finishing_count > 0 || 
-        order.extra_finishing_count > 0
+      }).filter((order: any) => 
+        // Include if has active finishing items OR is completed
+        order._hasActiveFinishing || order._isCompleted
       );
 
       setOrders(ordersWithCounts);
