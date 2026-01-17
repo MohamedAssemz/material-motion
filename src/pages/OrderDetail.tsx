@@ -104,6 +104,8 @@ interface PhaseStats {
   waiting: number;
   inProgress: number;
   completed: number;
+  addedToExtra: number;
+  extraToRetrieve: number;
 }
 
 interface OrderItem {
@@ -138,6 +140,7 @@ export default function OrderDetail() {
   const [selectedExtraPhase, setSelectedExtraPhase] = useState<'manufacturing' | 'finishing' | 'packaging' | 'boxing'>('manufacturing');
   const [extraInventoryCounts, setExtraInventoryCounts] = useState<Record<string, number>>({});
   const [reservedExtraCounts, setReservedExtraCounts] = useState<Record<string, number>>({});
+  const [addedToExtraCounts, setAddedToExtraCounts] = useState<Record<string, number>>({});
 
   // Selection states for inline actions
   const [productSelections, setProductSelections] = useState<Map<string, number>>(new Map());
@@ -147,6 +150,7 @@ export default function OrderDetail() {
   useEffect(() => {
     fetchOrder();
     fetchReservedExtraCounts();
+    fetchAddedToExtraCounts();
 
     const channel = supabase
       .channel(`order-${id}`)
@@ -160,6 +164,7 @@ export default function OrderDetail() {
       .on("postgres_changes", { event: "*", schema: "public", table: "extra_batches" }, () => {
         fetchExtraInventoryCounts();
         fetchReservedExtraCounts();
+        fetchAddedToExtraCounts();
       })
       .subscribe();
 
@@ -334,6 +339,48 @@ export default function OrderDetail() {
     }
   };
 
+  const fetchAddedToExtraCounts = async () => {
+    if (!id) return;
+    
+    try {
+      // Fetch extra batches that were created FROM this order (AVAILABLE state, meaning moved out)
+      // These are items that were deducted from order_batches and moved to extra inventory
+      const { data, error } = await supabase
+        .from('extra_batches')
+        .select('current_state, quantity, order_id')
+        .eq('order_id', id)
+        .eq('inventory_state', 'AVAILABLE');
+
+      if (error) throw error;
+
+      // Map extra batch states to phase names
+      const phaseMap: Record<string, string> = {
+        'extra_manufacturing': 'manufacturing',
+        'extra_finishing': 'finishing',
+        'extra_packaging': 'packaging',
+        'extra_boxing': 'boxing',
+      };
+
+      const counts: Record<string, number> = {
+        manufacturing: 0,
+        finishing: 0,
+        packaging: 0,
+        boxing: 0,
+      };
+
+      (data || []).forEach((batch) => {
+        const phase = phaseMap[batch.current_state];
+        if (phase) {
+          counts[phase] += batch.quantity;
+        }
+      });
+
+      setAddedToExtraCounts(counts);
+    } catch (error) {
+      console.error('Error fetching added to extra counts:', error);
+    }
+  };
+
   const handleDeleteOrder = async () => {
     try {
       await supabase.from("order_batches").delete().eq("order_id", id);
@@ -465,7 +512,7 @@ export default function OrderDetail() {
   const isPendingOrder = order.status === "pending" || order.status === "waiting_for_rm";
 
   // Calculate phase stats
-  const getPhaseStats = (inState: string, readyState?: string): PhaseStats => {
+  const getPhaseStats = (inState: string, readyState: string | undefined, phaseName: string): PhaseStats => {
     const waiting = readyState
       ? activeBatches.filter((b) => b.current_state === readyState).reduce((sum, b) => sum + b.quantity, 0)
       : 0;
@@ -474,13 +521,15 @@ export default function OrderDetail() {
     const completed = activeBatches
       .filter((b) => getAllStates().indexOf(b.current_state as UnitState) > stateIndex)
       .reduce((sum, b) => sum + b.quantity, 0);
-    return { waiting, inProgress, completed };
+    const addedToExtra = addedToExtraCounts[phaseName] || 0;
+    const extraToRetrieve = reservedExtraCounts[phaseName] || 0;
+    return { waiting, inProgress, completed, addedToExtra, extraToRetrieve };
   };
 
-  const manufacturingStats = getPhaseStats("in_manufacturing", "pending_rm");
-  const finishingStats = getPhaseStats("in_finishing", "ready_for_finishing");
-  const packagingStats = getPhaseStats("in_packaging", "ready_for_packaging");
-  const boxingStats = getPhaseStats("in_boxing", "ready_for_boxing");
+  const manufacturingStats = getPhaseStats("in_manufacturing", "pending_rm", "manufacturing");
+  const finishingStats = getPhaseStats("in_finishing", "ready_for_finishing", "finishing");
+  const packagingStats = getPhaseStats("in_packaging", "ready_for_packaging", "packaging");
+  const boxingStats = getPhaseStats("in_boxing", "ready_for_boxing", "boxing");
 
   // Items grouped by product for each state
   const getProductsByState = (state: string) => {
@@ -717,19 +766,29 @@ export default function OrderDetail() {
                     </div>
                     <div className="space-y-1 text-sm">
                       <div className="flex justify-between">
+                        <span className="text-muted-foreground">Waiting</span>
+                        <span className="font-medium text-warning">{manufacturingStats.waiting}</span>
+                      </div>
+                      <div className="flex justify-between">
                         <span className="text-muted-foreground">In Progress</span>
                         <span className="font-medium text-primary">{manufacturingStats.inProgress}</span>
                       </div>
-                      {reservedExtraCounts.manufacturing > 0 && (
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">In Extra</span>
-                          <span className="font-medium text-amber-600">{reservedExtraCounts.manufacturing}</span>
-                        </div>
-                      )}
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Completed</span>
                         <span className="font-medium text-green-600">{manufacturingStats.completed}</span>
                       </div>
+                      {manufacturingStats.addedToExtra > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Added to Extra</span>
+                          <span className="font-medium text-orange-600">{manufacturingStats.addedToExtra}</span>
+                        </div>
+                      )}
+                      {manufacturingStats.extraToRetrieve > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Extra (to retrieve)</span>
+                          <span className="font-medium text-amber-600">{manufacturingStats.extraToRetrieve}</span>
+                        </div>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -753,16 +812,22 @@ export default function OrderDetail() {
                         <span className="text-muted-foreground">In Progress</span>
                         <span className="font-medium text-primary">{finishingStats.inProgress}</span>
                       </div>
-                      {reservedExtraCounts.finishing > 0 && (
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">In Extra</span>
-                          <span className="font-medium text-amber-600">{reservedExtraCounts.finishing}</span>
-                        </div>
-                      )}
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Completed</span>
                         <span className="font-medium text-green-600">{finishingStats.completed}</span>
                       </div>
+                      {finishingStats.addedToExtra > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Added to Extra</span>
+                          <span className="font-medium text-orange-600">{finishingStats.addedToExtra}</span>
+                        </div>
+                      )}
+                      {finishingStats.extraToRetrieve > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Extra (to retrieve)</span>
+                          <span className="font-medium text-amber-600">{finishingStats.extraToRetrieve}</span>
+                        </div>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -786,16 +851,22 @@ export default function OrderDetail() {
                         <span className="text-muted-foreground">In Progress</span>
                         <span className="font-medium text-primary">{packagingStats.inProgress}</span>
                       </div>
-                      {reservedExtraCounts.packaging > 0 && (
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">In Extra</span>
-                          <span className="font-medium text-amber-600">{reservedExtraCounts.packaging}</span>
-                        </div>
-                      )}
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Completed</span>
                         <span className="font-medium text-green-600">{packagingStats.completed}</span>
                       </div>
+                      {packagingStats.addedToExtra > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Added to Extra</span>
+                          <span className="font-medium text-orange-600">{packagingStats.addedToExtra}</span>
+                        </div>
+                      )}
+                      {packagingStats.extraToRetrieve > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Extra (to retrieve)</span>
+                          <span className="font-medium text-amber-600">{packagingStats.extraToRetrieve}</span>
+                        </div>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -819,16 +890,22 @@ export default function OrderDetail() {
                         <span className="text-muted-foreground">In Progress</span>
                         <span className="font-medium text-primary">{boxingStats.inProgress}</span>
                       </div>
-                      {reservedExtraCounts.boxing > 0 && (
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">In Extra</span>
-                          <span className="font-medium text-amber-600">{reservedExtraCounts.boxing}</span>
-                        </div>
-                      )}
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Completed</span>
                         <span className="font-medium text-green-600">{boxingStats.completed}</span>
                       </div>
+                      {boxingStats.addedToExtra > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Added to Extra</span>
+                          <span className="font-medium text-orange-600">{boxingStats.addedToExtra}</span>
+                        </div>
+                      )}
+                      {boxingStats.extraToRetrieve > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Extra (to retrieve)</span>
+                          <span className="font-medium text-amber-600">{boxingStats.extraToRetrieve}</span>
+                        </div>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
