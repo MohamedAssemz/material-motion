@@ -246,7 +246,7 @@ export function MoveToExtraDialog({
               .update({ quantity: existingBatch.quantity + useQty })
               .eq('id', existingBatch.id);
           } else {
-            // Create new extra batch
+            // Create new extra batch with source tracking
             await supabase
               .from('extra_batches')
               .insert({
@@ -258,6 +258,8 @@ export function MoveToExtraDialog({
                 box_id: selectedBoxId,
                 order_id: null,
                 order_item_id: null,
+                source_order_id: orderId,
+                source_order_item_id: batch.order_item_id,
                 created_by: userId,
               });
           }
