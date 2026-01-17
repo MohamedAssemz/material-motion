@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Dialog,
@@ -23,6 +23,13 @@ interface OrderItem {
   };
 }
 
+interface PendingBatch {
+  product_id: string;
+  product_name: string;
+  product_sku: string;
+  quantity: number;
+}
+
 interface StartOrderDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -39,6 +46,55 @@ export function StartOrderDialog({
   onOrderStarted,
 }: StartOrderDialogProps) {
   const [loading, setLoading] = useState(false);
+  const [pendingBatches, setPendingBatches] = useState<PendingBatch[]>([]);
+  const [fetchingBatches, setFetchingBatches] = useState(false);
+
+  // Fetch actual pending_rm batches when dialog opens
+  useEffect(() => {
+    if (open && orderId) {
+      fetchPendingBatches();
+    }
+  }, [open, orderId]);
+
+  const fetchPendingBatches = async () => {
+    setFetchingBatches(true);
+    try {
+      const { data: batches, error } = await supabase
+        .from('order_batches')
+        .select(`
+          id,
+          product_id,
+          quantity,
+          product:products(id, name, sku)
+        `)
+        .eq('order_id', orderId)
+        .eq('current_state', 'pending_rm');
+
+      if (error) throw error;
+
+      // Group by product_id and sum quantities
+      const grouped = (batches || []).reduce((acc: Record<string, PendingBatch>, batch: any) => {
+        const productId = batch.product_id;
+        if (!acc[productId]) {
+          acc[productId] = {
+            product_id: productId,
+            product_name: batch.product?.name || 'Unknown',
+            product_sku: batch.product?.sku || '',
+            quantity: 0,
+          };
+        }
+        acc[productId].quantity += batch.quantity;
+        return acc;
+      }, {});
+
+      setPendingBatches(Object.values(grouped));
+    } catch (error: any) {
+      console.error('Error fetching pending batches:', error);
+      toast.error('Failed to load pending batches');
+    } finally {
+      setFetchingBatches(false);
+    }
+  };
 
   const handleStartOrder = async () => {
     setLoading(true);
@@ -72,7 +128,7 @@ export function StartOrderDialog({
     }
   };
 
-  const totalQuantity = orderItems.reduce((sum, item) => sum + item.quantity, 0);
+  const totalQuantity = pendingBatches.reduce((sum, batch) => sum + batch.quantity, 0);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -90,21 +146,33 @@ export function StartOrderDialog({
         <div className="space-y-4">
           <div className="bg-muted rounded-lg p-4">
             <p className="text-sm font-medium mb-3">Items to Manufacture:</p>
-            <ul className="space-y-2">
-              {orderItems.map(item => (
-                <li key={item.id} className="text-sm flex justify-between items-center">
-                  <div>
-                    <span className="font-medium">{item.product.name}</span>
-                    <span className="text-muted-foreground ml-2 text-xs">{item.product.sku}</span>
-                  </div>
-                  <span className="font-semibold">{item.quantity}</span>
-                </li>
-              ))}
-            </ul>
-            <div className="mt-3 pt-3 border-t flex justify-between text-sm font-medium">
-              <span>Total</span>
-              <span>{totalQuantity} units</span>
-            </div>
+            {fetchingBatches ? (
+              <div className="flex items-center justify-center py-4">
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              </div>
+            ) : pendingBatches.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-2">
+                No pending items to manufacture
+              </p>
+            ) : (
+              <>
+                <ul className="space-y-2">
+                  {pendingBatches.map(batch => (
+                    <li key={batch.product_id} className="text-sm flex justify-between items-center">
+                      <div>
+                        <span className="font-medium">{batch.product_name}</span>
+                        <span className="text-muted-foreground ml-2 text-xs">{batch.product_sku}</span>
+                      </div>
+                      <span className="font-semibold">{batch.quantity}</span>
+                    </li>
+                  ))}
+                </ul>
+                <div className="mt-3 pt-3 border-t flex justify-between text-sm font-medium">
+                  <span>Total</span>
+                  <span>{totalQuantity} units</span>
+                </div>
+              </>
+            )}
           </div>
         </div>
 
@@ -112,7 +180,7 @@ export function StartOrderDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
             Cancel
           </Button>
-          <Button onClick={handleStartOrder} disabled={loading}>
+          <Button onClick={handleStartOrder} disabled={loading || fetchingBatches || pendingBatches.length === 0}>
             {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
             Start Manufacturing
           </Button>
