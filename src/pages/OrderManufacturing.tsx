@@ -827,24 +827,26 @@ export default function OrderManufacturing() {
           />
         </TabsContent>
 
-        <TabsContent value="completed" className="space-y-4">
+        <TabsContent value="completed" className="space-y-6">
           {/* Added to Extra Inventory Section */}
           {addedToExtraItems.length > 0 && (
             <div className="space-y-3">
-              <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                <Package className="h-4 w-4" />
-                Added to Extra Inventory
-              </h3>
+              <div className="flex items-center gap-2 pb-2 border-b border-orange-200 dark:border-orange-900">
+                <Package className="h-4 w-4 text-orange-600" />
+                <h3 className="text-sm font-semibold text-orange-700 dark:text-orange-400">
+                  Added to Extra Inventory
+                </h3>
+              </div>
               {addedToExtraItems.map(item => (
-                <Card key={item.product_id}>
+                <Card key={item.product_id} className="border-orange-200 dark:border-orange-900 bg-orange-50 dark:bg-orange-950/20">
                   <CardContent className="p-4">
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="font-medium">{item.product_name}</p>
                         <p className="text-sm text-muted-foreground">{item.product_sku}</p>
                       </div>
-                      <Badge variant="outline" className="border-orange-500 text-orange-600">
-                        {item.quantity} added to extra
+                      <Badge className="bg-orange-500 hover:bg-orange-600 text-white">
+                        {item.quantity} to extra
                       </Badge>
                     </div>
                   </CardContent>
@@ -854,34 +856,36 @@ export default function OrderManufacturing() {
           )}
 
           {/* Moved to Next Phase Section */}
-          <div className="space-y-3">
-            {addedToExtraItems.length > 0 && completedGroups.length > 0 && (
-              <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                <CheckCircle className="h-4 w-4" />
-                Moved to Next Phase
-              </h3>
-            )}
-            {completedGroups.length === 0 && addedToExtraItems.length === 0 ? (
-              <Card><CardContent className="p-8 text-center text-muted-foreground">No completed items yet</CardContent></Card>
-            ) : (
-              completedGroups.map(group => {
+          {completedGroups.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 pb-2 border-b border-green-200 dark:border-green-900">
+                <CheckCircle className="h-4 w-4 text-green-600" />
+                <h3 className="text-sm font-semibold text-green-700 dark:text-green-400">
+                  Moved to Next Phase
+                </h3>
+              </div>
+              {completedGroups.map(group => {
                 const totalQty = group.batches.reduce((sum, b) => sum + b.quantity, 0);
                 return (
-                  <Card key={group.groupKey}>
+                  <Card key={group.groupKey} className="border-green-200 dark:border-green-900 bg-green-50 dark:bg-green-950/20">
                     <CardContent className="p-4">
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="font-medium">{group.product_name}</p>
                           <p className="text-sm text-muted-foreground">{group.product_sku}</p>
                         </div>
-                        <Badge variant="default" className="bg-green-600">{totalQty} completed</Badge>
+                        <Badge className="bg-green-600 hover:bg-green-700 text-white">{totalQty} completed</Badge>
                       </div>
                     </CardContent>
                   </Card>
                 );
-              })
-            )}
-          </div>
+              })}
+            </div>
+          )}
+
+          {completedGroups.length === 0 && addedToExtraItems.length === 0 && (
+            <Card><CardContent className="p-8 text-center text-muted-foreground">No completed items yet</CardContent></Card>
+          )}
         </TabsContent>
       </Tabs>
 
