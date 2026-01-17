@@ -68,6 +68,97 @@ export type Database = {
         }
         Relationships: []
       }
+      extra_batch_history: {
+        Row: {
+          consuming_order_id: string | null
+          consuming_order_item_id: string | null
+          created_at: string
+          event_type: string
+          extra_batch_id: string | null
+          from_state: string | null
+          id: string
+          notes: string | null
+          performed_by: string | null
+          product_id: string | null
+          quantity: number
+          source_order_id: string | null
+          source_order_item_id: string | null
+        }
+        Insert: {
+          consuming_order_id?: string | null
+          consuming_order_item_id?: string | null
+          created_at?: string
+          event_type: string
+          extra_batch_id?: string | null
+          from_state?: string | null
+          id?: string
+          notes?: string | null
+          performed_by?: string | null
+          product_id?: string | null
+          quantity: number
+          source_order_id?: string | null
+          source_order_item_id?: string | null
+        }
+        Update: {
+          consuming_order_id?: string | null
+          consuming_order_item_id?: string | null
+          created_at?: string
+          event_type?: string
+          extra_batch_id?: string | null
+          from_state?: string | null
+          id?: string
+          notes?: string | null
+          performed_by?: string | null
+          product_id?: string | null
+          quantity?: number
+          source_order_id?: string | null
+          source_order_item_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "extra_batch_history_consuming_order_id_fkey"
+            columns: ["consuming_order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "extra_batch_history_consuming_order_item_id_fkey"
+            columns: ["consuming_order_item_id"]
+            isOneToOne: false
+            referencedRelation: "order_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "extra_batch_history_extra_batch_id_fkey"
+            columns: ["extra_batch_id"]
+            isOneToOne: false
+            referencedRelation: "extra_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "extra_batch_history_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "extra_batch_history_source_order_id_fkey"
+            columns: ["source_order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "extra_batch_history_source_order_item_id_fkey"
+            columns: ["source_order_item_id"]
+            isOneToOne: false
+            referencedRelation: "order_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       extra_batches: {
         Row: {
           box_id: string
@@ -81,8 +172,6 @@ export type Database = {
           product_id: string
           qr_code_data: string | null
           quantity: number
-          source_order_id: string | null
-          source_order_item_id: string | null
           updated_at: string
         }
         Insert: {
@@ -97,8 +186,6 @@ export type Database = {
           product_id: string
           qr_code_data?: string | null
           quantity?: number
-          source_order_id?: string | null
-          source_order_item_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -113,8 +200,6 @@ export type Database = {
           product_id?: string
           qr_code_data?: string | null
           quantity?: number
-          source_order_id?: string | null
-          source_order_item_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -144,20 +229,6 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "extra_batches_source_order_id_fkey"
-            columns: ["source_order_id"]
-            isOneToOne: false
-            referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "extra_batches_source_order_item_id_fkey"
-            columns: ["source_order_item_id"]
-            isOneToOne: false
-            referencedRelation: "order_items"
             referencedColumns: ["id"]
           },
         ]
