@@ -1085,14 +1085,20 @@ export default function OrderBoxing() {
         <TabsContent value="process" className="space-y-4">
           {canManage && (
             <Card>
-              <CardContent className="p-4 flex items-center justify-between">
+              <CardContent className="p-4 flex items-center justify-between flex-wrap gap-3">
                 <Badge variant="secondary" className="text-lg px-3 py-1">
                   {totalSelected} selected
                 </Badge>
-                <Button onClick={() => setMoveToReadyDialogOpen(true)} disabled={totalSelected === 0}>
-                  <Package className="h-4 w-4 mr-2" />
-                  Move to Ready for Shipment
-                </Button>
+                <div className="flex gap-2">
+                  <Button variant="secondary" onClick={() => setMoveToExtraDialogOpen(true)} disabled={totalSelected === 0}>
+                    <Package className="h-4 w-4 mr-2" />
+                    Assign to Extra
+                  </Button>
+                  <Button onClick={() => setMoveToReadyDialogOpen(true)} disabled={totalSelected === 0}>
+                    <Package className="h-4 w-4 mr-2" />
+                    Move to Ready for Shipment
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           )}

@@ -622,6 +622,7 @@ export default function OrderPackaging() {
               <CardContent className="p-4 flex items-center justify-between flex-wrap gap-3">
                 <Badge variant="secondary" className="text-lg px-3 py-1">{totalSelected} selected</Badge>
                 <div className="flex gap-2">
+                  <Button variant="secondary" onClick={() => setMoveToExtraDialogOpen(true)} disabled={totalSelected === 0}><Package className="h-4 w-4 mr-2" />Assign to Extra</Button>
                   <Button variant="outline" onClick={handleOpenAssignDialog} disabled={totalSelected === 0}><Box className="h-4 w-4 mr-2" />Assign to Box</Button>
                   <Button onClick={() => setBoxDirectlyDialogOpen(true)} disabled={totalSelected === 0}><Zap className="h-4 w-4 mr-2" />Box Directly</Button>
                 </div>
