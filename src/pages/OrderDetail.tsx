@@ -146,7 +146,6 @@ export default function OrderDetail() {
 
   useEffect(() => {
     fetchOrder();
-    fetchExtraInventoryCounts();
     fetchReservedExtraCounts();
 
     const channel = supabase
@@ -169,6 +168,16 @@ export default function OrderDetail() {
       supabase.removeChannel(extraChannel);
     };
   }, [id]);
+
+  // Fetch extra inventory counts only when orderItems are loaded
+  useEffect(() => {
+    if (orderItems.length > 0) {
+      fetchExtraInventoryCounts();
+    } else {
+      // Reset counts if no order items
+      setExtraInventoryCounts({});
+    }
+  }, [orderItems]);
 
   const fetchOrder = async () => {
     try {
@@ -256,23 +265,22 @@ export default function OrderDetail() {
       // Get product IDs from order items to filter extra inventory
       const orderProductIds = orderItems.map(oi => oi.product_id);
 
+      // If no order items, return empty counts
+      if (orderProductIds.length === 0) {
+        setExtraInventoryCounts({});
+        return;
+      }
+
       const counts: Record<string, number> = {};
 
       for (const { phase, state } of states) {
-        // Build query for ALL available extra batches in this state
-        let query = supabase
+        // Only fetch extra batches that match products in this order
+        const { data, error } = await supabase
           .from('extra_batches')
           .select('quantity')
           .eq('inventory_state', 'AVAILABLE')
-          .eq('current_state', state);
-        
-        // Only filter by product if we have order items loaded
-        // This shows the TOTAL available for products in this order
-        if (orderProductIds.length > 0) {
-          query = query.in('product_id', orderProductIds);
-        }
-
-        const { data, error } = await query;
+          .eq('current_state', state)
+          .in('product_id', orderProductIds);
 
         if (!error && data) {
           counts[phase] = data.reduce((sum, b) => sum + b.quantity, 0);
