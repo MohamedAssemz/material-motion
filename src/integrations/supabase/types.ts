@@ -81,6 +81,8 @@ export type Database = {
           product_id: string
           qr_code_data: string | null
           quantity: number
+          source_order_id: string | null
+          source_order_item_id: string | null
           updated_at: string
         }
         Insert: {
@@ -95,6 +97,8 @@ export type Database = {
           product_id: string
           qr_code_data?: string | null
           quantity?: number
+          source_order_id?: string | null
+          source_order_item_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -109,6 +113,8 @@ export type Database = {
           product_id?: string
           qr_code_data?: string | null
           quantity?: number
+          source_order_id?: string | null
+          source_order_item_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -138,6 +144,20 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "extra_batches_source_order_id_fkey"
+            columns: ["source_order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "extra_batches_source_order_item_id_fkey"
+            columns: ["source_order_item_id"]
+            isOneToOne: false
+            referencedRelation: "order_items"
             referencedColumns: ["id"]
           },
         ]
