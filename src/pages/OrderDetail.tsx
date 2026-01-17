@@ -343,22 +343,22 @@ export default function OrderDetail() {
     if (!id) return;
     
     try {
-      // Fetch extra batches that were created FROM this order (AVAILABLE state, meaning moved out)
-      // These are items that were deducted from order_batches and moved to extra inventory
+      // Fetch from extra_batch_history - CREATED events where this order was the source
+      // This tracks items moved from this order to extra inventory permanently
       const { data, error } = await supabase
-        .from('extra_batches')
-        .select('current_state, quantity, order_id')
-        .eq('order_id', id)
-        .eq('inventory_state', 'AVAILABLE');
+        .from('extra_batch_history')
+        .select('from_state, quantity')
+        .eq('event_type', 'CREATED')
+        .eq('source_order_id', id);
 
       if (error) throw error;
 
-      // Map extra batch states to phase names
+      // Map from_state to phase names
       const phaseMap: Record<string, string> = {
-        'extra_manufacturing': 'manufacturing',
-        'extra_finishing': 'finishing',
-        'extra_packaging': 'packaging',
-        'extra_boxing': 'boxing',
+        'in_manufacturing': 'manufacturing',
+        'in_finishing': 'finishing',
+        'in_packaging': 'packaging',
+        'in_boxing': 'boxing',
       };
 
       const counts: Record<string, number> = {
@@ -368,10 +368,10 @@ export default function OrderDetail() {
         boxing: 0,
       };
 
-      (data || []).forEach((batch) => {
-        const phase = phaseMap[batch.current_state];
+      (data || []).forEach((record) => {
+        const phase = phaseMap[record.from_state || ''];
         if (phase) {
-          counts[phase] += batch.quantity;
+          counts[phase] += record.quantity;
         }
       });
 

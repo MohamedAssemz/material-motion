@@ -245,9 +245,21 @@ export function MoveToExtraDialog({
               .from('extra_batches')
               .update({ quantity: existingBatch.quantity + useQty })
               .eq('id', existingBatch.id);
+
+            // Log CREATED event in history (even for merge, we track the source)
+            await supabase.from('extra_batch_history').insert({
+              extra_batch_id: existingBatch.id,
+              event_type: 'CREATED',
+              quantity: useQty,
+              from_state: phase,
+              source_order_id: orderId,
+              source_order_item_id: batch.order_item_id,
+              product_id: selection.product_id,
+              performed_by: userId,
+            });
           } else {
-            // Create new extra batch with source tracking
-            await supabase
+            // Create new extra batch
+            const { data: newExtraBatch } = await supabase
               .from('extra_batches')
               .insert({
                 qr_code_data: extraBatchCode || `EB-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
@@ -258,10 +270,24 @@ export function MoveToExtraDialog({
                 box_id: selectedBoxId,
                 order_id: null,
                 order_item_id: null,
+                created_by: userId,
+              })
+              .select('id')
+              .single();
+
+            // Log CREATED event in history
+            if (newExtraBatch) {
+              await supabase.from('extra_batch_history').insert({
+                extra_batch_id: newExtraBatch.id,
+                event_type: 'CREATED',
+                quantity: useQty,
+                from_state: phase,
                 source_order_id: orderId,
                 source_order_item_id: batch.order_item_id,
-                created_by: userId,
+                product_id: selection.product_id,
+                performed_by: userId,
               });
+            }
           }
 
           // Update or delete the order batch

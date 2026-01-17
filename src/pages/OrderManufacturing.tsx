@@ -94,6 +94,7 @@ export default function OrderManufacturing() {
   const [order, setOrder] = useState<Order | null>(null);
   const [batches, setBatches] = useState<Batch[]>([]);
   const [completedBatches, setCompletedBatches] = useState<Batch[]>([]);
+  const [addedToExtraItems, setAddedToExtraItems] = useState<Array<{ product_id: string; product_name: string; product_sku: string; quantity: number }>>([]);
   const [loading, setLoading] = useState(true);
   
   // Selection & action states
@@ -119,10 +120,12 @@ export default function OrderManufacturing() {
 
   useEffect(() => {
     fetchData();
+    fetchAddedToExtra();
     const channel = supabase
       .channel(`order-manufacturing-${id}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'order_batches', filter: `order_id=eq.${id}` }, () => {
         fetchData();
+        fetchAddedToExtra();
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
@@ -155,6 +158,39 @@ export default function OrderManufacturing() {
       toast.error(error.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchAddedToExtra = async () => {
+    if (!id) return;
+    try {
+      const { data, error } = await supabase
+        .from('extra_batch_history')
+        .select('quantity, product_id, products(name, sku)')
+        .eq('event_type', 'CREATED')
+        .eq('source_order_id', id)
+        .eq('from_state', 'in_manufacturing');
+
+      if (error) throw error;
+
+      // Group by product
+      const productMap = new Map<string, { product_id: string; product_name: string; product_sku: string; quantity: number }>();
+      (data || []).forEach((record: any) => {
+        const existing = productMap.get(record.product_id);
+        if (existing) {
+          existing.quantity += record.quantity;
+        } else {
+          productMap.set(record.product_id, {
+            product_id: record.product_id,
+            product_name: record.products?.name || 'Unknown',
+            product_sku: record.products?.sku || 'N/A',
+            quantity: record.quantity,
+          });
+        }
+      });
+      setAddedToExtraItems(Array.from(productMap.values()));
+    } catch (error) {
+      console.error('Error fetching added to extra:', error);
     }
   };
 
@@ -792,8 +828,40 @@ export default function OrderManufacturing() {
         </TabsContent>
 
         <TabsContent value="completed" className="space-y-4">
+          {/* Added to Extra Inventory Section */}
+          {addedToExtraItems.length > 0 && (
+            <div className="space-y-3">
+              <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <Package className="h-4 w-4" />
+                Added to Extra Inventory
+              </h3>
+              {addedToExtraItems.map(item => (
+                <Card key={item.product_id}>
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium">{item.product_name}</p>
+                        <p className="text-sm text-muted-foreground">{item.product_sku}</p>
+                      </div>
+                      <Badge variant="outline" className="border-orange-500 text-orange-600">
+                        {item.quantity} added to extra
+                      </Badge>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+
+          {/* Moved to Next Phase Section */}
           <div className="space-y-3">
-            {completedGroups.length === 0 ? (
+            {addedToExtraItems.length > 0 && completedGroups.length > 0 && (
+              <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <CheckCircle className="h-4 w-4" />
+                Moved to Next Phase
+              </h3>
+            )}
+            {completedGroups.length === 0 && addedToExtraItems.length === 0 ? (
               <Card><CardContent className="p-8 text-center text-muted-foreground">No completed items yet</CardContent></Card>
             ) : (
               completedGroups.map(group => {

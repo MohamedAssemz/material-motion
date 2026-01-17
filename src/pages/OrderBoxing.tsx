@@ -84,6 +84,7 @@ export default function OrderBoxing() {
   const [order, setOrder] = useState<Order | null>(null);
   const [batches, setBatches] = useState<Batch[]>([]);
   const [shipments, setShipments] = useState<Shipment[]>([]);
+  const [addedToExtraItems, setAddedToExtraItems] = useState<Array<{ product_id: string; product_name: string; product_sku: string; quantity: number }>>([]);
   const [loading, setLoading] = useState(true);
   
   // Get default tab from URL query params
@@ -107,10 +108,12 @@ export default function OrderBoxing() {
 
   useEffect(() => {
     fetchData();
+    fetchAddedToExtra();
     const channel = supabase
       .channel(`order-boxing-${id}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "order_batches", filter: `order_id=eq.${id}` }, () => {
         fetchData();
+        fetchAddedToExtra();
       })
       .subscribe();
     return () => {
@@ -170,6 +173,38 @@ export default function OrderBoxing() {
       toast.error(error.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchAddedToExtra = async () => {
+    if (!id) return;
+    try {
+      const { data, error } = await supabase
+        .from('extra_batch_history')
+        .select('quantity, product_id, products(name, sku)')
+        .eq('event_type', 'CREATED')
+        .eq('source_order_id', id)
+        .eq('from_state', 'in_boxing');
+
+      if (error) throw error;
+
+      const productMap = new Map<string, { product_id: string; product_name: string; product_sku: string; quantity: number }>();
+      (data || []).forEach((record: any) => {
+        const existing = productMap.get(record.product_id);
+        if (existing) {
+          existing.quantity += record.quantity;
+        } else {
+          productMap.set(record.product_id, {
+            product_id: record.product_id,
+            product_name: record.products?.name || 'Unknown',
+            product_sku: record.products?.sku || 'N/A',
+            quantity: record.quantity,
+          });
+        }
+      });
+      setAddedToExtraItems(Array.from(productMap.values()));
+    } catch (error) {
+      console.error('Error fetching added to extra:', error);
     }
   };
 
