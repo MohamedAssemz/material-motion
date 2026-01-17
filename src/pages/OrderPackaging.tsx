@@ -30,6 +30,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { ExtraItemsTab } from '@/components/ExtraItemsTab';
+import { MoveToExtraDialog } from '@/components/MoveToExtraDialog';
 import {
   Select,
   SelectContent,
@@ -98,6 +99,7 @@ export default function OrderPackaging() {
   const [acceptDialogOpen, setAcceptDialogOpen] = useState(false);
   const [boxAssignDialogOpen, setBoxAssignDialogOpen] = useState(false);
   const [boxDirectlyDialogOpen, setBoxDirectlyDialogOpen] = useState(false);
+  const [moveToExtraDialogOpen, setMoveToExtraDialogOpen] = useState(false);
   const [boxSearchCode, setBoxSearchCode] = useState('');
   const [selectedBox, setSelectedBox] = useState<{ id: string; box_code: string } | null>(null);
   const [availableBoxes, setAvailableBoxes] = useState<Array<{ id: string; box_code: string }>>([]);
@@ -260,6 +262,25 @@ export default function OrderPackaging() {
   const totalReadyForPackaging = readyBoxGroups.reduce((sum, g) => sum + g.totalQty, 0);
   const totalInPackaging = inPackagingGroups.reduce((sum, g) => sum + g.quantity, 0);
   const totalSelected = Array.from(productSelections.values()).reduce((a, b) => a + b, 0);
+
+  // Prepare selections for MoveToExtraDialog
+  const extraSelections = inPackagingGroups
+    .filter(g => productSelections.get(g.groupKey) && productSelections.get(g.groupKey)! > 0)
+    .map(g => ({
+      groupKey: g.groupKey,
+      product_id: g.product_id,
+      product_name: g.product_name,
+      product_sku: g.product_sku,
+      quantity: productSelections.get(g.groupKey) || 0,
+      order_item_ids: g.order_item_ids,
+      batches: g.batches.map(b => ({
+        id: b.id,
+        quantity: b.quantity,
+        current_state: b.current_state,
+        order_item_id: b.order_item_id,
+      })),
+    }))
+    .filter(s => s.quantity > 0);
 
   // Group completed items by product + needs_boxing
   const completedGroups: OrderItemGroup[] = [];
@@ -778,6 +799,21 @@ export default function OrderPackaging() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Move to Extra Dialog */}
+      <MoveToExtraDialog
+        open={moveToExtraDialogOpen}
+        onOpenChange={setMoveToExtraDialogOpen}
+        orderId={id!}
+        phase="in_packaging"
+        selections={extraSelections}
+        totalQuantity={totalSelected}
+        onSuccess={() => {
+          setProductSelections(new Map());
+          fetchData();
+        }}
+        userId={user?.id}
+      />
     </div>
   );
 }

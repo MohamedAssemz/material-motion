@@ -438,6 +438,7 @@ export type Database = {
       order_items: {
         Row: {
           created_at: string | null
+          deducted_to_extra: number
           id: string
           needs_boxing: boolean
           order_id: string
@@ -446,6 +447,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          deducted_to_extra?: number
           id?: string
           needs_boxing?: boolean
           order_id: string
@@ -454,6 +456,7 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          deducted_to_extra?: number
           id?: string
           needs_boxing?: boolean
           order_id?: string

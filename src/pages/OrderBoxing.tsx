@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { ArrowLeft, Box, Loader2, QrCode, CheckSquare, Truck, Printer, Package, CheckCircle, Download, Search } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { ExtraItemsTab } from '@/components/ExtraItemsTab';
+import { MoveToExtraDialog } from '@/components/MoveToExtraDialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { format } from "date-fns";
@@ -97,6 +98,7 @@ export default function OrderBoxing() {
   const [acceptDialogOpen, setAcceptDialogOpen] = useState(false);
   const [moveToReadyDialogOpen, setMoveToReadyDialogOpen] = useState(false);
   const [kartonaDialogOpen, setKartonaDialogOpen] = useState(false);
+  const [moveToExtraDialogOpen, setMoveToExtraDialogOpen] = useState(false);
   const [shipmentNotes, setShipmentNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -315,6 +317,25 @@ export default function OrderBoxing() {
   const totalSelected = Array.from(productSelections.values()).reduce((a, b) => a + b, 0);
   const totalSelectedForShipment = Array.from(readyForShipmentSelections.values()).reduce((a, b) => a + b, 0);
   const totalShipped = shipments.reduce((sum, s) => sum + s.batches.reduce((bSum, batch) => bSum + batch.quantity, 0), 0);
+
+  // Prepare selections for MoveToExtraDialog
+  const extraSelections = inBoxingGroups
+    .filter(g => productSelections.get(g.groupKey) && productSelections.get(g.groupKey)! > 0)
+    .map(g => ({
+      groupKey: g.groupKey,
+      product_id: g.product_id,
+      product_name: g.product_name,
+      product_sku: g.product_sku,
+      quantity: productSelections.get(g.groupKey) || 0,
+      order_item_ids: g.order_item_ids,
+      batches: g.batches.map(b => ({
+        id: b.id,
+        quantity: b.quantity,
+        current_state: b.current_state,
+        order_item_id: b.order_item_id,
+      })),
+    }))
+    .filter(s => s.quantity > 0);
 
   // Filter boxes based on search query (box code, product SKU, or product name)
   const filteredReadyBoxGroups = receiveSearchQuery.trim()
@@ -1400,6 +1421,21 @@ export default function OrderBoxing() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Move to Extra Dialog */}
+      <MoveToExtraDialog
+        open={moveToExtraDialogOpen}
+        onOpenChange={setMoveToExtraDialogOpen}
+        orderId={id!}
+        phase="in_boxing"
+        selections={extraSelections}
+        totalQuantity={totalSelected}
+        onSuccess={() => {
+          setProductSelections(new Map());
+          fetchData();
+        }}
+        userId={user?.id}
+      />
     </div>
   );
 }

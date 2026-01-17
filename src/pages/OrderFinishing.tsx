@@ -18,7 +18,8 @@ import {
   QrCode, 
   Plus,
   Search,
-  CheckSquare
+  CheckSquare,
+  Package
 } from 'lucide-react';
 import {
   Dialog,
@@ -28,6 +29,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { ExtraItemsTab } from '@/components/ExtraItemsTab';
+import { MoveToExtraDialog } from '@/components/MoveToExtraDialog';
 import {
   Select,
   SelectContent,
@@ -102,6 +104,7 @@ export default function OrderFinishing() {
   // Dialog states
   const [acceptDialogOpen, setAcceptDialogOpen] = useState(false);
   const [boxAssignDialogOpen, setBoxAssignDialogOpen] = useState(false);
+  const [moveToExtraDialogOpen, setMoveToExtraDialogOpen] = useState(false);
   const [boxSearchCode, setBoxSearchCode] = useState('');
   const [selectedBox, setSelectedBox] = useState<{ id: string; box_code: string } | null>(null);
   const [availableBoxes, setAvailableBoxes] = useState<Array<{ id: string; box_code: string }>>([]);
@@ -327,6 +330,25 @@ export default function OrderFinishing() {
   const totalInFinishing = inFinishingGroups.reduce((sum, g) => sum + g.quantity, 0);
   const totalCompleted = completedGroups.reduce((sum, g) => sum + g.quantity, 0);
   const totalSelected = Array.from(productSelections.values()).reduce((a, b) => a + b, 0);
+
+  // Prepare selections for MoveToExtraDialog - only items in "in_finishing" state
+  const extraSelections = inFinishingGroups
+    .filter(g => productSelections.get(g.groupKey) && productSelections.get(g.groupKey)! > 0)
+    .map(g => ({
+      groupKey: g.groupKey,
+      product_id: g.product_id,
+      product_name: g.product_name,
+      product_sku: g.product_sku,
+      quantity: productSelections.get(g.groupKey) || 0,
+      order_item_ids: g.order_item_ids,
+      batches: g.batches.map(b => ({
+        id: b.id,
+        quantity: b.quantity,
+        current_state: b.current_state,
+        order_item_id: b.order_item_id,
+      })),
+    }))
+    .filter(s => s.quantity > 0);
 
   // Filter boxes based on search query (box code, product SKU, or product name)
   const filteredReadyBoxGroups = receiveSearchQuery.trim()
@@ -692,10 +714,21 @@ export default function OrderFinishing() {
             <Card>
               <CardContent className="p-4 flex items-center justify-between">
                 <Badge variant="secondary" className="text-lg px-3 py-1">{totalSelected} selected</Badge>
-                <Button onClick={handleOpenAssignDialog} disabled={totalSelected === 0}>
-                  <Box className="h-4 w-4 mr-2" />
-                  Assign to Box
-                </Button>
+                <div className="flex gap-2">
+                  <Button 
+                    variant="secondary" 
+                    onClick={() => setMoveToExtraDialogOpen(true)} 
+                    disabled={totalSelected === 0}
+                    title="Move selected items to Extra Inventory"
+                  >
+                    <Package className="h-4 w-4 mr-2" />
+                    Assign to Extra
+                  </Button>
+                  <Button onClick={handleOpenAssignDialog} disabled={totalSelected === 0}>
+                    <Box className="h-4 w-4 mr-2" />
+                    Assign to Box
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           )}
@@ -862,6 +895,21 @@ export default function OrderFinishing() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Move to Extra Dialog */}
+      <MoveToExtraDialog
+        open={moveToExtraDialogOpen}
+        onOpenChange={setMoveToExtraDialogOpen}
+        orderId={id!}
+        phase="in_finishing"
+        selections={extraSelections}
+        totalQuantity={totalSelected}
+        onSuccess={() => {
+          setProductSelections(new Map());
+          fetchData();
+        }}
+        userId={user?.id}
+      />
     </div>
   );
 }

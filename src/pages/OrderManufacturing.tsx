@@ -22,7 +22,8 @@ import {
   XCircle,
   Plus,
   Search,
-  CheckCircle
+  CheckCircle,
+  Package
 } from 'lucide-react';
 import {
   Dialog,
@@ -41,6 +42,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { MoveToExtraDialog } from '@/components/MoveToExtraDialog';
 
 interface Batch {
   id: string;
@@ -101,6 +103,7 @@ export default function OrderManufacturing() {
   const [boxDialogOpen, setBoxDialogOpen] = useState(false);
   const [terminateDialogOpen, setTerminateDialogOpen] = useState(false);
   const [redoDialogOpen, setRedoDialogOpen] = useState(false);
+  const [moveToExtraDialogOpen, setMoveToExtraDialogOpen] = useState(false);
   const [terminateReason, setTerminateReason] = useState('');
   const [redoReason, setRedoReason] = useState('');
   
@@ -296,6 +299,38 @@ export default function OrderManufacturing() {
 
   const totalCompleted = completedGroups.reduce((sum, g) => g.batches.reduce((s, b) => s + b.quantity, 0) + sum, 0);
   const totalSelected = Array.from(productSelections.values()).reduce((a, b) => a + b, 0);
+  
+  // Calculate how many selected items are from "in_manufacturing" state (eligible for move to extra)
+  const totalSelectedInManufacturing = Array.from(productSelections.entries()).reduce((sum, [groupKey, qty]) => {
+    const group = productGroups.find(g => g.groupKey === groupKey);
+    if (!group) return sum;
+    return sum + Math.min(qty, group.inManufacturing);
+  }, 0);
+
+  // Prepare selections for MoveToExtraDialog
+  const extraSelections = productGroups
+    .filter(g => productSelections.get(g.groupKey) && productSelections.get(g.groupKey)! > 0)
+    .map(g => {
+      const selectedQty = productSelections.get(g.groupKey) || 0;
+      // Only include batches that are in_manufacturing and calculate how much to take from them
+      const inMfgBatches = g.batches.filter(b => b.current_state === 'in_manufacturing');
+      const qtyFromInMfg = Math.min(selectedQty, g.inManufacturing);
+      return {
+        groupKey: g.groupKey,
+        product_id: g.product_id,
+        product_name: g.product_name,
+        product_sku: g.product_sku,
+        quantity: qtyFromInMfg,
+        order_item_ids: g.order_item_ids,
+        batches: inMfgBatches.map(b => ({
+          id: b.id,
+          quantity: b.quantity,
+          current_state: b.current_state,
+          order_item_id: b.order_item_id,
+        })),
+      };
+    })
+    .filter(s => s.quantity > 0);
 
   const handleOpenBoxDialog = () => {
     if (totalSelected === 0) {
@@ -661,11 +696,20 @@ export default function OrderManufacturing() {
             <Card>
               <CardContent className="p-4 flex flex-wrap items-center gap-3">
                 <div className="flex-1 text-sm text-muted-foreground">
-                  {totalSelected > 0 ? `${totalSelected} selected` : 'Select quantities below, then choose an action'}
+                  {totalSelected > 0 ? `${totalSelected} selected${totalSelectedInManufacturing > 0 ? ` (${totalSelectedInManufacturing} in manufacturing)` : ''}` : 'Select quantities below, then choose an action'}
                 </div>
                 <Button onClick={handleOpenBoxDialog} disabled={totalSelected === 0}>
                   <Box className="h-4 w-4 mr-2" />
                   Assign to Box
+                </Button>
+                <Button 
+                  variant="secondary" 
+                  onClick={() => setMoveToExtraDialogOpen(true)} 
+                  disabled={totalSelectedInManufacturing === 0}
+                  title="Move selected items from 'In Manufacturing' to Extra Inventory"
+                >
+                  <Package className="h-4 w-4 mr-2" />
+                  Assign to Extra
                 </Button>
                 <Button variant="outline" onClick={() => setRedoDialogOpen(true)} disabled={totalSelected === 0}>
                   <RotateCcw className="h-4 w-4 mr-2" />
@@ -905,6 +949,21 @@ export default function OrderManufacturing() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Move to Extra Dialog */}
+      <MoveToExtraDialog
+        open={moveToExtraDialogOpen}
+        onOpenChange={setMoveToExtraDialogOpen}
+        orderId={id!}
+        phase="in_manufacturing"
+        selections={extraSelections}
+        totalQuantity={totalSelectedInManufacturing}
+        onSuccess={() => {
+          setProductSelections(new Map());
+          fetchData();
+        }}
+        userId={user?.id}
+      />
     </div>
   );
 }
