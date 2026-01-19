@@ -129,18 +129,28 @@ export function ExtraInventoryDialog({
         productNeedsBoxingMap.set(oi.product_id, existing);
       });
       
-      // Collect all allowed states based on order items
-      // If any order item for a product has needs_boxing=true, we can use extra_boxing
-      const allowedStates = new Set<string>();
-      productNeedsBoxingMap.forEach(({ hasNeedsBoxing }) => {
-        if (hasNeedsBoxing) {
-          ALLOWED_EXTRA_STATES.needs_boxing_true.forEach(s => allowedStates.add(s));
-        } else {
-          ALLOWED_EXTRA_STATES.needs_boxing_false.forEach(s => allowedStates.add(s));
-        }
-      });
+      // Get the target state for the selected phase
+      const targetState = PHASE_CURRENT_STATE_MAP[phase];
       
-      // Fetch available extra inventory batches that match any allowed state
+      // Check if any order item can use this phase's state
+      // extra_boxing can only be used by needs_boxing=true items
+      let hasEligibleOrderItem = false;
+      if (targetState === 'extra_boxing') {
+        // extra_boxing only usable if at least one order item needs boxing
+        hasEligibleOrderItem = Array.from(productNeedsBoxingMap.values()).some(v => v.hasNeedsBoxing);
+      } else {
+        // extra_manufacturing, extra_finishing, extra_packaging can be used by any item
+        hasEligibleOrderItem = true;
+      }
+      
+      if (!hasEligibleOrderItem) {
+        // No order items can use this phase's extra batches
+        setBatches([]);
+        setLoading(false);
+        return;
+      }
+      
+      // Fetch available extra inventory batches for the selected phase only
       const { data, error } = await supabase
         .from('extra_batches')
         .select(`
@@ -154,7 +164,7 @@ export function ExtraInventoryDialog({
           product:products(id, name, sku)
         `)
         .eq('inventory_state', 'AVAILABLE')
-        .in('current_state', [...allowedStates])
+        .eq('current_state', targetState)
         .is('order_id', null)
         .in('product_id', orderProductIds);
 
