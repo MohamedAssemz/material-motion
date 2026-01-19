@@ -1084,6 +1084,7 @@ export default function OrderDetail() {
           id: item.id,
           product_id: item.product_id,
           quantity: item.quantity,
+          needs_boxing: item.needs_boxing,
         }))}
         onItemsSelected={(selections) => {
           fetchOrder();
