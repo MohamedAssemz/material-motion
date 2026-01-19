@@ -269,6 +269,12 @@ export default function OrderDetail() {
 
       // Get product IDs from order items to filter extra inventory
       const orderProductIds = orderItems.map(oi => oi.product_id);
+      
+      // Get product IDs that have at least one needs_boxing=true order item
+      // extra_boxing batches can ONLY be used by items that need boxing
+      const boxingEligibleProductIds = orderItems
+        .filter(oi => oi.needs_boxing)
+        .map(oi => oi.product_id);
 
       // If no order items, return empty counts
       if (orderProductIds.length === 0) {
@@ -279,13 +285,24 @@ export default function OrderDetail() {
       const counts: Record<string, number> = {};
 
       for (const { phase, state } of states) {
+        // For extra_boxing, only count products with needs_boxing=true items
+        const productIds = state === 'extra_boxing' 
+          ? boxingEligibleProductIds 
+          : orderProductIds;
+        
+        // If no eligible products for this state, count is 0
+        if (productIds.length === 0) {
+          counts[phase] = 0;
+          continue;
+        }
+        
         // Only fetch extra batches that match products in this order
         const { data, error } = await supabase
           .from('extra_batches')
           .select('quantity')
           .eq('inventory_state', 'AVAILABLE')
           .eq('current_state', state)
-          .in('product_id', orderProductIds);
+          .in('product_id', productIds);
 
         if (!error && data) {
           counts[phase] = data.reduce((sum, b) => sum + b.quantity, 0);
