@@ -718,9 +718,6 @@ export function ExtraInventoryDialog({
                               <div key={batch.id} className="flex items-center gap-3 p-2 bg-muted/50 rounded">
                                 <Box className="h-4 w-4 text-muted-foreground" />
                                 <span className="font-mono text-sm">{batch.box?.box_code || 'No Box'}</span>
-                                <Badge variant="outline" className="text-xs">
-                                  {batch.current_state.replace('extra_', '')}
-                                </Badge>
                                 {batch.current_state === 'extra_boxing' && (
                                   <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
                                     Boxing items only
