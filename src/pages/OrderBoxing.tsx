@@ -14,6 +14,7 @@ import { ArrowLeft, Box, Loader2, QrCode, CheckSquare, Truck, Printer, Package, 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { ExtraItemsTab } from '@/components/ExtraItemsTab';
 import { MoveToExtraDialog } from '@/components/MoveToExtraDialog';
+import { ProductionRateSection } from '@/components/ProductionRateSection';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { format } from "date-fns";
@@ -26,6 +27,7 @@ interface Batch {
   product_id: string;
   order_item_id: string | null;
   box_id: string | null;
+  boxing_machine_id: string | null;
   product: { id: string; name: string; sku: string; needs_packing: boolean };
   box?: { id: string; box_code: string } | null;
   order_item?: { id: string; needs_boxing: boolean } | null;
@@ -128,7 +130,7 @@ export default function OrderBoxing() {
         supabase
           .from("order_batches")
           .select(
-            "id, qr_code_data, current_state, quantity, product_id, order_item_id, box_id, product:products(id, name, sku, needs_packing)",
+            "id, qr_code_data, current_state, quantity, product_id, order_item_id, box_id, boxing_machine_id, product:products(id, name, sku, needs_packing)",
           )
           .eq("order_id", id)
           .eq("is_terminated", false)
@@ -1274,6 +1276,22 @@ export default function OrderBoxing() {
         </TabsContent>
 
         <TabsContent value="shipments" className="space-y-4">
+          {/* Production Rate Section - for shipped batches */}
+          <ProductionRateSection
+            batches={batches.filter(b => b.current_state === 'shipped').map(b => ({
+              id: b.id,
+              product_id: b.product_id,
+              product_name: b.product?.name || 'Unknown',
+              product_sku: b.product?.sku || 'N/A',
+              quantity: b.quantity,
+              machine_id: b.boxing_machine_id,
+              needs_boxing: b.order_item?.needs_boxing ?? true,
+            }))}
+            machineType="boxing"
+            machineColumnName="boxing_machine_id"
+            onAssigned={fetchData}
+          />
+
           <Card>
             <CardContent className="p-4 flex items-center justify-between">
               <p className="text-sm text-muted-foreground">
