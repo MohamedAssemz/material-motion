@@ -37,6 +37,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { ProductionRateSection } from '@/components/ProductionRateSection';
 
 interface Batch {
   id: string;
@@ -46,6 +47,7 @@ interface Batch {
   product_id: string;
   order_item_id: string | null;
   box_id: string | null;
+  finishing_machine_id: string | null;
   product: {
     id: string;
     name: string;
@@ -133,13 +135,13 @@ export default function OrderFinishing() {
       const [orderRes, batchesRes, completedRes] = await Promise.all([
         supabase.from('orders').select('id, order_number, priority, customer:customers(name)').eq('id', id).single(),
         supabase.from('order_batches')
-          .select('id, qr_code_data, current_state, quantity, product_id, order_item_id, box_id, product:products(id, name, sku, needs_packing)')
+          .select('id, qr_code_data, current_state, quantity, product_id, order_item_id, box_id, finishing_machine_id, product:products(id, name, sku, needs_packing)')
           .eq('order_id', id)
           .eq('is_terminated', false)
           .in('current_state', ['ready_for_finishing', 'in_finishing']),
         // Fetch completed items for this phase (moved to next phases)
         supabase.from('order_batches')
-          .select('id, qr_code_data, current_state, quantity, product_id, order_item_id, box_id, product:products(id, name, sku, needs_packing)')
+          .select('id, qr_code_data, current_state, quantity, product_id, order_item_id, box_id, finishing_machine_id, product:products(id, name, sku, needs_packing)')
           .eq('order_id', id)
           .eq('is_terminated', false)
           .in('current_state', ['ready_for_packaging', 'in_packaging', 'ready_for_boxing', 'in_boxing', 'ready_for_shipment', 'shipped'])
@@ -870,7 +872,23 @@ export default function OrderFinishing() {
             </div>
           )}
 
-          {completedGroups.length === 0 && addedToExtraItems.length === 0 && (
+          {/* Production Rate Section */}
+          <ProductionRateSection
+            batches={completedBatches.map(b => ({
+              id: b.id,
+              product_id: b.product_id,
+              product_name: b.product?.name || 'Unknown',
+              product_sku: b.product?.sku || 'N/A',
+              quantity: b.quantity,
+              machine_id: b.finishing_machine_id,
+              needs_boxing: b.order_item?.needs_boxing ?? true,
+            }))}
+            machineType="finishing"
+            machineColumnName="finishing_machine_id"
+            onAssigned={fetchData}
+          />
+
+          {completedGroups.length === 0 && addedToExtraItems.length === 0 && completedBatches.length === 0 && (
             <Card><CardContent className="p-8 text-center text-muted-foreground">No completed items yet</CardContent></Card>
           )}
         </TabsContent>

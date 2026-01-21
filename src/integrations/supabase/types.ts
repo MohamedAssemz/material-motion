@@ -415,10 +415,12 @@ export type Database = {
       order_batches: {
         Row: {
           box_id: string | null
+          boxing_machine_id: string | null
           created_at: string
           created_by: string | null
           current_state: string
           eta: string | null
+          finishing_machine_id: string | null
           flagged_by: string | null
           flagged_reason: string | null
           id: string
@@ -429,6 +431,7 @@ export type Database = {
           manufacturing_machine_id: string | null
           order_id: string
           order_item_id: string | null
+          packaging_machine_id: string | null
           product_id: string
           qr_code_data: string | null
           quantity: number
@@ -441,10 +444,12 @@ export type Database = {
         }
         Insert: {
           box_id?: string | null
+          boxing_machine_id?: string | null
           created_at?: string
           created_by?: string | null
           current_state?: string
           eta?: string | null
+          finishing_machine_id?: string | null
           flagged_by?: string | null
           flagged_reason?: string | null
           id?: string
@@ -455,6 +460,7 @@ export type Database = {
           manufacturing_machine_id?: string | null
           order_id: string
           order_item_id?: string | null
+          packaging_machine_id?: string | null
           product_id: string
           qr_code_data?: string | null
           quantity?: number
@@ -467,10 +473,12 @@ export type Database = {
         }
         Update: {
           box_id?: string | null
+          boxing_machine_id?: string | null
           created_at?: string
           created_by?: string | null
           current_state?: string
           eta?: string | null
+          finishing_machine_id?: string | null
           flagged_by?: string | null
           flagged_reason?: string | null
           id?: string
@@ -481,6 +489,7 @@ export type Database = {
           manufacturing_machine_id?: string | null
           order_id?: string
           order_item_id?: string | null
+          packaging_machine_id?: string | null
           product_id?: string
           qr_code_data?: string | null
           quantity?: number
@@ -521,8 +530,29 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "order_batches_boxing_machine_id_fkey"
+            columns: ["boxing_machine_id"]
+            isOneToOne: false
+            referencedRelation: "machines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_batches_finishing_machine_id_fkey"
+            columns: ["finishing_machine_id"]
+            isOneToOne: false
+            referencedRelation: "machines"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "order_batches_manufacturing_machine_id_fkey"
             columns: ["manufacturing_machine_id"]
+            isOneToOne: false
+            referencedRelation: "machines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_batches_packaging_machine_id_fkey"
+            columns: ["packaging_machine_id"]
             isOneToOne: false
             referencedRelation: "machines"
             referencedColumns: ["id"]

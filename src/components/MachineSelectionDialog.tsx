@@ -22,7 +22,7 @@ interface MachineSelectionDialogProps {
   onOpenChange: (open: boolean) => void;
   onConfirm: (selections: MachineSelection[]) => void;
   totalUnits: number;
-  machineType: 'manufacturing' | 'packaging';
+  machineType: 'manufacturing' | 'finishing' | 'packaging' | 'boxing';
 }
 
 export function MachineSelectionDialog({

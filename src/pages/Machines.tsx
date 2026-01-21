@@ -15,7 +15,7 @@ import { toast } from 'sonner';
 interface Machine {
   id: string;
   name: string;
-  type: 'manufacturing' | 'packaging';
+  type: 'manufacturing' | 'finishing' | 'packaging' | 'boxing';
   is_active: boolean;
   created_at: string;
 }
@@ -112,7 +112,9 @@ export default function Machines() {
   }
 
   const manufacturingMachines = machines.filter(m => m.type === 'manufacturing');
+  const finishingMachines = machines.filter(m => m.type === 'finishing');
   const packagingMachines = machines.filter(m => m.type === 'packaging');
+  const boxingMachines = machines.filter(m => m.type === 'boxing');
 
   return (
     <div className="min-h-screen bg-background">
@@ -160,7 +162,9 @@ export default function Machines() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="manufacturing">Manufacturing</SelectItem>
+                      <SelectItem value="finishing">Finishing</SelectItem>
                       <SelectItem value="packaging">Packaging</SelectItem>
+                      <SelectItem value="boxing">Boxing</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -210,6 +214,34 @@ export default function Machines() {
 
           <Card>
             <CardHeader>
+              <CardTitle>Finishing Machines</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {finishingMachines.length === 0 ? (
+                <p className="text-muted-foreground text-center py-4">No finishing machines</p>
+              ) : (
+                <div className="space-y-3">
+                  {finishingMachines.map(machine => (
+                    <div key={machine.id} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div>
+                        <p className="font-medium">{machine.name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {machine.is_active ? 'Active' : 'Inactive'}
+                        </p>
+                      </div>
+                      <Switch
+                        checked={machine.is_active}
+                        onCheckedChange={() => toggleMachineStatus(machine)}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
               <CardTitle>Packaging Machines</CardTitle>
             </CardHeader>
             <CardContent>
@@ -218,6 +250,34 @@ export default function Machines() {
               ) : (
                 <div className="space-y-3">
                   {packagingMachines.map(machine => (
+                    <div key={machine.id} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div>
+                        <p className="font-medium">{machine.name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {machine.is_active ? 'Active' : 'Inactive'}
+                        </p>
+                      </div>
+                      <Switch
+                        checked={machine.is_active}
+                        onCheckedChange={() => toggleMachineStatus(machine)}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Boxing Machines</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {boxingMachines.length === 0 ? (
+                <p className="text-muted-foreground text-center py-4">No boxing machines</p>
+              ) : (
+                <div className="space-y-3">
+                  {boxingMachines.map(machine => (
                     <div key={machine.id} className="flex items-center justify-between p-3 border rounded-lg">
                       <div>
                         <p className="font-medium">{machine.name}</p>
