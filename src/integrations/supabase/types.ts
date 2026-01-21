@@ -426,6 +426,7 @@ export type Database = {
           is_redo: boolean | null
           is_terminated: boolean | null
           lead_time_days: number | null
+          manufacturing_machine_id: string | null
           order_id: string
           order_item_id: string | null
           product_id: string
@@ -451,6 +452,7 @@ export type Database = {
           is_redo?: boolean | null
           is_terminated?: boolean | null
           lead_time_days?: number | null
+          manufacturing_machine_id?: string | null
           order_id: string
           order_item_id?: string | null
           product_id: string
@@ -476,6 +478,7 @@ export type Database = {
           is_redo?: boolean | null
           is_terminated?: boolean | null
           lead_time_days?: number | null
+          manufacturing_machine_id?: string | null
           order_id?: string
           order_item_id?: string | null
           product_id?: string
@@ -515,6 +518,13 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_batches_manufacturing_machine_id_fkey"
+            columns: ["manufacturing_machine_id"]
+            isOneToOne: false
+            referencedRelation: "machines"
             referencedColumns: ["id"]
           },
           {
