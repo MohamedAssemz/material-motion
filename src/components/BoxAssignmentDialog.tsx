@@ -336,20 +336,6 @@ export function BoxAssignmentDialog({
           </div>
         </div>
 
-        {/* Create New Box Button */}
-        <Button 
-          variant="outline" 
-          onClick={handleCreateNewBox}
-          disabled={creating}
-          className="w-full"
-        >
-          {creating ? (
-            <Loader2 className="h-4 w-4 animate-spin mr-2" />
-          ) : (
-            <Plus className="h-4 w-4 mr-2" />
-          )}
-          Create New Box
-        </Button>
 
         {/* Selected Box */}
         {selectedBox && (
