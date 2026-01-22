@@ -48,6 +48,7 @@ interface Batch {
   order_item_id: string | null;
   box_id: string | null;
   finishing_machine_id: string | null;
+  manufacturing_machine_id: string | null;
   product: {
     id: string;
     name: string;
@@ -512,6 +513,7 @@ export default function OrderFinishing() {
             });
           } else {
             const { data: qrCode } = await supabase.rpc('generate_extra_batch_code');
+            // Inherit machine IDs from parent batch
             const { data: newBatch } = await supabase.from('order_batches').insert({
               qr_code_data: qrCode,
               order_id: id,
@@ -521,6 +523,8 @@ export default function OrderFinishing() {
               quantity: useQty,
               box_id: selectedBox.id,
               created_by: user?.id,
+              manufacturing_machine_id: batch.manufacturing_machine_id,
+              finishing_machine_id: batch.finishing_machine_id,
             }).select('id').single();
             
             await supabase.from('order_batches').update({ quantity: batch.quantity - useQty }).eq('id', batch.id);

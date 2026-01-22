@@ -28,6 +28,9 @@ interface Batch {
   order_item_id: string | null;
   box_id: string | null;
   boxing_machine_id: string | null;
+  packaging_machine_id: string | null;
+  finishing_machine_id: string | null;
+  manufacturing_machine_id: string | null;
   product: { id: string; name: string; sku: string; needs_packing: boolean };
   box?: { id: string; box_code: string } | null;
   order_item?: { id: string; needs_boxing: boolean } | null;
@@ -547,6 +550,7 @@ export default function OrderBoxing() {
               const { data: qrCode, error: qrError } = await supabase.rpc("generate_extra_batch_code");
               if (qrError) throw qrError;
               
+              // Inherit machine IDs from parent batch
               const { error: insertError } = await supabase.from("order_batches").insert({
                 qr_code_data: qrCode,
                 order_id: id,
@@ -555,6 +559,10 @@ export default function OrderBoxing() {
                 current_state: "ready_for_shipment",
                 quantity: useQty,
                 created_by: user?.id,
+                manufacturing_machine_id: batch.manufacturing_machine_id,
+                finishing_machine_id: batch.finishing_machine_id,
+                packaging_machine_id: batch.packaging_machine_id,
+                boxing_machine_id: batch.boxing_machine_id,
               });
               if (insertError) throw insertError;
             }

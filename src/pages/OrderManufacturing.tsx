@@ -16,7 +16,6 @@ import {
   Factory, 
   Box, 
   Loader2, 
-  QrCode, 
   AlertTriangle,
   RotateCcw,
   XCircle,
@@ -24,8 +23,8 @@ import {
   Search,
   CheckCircle,
   Package,
-  Settings
 } from 'lucide-react';
+import { ProductionRateSection } from '@/components/ProductionRateSection';
 import {
   Dialog,
   DialogContent,
@@ -35,13 +34,7 @@ import {
 } from '@/components/ui/dialog';
 import { ExtraItemsTab } from '@/components/ExtraItemsTab';
 import { Textarea } from '@/components/ui/textarea';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { MoveToExtraDialog } from '@/components/MoveToExtraDialog';
 
@@ -69,11 +62,6 @@ interface Batch {
   };
 }
 
-interface Machine {
-  id: string;
-  name: string;
-  type: string;
-}
 
 interface Order {
   id: string;
@@ -123,18 +111,12 @@ export default function OrderManufacturing() {
   const [loadingBoxes, setLoadingBoxes] = useState(false);
   const [creatingBox, setCreatingBox] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  
-  // Machine assignment states
-  const [manufacturingMachines, setManufacturingMachines] = useState<Machine[]>([]);
-  const [machineAssignments, setMachineAssignments] = useState<Map<string, string>>(new Map());
-  const [assigningMachine, setAssigningMachine] = useState<string | null>(null);
 
   const canManage = hasRole('manufacture_lead') || hasRole('manufacturer') || hasRole('admin');
 
   useEffect(() => {
     fetchData();
     fetchAddedToExtra();
-    fetchManufacturingMachines();
     const channel = supabase
       .channel(`order-manufacturing-${id}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'order_batches', filter: `order_id=eq.${id}` }, () => {
@@ -144,20 +126,6 @@ export default function OrderManufacturing() {
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [id]);
-
-  const fetchManufacturingMachines = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('machines')
-        .select('id, name, type')
-        .eq('type', 'manufacturing')
-        .eq('is_active', true);
-      if (error) throw error;
-      setManufacturingMachines(data || []);
-    } catch (error) {
-      console.error('Error fetching machines:', error);
-    }
-  };
 
   const fetchData = async () => {
     try {
@@ -186,26 +154,6 @@ export default function OrderManufacturing() {
       toast.error(error.message);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleAssignMachine = async (batchId: string, machineId: string) => {
-    setAssigningMachine(batchId);
-    try {
-      const { error } = await supabase
-        .from('order_batches')
-        .update({ manufacturing_machine_id: machineId })
-        .eq('id', batchId);
-      
-      if (error) throw error;
-      
-      toast.success('Machine assigned successfully');
-      setMachineAssignments(prev => new Map(prev).set(batchId, machineId));
-      fetchData();
-    } catch (error: any) {
-      toast.error(error.message);
-    } finally {
-      setAssigningMachine(null);
     }
   };
 
@@ -494,6 +442,7 @@ export default function OrderManufacturing() {
             const { data: qrCode } = await supabase.rpc('generate_extra_batch_code');
             
             // Create new batch with selected quantity - no ETA here
+            // Inherit manufacturing_machine_id from parent batch
             const { data: newBatch } = await supabase.from('order_batches').insert({
               qr_code_data: qrCode,
               order_id: id,
@@ -503,6 +452,7 @@ export default function OrderManufacturing() {
               quantity: useQty,
               box_id: selectedBox.id,
               created_by: user?.id,
+              manufacturing_machine_id: batch.manufacturing_machine_id,
             }).select('id').single();
             
             // Reduce original batch
@@ -932,77 +882,20 @@ export default function OrderManufacturing() {
           )}
 
           {/* Production Rate Section */}
-          {completedBatches.length > 0 && manufacturingMachines.length > 0 && (
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 pb-2 border-b border-primary/20">
-                <Settings className="h-4 w-4 text-primary" />
-                <h3 className="text-sm font-semibold text-primary">
-                  Production Rate
-                </h3>
-                <span className="text-xs text-muted-foreground ml-auto">
-                  Assign machines to track production
-                </span>
-              </div>
-              {completedBatches.map(batch => {
-                const machine = manufacturingMachines.find(m => m.id === batch.manufacturing_machine_id);
-                const selectedMachineId = machineAssignments.get(batch.id) || batch.manufacturing_machine_id || '';
-                return (
-                  <Card key={batch.id} className="border-primary/20 bg-primary/5">
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between gap-4">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <p className="font-medium truncate">{batch.product?.name}</p>
-                            {batch.manufacturing_machine_id ? (
-                              <Badge variant="secondary" className="bg-completed/20 text-completed">
-                                {machine?.name || 'Assigned'}
-                              </Badge>
-                            ) : (
-                              <Badge variant="outline" className="border-attention text-attention">
-                                Unassigned
-                              </Badge>
-                            )}
-                          </div>
-                          <p className="text-sm text-muted-foreground">{batch.product?.sku} · Qty: {batch.quantity}</p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Select
-                            value={selectedMachineId}
-                            onValueChange={(val) => setMachineAssignments(prev => new Map(prev).set(batch.id, val))}
-                          >
-                            <SelectTrigger className="w-40">
-                              <SelectValue placeholder="Select machine" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {manufacturingMachines.map(m => (
-                                <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <Button
-                            size="sm"
-                            onClick={() => {
-                              const machineId = machineAssignments.get(batch.id);
-                              if (machineId) {
-                                handleAssignMachine(batch.id, machineId);
-                              }
-                            }}
-                            disabled={!machineAssignments.get(batch.id) || assigningMachine === batch.id || machineAssignments.get(batch.id) === batch.manufacturing_machine_id}
-                          >
-                            {assigningMachine === batch.id ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              'Assign'
-                            )}
-                          </Button>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          )}
+          <ProductionRateSection
+            batches={completedBatches.map(batch => ({
+              id: batch.id,
+              product_id: batch.product_id,
+              product_name: batch.product?.name || 'Unknown',
+              product_sku: batch.product?.sku || 'N/A',
+              quantity: batch.quantity,
+              machine_id: batch.manufacturing_machine_id || null,
+              needs_boxing: batch.order_item?.needs_boxing ?? true,
+            }))}
+            machineType="manufacturing"
+            machineColumnName="manufacturing_machine_id"
+            onAssigned={fetchData}
+          />
 
           {completedGroups.length === 0 && addedToExtraItems.length === 0 && (
             <Card><CardContent className="p-8 text-center text-muted-foreground">No completed items yet</CardContent></Card>

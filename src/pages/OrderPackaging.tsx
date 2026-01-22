@@ -49,6 +49,8 @@ interface Batch {
   order_item_id: string | null;
   box_id: string | null;
   packaging_machine_id: string | null;
+  finishing_machine_id: string | null;
+  manufacturing_machine_id: string | null;
   product: {
     id: string;
     name: string;
@@ -443,7 +445,20 @@ export default function OrderPackaging() {
             });
           } else {
             const { data: qrCode } = await supabase.rpc('generate_extra_batch_code');
-            const { data: newBatch } = await supabase.from('order_batches').insert({ qr_code_data: qrCode, order_id: id, product_id: batch.product_id, order_item_id: batch.order_item_id, current_state: 'ready_for_boxing', quantity: useQty, box_id: selectedBox.id, created_by: user?.id }).select('id').single();
+            // Inherit machine IDs from parent batch
+            const { data: newBatch } = await supabase.from('order_batches').insert({
+              qr_code_data: qrCode,
+              order_id: id,
+              product_id: batch.product_id,
+              order_item_id: batch.order_item_id,
+              current_state: 'ready_for_boxing',
+              quantity: useQty,
+              box_id: selectedBox.id,
+              created_by: user?.id,
+              manufacturing_machine_id: batch.manufacturing_machine_id,
+              finishing_machine_id: batch.finishing_machine_id,
+              packaging_machine_id: batch.packaging_machine_id,
+            }).select('id').single();
             await supabase.from('order_batches').update({ quantity: batch.quantity - useQty }).eq('id', batch.id);
             newItems.push({
               product_id: group.product_id,
