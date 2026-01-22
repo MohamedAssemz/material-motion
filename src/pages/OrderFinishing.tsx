@@ -648,25 +648,10 @@ export default function OrderFinishing() {
           {canManage && readyBoxGroups.length > 0 && (
             <Card>
               <CardContent className="p-4 flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <Button variant="outline" size="sm" onClick={handleSelectAllBoxes}>
-                    <CheckSquare className="h-4 w-4 mr-2" />
-                    {selectedBoxes.size === filteredReadyBoxGroups.length ? 'Deselect All' : 'Select All'}
-                  </Button>
-                  <div>
-                    <Label className="text-xs text-muted-foreground">ETA (days)</Label>
-                    <Select value={etaDays} onValueChange={setEtaDays}>
-                      <SelectTrigger className="w-20 h-8">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {[1, 2, 3, 5, 7, 10, 14].map(d => (
-                          <SelectItem key={d} value={d.toString()}>{d}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
+                <Button variant="outline" size="sm" onClick={handleSelectAllBoxes}>
+                  <CheckSquare className="h-4 w-4 mr-2" />
+                  {selectedBoxes.size === filteredReadyBoxGroups.length ? 'Deselect All' : 'Select All'}
+                </Button>
                 <Button onClick={() => setAcceptDialogOpen(true)} disabled={selectedBoxes.size === 0}>
                   Accept {selectedBoxes.size} Box(es)
                 </Button>
@@ -900,10 +885,28 @@ export default function OrderFinishing() {
           <DialogHeader>
             <DialogTitle>Accept Boxes into Finishing</DialogTitle>
           </DialogHeader>
-          <div className="py-4">
+          <div className="py-4 space-y-4">
             <p className="text-sm text-muted-foreground">
-              You are about to accept {selectedBoxes.size} box(es) into the finishing phase with an ETA of {etaDays} day(s).
+              You are about to accept {selectedBoxes.size} box(es) into the finishing phase.
             </p>
+            <div>
+              <Label>Lead Time (days) *</Label>
+              <Select value={etaDays} onValueChange={setEtaDays}>
+                <SelectTrigger className="w-full mt-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {[1, 2, 3, 5, 7, 10, 14, 21, 30].map(d => (
+                    <SelectItem key={d} value={d.toString()}>{d} day{d !== 1 ? 's' : ''}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="p-3 rounded-lg bg-muted">
+              <p className="text-sm text-muted-foreground">
+                Items will be expected to complete by <strong>{new Date(Date.now() + parseInt(etaDays) * 24 * 60 * 60 * 1000).toLocaleDateString()}</strong>
+              </p>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAcceptDialogOpen(false)}>Cancel</Button>
