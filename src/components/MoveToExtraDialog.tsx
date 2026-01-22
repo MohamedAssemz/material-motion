@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Box, Loader2, Plus, Search, Package, AlertTriangle } from 'lucide-react';
+import { Box, Loader2, Search, Package, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 
 type OrderPhase = 'in_manufacturing' | 'in_finishing' | 'in_packaging' | 'in_boxing';
@@ -77,7 +77,6 @@ export function MoveToExtraDialog({
   const [boxes, setBoxes] = useState<ExtraBoxOption[]>([]);
   const [selectedBoxId, setSelectedBoxId] = useState<string>('');
   const [loading, setLoading] = useState(true);
-  const [creating, setCreating] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -155,43 +154,6 @@ export function MoveToExtraDialog({
       )
     );
   }, [compatibleBoxes, searchQuery]);
-
-  const handleCreateNewBox = async () => {
-    setCreating(true);
-    try {
-      const { data: boxCode } = await supabase.rpc('generate_extra_box_code');
-
-      const { data: newBox, error } = await supabase
-        .from('extra_boxes')
-        .insert({
-          box_code: boxCode || `EBOX-${Date.now()}`,
-          is_active: true,
-          content_type: 'EMPTY',
-          items_list: [],
-        })
-        .select('id, box_code, content_type, items_list')
-        .single();
-
-      if (error) throw error;
-
-      toast.success(`Created new box: ${newBox.box_code}`);
-
-      const formattedBox: ExtraBoxOption = {
-        id: newBox.id,
-        box_code: newBox.box_code,
-        content_type: 'EMPTY',
-        current_state: null,
-        items_list: [],
-      };
-
-      setBoxes(prev => [formattedBox, ...prev]);
-      setSelectedBoxId(newBox.id);
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to create box');
-    } finally {
-      setCreating(false);
-    }
-  };
 
   const handleConfirm = async () => {
     if (!selectedBoxId || selections.length === 0) return;
@@ -405,19 +367,6 @@ export function MoveToExtraDialog({
                   className="pl-9"
                 />
               </div>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={handleCreateNewBox}
-                disabled={creating}
-                title="Create new EBox"
-              >
-                {creating ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Plus className="h-4 w-4" />
-                )}
-              </Button>
             </div>
 
             {filteredBoxes.length === 0 ? (
@@ -429,15 +378,6 @@ export function MoveToExtraDialog({
                     <p className="text-xs text-muted-foreground mt-1">
                       Boxes must be empty or contain items in "{extraState.replace('_', ' ')}" state
                     </p>
-                    <Button
-                      variant="link"
-                      onClick={handleCreateNewBox}
-                      disabled={creating}
-                      className="mt-2"
-                    >
-                      <Plus className="h-4 w-4 mr-1" />
-                      Create new EBox
-                    </Button>
                   </>
                 ) : (
                   <p className="text-muted-foreground text-sm">No boxes match your search</p>

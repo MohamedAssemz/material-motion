@@ -16,7 +16,6 @@ import {
   Box, 
   Loader2, 
   QrCode, 
-  Plus,
   Search,
   CheckSquare,
   Package
@@ -113,7 +112,6 @@ export default function OrderFinishing() {
   const [selectedBox, setSelectedBox] = useState<{ id: string; box_code: string } | null>(null);
   const [availableBoxes, setAvailableBoxes] = useState<Array<{ id: string; box_code: string }>>([]);
   const [loadingBoxes, setLoadingBoxes] = useState(false);
-  const [creatingBox, setCreatingBox] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const canManage = hasRole('manufacture_lead') || hasRole('packaging_manager') || hasRole('packer') || hasRole('admin');
@@ -267,22 +265,6 @@ export default function OrderFinishing() {
       setBoxSearchCode('');
     } catch (error: any) {
       toast.error(error.message);
-    }
-  };
-
-  const createNewBox = async () => {
-    setCreatingBox(true);
-    try {
-      const { data: code } = await supabase.rpc('generate_box_code');
-      const { data: newBox, error } = await supabase.from('boxes').insert({ box_code: code || `BOX-${Date.now()}` }).select().single();
-      if (error) throw error;
-      setSelectedBox(newBox);
-      await fetchEmptyBoxes();
-      toast.success(`Created box ${newBox.box_code}`);
-    } catch (error: any) {
-      toast.error(error.message);
-    } finally {
-      setCreatingBox(false);
     }
   };
 
@@ -976,11 +958,6 @@ export default function OrderFinishing() {
                 </SelectContent>
               </Select>
             </div>
-
-            <Button variant="outline" className="w-full" onClick={createNewBox} disabled={creatingBox}>
-              {creatingBox ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
-              Create New Box
-            </Button>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setBoxAssignDialogOpen(false)}>Cancel</Button>
