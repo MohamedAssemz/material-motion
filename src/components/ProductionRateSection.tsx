@@ -29,6 +29,16 @@ interface BatchData {
   needs_boxing?: boolean;
 }
 
+interface GroupedBatch {
+  groupKey: string;
+  product_id: string;
+  product_name: string;
+  product_sku: string;
+  quantity: number;
+  machine_id: string | null;
+  batch_ids: string[];
+}
+
 interface ProductionRateSectionProps {
   batches: BatchData[];
   machineType: 'manufacturing' | 'finishing' | 'packaging' | 'boxing';
@@ -66,26 +76,58 @@ export function ProductionRateSection({
     }
   };
 
-  const handleAssign = async (batchId: string) => {
-    const machineId = assignments.get(batchId);
+  // Group batches by product_id and machine_id
+  const groupedBatches: GroupedBatch[] = [];
+  const groupMap = new Map<string, GroupedBatch>();
+  
+  batches.forEach(batch => {
+    const groupKey = `${batch.product_id}-${batch.machine_id || 'unassigned'}`;
+    
+    if (!groupMap.has(groupKey)) {
+      groupMap.set(groupKey, {
+        groupKey,
+        product_id: batch.product_id,
+        product_name: batch.product_name,
+        product_sku: batch.product_sku,
+        quantity: 0,
+        machine_id: batch.machine_id,
+        batch_ids: [],
+      });
+    }
+    
+    const group = groupMap.get(groupKey)!;
+    group.quantity += batch.quantity;
+    group.batch_ids.push(batch.id);
+  });
+  
+  groupMap.forEach(g => groupedBatches.push(g));
+  // Sort: unassigned first, then by product name
+  groupedBatches.sort((a, b) => {
+    if (!a.machine_id && b.machine_id) return -1;
+    if (a.machine_id && !b.machine_id) return 1;
+    return a.product_name.localeCompare(b.product_name);
+  });
+
+  const handleAssign = async (groupKey: string, batchIds: string[]) => {
+    const machineId = assignments.get(groupKey);
     if (!machineId) {
       toast.error('Please select a machine');
       return;
     }
 
-    setAssigning(batchId);
+    setAssigning(groupKey);
     try {
       const { error } = await supabase
         .from('order_batches')
         .update({ [machineColumnName]: machineId })
-        .eq('id', batchId);
+        .in('id', batchIds);
 
       if (error) throw error;
 
       toast.success('Machine assigned successfully');
       setAssignments(prev => {
         const newMap = new Map(prev);
-        newMap.delete(batchId);
+        newMap.delete(groupKey);
         return newMap;
       });
       onAssigned();
@@ -112,18 +154,18 @@ export function ProductionRateSection({
         </span>
       </div>
 
-      {batches.map(batch => {
-        const machine = machines.find(m => m.id === batch.machine_id);
-        const selectedMachineId = assignments.get(batch.id) || batch.machine_id || '';
+      {groupedBatches.map(group => {
+        const machine = machines.find(m => m.id === group.machine_id);
+        const selectedMachineId = assignments.get(group.groupKey) || group.machine_id || '';
         
         return (
-          <Card key={batch.id} className="border-primary/20 bg-primary/5">
+          <Card key={group.groupKey} className="border-primary/20 bg-primary/5">
             <CardContent className="p-4">
               <div className="flex items-center justify-between gap-4">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <p className="font-medium truncate">{batch.product_name}</p>
-                    {batch.machine_id ? (
+                    <p className="font-medium truncate">{group.product_name}</p>
+                    {group.machine_id ? (
                       <Badge variant="secondary" className="bg-completed/20 text-completed">
                         {machine?.name || 'Assigned'}
                       </Badge>
@@ -133,12 +175,12 @@ export function ProductionRateSection({
                       </Badge>
                     )}
                   </div>
-                  <p className="text-sm text-muted-foreground">{batch.product_sku} · Qty: {batch.quantity}</p>
+                  <p className="text-sm text-muted-foreground">{group.product_sku} · Qty: {group.quantity}</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <Select
                     value={selectedMachineId}
-                    onValueChange={(val) => setAssignments(prev => new Map(prev).set(batch.id, val))}
+                    onValueChange={(val) => setAssignments(prev => new Map(prev).set(group.groupKey, val))}
                   >
                     <SelectTrigger className="w-40">
                       <SelectValue placeholder="Select machine" />
@@ -151,10 +193,10 @@ export function ProductionRateSection({
                   </Select>
                   <Button
                     size="sm"
-                    onClick={() => handleAssign(batch.id)}
-                    disabled={!assignments.get(batch.id) || assigning === batch.id || assignments.get(batch.id) === batch.machine_id}
+                    onClick={() => handleAssign(group.groupKey, group.batch_ids)}
+                    disabled={!assignments.get(group.groupKey) || assigning === group.groupKey || assignments.get(group.groupKey) === group.machine_id}
                   >
-                    {assigning === batch.id ? (
+                    {assigning === group.groupKey ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
                       'Assign'
