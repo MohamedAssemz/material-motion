@@ -130,13 +130,13 @@ export default function OrderPackaging() {
       const [orderRes, batchesRes, completedRes] = await Promise.all([
         supabase.from('orders').select('id, order_number, priority, customer:customers(name)').eq('id', id).single(),
         supabase.from('order_batches')
-          .select('id, qr_code_data, current_state, quantity, product_id, order_item_id, box_id, packaging_machine_id, product:products(id, name, sku)')
+          .select('id, qr_code_data, current_state, quantity, product_id, order_item_id, box_id, manufacturing_machine_id, finishing_machine_id, packaging_machine_id, product:products(id, name, sku)')
           .eq('order_id', id)
           .eq('is_terminated', false)
           .in('current_state', ['ready_for_packaging', 'in_packaging']),
         // Fetch completed items for this phase (moved to next phases)
         supabase.from('order_batches')
-          .select('id, qr_code_data, current_state, quantity, product_id, order_item_id, box_id, packaging_machine_id, product:products(id, name, sku)')
+          .select('id, qr_code_data, current_state, quantity, product_id, order_item_id, box_id, manufacturing_machine_id, finishing_machine_id, packaging_machine_id, product:products(id, name, sku)')
           .eq('order_id', id)
           .eq('is_terminated', false)
           .in('current_state', ['ready_for_boxing', 'in_boxing', 'ready_for_shipment', 'shipped'])
