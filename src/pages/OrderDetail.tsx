@@ -400,6 +400,21 @@ export default function OrderDetail() {
 
   const handleDeleteOrder = async () => {
     try {
+      // Release reserved extra batches back to AVAILABLE
+      await supabase
+        .from("extra_batches")
+        .update({ 
+          inventory_state: "AVAILABLE", 
+          order_id: null, 
+          order_item_id: null 
+        })
+        .eq("order_id", id)
+        .eq("inventory_state", "RESERVED");
+
+      // Delete shipments for this order
+      await supabase.from("shipments").delete().eq("order_id", id);
+
+      // Delete order batches
       await supabase.from("order_batches").delete().eq("order_id", id);
       await supabase.from("order_items").delete().eq("order_id", id);
       await supabase.from("raw_material_versions").delete().eq("order_id", id);
