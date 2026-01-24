@@ -8,12 +8,11 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Box, Loader2, QrCode, Search, AlertTriangle, Settings } from 'lucide-react';
 import { getStateLabel, type UnitState } from '@/lib/stateMachine';
 import { useToast } from '@/hooks/use-toast';
-
+import { SearchableSelect } from '@/components/ui/searchable-select';
 interface Machine {
   id: string;
   name: string;
@@ -85,19 +84,10 @@ export function BoxAssignmentDialog({
   // Machine selection state
   const [machines, setMachines] = useState<Machine[]>([]);
   const [selectedMachine, setSelectedMachine] = useState<string | null>(null);
-  const [machineSearch, setMachineSearch] = useState('');
   const [loadingMachines, setLoadingMachines] = useState(false);
-
   // Check if in finishing state - validate needs_packing compatibility
   const isFinishingState = currentState === 'in_finishing';
   const isPackagingState = currentState === 'in_packaging';
-  
-  // Filter machines based on search
-  const filteredMachines = useMemo(() => {
-    if (!machineSearch.trim()) return machines;
-    const query = machineSearch.toLowerCase();
-    return machines.filter(m => m.name.toLowerCase().includes(query));
-  }, [machines, machineSearch]);
 
   useEffect(() => {
     if (open) {
@@ -110,7 +100,6 @@ export function BoxAssignmentDialog({
       setBoxingOption('needs_boxing');
       setSelectedTab('empty');
       setSelectedMachine(null);
-      setMachineSearch('');
       validateProductSelection();
     }
   }, [open, products, machineType]);
@@ -377,48 +366,15 @@ export function BoxAssignmentDialog({
               <Settings className="h-4 w-4 text-muted-foreground" />
               <Label>{machineTypeLabel} Machine (Optional)</Label>
             </div>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                value={machineSearch}
-                onChange={(e) => setMachineSearch(e.target.value)}
-                placeholder="Search machines..."
-                className="pl-10"
-              />
-            </div>
-            {loadingMachines ? (
-              <div className="flex items-center justify-center py-2">
-                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-              </div>
-            ) : filteredMachines.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-2">
-                No {machineTypeLabel.toLowerCase()} machines found
-              </p>
-            ) : (
-              <div className="grid grid-cols-2 gap-2 max-h-[100px] overflow-y-auto">
-                {filteredMachines.map(machine => (
-                  <Button
-                    key={machine.id}
-                    variant={selectedMachine === machine.id ? "default" : "outline"}
-                    size="sm"
-                    className="justify-start"
-                    onClick={() => setSelectedMachine(selectedMachine === machine.id ? null : machine.id)}
-                  >
-                    {machine.name}
-                  </Button>
-                ))}
-              </div>
-            )}
-            {selectedMachine && (
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">
-                  Selected: <span className="font-medium text-foreground">{machines.find(m => m.id === selectedMachine)?.name}</span>
-                </span>
-                <Button variant="ghost" size="sm" onClick={() => setSelectedMachine(null)}>
-                  Clear
-                </Button>
-              </div>
-            )}
+            <SearchableSelect
+              options={machines.map(m => ({ value: m.id, label: m.name }))}
+              value={selectedMachine}
+              onValueChange={setSelectedMachine}
+              placeholder="Select a machine..."
+              searchPlaceholder="Search machines..."
+              emptyText={`No ${machineTypeLabel.toLowerCase()} machines found`}
+              loading={loadingMachines}
+            />
           </div>
         )}
 
