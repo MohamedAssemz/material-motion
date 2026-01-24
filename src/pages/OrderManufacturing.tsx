@@ -33,9 +33,9 @@ import {
 } from '@/components/ui/dialog';
 import { ExtraItemsTab } from '@/components/ExtraItemsTab';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { MoveToExtraDialog } from '@/components/MoveToExtraDialog';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 
 interface Batch {
   id: string;
@@ -113,7 +113,6 @@ export default function OrderManufacturing() {
   // Machine selection state
   const [machines, setMachines] = useState<Array<{ id: string; name: string }>>([]);
   const [selectedMachine, setSelectedMachine] = useState<string | null>(null);
-  const [machineSearch, setMachineSearch] = useState('');
   const [loadingMachines, setLoadingMachines] = useState(false);
 
   const canManage = hasRole('manufacture_lead') || hasRole('manufacturer') || hasRole('admin');
@@ -372,7 +371,6 @@ export default function OrderManufacturing() {
     setSelectedBox(null);
     setBoxSearchCode('');
     setSelectedMachine(null);
-    setMachineSearch('');
     fetchEmptyBoxes();
     fetchMachines();
     setBoxDialogOpen(true);
@@ -918,44 +916,17 @@ export default function OrderManufacturing() {
             {/* Machine Selection */}
             <div>
               <Label>Manufacturing Machine (Optional)</Label>
-              <div className="relative mt-2">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  value={machineSearch}
-                  onChange={(e) => setMachineSearch(e.target.value)}
-                  placeholder="Search machines..."
-                  className="pl-10"
+              <div className="mt-2">
+                <SearchableSelect
+                  options={machines.map(m => ({ value: m.id, label: m.name }))}
+                  value={selectedMachine}
+                  onValueChange={setSelectedMachine}
+                  placeholder="Select a machine..."
+                  searchPlaceholder="Search machines..."
+                  emptyText="No manufacturing machines found"
+                  loading={loadingMachines}
                 />
               </div>
-              {loadingMachines ? (
-                <div className="flex items-center justify-center py-2 mt-2">
-                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 gap-2 max-h-[80px] overflow-y-auto mt-2">
-                  {machines
-                    .filter(m => !machineSearch || m.name.toLowerCase().includes(machineSearch.toLowerCase()))
-                    .map(machine => (
-                      <Button
-                        key={machine.id}
-                        variant={selectedMachine === machine.id ? "default" : "outline"}
-                        size="sm"
-                        className="justify-start"
-                        onClick={() => setSelectedMachine(selectedMachine === machine.id ? null : machine.id)}
-                      >
-                        {machine.name}
-                      </Button>
-                    ))}
-                </div>
-              )}
-              {selectedMachine && (
-                <div className="flex items-center justify-between text-sm mt-2">
-                  <span className="text-muted-foreground">
-                    Selected: <span className="font-medium text-foreground">{machines.find(m => m.id === selectedMachine)?.name}</span>
-                  </span>
-                  <Button variant="ghost" size="sm" onClick={() => setSelectedMachine(null)}>Clear</Button>
-                </div>
-              )}
             </div>
 
             <div className="flex items-center gap-2">
@@ -994,22 +965,21 @@ export default function OrderManufacturing() {
 
             <div>
               <Label>Select Available Box</Label>
-              <Select 
-                value={selectedBox?.id || ''} 
-                onValueChange={(val) => {
-                  const box = availableBoxes.find(b => b.id === val);
-                  setSelectedBox(box || null);
-                }}
-              >
-                <SelectTrigger className="mt-2">
-                  <SelectValue placeholder={loadingBoxes ? 'Loading...' : 'Select a box'} />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableBoxes.map(box => (
-                    <SelectItem key={box.id} value={box.id}>{box.box_code}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="mt-2">
+                <SearchableSelect
+                  options={availableBoxes.map(b => ({ value: b.id, label: b.box_code }))}
+                  value={selectedBox?.id || null}
+                  onValueChange={(val) => {
+                    const box = availableBoxes.find(b => b.id === val);
+                    setSelectedBox(box || null);
+                  }}
+                  placeholder={loadingBoxes ? 'Loading...' : 'Select a box...'}
+                  searchPlaceholder="Search boxes..."
+                  emptyText="No boxes available"
+                  loading={loadingBoxes}
+                  allowClear={false}
+                />
+              </div>
             </div>
           </div>
           <DialogFooter>
