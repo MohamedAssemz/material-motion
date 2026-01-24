@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -10,9 +10,15 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Box, Loader2, QrCode, Search, AlertTriangle, Plus, Package } from 'lucide-react';
+import { Box, Loader2, QrCode, Search, AlertTriangle, Settings } from 'lucide-react';
 import { getStateLabel, type UnitState } from '@/lib/stateMachine';
 import { useToast } from '@/hooks/use-toast';
+
+interface Machine {
+  id: string;
+  name: string;
+  type: string;
+}
 
 interface ProductSelection {
   product_id: string;
@@ -42,13 +48,14 @@ interface BoxData {
 interface BoxAssignmentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onConfirm: (boxId: string, boxCode: string, boxingOption?: 'needs_boxing' | 'skip_boxing') => void;
+  onConfirm: (boxId: string, boxCode: string, boxingOption?: 'needs_boxing' | 'skip_boxing', machineId?: string) => void;
   onCreateNewBox: () => Promise<{ id: string; box_code: string } | null>;
   products: ProductSelection[];
   currentState: UnitState;
   title?: string;
-  allowMultipleItems?: boolean; // Allow adding to boxes with existing items of same type
-  batchType?: 'ORDER' | 'EXTRA'; // Type of batch being assigned
+  allowMultipleItems?: boolean;
+  batchType?: 'ORDER' | 'EXTRA';
+  machineType?: 'manufacturing' | 'finishing' | 'packaging'; // If provided, show machine selector
 }
 
 export function BoxAssignmentDialog({
@@ -61,33 +68,72 @@ export function BoxAssignmentDialog({
   title,
   allowMultipleItems = true,
   batchType = 'ORDER',
+  machineType,
 }: BoxAssignmentDialogProps) {
   const { toast } = useToast();
   const [searchCode, setSearchCode] = useState('');
   const [selectedBox, setSelectedBox] = useState<BoxData | null>(null);
   const [emptyBoxes, setEmptyBoxes] = useState<BoxData[]>([]);
-  const [compatibleBoxes, setCompatibleBoxes] = useState<BoxData[]>([]); // Boxes with same batch type
+  const [compatibleBoxes, setCompatibleBoxes] = useState<BoxData[]>([]);
   const [selectedTab, setSelectedTab] = useState<'empty' | 'existing'>('empty');
   const [loading, setLoading] = useState(true);
   const [searching, setSearching] = useState(false);
   const [creating, setCreating] = useState(false);
   const [boxingOption, setBoxingOption] = useState<'needs_boxing' | 'skip_boxing'>('needs_boxing');
   const [validationError, setValidationError] = useState<string | null>(null);
+  
+  // Machine selection state
+  const [machines, setMachines] = useState<Machine[]>([]);
+  const [selectedMachine, setSelectedMachine] = useState<string | null>(null);
+  const [machineSearch, setMachineSearch] = useState('');
+  const [loadingMachines, setLoadingMachines] = useState(false);
 
   // Check if in finishing state - validate needs_packing compatibility
   const isFinishingState = currentState === 'in_finishing';
   const isPackagingState = currentState === 'in_packaging';
+  
+  // Filter machines based on search
+  const filteredMachines = useMemo(() => {
+    if (!machineSearch.trim()) return machines;
+    const query = machineSearch.toLowerCase();
+    return machines.filter(m => m.name.toLowerCase().includes(query));
+  }, [machines, machineSearch]);
 
   useEffect(() => {
     if (open) {
       fetchBoxes();
+      if (machineType) {
+        fetchMachines();
+      }
       setSelectedBox(null);
       setSearchCode('');
       setBoxingOption('needs_boxing');
       setSelectedTab('empty');
+      setSelectedMachine(null);
+      setMachineSearch('');
       validateProductSelection();
     }
-  }, [open, products]);
+  }, [open, products, machineType]);
+  
+  const fetchMachines = async () => {
+    if (!machineType) return;
+    setLoadingMachines(true);
+    try {
+      const { data, error } = await supabase
+        .from('machines')
+        .select('id, name, type')
+        .eq('type', machineType)
+        .eq('is_active', true)
+        .order('name');
+      
+      if (error) throw error;
+      setMachines(data || []);
+    } catch (error: any) {
+      console.error('Error fetching machines:', error);
+    } finally {
+      setLoadingMachines(false);
+    }
+  };
 
   const validateProductSelection = () => {
     // Check if all products have the same next phase (based on needs_packing)
@@ -250,11 +296,19 @@ export function BoxAssignmentDialog({
       return;
     }
     
-    onConfirm(selectedBox.id, selectedBox.box_code, isPackagingState ? boxingOption : undefined);
+    onConfirm(
+      selectedBox.id, 
+      selectedBox.box_code, 
+      isPackagingState ? boxingOption : undefined,
+      selectedMachine || undefined
+    );
     onOpenChange(false);
   };
 
   const totalQuantity = products.reduce((sum, p) => sum + p.quantity, 0);
+  const machineTypeLabel = machineType === 'manufacturing' ? 'Manufacturing' : 
+                           machineType === 'finishing' ? 'Finishing' : 
+                           machineType === 'packaging' ? 'Packaging' : '';
   const currentBoxes = selectedTab === 'empty' ? emptyBoxes : compatibleBoxes;
 
   return (
@@ -313,6 +367,58 @@ export function BoxAssignmentDialog({
                 </Label>
               </div>
             </RadioGroup>
+          </div>
+        )}
+
+        {/* Machine Selection */}
+        {machineType && (
+          <div className="space-y-2 p-3 border rounded-lg">
+            <div className="flex items-center gap-2">
+              <Settings className="h-4 w-4 text-muted-foreground" />
+              <Label>{machineTypeLabel} Machine (Optional)</Label>
+            </div>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                value={machineSearch}
+                onChange={(e) => setMachineSearch(e.target.value)}
+                placeholder="Search machines..."
+                className="pl-10"
+              />
+            </div>
+            {loadingMachines ? (
+              <div className="flex items-center justify-center py-2">
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+              </div>
+            ) : filteredMachines.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-2">
+                No {machineTypeLabel.toLowerCase()} machines found
+              </p>
+            ) : (
+              <div className="grid grid-cols-2 gap-2 max-h-[100px] overflow-y-auto">
+                {filteredMachines.map(machine => (
+                  <Button
+                    key={machine.id}
+                    variant={selectedMachine === machine.id ? "default" : "outline"}
+                    size="sm"
+                    className="justify-start"
+                    onClick={() => setSelectedMachine(selectedMachine === machine.id ? null : machine.id)}
+                  >
+                    {machine.name}
+                  </Button>
+                ))}
+              </div>
+            )}
+            {selectedMachine && (
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">
+                  Selected: <span className="font-medium text-foreground">{machines.find(m => m.id === selectedMachine)?.name}</span>
+                </span>
+                <Button variant="ghost" size="sm" onClick={() => setSelectedMachine(null)}>
+                  Clear
+                </Button>
+              </div>
+            )}
           </div>
         )}
 

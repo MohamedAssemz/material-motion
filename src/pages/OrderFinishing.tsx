@@ -113,6 +113,12 @@ export default function OrderFinishing() {
   const [availableBoxes, setAvailableBoxes] = useState<Array<{ id: string; box_code: string }>>([]);
   const [loadingBoxes, setLoadingBoxes] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  
+  // Machine selection state
+  const [machines, setMachines] = useState<Array<{ id: string; name: string }>>([]);
+  const [selectedMachine, setSelectedMachine] = useState<string | null>(null);
+  const [machineSearch, setMachineSearch] = useState('');
+  const [loadingMachines, setLoadingMachines] = useState(false);
 
   const canManage = hasRole('manufacture_lead') || hasRole('packaging_manager') || hasRole('packer') || hasRole('admin');
 
@@ -231,6 +237,23 @@ export default function OrderFinishing() {
       toast.error(error.message);
     } finally {
       setLoadingBoxes(false);
+    }
+  };
+
+  const fetchMachines = async () => {
+    setLoadingMachines(true);
+    try {
+      const { data } = await supabase
+        .from('machines')
+        .select('id, name')
+        .eq('type', 'finishing')
+        .eq('is_active', true)
+        .order('name');
+      setMachines(data || []);
+    } catch (error) {
+      console.error('Error fetching machines:', error);
+    } finally {
+      setLoadingMachines(false);
     }
   };
 
@@ -433,16 +456,31 @@ export default function OrderFinishing() {
       toast.error('Please select items first');
       return;
     }
+    
+    // Validate: all selected items must have the same needs_packing value
+    const selectedGroups = inFinishingGroups.filter(g => 
+      productSelections.get(g.groupKey) && productSelections.get(g.groupKey)! > 0
+    );
+    
+    const needsPackingValues = new Set(selectedGroups.map(g => g.needs_packing));
+    if (needsPackingValues.size > 1) {
+      toast.error('Cannot mix items in the same box: some require packaging while others go directly to boxing. Please select items with the same packaging requirement.');
+      return;
+    }
+    
     setSelectedBox(null);
     setBoxSearchCode('');
+    setSelectedMachine(null);
+    setMachineSearch('');
     fetchEmptyBoxes();
+    fetchMachines();
     setBoxAssignDialogOpen(true);
   };
 
   const handleAssignToBox = async () => {
     if (!selectedBox || totalSelected === 0) return;
     setSubmitting(true);
-    
+    const machineId = selectedMachine;
     try {
       // Get current box data for items_list
       const { data: boxData } = await supabase
@@ -482,6 +520,7 @@ export default function OrderFinishing() {
             await supabase.from('order_batches').update({
               current_state: nextState,
               box_id: selectedBox.id,
+              finishing_machine_id: machineId || batch.finishing_machine_id,
             }).eq('id', batch.id);
             
             newItems.push({
@@ -506,7 +545,7 @@ export default function OrderFinishing() {
               box_id: selectedBox.id,
               created_by: user?.id,
               manufacturing_machine_id: batch.manufacturing_machine_id,
-              finishing_machine_id: batch.finishing_machine_id,
+              finishing_machine_id: machineId || batch.finishing_machine_id,
             }).select('id').single();
             
             await supabase.from('order_batches').update({ quantity: batch.quantity - useQty }).eq('id', batch.id);
@@ -911,6 +950,55 @@ export default function OrderFinishing() {
             <DialogTitle>Assign to Box</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
+            {/* Machine Selection */}
+            <div>
+              <Label>Finishing Machine (Optional)</Label>
+              <div className="relative mt-2">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  value={machineSearch}
+                  onChange={(e) => setMachineSearch(e.target.value)}
+                  placeholder="Search machines..."
+                  className="pl-10"
+                />
+              </div>
+              {loadingMachines ? (
+                <div className="flex items-center justify-center py-2 mt-2">
+                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-2 max-h-[80px] overflow-y-auto mt-2">
+                  {machines
+                    .filter(m => !machineSearch || m.name.toLowerCase().includes(machineSearch.toLowerCase()))
+                    .map(machine => (
+                      <Button
+                        key={machine.id}
+                        variant={selectedMachine === machine.id ? "default" : "outline"}
+                        size="sm"
+                        className="justify-start"
+                        onClick={() => setSelectedMachine(selectedMachine === machine.id ? null : machine.id)}
+                      >
+                        {machine.name}
+                      </Button>
+                    ))}
+                </div>
+              )}
+              {selectedMachine && (
+                <div className="flex items-center justify-between text-sm mt-2">
+                  <span className="text-muted-foreground">
+                    Selected: <span className="font-medium text-foreground">{machines.find(m => m.id === selectedMachine)?.name}</span>
+                  </span>
+                  <Button variant="ghost" size="sm" onClick={() => setSelectedMachine(null)}>Clear</Button>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <div className="flex-1 h-px bg-border" />
+              <span className="text-xs text-muted-foreground">Box Selection</span>
+              <div className="flex-1 h-px bg-border" />
+            </div>
+
             <div>
               <Label>Search Box by Code</Label>
               <div className="flex gap-2 mt-2">
