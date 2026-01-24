@@ -109,6 +109,12 @@ export default function OrderPackaging() {
   const [availableBoxes, setAvailableBoxes] = useState<Array<{ id: string; box_code: string }>>([]);
   const [loadingBoxes, setLoadingBoxes] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  
+  // Machine selection state
+  const [machines, setMachines] = useState<Array<{ id: string; name: string }>>([]);
+  const [selectedMachine, setSelectedMachine] = useState<string | null>(null);
+  const [machineSearch, setMachineSearch] = useState('');
+  const [loadingMachines, setLoadingMachines] = useState(false);
 
   const canManage = hasRole('packaging_manager') || hasRole('packer') || hasRole('admin');
 
@@ -226,6 +232,23 @@ export default function OrderPackaging() {
       toast.error(error.message);
     } finally {
       setLoadingBoxes(false);
+    }
+  };
+
+  const fetchMachines = async () => {
+    setLoadingMachines(true);
+    try {
+      const { data } = await supabase
+        .from('machines')
+        .select('id, name')
+        .eq('type', 'packaging')
+        .eq('is_active', true)
+        .order('name');
+      setMachines(data || []);
+    } catch (error) {
+      console.error('Error fetching machines:', error);
+    } finally {
+      setLoadingMachines(false);
     }
   };
 
@@ -382,13 +405,17 @@ export default function OrderPackaging() {
     if (totalSelected === 0) { toast.error('Please select items first'); return; }
     setSelectedBox(null);
     setBoxSearchCode('');
+    setSelectedMachine(null);
+    setMachineSearch('');
     fetchEmptyBoxes();
+    fetchMachines();
     setBoxAssignDialogOpen(true);
   };
 
   const handleAssignToBox = async () => {
     if (!selectedBox || totalSelected === 0) return;
     setSubmitting(true);
+    const machineId = selectedMachine;
     try {
       // Get current box data for items_list
       const { data: boxData } = await supabase
@@ -417,8 +444,12 @@ export default function OrderPackaging() {
           if (remainingQty <= 0) break;
           const useQty = Math.min(batch.quantity, remainingQty);
           remainingQty -= useQty;
-          if (useQty === batch.quantity) {
-            await supabase.from('order_batches').update({ current_state: 'ready_for_boxing', box_id: selectedBox.id }).eq('id', batch.id);
+        if (useQty === batch.quantity) {
+            await supabase.from('order_batches').update({ 
+              current_state: 'ready_for_boxing', 
+              box_id: selectedBox.id,
+              packaging_machine_id: machineId || batch.packaging_machine_id,
+            }).eq('id', batch.id);
             newItems.push({
               product_id: group.product_id,
               product_name: group.product_name,
@@ -430,7 +461,7 @@ export default function OrderPackaging() {
             });
           } else {
             const { data: qrCode } = await supabase.rpc('generate_extra_batch_code');
-            // Inherit machine IDs from parent batch
+            // Inherit machine IDs from parent batch or use selected
             const { data: newBatch } = await supabase.from('order_batches').insert({
               qr_code_data: qrCode,
               order_id: id,
@@ -442,7 +473,7 @@ export default function OrderPackaging() {
               created_by: user?.id,
               manufacturing_machine_id: batch.manufacturing_machine_id,
               finishing_machine_id: batch.finishing_machine_id,
-              packaging_machine_id: batch.packaging_machine_id,
+              packaging_machine_id: machineId || batch.packaging_machine_id,
             }).select('id').single();
             await supabase.from('order_batches').update({ quantity: batch.quantity - useQty }).eq('id', batch.id);
             newItems.push({
@@ -825,6 +856,55 @@ export default function OrderPackaging() {
         <DialogContent className="max-w-md">
           <DialogHeader><DialogTitle>Assign to Box</DialogTitle></DialogHeader>
           <div className="space-y-4 py-4">
+            {/* Machine Selection */}
+            <div>
+              <Label>Packaging Machine (Optional)</Label>
+              <div className="relative mt-2">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  value={machineSearch}
+                  onChange={(e) => setMachineSearch(e.target.value)}
+                  placeholder="Search machines..."
+                  className="pl-10"
+                />
+              </div>
+              {loadingMachines ? (
+                <div className="flex items-center justify-center py-2 mt-2">
+                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-2 max-h-[80px] overflow-y-auto mt-2">
+                  {machines
+                    .filter(m => !machineSearch || m.name.toLowerCase().includes(machineSearch.toLowerCase()))
+                    .map(machine => (
+                      <Button
+                        key={machine.id}
+                        variant={selectedMachine === machine.id ? "default" : "outline"}
+                        size="sm"
+                        className="justify-start"
+                        onClick={() => setSelectedMachine(selectedMachine === machine.id ? null : machine.id)}
+                      >
+                        {machine.name}
+                      </Button>
+                    ))}
+                </div>
+              )}
+              {selectedMachine && (
+                <div className="flex items-center justify-between text-sm mt-2">
+                  <span className="text-muted-foreground">
+                    Selected: <span className="font-medium text-foreground">{machines.find(m => m.id === selectedMachine)?.name}</span>
+                  </span>
+                  <Button variant="ghost" size="sm" onClick={() => setSelectedMachine(null)}>Clear</Button>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <div className="flex-1 h-px bg-border" />
+              <span className="text-xs text-muted-foreground">Box Selection</span>
+              <div className="flex-1 h-px bg-border" />
+            </div>
+
             <div>
               <Label>Search Box by Code</Label>
               <div className="flex gap-2 mt-2">
