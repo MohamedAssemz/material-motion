@@ -155,7 +155,11 @@ export function StateGroupView({
         </head>
         <body>
           ${selectedBoxCodes.map(code => `<div class="box-id">${code}</div>`).join('')}
-          <script>window.print(); window.close();</script>
+          <script>
+            setTimeout(function() {
+              window.print();
+            }, 100);
+          </script>
         </body>
       </html>
     `;

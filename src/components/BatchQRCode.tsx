@@ -57,7 +57,11 @@ export function BatchQRCode({
             <div class="info"><span class="label">State:</span> <span class="value">${getStateLabel(state as any)}</span></div>
             <div class="info"><span class="label">Quantity:</span> <span class="value">${quantity}</span></div>
             ${eta ? `<div class="info"><span class="label">ETA:</span> <span class="value">${new Date(eta).toLocaleDateString()}</span></div>` : ''}
-            <script>window.print();</script>
+            <script>
+              setTimeout(function() {
+                window.print();
+              }, 100);
+            </script>
           </body>
         </html>
       `);
