@@ -1,8 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { ArrowLeft, Sparkles, Package } from 'lucide-react';
+import { Sparkles, Package } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -191,12 +190,15 @@ export default function QueueFinishing() {
           <TableHead>In Finishing</TableHead>
           <TableHead>Extra Items</TableHead>
           <TableHead>Created Date</TableHead>
-          <TableHead>Actions</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {ordersList.map((order) => (
-          <TableRow key={order.id}>
+          <TableRow 
+            key={order.id}
+            className="cursor-pointer hover:bg-muted/50"
+            onClick={() => navigate(`/orders/${order.id}/finishing`)}
+          >
             <TableCell className="font-medium">{order.order_number}</TableCell>
             <TableCell>
               {order.ready_for_finishing_count > 0 && (
@@ -217,11 +219,6 @@ export default function QueueFinishing() {
               )}
             </TableCell>
             <TableCell>{format(new Date(order.created_at), 'PPP')}</TableCell>
-            <TableCell>
-              <Button size="sm" onClick={() => navigate(`/orders/${order.id}/finishing`)}>
-                View Details
-              </Button>
-            </TableCell>
           </TableRow>
         ))}
       </TableBody>
@@ -230,18 +227,12 @@ export default function QueueFinishing() {
 
   return (
     <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" onClick={() => navigate('/dashboard')}>
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Dashboard
-        </Button>
-        <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <Sparkles className="h-8 w-8" />
-            Finishing Queue
-          </h1>
-          <p className="text-muted-foreground">Orders awaiting finishing or in finishing</p>
-        </div>
+      <div>
+        <h1 className="text-3xl font-bold flex items-center gap-2">
+          <Sparkles className="h-8 w-8" />
+          Finishing Queue
+        </h1>
+        <p className="text-muted-foreground">Orders awaiting finishing or in finishing</p>
       </div>
 
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabStatus)} className="space-y-4">

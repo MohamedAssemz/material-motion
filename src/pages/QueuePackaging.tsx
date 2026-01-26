@@ -1,8 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { ArrowLeft, Package } from 'lucide-react';
+import { Package } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -191,12 +190,15 @@ export default function QueuePackaging() {
           <TableHead>In Packaging</TableHead>
           <TableHead>Extra Items</TableHead>
           <TableHead>Created Date</TableHead>
-          <TableHead>Actions</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {ordersList.map((order) => (
-          <TableRow key={order.id}>
+          <TableRow 
+            key={order.id}
+            className="cursor-pointer hover:bg-muted/50"
+            onClick={() => navigate(`/orders/${order.id}/packaging`)}
+          >
             <TableCell className="font-medium">{order.order_number}</TableCell>
             <TableCell>
               {order.ready_for_packaging_count > 0 && (
@@ -217,11 +219,6 @@ export default function QueuePackaging() {
               )}
             </TableCell>
             <TableCell>{format(new Date(order.created_at), 'PPP')}</TableCell>
-            <TableCell>
-              <Button size="sm" onClick={() => navigate(`/orders/${order.id}/packaging`)}>
-                View Details
-              </Button>
-            </TableCell>
           </TableRow>
         ))}
       </TableBody>
@@ -230,18 +227,12 @@ export default function QueuePackaging() {
 
   return (
     <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" onClick={() => navigate('/dashboard')}>
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Dashboard
-        </Button>
-        <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <Package className="h-8 w-8" />
-            Packaging Queue
-          </h1>
-          <p className="text-muted-foreground">Orders awaiting packaging materials or in packaging</p>
-        </div>
+      <div>
+        <h1 className="text-3xl font-bold flex items-center gap-2">
+          <Package className="h-8 w-8" />
+          Packaging Queue
+        </h1>
+        <p className="text-muted-foreground">Orders awaiting packaging materials or in packaging</p>
       </div>
 
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabStatus)} className="space-y-4">
