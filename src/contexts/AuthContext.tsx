@@ -7,6 +7,7 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   userRoles: string[];
+  primaryRole: string | null;
   loading: boolean;
   signOut: () => Promise<void>;
   hasRole: (role: string) => boolean;
@@ -18,6 +19,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [userRoles, setUserRoles] = useState<string[]>([]);
+  const [primaryRole, setPrimaryRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
@@ -31,10 +33,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Fetch user roles when session changes
         if (session?.user) {
           setTimeout(() => {
-            fetchUserRoles(session.user.id);
+            fetchUserData(session.user.id);
           }, 0);
         } else {
           setUserRoles([]);
+          setPrimaryRole(null);
         }
       }
     );
@@ -45,7 +48,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(session?.user ?? null);
       
       if (session?.user) {
-        fetchUserRoles(session.user.id);
+        fetchUserData(session.user.id);
       }
       setLoading(false);
     });
@@ -53,34 +56,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  const fetchUserRoles = async (userId: string) => {
+  const fetchUserData = async (userId: string) => {
     try {
-      const { data, error } = await supabase
+      // Fetch roles
+      const { data: rolesData, error: rolesError } = await supabase
         .from('user_roles')
         .select('role')
         .eq('user_id', userId);
 
-      if (error) throw error;
-      
-      setUserRoles(data?.map(r => r.role) || []);
+      if (rolesError) throw rolesError;
+      setUserRoles(rolesData?.map(r => r.role) || []);
+
+      // Fetch primary role from profile
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('primary_role')
+        .eq('id', userId)
+        .single();
+
+      if (profileError) throw profileError;
+      setPrimaryRole(profileData?.primary_role || null);
     } catch (error) {
-      console.error('Error fetching user roles:', error);
+      console.error('Error fetching user data:', error);
       setUserRoles([]);
+      setPrimaryRole(null);
     }
   };
 
   const signOut = async () => {
     await supabase.auth.signOut();
     setUserRoles([]);
+    setPrimaryRole(null);
     navigate('/auth');
   };
 
   const hasRole = (role: string) => {
-    return userRoles.includes(role) || userRoles.includes('admin');
+    return userRoles.includes(role) || userRoles.includes('admin') || primaryRole === role || primaryRole === 'admin';
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, userRoles, loading, signOut, hasRole }}>
+    <AuthContext.Provider value={{ user, session, userRoles, primaryRole, loading, signOut, hasRole }}>
       {children}
     </AuthContext.Provider>
   );
