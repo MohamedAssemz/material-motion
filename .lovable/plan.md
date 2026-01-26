@@ -1,161 +1,240 @@
 
 
-## Fix: Prevent Website Freeze During Kartona Printing
+## User Role Management & Authentication Overhaul
 
-### Problem
-When printing a kartona (shipment label), the original browser tab freezes until the print dialog is closed. This happens because `window.print()` is a synchronous blocking call that blocks the JavaScript main thread across all windows from the same origin.
-
-### Root Cause
-The current implementation uses:
-```javascript
-<script>window.print();</script>
-// or
-printWindow.print();
-```
-
-This blocks the main thread immediately, causing the original tab to freeze.
-
-### Solution
-Defer the `window.print()` call using `setTimeout` to allow the browser to complete rendering before showing the print dialog. This breaks the synchronous blocking behavior and allows the original tab to remain responsive.
+### Overview
+Transform the authentication flow from self-signup to admin-managed user creation. Admins will create users with credentials, assign a primary role, and manage additional roles. Users can only sign in with provided credentials.
 
 ---
 
-### Files to Update
+### Current State Analysis
 
-| File | Issue |
-|------|-------|
-| `src/components/ShipmentDialog.tsx` | Line 283: inline script with `window.print(); window.close();` |
-| `src/pages/OrderBoxing.tsx` | Line 930: inline script with `window.print();` |
-| `src/components/BoxScanDialog.tsx` | Line 309-310: uses `document.close()` without print |
-| `src/components/StateGroupView.tsx` | Line 162-163: uses `document.close()` without print |
-| `src/components/ExtraInventoryDialog.tsx` | Line 655-656: uses `document.close()` without print |
-| `src/components/ExtraItemsTab.tsx` | Line 549-550: calls `printWindow.print()` synchronously |
-| `src/pages/OrderDetail.tsx` | Line 504-505: uses `document.close()` without print |
-| `src/components/BoxReceiveDialog.tsx` | Line 357-358: uses `document.close()` without print |
-| `src/components/BatchQRCode.tsx` | Lines 51: inline script with `window.print();` |
-| `src/components/BatchCardPrintable.tsx` | QR script with `window.print()` |
-| `src/components/ExtraInventoryGuide.tsx` | Line 82-83: uses `document.close()` without print |
+**Auth Page (`src/pages/Auth.tsx`):**
+- Has both Sign In and Sign Up tabs
+- Uses `supabase.auth.signUp()` for self-registration
+- Profiles are created automatically via database trigger
 
----
+**Admin Page (`src/pages/Admin.tsx`):**
+- Displays users from `profiles` table
+- Can add/remove roles from existing users
+- No ability to create users, update passwords, or delete users
 
-### Implementation Pattern
-
-**For inline scripts (inside HTML template):**
-
-Change from:
-```javascript
-<script>window.print(); window.close();</script>
-```
-
-To:
-```javascript
-<script>
-  setTimeout(function() {
-    window.print();
-  }, 100);
-</script>
-```
-
-**For direct `printWindow.print()` calls:**
-
-Change from:
-```javascript
-printWindow.document.write(html);
-printWindow.document.close();
-printWindow.print();
-```
-
-To:
-```javascript
-printWindow.document.write(html);
-printWindow.document.close();
-// Don't call print() from the parent window - let the child handle it via setTimeout in the script
-```
-
-Or if you need to trigger from parent:
-```javascript
-printWindow.document.write(html);
-printWindow.document.close();
-setTimeout(() => {
-  printWindow.print();
-}, 100);
-```
+**Database:**
+- `profiles` table: id, email, full_name, created_at, updated_at
+- `user_roles` table: id, user_id, role (app_role enum)
+- Trigger `handle_new_user()` creates profile on signup
 
 ---
 
-### Specific Changes
+### Implementation Plan
 
-**1. `src/components/ShipmentDialog.tsx` (Line 283)**
-```javascript
-// Before
-<script>window.print(); window.close();</script>
+#### Phase 1: Database Changes
 
-// After  
-<script>
-  setTimeout(function() {
-    window.print();
-  }, 100);
-</script>
-```
-Note: Removed `window.close()` to let user close the tab manually after printing.
+**1.1 Add `primary_role` column to profiles table**
 
-**2. `src/pages/OrderBoxing.tsx` (Line 930)**
-```javascript
-// Before
-<script>window.print();</script>
-
-// After
-<script>
-  setTimeout(function() {
-    window.print();
-  }, 100);
-</script>
+```sql
+ALTER TABLE public.profiles 
+ADD COLUMN primary_role public.app_role DEFAULT 'viewer';
 ```
 
-**3. `src/components/ExtraItemsTab.tsx` (Lines 548-550)**
-```javascript
-// Before
-printWindow.document.write(html);
-printWindow.document.close();
-printWindow.print();
+This distinguishes the user's main role from additional roles in `user_roles`.
 
-// After
-printWindow.document.write(html);
-printWindow.document.close();
-// Remove the printWindow.print() call - add it to the HTML template instead
+**1.2 Create Edge Function for Admin User Management**
+
+Since creating/deleting users in `auth.users` requires the service role key, we need an edge function:
+
+```text
+supabase/functions/admin-users/index.ts
 ```
 
-And add to the HTML template:
-```javascript
-<script>
-  setTimeout(function() {
-    window.print();
-  }, 100);
-</script>
-```
-
-**4. `src/components/BatchQRCode.tsx`**
-Update the inline script similarly.
-
-**5. `src/components/BatchCardPrintable.tsx`**
-Update the QRCode script that calls `window.print()`.
+This function will handle:
+- **Create user**: Uses Supabase Admin API to create user with email/password
+- **Update password**: Reset user password
+- **Delete user**: Remove user from auth.users (cascades to profiles)
 
 ---
 
-### Why This Works
+#### Phase 2: Edge Function Implementation
 
-1. **`setTimeout` breaks synchronous blocking**: By deferring `window.print()`, the new window's thread handles the print dialog independently.
+**`admin-users` Edge Function:**
 
-2. **100ms delay is sufficient**: This gives the browser time to fully render the document before showing the print dialog.
+| Endpoint | Method | Action |
+|----------|--------|--------|
+| `/admin-users?action=create` | POST | Create new user with email, password, full_name, primary_role |
+| `/admin-users?action=update-password` | POST | Update user's password |
+| `/admin-users?action=delete` | POST | Delete user account |
 
-3. **No impact on user experience**: The print dialog still appears quickly, but the original tab remains responsive.
+**Security:**
+- Validates JWT token from request
+- Checks if caller has `admin` role using the `has_role` database function
+- Returns 403 if not authorized
 
 ---
 
-### Summary
+#### Phase 3: Auth Page Updates
 
-Update all print functions across the codebase to use `setTimeout` for deferred printing:
-- 11 files need updates
-- Replace synchronous `window.print()` with `setTimeout(() => window.print(), 100)`
-- This prevents the original tab from freezing while the print dialog is open
+**3.1 Simplify Auth page (`src/pages/Auth.tsx`):**
+- Remove the Sign Up tab completely
+- Show only Sign In form
+- Update description text to reflect admin-provided credentials
+
+---
+
+#### Phase 4: Admin Page Enhancements
+
+**4.1 Redesign Admin page (`src/pages/Admin.tsx`):**
+
+**New Features:**
+1. **Create User Dialog**
+   - Email input
+   - Password input (with show/hide toggle)
+   - Full Name input
+   - Primary Role dropdown
+   - "Create User" button
+
+2. **User Cards Enhancement**
+   - Show primary role as main badge (different style)
+   - Show additional roles as secondary badges
+   - Actions dropdown with:
+     - Edit credentials (opens dialog to update email/password)
+     - Change primary role
+     - Delete user (with confirmation)
+
+3. **Add Extra Roles Section**
+   - Keep existing role addition functionality
+   - Clarify UI that these are "additional" roles
+
+**4.2 Create New Components:**
+
+| Component | Purpose |
+|-----------|---------|
+| `CreateUserDialog.tsx` | Modal for creating new users |
+| `EditUserDialog.tsx` | Modal for editing email/password |
+| `DeleteUserConfirmation.tsx` | Confirmation dialog for user deletion |
+
+---
+
+#### Phase 5: Context Updates
+
+**5.1 Update AuthContext (`src/contexts/AuthContext.tsx`):**
+- Add `primaryRole` to context state
+- Fetch primary role from profiles table alongside user_roles
+- Update `hasRole` to check primary role as well
+
+---
+
+### File Changes Summary
+
+| File | Action | Changes |
+|------|--------|---------|
+| `src/pages/Auth.tsx` | Modify | Remove signup, sign-in only |
+| `src/pages/Admin.tsx` | Major rewrite | Add create/edit/delete user functionality |
+| `src/components/CreateUserDialog.tsx` | Create | New user creation modal |
+| `src/components/EditUserDialog.tsx` | Create | Edit credentials modal |
+| `src/contexts/AuthContext.tsx` | Modify | Add primary role support |
+| `supabase/functions/admin-users/index.ts` | Create | Admin API for user management |
+
+---
+
+### Database Migration
+
+```sql
+-- Add primary_role column to profiles
+ALTER TABLE public.profiles 
+ADD COLUMN primary_role public.app_role DEFAULT 'viewer';
+
+-- Update existing profiles with their first role (or 'admin' for admin users)
+UPDATE public.profiles p
+SET primary_role = COALESCE(
+  (SELECT role FROM public.user_roles WHERE user_id = p.id ORDER BY created_at LIMIT 1),
+  'viewer'
+);
+
+-- Update handle_new_user trigger to accept primary_role from metadata
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = 'public'
+AS $$
+BEGIN
+  INSERT INTO public.profiles (id, email, full_name, primary_role)
+  VALUES (
+    new.id,
+    new.email,
+    COALESCE(new.raw_user_meta_data->>'full_name', new.email),
+    COALESCE((new.raw_user_meta_data->>'primary_role')::public.app_role, 'viewer')
+  );
+  
+  -- Also insert the primary role into user_roles
+  INSERT INTO public.user_roles (user_id, role)
+  VALUES (
+    new.id,
+    COALESCE((new.raw_user_meta_data->>'primary_role')::public.app_role, 'viewer')
+  );
+  
+  RETURN new;
+END;
+$$;
+```
+
+---
+
+### UI Flow After Implementation
+
+```text
++------------------+     +------------------------+
+|   Auth Page      |     |      Admin Page        |
++------------------+     +------------------------+
+| [Sign In Form]   |     | [+ Create User]        |
+| - Email          |     |                        |
+| - Password       |     | User Cards:            |
+| [Sign In Button] |     | +--------------------+ |
++------------------+     | | John Doe           | |
+                         | | john@company.com   | |
+                         | | Primary: Packer    | |
+                         | | Extra: QC, Boxer   | |
+                         | | [Edit] [Delete]    | |
+                         | +--------------------+ |
+                         +------------------------+
+```
+
+---
+
+### Technical Details
+
+**Edge Function Security Pattern:**
+
+```typescript
+// Verify admin role before any operation
+const { data: { user } } = await supabase.auth.getUser(token);
+const { data: isAdmin } = await supabase.rpc('has_role', {
+  _user_id: user.id,
+  _role: 'admin'
+});
+if (!isAdmin) return new Response('Forbidden', { status: 403 });
+```
+
+**Supabase Admin API for User Creation:**
+
+```typescript
+const { data, error } = await supabaseAdmin.auth.admin.createUser({
+  email,
+  password,
+  email_confirm: true, // Auto-confirm email
+  user_metadata: { full_name, primary_role }
+});
+```
+
+---
+
+### Implementation Order
+
+1. Create database migration (add primary_role, update trigger)
+2. Create edge function for admin user management
+3. Update Auth page (remove signup)
+4. Create dialog components
+5. Update Admin page with new functionality
+6. Update AuthContext for primary role support
+7. Test complete flow
 
