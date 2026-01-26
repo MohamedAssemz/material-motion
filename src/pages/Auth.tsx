@@ -15,12 +15,23 @@ export default function Auth() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Check if user is already logged in
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      
       if (session) {
-        navigate('/');
+        // Verify token is still valid on server (not just cached)
+        const { data: { user }, error } = await supabase.auth.getUser();
+        
+        if (user && !error) {
+          navigate('/');
+        } else {
+          // Session invalid - clear local storage
+          await supabase.auth.signOut({ scope: 'local' });
+        }
       }
-    });
+    };
+    
+    checkSession();
   }, [navigate]);
 
   const handleSignIn = async (e: React.FormEvent) => {

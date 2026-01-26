@@ -89,6 +89,15 @@ export function EditUserDialog({ open, onOpenChange, onSuccess, user }: EditUser
         throw new Error(data.error || 'Failed to update password');
       }
 
+      // Check if current user updated their own password
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (currentUser?.id === user.id) {
+        toast({ title: 'Password Updated', description: 'Please sign in again with your new password.' });
+        await supabase.auth.signOut({ scope: 'local' });
+        window.location.href = '/auth'; // Hard redirect to clear all state
+        return;
+      }
+
       toast({ title: 'Success', description: 'Password updated successfully' });
       setPassword('');
       onSuccess();
