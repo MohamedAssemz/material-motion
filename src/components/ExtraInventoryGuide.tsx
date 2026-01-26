@@ -75,7 +75,11 @@ export function ExtraInventoryGuide({ phase, items }: ExtraInventoryGuideProps) 
           
           <div class="total">Total Extra Items: ${totalItems}</div>
           
-          <script>window.print();</script>
+          <script>
+            setTimeout(function() {
+              window.print();
+            }, 100);
+          </script>
         </body>
       </html>
     `;

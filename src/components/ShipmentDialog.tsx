@@ -280,7 +280,11 @@ export function ShipmentDialog({
             Miracle Medical Products Factory
           </div>
           
-          <script>window.print(); window.close();</script>
+          <script>
+            setTimeout(function() {
+              window.print();
+            }, 100);
+          </script>
         </body>
       </html>
     `;

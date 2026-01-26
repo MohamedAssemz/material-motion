@@ -648,7 +648,11 @@ export function ExtraInventoryDialog({
           
           <div class="total">Total Items: ${totalSelected}</div>
           
-          <script>window.print();</script>
+          <script>
+            setTimeout(function() {
+              window.print();
+            }, 100);
+          </script>
         </body>
       </html>
     `;

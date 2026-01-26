@@ -497,7 +497,11 @@ export default function OrderDetail() {
 
           ${order.notes ? `<div class="section"><div class="section-title">Notes</div><p>${order.notes}</p></div>` : ""}
 
-          <script>window.print(); window.close();</script>
+          <script>
+            setTimeout(function() {
+              window.print();
+            }, 100);
+          </script>
         </body>
       </html>
     `;

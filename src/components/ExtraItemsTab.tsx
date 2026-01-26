@@ -543,11 +543,17 @@ export function ExtraItemsTab({ orderId, phase, onRefresh }: ExtraItemsTabProps)
         <div class="total">Total Items: ${totalItems}</div>
       </body>
       </html>
+        <script>
+          setTimeout(function() {
+            window.print();
+          }, 100);
+        </script>
+      </body>
+      </html>
     `;
 
     printWindow.document.write(html);
     printWindow.document.close();
-    printWindow.print();
   };
 
   if (loading) {

@@ -302,7 +302,11 @@ export function BoxScanDialog({
         </head>
         <body>
           ${selectedBoxes.map(box => `<div class="box-id">${box.box_code}</div>`).join('')}
-          <script>window.print(); window.close();</script>
+          <script>
+            setTimeout(function() {
+              window.print();
+            }, 100);
+          </script>
         </body>
       </html>
     `;

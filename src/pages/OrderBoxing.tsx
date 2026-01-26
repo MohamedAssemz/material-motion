@@ -927,7 +927,11 @@ export default function OrderBoxing() {
             Miracle Medical Products Factory
           </div>
           
-          <script>window.print();</script>
+          <script>
+            setTimeout(function() {
+              window.print();
+            }, 100);
+          </script>
         </body>
       </html>
     `;
