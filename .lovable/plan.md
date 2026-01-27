@@ -1,337 +1,326 @@
 
 
-## Box Management Page Enhancement
+## Catalog Management System (CMS) - Complete Redesign
 
 ### Overview
-Enhance the Boxes page to display box entries as clickable table rows that show a details popup when clicked. Both Order Boxes and Extra Boxes tabs will show consistent information including batch counts, total quantities, and admin-only delete functionality for empty boxes.
+
+Redesigning the catalog to use a **flat product structure** where each product is an independent item with its own SKU. Products are grouped/organized through **Categories** and **Brands** instead of parent-child relationships. This simplifies the system while maintaining rich filtering and search capabilities.
 
 ---
 
-### Current State Analysis
+### Current State vs New Design
 
-**Current Implementation:**
-- Two tabs: Order Boxes and Extra Boxes
-- Table display with columns: Box Code, Status, Current Batch/Items, Product, Quantity, Created, Active toggle
-- Data fetched from `boxes` and `extra_boxes` tables
-- No click-to-view-details functionality
-- No delete capability
-
-**Data Available:**
-- `items_list` on both box types contains batch details with product info and quantities
-- Order batches can be queried by `box_id` from `order_batches` table
-- Extra batches can be queried by `box_id` from `extra_batches` table
-- Extra batches have `current_state` field with values like `extra_manufacturing`, `extra_finishing`, `extra_packaging`, `extra_boxing`
+| Aspect | Current | New |
+|--------|---------|-----|
+| Structure | Parent SKU + Child SKU variants | Single independent products |
+| Grouping | Parent product → variants | Categories & Brands (tags) |
+| Size/Color | Creates N variants per combination | Single product with 1 size + 1 color |
+| Photos | Not implemented | Main photo + gallery |
+| Filtering | Limited | Categories, Brands, Countries, Search |
 
 ---
 
-### Implementation Plan
+### Database Schema Changes
 
-#### 1. Update Table Display (Both Tabs)
+#### New Tables to Create
 
-**Columns to display:**
-| Column | Description |
-|--------|-------------|
-| Box Code | Font mono, bold |
-| Status | See status logic below |
-| Batches | Number of batches in the box |
-| Total Qty | Sum of all quantities across batches |
-| Created | Formatted date |
-| Active | Switch toggle |
-
-**Make rows clickable** - clicking anywhere on the row opens the details popup
-
-#### 2. Create Box Details Popup Component
-
-**New component: `BoxDetailsDialog.tsx`**
-
-**Props:**
-```typescript
-interface BoxDetailsDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  boxType: 'order' | 'extra';
-  boxId: string | null;
-  onDeleted?: () => void;
-}
+**1. `categories` - Product categories for grouping**
+```sql
+CREATE TABLE public.categories (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL UNIQUE,
+  description TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
 ```
 
-**Popup Content Structure:**
-- Header: Box Code with status badge
-- Box Info Section:
-  - Created date
-  - Active status
-  - Content type
-- Batches Section:
-  - Table showing all batches in the box:
-    - For Order Boxes: QR Code, Product SKU, Product Name, Quantity, Current State
-    - For Extra Boxes: QR Code, Product SKU, Product Name, Quantity, Current State, Inventory State
-- Footer:
-  - Close button
-  - Delete button (admin only, only shown if box is empty)
-
-#### 3. Status Display Logic
-
-**Order Boxes:**
-```typescript
-// If box has no batches
-if (isEmpty) {
-  return <Badge variant="outline" className="text-green-600 border-green-600">Empty</Badge>
-}
-
-// If box has batches - show the production state
-return <Badge className={getStateColor(primaryState)}>
-  {primaryState.replace(/_/g, ' ').toUpperCase()}
-</Badge>
-// e.g., "READY FOR BOXING", "IN PACKAGING"
+**2. `brands` - Brand management**
+```sql
+CREATE TABLE public.brands (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL UNIQUE,
+  logo_url TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
 ```
 
-**Extra Boxes (Updated):**
-```typescript
-// If box has no batches
-if (isEmpty) {
-  return <Badge variant="outline" className="text-green-600 border-green-600">Empty</Badge>
-}
-
-// If box has batches - show the extra batch state from the batches inside
-// Extra boxes have batches with states like: extra_manufacturing, extra_finishing, extra_packaging, extra_boxing
-const extraState = batches[0]?.current_state; // All batches in an EBox share the same state
-return <Badge className={getExtraStateColor(extraState)}>
-  {formatExtraState(extraState)}
-</Badge>
-// e.g., "EXTRA MANUFACTURING", "EXTRA FINISHING", "EXTRA PACKAGING", "EXTRA BOXING"
+**3. `product_images` - Product photo gallery**
+```sql
+CREATE TABLE public.product_images (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  image_url TEXT NOT NULL,
+  is_main BOOLEAN DEFAULT false,
+  sort_order INTEGER DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
 ```
 
-**Extra State Color Mapping:**
-```typescript
-const getExtraStateColor = (state: string) => {
-  const colors: Record<string, string> = {
-    'extra_manufacturing': 'bg-blue-500',
-    'extra_finishing': 'bg-purple-500',
-    'extra_packaging': 'bg-orange-500',
-    'extra_boxing': 'bg-cyan-500',
-  };
-  return colors[state] || 'bg-amber-500';
-};
-
-const formatExtraState = (state: string) => {
-  // Convert 'extra_manufacturing' to 'EXTRA MANUFACTURING'
-  return state?.replace(/_/g, ' ').toUpperCase() || 'OCCUPIED';
-};
+**4. `product_categories` - Junction table for product-category relationship**
+```sql
+CREATE TABLE public.product_categories (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  category_id UUID NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(product_id, category_id)
+);
 ```
 
-#### 4. Fetch Extra Batch States for Table Display
+#### Modify `products` Table
 
-Since we need to show the state of batches inside extra boxes, we need to fetch batch data:
+Add new columns to the existing products table:
 
-```typescript
-// After fetching extra_boxes, get the primary state for each box
-const boxIds = extraBoxesData?.map(b => b.id) || [];
-const { data: extraBatchStates } = await supabase
-  .from('extra_batches')
-  .select('box_id, current_state')
-  .in('box_id', boxIds);
-
-// Create a map of box_id to state
-const stateByBox = new Map();
-extraBatchStates?.forEach(batch => {
-  if (batch.box_id && !stateByBox.has(batch.box_id)) {
-    stateByBox.set(batch.box_id, batch.current_state);
-  }
-});
-
-// Add state to each extra box
-const extraBoxesMapped = extraBoxesData.map(box => ({
-  ...box,
-  primary_state: stateByBox.get(box.id) || null,
-}));
+```sql
+ALTER TABLE public.products
+  ADD COLUMN brand_id UUID REFERENCES brands(id) ON DELETE SET NULL,
+  ADD COLUMN size TEXT,           -- From fixed dropdown: XXS, XS, S, M, L, XL, 2XL, 3XL, 4XL, 5XL, 6XL
+  ADD COLUMN color TEXT,
+  ADD COLUMN country TEXT;        -- Target market/origin country
 ```
 
-#### 5. Fetch Batch Details for Popup
+Drop unused columns (optional - can keep for backwards compatibility):
+- `parent_product_id` - No longer needed
+- `size_id` - Replaced by `size` text field
+- `color_id` - Replaced by `color` text field
 
-**Order Boxes:**
+#### Storage Bucket for Product Images
+
+```sql
+-- Create storage bucket for product images
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('product-images', 'product-images', true);
+
+-- RLS Policy: Anyone can view images
+CREATE POLICY "Public can view product images"
+ON storage.objects FOR SELECT
+USING (bucket_id = 'product-images');
+
+-- RLS Policy: Only admins can upload/manage images
+CREATE POLICY "Admins can manage product images"
+ON storage.objects FOR ALL
+USING (bucket_id = 'product-images' AND has_role(auth.uid(), 'admin'));
+```
+
+---
+
+### Product Data Model
+
+```text
+Product (products table)
+├── id (UUID)
+├── sku (TEXT, unique, auto-generated)
+├── name (TEXT)
+├── description (TEXT)
+├── size (TEXT) - dropdown: XXS, XS, S, M, L, XL, 2XL, 3XL, 4XL, 5XL, 6XL
+├── color (TEXT) - free text
+├── brand_id (UUID) → brands table
+├── country (TEXT) - target market
+├── needs_packing (BOOLEAN)
+├── created_at (TIMESTAMPTZ)
+│
+├── Categories (many-to-many via product_categories)
+├── Potential Customers (many-to-many via product_potential_customers)
+└── Images (one-to-many via product_images)
+```
+
+---
+
+### Size Dropdown Options
+
+Fixed list for the size dropdown:
 ```typescript
+const SIZE_OPTIONS = [
+  'XXS', 'XS', 'S', 'M', 'L', 'XL',
+  '2XL', '3XL', '4XL', '5XL', '6XL'
+] as const;
+```
+
+---
+
+### UI Components
+
+#### 1. Catalog Page (`/catalog`)
+
+**Header Section:**
+- Page title + description
+- "Add Product" button (admin only)
+- Search input (searches name, SKU, description)
+- Filter dropdowns:
+  - Category (multi-select)
+  - Brand (multi-select)
+  - Country (multi-select)
+  - Size (multi-select)
+
+**Product Grid:**
+- Vertical product cards in a responsive grid
+- Card shows: Main image, Name, SKU, Size, Color, Brand badge, Category badges
+- Click card to view/edit details
+
+**Product Card Layout:**
+```text
+┌─────────────────────────┐
+│                         │
+│       [Main Photo]      │
+│         300x300         │
+│                         │
+├─────────────────────────┤
+│ Product Name            │
+│ SKU-0001                │
+│ Size: M | Color: Blue   │
+│ [Category] [Category]   │
+│ Brand: BrandName        │
+└─────────────────────────┘
+```
+When clicking on the card, it opens the details of this product with the remaining details and photos
+#### 2. Add/Edit Product Dialog
+
+**Form Fields:**
+- Product Name (required)
+- Description (textarea)
+- Size (dropdown: XXS → 6XL)
+- Color (text input)
+- Brand (searchable dropdown from brands table)
+- Country (dropdown or text input)
+- Categories (multi-select checkboxes)
+- Potential Customers (multi-select checkboxes - current implementation)
+- Needs Packaging (toggle)
+- Photos:
+  - Main Photo upload (with preview)
+  - Additional Photos upload (gallery with drag-to-reorder)
+
+#### 3. Category Management Page (`/catalog/categories`)
+
+- Simple CRUD table for categories
+- Columns: Name, Description, Product Count, Actions
+- Add/Edit dialog with name and description fields
+- view the creation timestamp of the product
+
+#### 4. Brand Management Page (`/catalog/brands`)
+
+- Simple CRUD table for brands
+- Columns: Logo, Name, Product Count, Actions
+- Add/Edit dialog with name and optional logo upload
+
+---
+
+### File Changes
+
+| File | Action | Description |
+|------|--------|-------------|
+| `src/pages/Catalog.tsx` | **Rewrite** | Complete redesign with flat product structure, search, filters, product cards |
+| `src/components/ProductCard.tsx` | **Create** | Vertical card component for product display |
+| `src/components/ProductFormDialog.tsx` | **Create** | Add/Edit product dialog with all fields and image upload |
+| `src/components/ProductImageUpload.tsx` | **Create** | Image upload component with main photo + gallery |
+| `src/pages/CatalogCategories.tsx` | **Create** | Category management page |
+| `src/pages/CatalogBrands.tsx` | **Create** | Brand management page |
+| `src/App.tsx` | **Modify** | Add routes for category/brand management |
+| `src/components/AppLayout.tsx` | **Modify** | Add submenu items under Catalog (if applicable) |
+| Migration file | **Create** | Database schema changes |
+
+---
+
+### Migration Strategy for Existing Data
+
+Since the current system has parent-child products with variants:
+
+1. **Keep existing `products` table records** - they already have SKUs
+2. **Add new columns** to products table (brand_id, size, color, country)
+3. **Migrate size/color data:**
+   - For each product with `size_id`, copy the `size_name` to the new `size` column
+   - For each product with `color_id`, copy the `color_name` to the new `color` column
+4. **Migrate potential customers:**
+   - Copy from `product_potential_customers` (parent_product_id) to use product_id directly
+5. **Deprecate parent tables** (keep for reference but stop using):
+   - `parent_products`
+   - `product_sizes`
+   - `product_colors`
+
+---
+
+### Search and Filter Implementation
+
+**Search Query:**
+```typescript
+// Full-text search on name, SKU, description
 const { data } = await supabase
-  .from('order_batches')
+  .from('products')
   .select(`
-    id,
-    qr_code_data,
-    quantity,
-    current_state,
-    product:products(name, sku)
+    *,
+    brand:brands(id, name),
+    categories:product_categories(category:categories(id, name)),
+    images:product_images(id, image_url, is_main, sort_order),
+    potential_customers:product_potential_customers(customer:customers(id, name, code, country))
   `)
-  .eq('box_id', boxId)
-  .eq('is_terminated', false);
+  .ilike('name', `%${searchTerm}%`)
+  .order('created_at', { ascending: false });
 ```
 
-**Extra Boxes:**
+**Filter by Category:**
 ```typescript
+// Using inner join to filter by category
 const { data } = await supabase
-  .from('extra_batches')
-  .select(`
-    id,
-    qr_code_data,
-    quantity,
-    current_state,
-    inventory_state,
-    product:products(name, sku)
-  `)
-  .eq('box_id', boxId);
-```
-
-#### 6. Admin Delete Functionality
-
-**Conditions for delete button visibility:**
-1. User has `admin` role (checked via `hasRole('admin')`)
-2. Box is empty (no batches assigned)
-
-**Delete handlers:**
-```typescript
-// For Order Boxes
-const handleDeleteOrderBox = async (boxId: string) => {
-  const { error } = await supabase
-    .from('boxes')
-    .delete()
-    .eq('id', boxId);
-  // Handle result
-};
-
-// For Extra Boxes
-const handleDeleteExtraBox = async (boxId: string) => {
-  const { error } = await supabase
-    .from('extra_boxes')
-    .delete()
-    .eq('id', boxId);
-  // Handle result
-};
+  .from('products')
+  .select('*, categories:product_categories!inner(category_id)')
+  .in('categories.category_id', selectedCategoryIds);
 ```
 
 ---
 
-### File Changes Summary
+### RLS Policies
 
-| File | Action | Changes |
-|------|--------|---------|
-| `src/components/BoxDetailsDialog.tsx` | Create | New dialog component for viewing box details |
-| `src/pages/Boxes.tsx` | Modify | Update tables with batch count/total qty columns, fetch extra batch states, make rows clickable, integrate details dialog |
+**Categories:**
+- SELECT: Authenticated users can view
+- ALL: Admin only
 
----
+**Brands:**
+- SELECT: Authenticated users can view
+- ALL: Admin only
 
-### UI Mockup
+**Product Images:**
+- SELECT: Authenticated users can view
+- ALL: Admin only
 
-**Table Row (Order Box - Occupied):**
-```text
-| BOX-0001 | [READY FOR BOXING] | 2 batches | 30 units | Jan 10, 2026 | [Active] |
-```
-
-**Table Row (Extra Box - Occupied with state):**
-```text
-| EBOX-0001 | [EXTRA BOXING]        | 6 batches | 465 units | Jan 12, 2026 | [Active] |
-| EBOX-0002 | [EXTRA MANUFACTURING] | 3 batches | 295 units | Jan 12, 2026 | [Active] |
-| EBOX-0003 | [EXTRA FINISHING]     | 1 batch   |  70 units | Jan 17, 2026 | [Active] |
-```
-
-**Table Row (Empty Box):**
-```text
-| BOX-0003  | [Empty] | 0 | 0 | Jan 10, 2026 | [Active] |
-| EBOX-0005 | [Empty] | 0 | 0 | Jan 20, 2026 | [Active] |
-```
-
-**Details Popup (Extra Box):**
-```text
-+--------------------------------------------------+
-|  EBOX-0001                    [EXTRA BOXING]     |
-+--------------------------------------------------+
-| Created: Jan 12, 2026                            |
-| Active: Yes                                      |
-| Content Type: EXTRA                              |
-+--------------------------------------------------+
-| Batches (6)                                      |
-|                                                  |
-| QR Code      | Product          | Qty  | State   | Inv State |
-|--------------|------------------|------|---------|-----------|
-| EB-CF1EB1AA  | SKU-0001-MED-BLU | 25   | e_box   | AVAILABLE |
-| EB-D28E5E05  | SKU-0001-MED-BLU | 175  | e_box   | AVAILABLE |
-| EB-186E2E7B  | SKU-0001-SML-RED | 100  | e_box   | AVAILABLE |
-| EB-CE914EAE  | SKU-0001-SML-BLU | 100  | e_box   | AVAILABLE |
-| EB-3AE8A1B5  | SKU-0001-MED-BLU | 15   | e_box   | RESERVED  |
-| EB-F33CE85A  | SKU-0001-MED-BLU | 50   | e_box   | RESERVED  |
-+--------------------------------------------------+
-|                                    [Close]       |
-+--------------------------------------------------+
-
-(For empty box with admin user)
-+--------------------------------------------------+
-|                      [Delete Box] [Close]        |
-+--------------------------------------------------+
-```
+**Product Categories:**
+- SELECT: Authenticated users can view
+- ALL: Admin only
 
 ---
 
-### Technical Details
+### Implementation Phases
 
-**Updated data interfaces:**
-```typescript
-interface OrderBoxData {
-  id: string;
-  box_code: string;
-  is_active: boolean;
-  created_at: string;
-  content_type: string;
-  items_list: any[];
-  batch_count: number;
-  total_quantity: number;
-  primary_state: string | null;  // For order batches state
-}
+**Phase 1: Database Setup**
+- Create migration for new tables (categories, brands, product_images, product_categories)
+- add the creation timestamp of the product
+- Add new columns to products table
+- Create storage bucket for images
+- Set up RLS policies
 
-interface ExtraBoxData {
-  id: string;
-  box_code: string;
-  is_active: boolean;
-  created_at: string;
-  content_type: string;
-  items_list: any[];
-  batch_count: number;
-  total_quantity: number;
-  primary_state: string | null;  // extra_manufacturing, extra_finishing, etc.
-}
-```
+**Phase 2: Category & Brand Management**
+- Create CatalogCategories page
+- Create CatalogBrands page
+- Add routes and navigation
 
-**Computing batch stats from items_list:**
-```typescript
-// items_list already contains aggregated product info with quantities
-const batch_count = box.items_list?.length || 0;
-const total_quantity = box.items_list?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0;
-```
+**Phase 3: Catalog Redesign**
+- Create ProductCard component
+- Create ProductFormDialog with image upload
+- Rewrite Catalog page with search and filters
 
-**Delete confirmation:**
-Use existing AlertDialog pattern for confirmation before delete:
-- Title: "Delete Box?"
-- Description: "Are you sure you want to delete {box_code}? This action cannot be undone."
-- Actions: Cancel | Delete
+**Phase 4: Data Migration (if needed)**
+- Script to migrate existing size/color data
+- Update existing product records
 
 ---
 
-### Implementation Steps
+### Summary
 
-1. Create `BoxDetailsDialog.tsx` component
-   - Accept box type, ID, and callbacks as props
-   - Fetch batch details on open based on box type
-   - Display box info and batch table
-   - Include admin-only delete button with confirmation
+This redesign transforms the catalog from a complex parent-child variant system to a simple flat structure where:
 
-2. Update `Boxes.tsx`
-   - Add state for selected box and dialog open state
-   - Compute batch_count and total_quantity from items_list
-   - Fetch extra batch states to get `current_state` for extra boxes
-   - Update table columns to show Batches, Total Qty, and proper Status
-   - Extra boxes show state like "EXTRA MANUFACTURING" instead of just "OCCUPIED"
-   - Make table rows clickable with cursor-pointer styling
-   - Integrate BoxDetailsDialog component
-
-3. Test functionality
-   - Click on boxes to view details
-   - Verify batch counts and quantities are correct
-   - Verify extra boxes show correct phase status (Extra Manufacturing, Extra Finishing, etc.)
-   - Test delete functionality as admin user
-   - Verify non-admin users don't see delete button
+- Each product is independent with its own SKU
+- Products are grouped via Categories (many-to-many) and Brands (one-to-many)
+- Size is a fixed dropdown (XXS to 6XL)
+- Color is free text
+- Multiple photos are supported with a main image designation
+- Multiple potential customers can be assigned
+- Rich filtering by category, brand, country, and full-text search
 
