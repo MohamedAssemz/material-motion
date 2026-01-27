@@ -547,14 +547,22 @@ export default function OrderDetail() {
   // Order can be "pending" or "waiting_for_rm" before being started
   const isPendingOrder = order.status === "pending" || order.status === "waiting_for_rm";
 
-  // Calculate phase stats
-  const getPhaseStats = (inState: string, readyState: string | undefined, phaseName: string): PhaseStats => {
+  // Calculate phase stats with optional filter for phases that can be skipped
+  const getPhaseStats = (
+    inState: string, 
+    readyState: string | undefined, 
+    phaseName: string,
+    phaseFilter?: (batch: Batch) => boolean
+  ): PhaseStats => {
+    // Apply filter to get only relevant batches for this phase
+    const relevantBatches = phaseFilter ? activeBatches.filter(phaseFilter) : activeBatches;
+    
     const waiting = readyState
-      ? activeBatches.filter((b) => b.current_state === readyState).reduce((sum, b) => sum + b.quantity, 0)
+      ? relevantBatches.filter((b) => b.current_state === readyState).reduce((sum, b) => sum + b.quantity, 0)
       : 0;
-    const inProgress = activeBatches.filter((b) => b.current_state === inState).reduce((sum, b) => sum + b.quantity, 0);
+    const inProgress = relevantBatches.filter((b) => b.current_state === inState).reduce((sum, b) => sum + b.quantity, 0);
     const stateIndex = getAllStates().indexOf(inState as UnitState);
-    const completed = activeBatches
+    const completed = relevantBatches
       .filter((b) => getAllStates().indexOf(b.current_state as UnitState) > stateIndex)
       .reduce((sum, b) => sum + b.quantity, 0);
     const addedToExtra = addedToExtraCounts[phaseName] || 0;
@@ -564,8 +572,13 @@ export default function OrderDetail() {
 
   const manufacturingStats = getPhaseStats("in_manufacturing", "pending_rm", "manufacturing");
   const finishingStats = getPhaseStats("in_finishing", "ready_for_finishing", "finishing");
-  const packagingStats = getPhaseStats("in_packaging", "ready_for_packaging", "packaging");
-  const boxingStats = getPhaseStats("in_boxing", "ready_for_boxing", "boxing");
+  // Packaging: only count items where product.needs_packing is true (items that skip packaging shouldn't count)
+  const packagingStats = getPhaseStats("in_packaging", "ready_for_packaging", "packaging", (b) => b.product?.needs_packing !== false);
+  // Boxing: only count items where order_item.needs_boxing is true
+  const boxingStats = getPhaseStats("in_boxing", "ready_for_boxing", "boxing", (b) => {
+    const orderItem = orderItems.find(oi => oi.id === b.order_item_id);
+    return orderItem?.needs_boxing !== false;
+  });
 
   // Items grouped by product for each state
   const getProductsByState = (state: string) => {

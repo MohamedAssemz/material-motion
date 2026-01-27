@@ -55,6 +55,7 @@ interface Batch {
     id: string;
     name: string;
     sku: string;
+    needs_packing?: boolean;
   };
   box?: { id: string; box_code: string } | null;
   order_item?: { id: string; needs_boxing: boolean } | null;
@@ -136,13 +137,13 @@ export default function OrderPackaging() {
       const [orderRes, batchesRes, completedRes] = await Promise.all([
         supabase.from('orders').select('id, order_number, priority, customer:customers(name)').eq('id', id).single(),
         supabase.from('order_batches')
-          .select('id, qr_code_data, current_state, quantity, product_id, order_item_id, box_id, manufacturing_machine_id, finishing_machine_id, packaging_machine_id, product:products(id, name, sku)')
+          .select('id, qr_code_data, current_state, quantity, product_id, order_item_id, box_id, manufacturing_machine_id, finishing_machine_id, packaging_machine_id, product:products(id, name, sku, needs_packing)')
           .eq('order_id', id)
           .eq('is_terminated', false)
           .in('current_state', ['ready_for_packaging', 'in_packaging']),
         // Fetch completed items for this phase (moved to next phases)
         supabase.from('order_batches')
-          .select('id, qr_code_data, current_state, quantity, product_id, order_item_id, box_id, manufacturing_machine_id, finishing_machine_id, packaging_machine_id, product:products(id, name, sku)')
+          .select('id, qr_code_data, current_state, quantity, product_id, order_item_id, box_id, manufacturing_machine_id, finishing_machine_id, packaging_machine_id, product:products(id, name, sku, needs_packing)')
           .eq('order_id', id)
           .eq('is_terminated', false)
           .in('current_state', ['ready_for_boxing', 'in_boxing', 'ready_for_shipment', 'shipped'])
@@ -173,11 +174,16 @@ export default function OrderPackaging() {
         order_item: batch.order_item_id ? orderItemMap.get(batch.order_item_id) : null,
       })) || [];
       
-      const completedWithData = completedRes.data?.map((batch: any) => ({
-        ...batch,
-        box: batch.box_id ? boxMap.get(batch.box_id) : null,
-        order_item: batch.order_item_id ? orderItemMap.get(batch.order_item_id) : null,
-      })) || [];
+      // Filter completed batches to only include items that actually went through packaging
+      // Items with needs_packing = false skip packaging entirely (go from Finishing -> Boxing)
+      // and should NOT appear in the Packaging completed list
+      const completedWithData = completedRes.data
+        ?.filter((batch: any) => batch.product?.needs_packing !== false)
+        .map((batch: any) => ({
+          ...batch,
+          box: batch.box_id ? boxMap.get(batch.box_id) : null,
+          order_item: batch.order_item_id ? orderItemMap.get(batch.order_item_id) : null,
+        })) || [];
       
       setOrder(orderRes.data as Order);
       setBatches(batchesWithData as Batch[]);

@@ -20,6 +20,10 @@ const STAGES = [
   { key: 'shipped', label: 'Shipped', icon: CheckCircle },
 ];
 
+// Stages where items can skip based on product/order_item configuration
+const PACKAGING_STAGES = ['ready_for_packaging', 'in_packaging'];
+const BOXING_STAGES = ['ready_for_boxing', 'in_boxing'];
+
 export function OrderTimeline({ batches, orderStatus }: OrderTimelineProps) {
   const totalItems = batches.reduce((sum, b) => sum + b.total_quantity, 0);
   
@@ -27,12 +31,41 @@ export function OrderTimeline({ batches, orderStatus }: OrderTimelineProps) {
   const isPending = orderStatus === 'pending' || 
     (batches.length > 0 && batches.every(b => b.state === 'pending_rm'));
 
+  // Get effective total for a stage - accounts for items that skip certain phases
+  const getEffectiveTotalForStage = (stageKey: string) => {
+    // Packaging stages: only count items where needs_packing is true (default true if undefined)
+    if (PACKAGING_STAGES.includes(stageKey)) {
+      return batches.filter(b => b.needs_packing !== false)
+        .reduce((sum, b) => sum + b.total_quantity, 0);
+    }
+    // Boxing stages: only count items where needs_boxing is true (default true if undefined)
+    if (BOXING_STAGES.includes(stageKey)) {
+      return batches.filter(b => b.needs_boxing !== false)
+        .reduce((sum, b) => sum + b.total_quantity, 0);
+    }
+    return totalItems;
+  };
+
+  // Get relevant batches for a stage (filters out items that skip this stage)
+  const getRelevantBatchesForStage = (stageKey: string) => {
+    if (PACKAGING_STAGES.includes(stageKey)) {
+      return batches.filter(b => b.needs_packing !== false);
+    }
+    if (BOXING_STAGES.includes(stageKey)) {
+      return batches.filter(b => b.needs_boxing !== false);
+    }
+    return batches;
+  };
+
   const getStageStatus = (stageKey: string) => {
-    const itemsInStage = batches
+    const relevantBatches = getRelevantBatchesForStage(stageKey);
+    const effectiveTotal = getEffectiveTotalForStage(stageKey);
+    
+    const itemsInStage = relevantBatches
       .filter(b => b.state === stageKey)
       .reduce((sum, b) => sum + b.total_quantity, 0);
     
-    const itemsPassedStage = batches
+    const itemsPassedStage = relevantBatches
       .filter(b => {
         const stageIndex = STAGES.findIndex(s => s.key === stageKey);
         const batchStageIndex = STAGES.findIndex(s => s.key === b.state);
@@ -41,16 +74,17 @@ export function OrderTimeline({ batches, orderStatus }: OrderTimelineProps) {
       .reduce((sum, b) => sum + b.total_quantity, 0);
 
     const totalPassed = itemsInStage + itemsPassedStage;
-    const isLate = batches.some(b => b.state === stageKey && b.has_late_units);
-    const leadTimeDays = batches.find(b => b.state === stageKey)?.lead_time_days;
+    const isLate = relevantBatches.some(b => b.state === stageKey && b.has_late_units);
+    const leadTimeDays = relevantBatches.find(b => b.state === stageKey)?.lead_time_days;
 
     return {
       inProgress: itemsInStage > 0,
-      completed: totalPassed === totalItems && itemsInStage === 0,
-      total: totalItems,
+      completed: effectiveTotal > 0 && totalPassed === effectiveTotal && itemsInStage === 0,
+      total: effectiveTotal,
       current: totalPassed,
       isLate,
-      leadTimeDays
+      leadTimeDays,
+      isApplicable: effectiveTotal > 0, // Stage is not applicable if no items need it
     };
   };
 
@@ -95,6 +129,25 @@ export function OrderTimeline({ batches, orderStatus }: OrderTimelineProps) {
             {STAGES.map((stage) => {
               const status = getStageStatus(stage.key);
               const Icon = stage.icon;
+              
+              // Skip rendering stages that have 0 applicable items
+              // (e.g., packaging stages when all items have needs_packing=false)
+              if (!status.isApplicable && (PACKAGING_STAGES.includes(stage.key) || BOXING_STAGES.includes(stage.key))) {
+                return (
+                  <div key={stage.key} className="relative flex items-start gap-4 opacity-50">
+                    <div className="relative z-10 flex items-center justify-center w-8 h-8 rounded-full border-2 bg-background border-border text-muted-foreground">
+                      <Icon className="h-4 w-4" />
+                    </div>
+                    
+                    <div className="flex-1 min-w-0 pt-1">
+                      <div className="flex items-center justify-between">
+                        <p className="font-medium text-muted-foreground">{stage.label}</p>
+                        <span className="text-sm text-muted-foreground italic">N/A (skipped)</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
               
               return (
                 <div key={stage.key} className="relative flex items-start gap-4">
