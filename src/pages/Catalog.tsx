@@ -13,6 +13,7 @@ import { ProductDetailDialog } from '@/components/catalog/ProductDetailDialog';
 import { ProductFormDialog } from '@/components/catalog/ProductFormDialog';
 import { CategoryListDialog } from '@/components/catalog/CategoryListDialog';
 import { BrandListDialog } from '@/components/catalog/BrandListDialog';
+import { CountrySelect } from '@/components/catalog/CountrySelect';
 import { SIZE_OPTIONS } from '@/lib/catalogConstants';
 
 interface Category {
@@ -133,8 +134,8 @@ export default function Catalog() {
     }
   };
 
-  // Get unique countries from products
-  const uniqueCountries = useMemo(() => {
+  // Get unique country codes from products
+  const uniqueCountryCodes = useMemo(() => {
     const countries = new Set<string>();
     products.forEach(p => {
       if (p.country) countries.add(p.country);
@@ -326,17 +327,14 @@ export default function Catalog() {
               </SelectContent>
             </Select>
 
-            <Select value={selectedCountry} onValueChange={setSelectedCountry}>
-              <SelectTrigger>
-                <SelectValue placeholder="Country" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Countries</SelectItem>
-                {uniqueCountries.map(c => (
-                  <SelectItem key={c} value={c}>{c}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <CountrySelect
+              value={selectedCountry}
+              onValueChange={setSelectedCountry}
+              placeholder="Country"
+              availableCountryCodes={uniqueCountryCodes}
+              showAllOption
+              allOptionLabel="All Countries"
+            />
           </div>
         </div>
       </Card>

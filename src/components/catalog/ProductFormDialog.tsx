@@ -7,12 +7,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { SIZE_OPTIONS } from '@/lib/catalogConstants';
 import { ProductImageUpload } from './ProductImageUpload';
+import { CountrySelect } from './CountrySelect';
 
 interface Category {
   id: string;
@@ -352,11 +352,10 @@ export function ProductFormDialog({
 
                   <div>
                     <Label htmlFor="country">Country</Label>
-                    <Input
-                      id="country"
+                    <CountrySelect
                       value={formData.country}
-                      onChange={(e) => setFormData(prev => ({ ...prev, country: e.target.value }))}
-                      placeholder="Target market"
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, country: value }))}
+                      placeholder="Select target market"
                     />
                   </div>
                 </div>
