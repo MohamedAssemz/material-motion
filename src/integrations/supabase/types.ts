@@ -41,6 +41,48 @@ export type Database = {
         }
         Relationships: []
       }
+      brands: {
+        Row: {
+          created_at: string
+          id: string
+          logo_url: string | null
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          logo_url?: string | null
+          name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          logo_url?: string | null
+          name?: string
+        }
+        Relationships: []
+      }
+      categories: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
       customers: {
         Row: {
           code: string | null
@@ -736,6 +778,42 @@ export type Database = {
           },
         ]
       }
+      product_categories: {
+        Row: {
+          category_id: string
+          created_at: string
+          id: string
+          product_id: string
+        }
+        Insert: {
+          category_id: string
+          created_at?: string
+          id?: string
+          product_id: string
+        }
+        Update: {
+          category_id?: string
+          created_at?: string
+          id?: string
+          product_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_categories_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_categories_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_colors: {
         Row: {
           color_name: string
@@ -765,24 +843,62 @@ export type Database = {
           },
         ]
       }
+      product_images: {
+        Row: {
+          created_at: string
+          id: string
+          image_url: string
+          is_main: boolean | null
+          product_id: string
+          sort_order: number | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          image_url: string
+          is_main?: boolean | null
+          product_id: string
+          sort_order?: number | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          image_url?: string
+          is_main?: boolean | null
+          product_id?: string
+          sort_order?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_images_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_potential_customers: {
         Row: {
           created_at: string | null
           customer_id: string
           id: string
           parent_product_id: string
+          product_id: string | null
         }
         Insert: {
           created_at?: string | null
           customer_id: string
           id?: string
           parent_product_id: string
+          product_id?: string | null
         }
         Update: {
           created_at?: string | null
           customer_id?: string
           id?: string
           parent_product_id?: string
+          product_id?: string | null
         }
         Relationships: [
           {
@@ -797,6 +913,13 @@ export type Database = {
             columns: ["parent_product_id"]
             isOneToOne: false
             referencedRelation: "parent_products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_potential_customers_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
             referencedColumns: ["id"]
           },
         ]
@@ -832,39 +955,58 @@ export type Database = {
       }
       products: {
         Row: {
+          brand_id: string | null
+          color: string | null
           color_id: string | null
+          country: string | null
           created_at: string | null
           description: string | null
           id: string
           name: string
           needs_packing: boolean | null
           parent_product_id: string | null
+          size: string | null
           size_id: string | null
           sku: string
         }
         Insert: {
+          brand_id?: string | null
+          color?: string | null
           color_id?: string | null
+          country?: string | null
           created_at?: string | null
           description?: string | null
           id?: string
           name: string
           needs_packing?: boolean | null
           parent_product_id?: string | null
+          size?: string | null
           size_id?: string | null
           sku: string
         }
         Update: {
+          brand_id?: string | null
+          color?: string | null
           color_id?: string | null
+          country?: string | null
           created_at?: string | null
           description?: string | null
           id?: string
           name?: string
           needs_packing?: boolean | null
           parent_product_id?: string | null
+          size?: string | null
           size_id?: string | null
           sku?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "products_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "products_color_id_fkey"
             columns: ["color_id"]
