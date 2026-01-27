@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,12 +7,72 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Search } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { SIZE_OPTIONS } from '@/lib/catalogConstants';
 import { ProductImageUpload } from './ProductImageUpload';
 import { CountrySelect } from './CountrySelect';
+import { SearchableSelect } from '@/components/ui/searchable-select';
+
+// Categories selector with search
+function CategoriesSelector({ 
+  categories, 
+  selectedIds, 
+  onToggle 
+}: { 
+  categories: { id: string; name: string }[]; 
+  selectedIds: string[]; 
+  onToggle: (id: string) => void;
+}) {
+  const [search, setSearch] = useState('');
+  
+  const filtered = useMemo(() => {
+    if (!search.trim()) return categories;
+    return categories.filter(c => 
+      c.name.toLowerCase().includes(search.toLowerCase())
+    );
+  }, [categories, search]);
+
+  return (
+    <div>
+      <Label className="mb-2 block">Categories</Label>
+      <div className="border rounded-lg">
+        <div className="p-2 border-b">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search categories..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-8 h-8"
+            />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-32 overflow-y-auto p-2">
+          {filtered.length === 0 ? (
+            <p className="col-span-full text-sm text-muted-foreground text-center py-2">
+              {search ? 'No categories match your search' : 'No categories available'}
+            </p>
+          ) : (
+            filtered.map(category => (
+              <label 
+                key={category.id} 
+                className="flex items-center gap-2 cursor-pointer text-sm"
+              >
+                <Checkbox
+                  checked={selectedIds.includes(category.id)}
+                  onCheckedChange={() => onToggle(category.id)}
+                />
+                {category.name}
+              </label>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 interface Category {
   id: string;
@@ -335,19 +395,14 @@ export function ProductFormDialog({
 
                   <div>
                     <Label htmlFor="brand">Brand</Label>
-                    <Select
-                      value={formData.brand_id}
-                      onValueChange={(value) => setFormData(prev => ({ ...prev, brand_id: value }))}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select brand" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {brands.map(brand => (
-                          <SelectItem key={brand.id} value={brand.id}>{brand.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <SearchableSelect
+                      options={brands.map(b => ({ value: b.id, label: b.name }))}
+                      value={formData.brand_id || null}
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, brand_id: value || '' }))}
+                      placeholder="Select brand"
+                      searchPlaceholder="Search brands..."
+                      emptyText="No brands found."
+                    />
                   </div>
 
                   <div>
@@ -376,27 +431,11 @@ export function ProductFormDialog({
                 </div>
 
                 {/* Categories */}
-                <div>
-                  <Label className="mb-2 block">Categories</Label>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-32 overflow-y-auto p-2 border rounded-lg">
-                    {categories.length === 0 ? (
-                      <p className="col-span-full text-sm text-muted-foreground">No categories available</p>
-                    ) : (
-                      categories.map(category => (
-                        <label 
-                          key={category.id} 
-                          className="flex items-center gap-2 cursor-pointer text-sm"
-                        >
-                          <Checkbox
-                            checked={formData.category_ids.includes(category.id)}
-                            onCheckedChange={() => toggleCategory(category.id)}
-                          />
-                          {category.name}
-                        </label>
-                      ))
-                    )}
-                  </div>
-                </div>
+                <CategoriesSelector
+                  categories={categories}
+                  selectedIds={formData.category_ids}
+                  onToggle={toggleCategory}
+                />
 
                 {/* Potential Customers */}
                 <div>
