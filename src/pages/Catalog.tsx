@@ -6,16 +6,14 @@ import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Package, Plus, Search, Loader2, Tag, Palette, X, Trash2, Edit } from 'lucide-react';
+import { Package, Plus, Search, Loader2, Tag, Palette, X } from 'lucide-react';
 import { ProductCard } from '@/components/catalog/ProductCard';
 import { ProductDetailDialog } from '@/components/catalog/ProductDetailDialog';
 import { ProductFormDialog } from '@/components/catalog/ProductFormDialog';
+import { CategoryListDialog } from '@/components/catalog/CategoryListDialog';
+import { BrandListDialog } from '@/components/catalog/BrandListDialog';
 import { SIZE_OPTIONS } from '@/lib/catalogConstants';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 interface Category {
   id: string;
@@ -71,15 +69,9 @@ export default function Catalog() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   
-  // Category/Brand management dialogs
-  const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
-  const [brandDialogOpen, setBrandDialogOpen] = useState(false);
-  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
-  const [editingBrand, setEditingBrand] = useState<Brand | null>(null);
-  const [categoryForm, setCategoryForm] = useState({ name: '', description: '' });
-  const [brandForm, setBrandForm] = useState({ name: '', logo_url: '' });
-  const [savingCategory, setSavingCategory] = useState(false);
-  const [savingBrand, setSavingBrand] = useState(false);
+  // Category/Brand list dialogs
+  const [categoryListOpen, setCategoryListOpen] = useState(false);
+  const [brandListOpen, setBrandListOpen] = useState(false);
 
   const canManage = hasRole('admin');
 
@@ -222,90 +214,6 @@ export default function Catalog() {
     setDetailOpen(false);
   };
 
-  // Category CRUD
-  const handleSaveCategory = async () => {
-    if (!categoryForm.name.trim()) return;
-    setSavingCategory(true);
-    try {
-      if (editingCategory) {
-        const { error } = await supabase
-          .from('categories')
-          .update({ name: categoryForm.name.trim(), description: categoryForm.description.trim() || null })
-          .eq('id', editingCategory.id);
-        if (error) throw error;
-        toast({ title: 'Category updated' });
-      } else {
-        const { error } = await supabase
-          .from('categories')
-          .insert({ name: categoryForm.name.trim(), description: categoryForm.description.trim() || null });
-        if (error) throw error;
-        toast({ title: 'Category created' });
-      }
-      setCategoryDialogOpen(false);
-      setEditingCategory(null);
-      setCategoryForm({ name: '', description: '' });
-      fetchData();
-    } catch (error: any) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
-    } finally {
-      setSavingCategory(false);
-    }
-  };
-
-  const handleDeleteCategory = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this category?')) return;
-    try {
-      const { error } = await supabase.from('categories').delete().eq('id', id);
-      if (error) throw error;
-      toast({ title: 'Category deleted' });
-      fetchData();
-    } catch (error: any) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
-    }
-  };
-
-  // Brand CRUD
-  const handleSaveBrand = async () => {
-    if (!brandForm.name.trim()) return;
-    setSavingBrand(true);
-    try {
-      if (editingBrand) {
-        const { error } = await supabase
-          .from('brands')
-          .update({ name: brandForm.name.trim(), logo_url: brandForm.logo_url.trim() || null })
-          .eq('id', editingBrand.id);
-        if (error) throw error;
-        toast({ title: 'Brand updated' });
-      } else {
-        const { error } = await supabase
-          .from('brands')
-          .insert({ name: brandForm.name.trim(), logo_url: brandForm.logo_url.trim() || null });
-        if (error) throw error;
-        toast({ title: 'Brand created' });
-      }
-      setBrandDialogOpen(false);
-      setEditingBrand(null);
-      setBrandForm({ name: '', logo_url: '' });
-      fetchData();
-    } catch (error: any) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
-    } finally {
-      setSavingBrand(false);
-    }
-  };
-
-  const handleDeleteBrand = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this brand?')) return;
-    try {
-      const { error } = await supabase.from('brands').delete().eq('id', id);
-      if (error) throw error;
-      toast({ title: 'Brand deleted' });
-      fetchData();
-    } catch (error: any) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
-    }
-  };
-
   const clearFilters = () => {
     setSearchTerm('');
     setSelectedCategory('all');
@@ -327,363 +235,154 @@ export default function Catalog() {
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="p-2 rounded-lg bg-primary/10">
             <Package className="h-6 w-6 text-primary" />
           </div>
           <div>
             <h1 className="text-2xl font-bold">Product Catalog</h1>
-            <p className="text-muted-foreground">Manage products, categories, and brands</p>
+            <p className="text-muted-foreground text-sm">{products.length} products</p>
           </div>
         </div>
         
-        {canManage && (
-          <Button onClick={() => { setEditingProduct(null); setProductFormOpen(true); }}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Product
-          </Button>
-        )}
+        <div className="flex items-center gap-2 flex-wrap">
+          {canManage && (
+            <>
+              <Button variant="outline" size="sm" onClick={() => setCategoryListOpen(true)}>
+                <Tag className="mr-2 h-4 w-4" />
+                Categories
+                <Badge variant="secondary" className="ml-2">{categories.length}</Badge>
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setBrandListOpen(true)}>
+                <Palette className="mr-2 h-4 w-4" />
+                Brands
+                <Badge variant="secondary" className="ml-2">{brands.length}</Badge>
+              </Button>
+              <Button onClick={() => { setEditingProduct(null); setProductFormOpen(true); }}>
+                <Plus className="mr-2 h-4 w-4" />
+                Add Product
+              </Button>
+            </>
+          )}
+        </div>
       </div>
 
-      <Tabs defaultValue="products" className="w-full">
-        <TabsList>
-          <TabsTrigger value="products">Products ({products.length})</TabsTrigger>
-          {canManage && <TabsTrigger value="categories">Categories ({categories.length})</TabsTrigger>}
-          {canManage && <TabsTrigger value="brands">Brands ({brands.length})</TabsTrigger>}
-        </TabsList>
-
-        {/* Products Tab */}
-        <TabsContent value="products" className="space-y-4">
-          {/* Search and Filters */}
-          <Card className="p-4">
-            <div className="flex flex-col gap-4">
-              <div className="flex flex-col sm:flex-row gap-4">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search products by name, SKU, or description..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
-                {hasActiveFilters && (
-                  <Button variant="ghost" onClick={clearFilters} size="sm">
-                    <X className="mr-1 h-4 w-4" />
-                    Clear filters
-                  </Button>
-                )}
-              </div>
-              
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Categories</SelectItem>
-                    {categories.map(c => (
-                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                <Select value={selectedBrand} onValueChange={setSelectedBrand}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Brand" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Brands</SelectItem>
-                    {brands.map(b => (
-                      <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                <Select value={selectedSize} onValueChange={setSelectedSize}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Size" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Sizes</SelectItem>
-                    {SIZE_OPTIONS.map(s => (
-                      <SelectItem key={s} value={s}>{s}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                <Select value={selectedCountry} onValueChange={setSelectedCountry}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Country" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Countries</SelectItem>
-                    {uniqueCountries.map(c => (
-                      <SelectItem key={c} value={c}>{c}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+      {/* Search and Filters */}
+      <Card className="p-4">
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search products by name, SKU, or description..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
             </div>
-          </Card>
-
-          {/* Products Grid */}
-          {filteredProducts.length === 0 ? (
-            <Card className="p-12 text-center">
-              <Package className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold mb-2">
-                {products.length === 0 ? 'No products yet' : 'No products match your filters'}
-              </h3>
-              <p className="text-muted-foreground">
-                {products.length === 0 && canManage 
-                  ? 'Get started by adding your first product' 
-                  : hasActiveFilters 
-                    ? 'Try adjusting your filters' 
-                    : 'Products will appear here once added'}
-              </p>
-            </Card>
-          ) : (
-            <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-              {filteredProducts.map((product) => (
-                <ProductCard
-                  key={product.id}
-                  product={product}
-                  onClick={() => handleProductClick(product)}
-                />
-              ))}
-            </div>
-          )}
-        </TabsContent>
-
-        {/* Categories Tab (Admin only) */}
-        {canManage && (
-          <TabsContent value="categories" className="space-y-4">
-            <div className="flex justify-between items-center">
-              <p className="text-muted-foreground">Manage product categories</p>
-              <Button onClick={() => { setEditingCategory(null); setCategoryForm({ name: '', description: '' }); setCategoryDialogOpen(true); }}>
-                <Plus className="mr-2 h-4 w-4" />
-                Add Category
+            {hasActiveFilters && (
+              <Button variant="ghost" onClick={clearFilters} size="sm">
+                <X className="mr-1 h-4 w-4" />
+                Clear filters
               </Button>
-            </div>
-
-            <Card>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead>Products</TableHead>
-                    <TableHead>Created</TableHead>
-                    <TableHead className="w-[100px]">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {categories.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                        No categories yet. Add your first category to get started.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    categories.map((category) => (
-                      <TableRow key={category.id}>
-                        <TableCell className="font-medium">{category.name}</TableCell>
-                        <TableCell className="text-muted-foreground">{category.description || '—'}</TableCell>
-                        <TableCell>
-                          <Badge variant="secondary">{category.product_count || 0}</Badge>
-                        </TableCell>
-                        <TableCell className="text-muted-foreground text-sm">
-                          {new Date(category.created_at).toLocaleDateString()}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex gap-1">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => {
-                                setEditingCategory(category);
-                                setCategoryForm({ name: category.name, description: category.description || '' });
-                                setCategoryDialogOpen(true);
-                              }}
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleDeleteCategory(category.id)}
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </Card>
-          </TabsContent>
-        )}
-
-        {/* Brands Tab (Admin only) */}
-        {canManage && (
-          <TabsContent value="brands" className="space-y-4">
-            <div className="flex justify-between items-center">
-              <p className="text-muted-foreground">Manage product brands</p>
-              <Button onClick={() => { setEditingBrand(null); setBrandForm({ name: '', logo_url: '' }); setBrandDialogOpen(true); }}>
-                <Plus className="mr-2 h-4 w-4" />
-                Add Brand
-              </Button>
-            </div>
-
-            <Card>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Logo</TableHead>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Products</TableHead>
-                    <TableHead>Created</TableHead>
-                    <TableHead className="w-[100px]">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {brands.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                        No brands yet. Add your first brand to get started.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    brands.map((brand) => (
-                      <TableRow key={brand.id}>
-                        <TableCell>
-                          {brand.logo_url ? (
-                            <img src={brand.logo_url} alt={brand.name} className="h-8 w-8 object-contain rounded" />
-                          ) : (
-                            <div className="h-8 w-8 rounded bg-muted flex items-center justify-center">
-                              <Palette className="h-4 w-4 text-muted-foreground" />
-                            </div>
-                          )}
-                        </TableCell>
-                        <TableCell className="font-medium">{brand.name}</TableCell>
-                        <TableCell>
-                          <Badge variant="secondary">{brand.product_count || 0}</Badge>
-                        </TableCell>
-                        <TableCell className="text-muted-foreground text-sm">
-                          {new Date(brand.created_at).toLocaleDateString()}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex gap-1">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => {
-                                setEditingBrand(brand);
-                                setBrandForm({ name: brand.name, logo_url: brand.logo_url || '' });
-                                setBrandDialogOpen(true);
-                              }}
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleDeleteBrand(brand.id)}
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </Card>
-          </TabsContent>
-        )}
-      </Tabs>
-
-      {/* Category Dialog */}
-      <Dialog open={categoryDialogOpen} onOpenChange={setCategoryDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{editingCategory ? 'Edit Category' : 'Add Category'}</DialogTitle>
-            <DialogDescription>
-              {editingCategory ? 'Update the category details below.' : 'Create a new product category.'}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="category-name">Name *</Label>
-              <Input
-                id="category-name"
-                value={categoryForm.name}
-                onChange={(e) => setCategoryForm({ ...categoryForm, name: e.target.value })}
-                placeholder="Category name"
-              />
-            </div>
-            <div>
-              <Label htmlFor="category-description">Description</Label>
-              <Input
-                id="category-description"
-                value={categoryForm.description}
-                onChange={(e) => setCategoryForm({ ...categoryForm, description: e.target.value })}
-                placeholder="Optional description"
-              />
-            </div>
+            )}
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setCategoryDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleSaveCategory} disabled={savingCategory || !categoryForm.name.trim()}>
-              {savingCategory && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {editingCategory ? 'Update' : 'Create'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+              <SelectTrigger>
+                <SelectValue placeholder="Category" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Categories</SelectItem>
+                {categories.map(c => (
+                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
-      {/* Brand Dialog */}
-      <Dialog open={brandDialogOpen} onOpenChange={setBrandDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{editingBrand ? 'Edit Brand' : 'Add Brand'}</DialogTitle>
-            <DialogDescription>
-              {editingBrand ? 'Update the brand details below.' : 'Create a new product brand.'}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="brand-name">Name *</Label>
-              <Input
-                id="brand-name"
-                value={brandForm.name}
-                onChange={(e) => setBrandForm({ ...brandForm, name: e.target.value })}
-                placeholder="Brand name"
-              />
-            </div>
-            <div>
-              <Label htmlFor="brand-logo">Logo URL</Label>
-              <Input
-                id="brand-logo"
-                value={brandForm.logo_url}
-                onChange={(e) => setBrandForm({ ...brandForm, logo_url: e.target.value })}
-                placeholder="https://example.com/logo.png"
-              />
-            </div>
+            <Select value={selectedBrand} onValueChange={setSelectedBrand}>
+              <SelectTrigger>
+                <SelectValue placeholder="Brand" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Brands</SelectItem>
+                {brands.map(b => (
+                  <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={selectedSize} onValueChange={setSelectedSize}>
+              <SelectTrigger>
+                <SelectValue placeholder="Size" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Sizes</SelectItem>
+                {SIZE_OPTIONS.map(s => (
+                  <SelectItem key={s} value={s}>{s}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={selectedCountry} onValueChange={setSelectedCountry}>
+              <SelectTrigger>
+                <SelectValue placeholder="Country" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Countries</SelectItem>
+                {uniqueCountries.map(c => (
+                  <SelectItem key={c} value={c}>{c}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setBrandDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleSaveBrand} disabled={savingBrand || !brandForm.name.trim()}>
-              {savingBrand && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {editingBrand ? 'Update' : 'Create'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        </div>
+      </Card>
+
+      {/* Products Grid */}
+      {filteredProducts.length === 0 ? (
+        <Card className="p-12 text-center">
+          <Package className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+          <h3 className="text-lg font-semibold mb-2">
+            {products.length === 0 ? 'No products yet' : 'No products match your filters'}
+          </h3>
+          <p className="text-muted-foreground">
+            {products.length === 0 && canManage 
+              ? 'Get started by adding your first product' 
+              : hasActiveFilters 
+                ? 'Try adjusting your filters' 
+                : 'Products will appear here once added'}
+          </p>
+        </Card>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+          {filteredProducts.map((product) => (
+            <ProductCard
+              key={product.id}
+              product={product}
+              onClick={() => handleProductClick(product)}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Category List Dialog */}
+      <CategoryListDialog
+        open={categoryListOpen}
+        onOpenChange={setCategoryListOpen}
+        categories={categories}
+        onRefresh={fetchData}
+      />
+
+      {/* Brand List Dialog */}
+      <BrandListDialog
+        open={brandListOpen}
+        onOpenChange={setBrandListOpen}
+        brands={brands}
+        onRefresh={fetchData}
+      />
 
       {/* Product Form Dialog */}
       <ProductFormDialog
