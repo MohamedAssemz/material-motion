@@ -1,7 +1,14 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
-import { Package } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Package, MoreVertical, Eye, Trash2, Copy } from 'lucide-react';
 
 interface ProductCategory {
   category: {
@@ -39,16 +46,57 @@ export interface ProductCardData {
 interface ProductCardProps {
   product: ProductCardData;
   onClick: () => void;
+  onView?: () => void;
+  onDelete?: () => void;
+  onDuplicate?: () => void;
+  showMenu?: boolean;
 }
 
-export function ProductCard({ product, onClick }: ProductCardProps) {
+export function ProductCard({ 
+  product, 
+  onClick, 
+  onView, 
+  onDelete, 
+  onDuplicate,
+  showMenu = false 
+}: ProductCardProps) {
   const mainImage = product.images?.find(img => img.is_main) || product.images?.[0];
   
   return (
     <Card 
-      className="group cursor-pointer overflow-hidden transition-all hover:shadow-lg hover:border-primary/50"
+      className="group cursor-pointer overflow-hidden transition-all hover:shadow-lg hover:border-primary/50 relative"
       onClick={onClick}
     >
+      {showMenu && (
+        <div className="absolute top-2 right-2 z-10">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+              <Button 
+                variant="secondary" 
+                size="icon" 
+                className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+              >
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+              <DropdownMenuItem onClick={onView}>
+                <Eye className="mr-2 h-4 w-4" />
+                View
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onDuplicate}>
+                <Copy className="mr-2 h-4 w-4" />
+                Duplicate
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onDelete} className="text-destructive focus:text-destructive">
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      )}
+      
       <AspectRatio ratio={1}>
         {mainImage ? (
           <img 

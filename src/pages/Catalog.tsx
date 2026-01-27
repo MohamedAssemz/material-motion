@@ -6,11 +6,21 @@ import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { Package, Plus, Search, Loader2, Tag, Palette, X } from 'lucide-react';
 import { ProductCard } from '@/components/catalog/ProductCard';
 import { ProductDetailDialog } from '@/components/catalog/ProductDetailDialog';
-import { ProductFormDialog } from '@/components/catalog/ProductFormDialog';
+import { ProductFormDialog, ProductFormData } from '@/components/catalog/ProductFormDialog';
 import { CategoryListDialog } from '@/components/catalog/CategoryListDialog';
 import { BrandListDialog } from '@/components/catalog/BrandListDialog';
 import { CountrySelect } from '@/components/catalog/CountrySelect';
@@ -66,9 +76,18 @@ export default function Catalog() {
   
   // Dialogs
   const [productFormOpen, setProductFormOpen] = useState(false);
-  const [editingProduct, setEditingProduct] = useState<any>(null);
+  const [editingProduct, setEditingProduct] = useState<ProductFormData | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
+  
+  // Duplicate mode
+  const [isDuplicating, setIsDuplicating] = useState(false);
+  const [originalProductForDuplicate, setOriginalProductForDuplicate] = useState<ProductFormData | null>(null);
+  
+  // Delete dialog
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [productToDelete, setProductToDelete] = useState<Product | null>(null);
+  const [deleting, setDeleting] = useState(false);
   
   // Category/Brand list dialogs
   const [categoryListOpen, setCategoryListOpen] = useState(false);
@@ -186,10 +205,9 @@ export default function Catalog() {
     setDetailOpen(true);
   };
 
-  const handleEditProduct = async (product: Product) => {
-    // Prepare the product for editing
-    const categoryIds = product.categories?.map(c => c.category?.id).filter(Boolean) || [];
-    const customerIds = product.potential_customers?.map(c => c.customer?.id).filter(Boolean) || [];
+  const prepareProductFormData = (product: Product): ProductFormData => {
+    const categoryIds = product.categories?.map(c => c.category?.id).filter(Boolean) as string[] || [];
+    const customerIds = product.potential_customers?.map(c => c.customer?.id).filter(Boolean) as string[] || [];
     const images = product.images?.map(img => ({
       id: img.id,
       image_url: img.image_url,
@@ -197,7 +215,7 @@ export default function Catalog() {
       sort_order: img.sort_order ?? 0,
     })) || [];
 
-    setEditingProduct({
+    return {
       id: product.id,
       sku: product.sku,
       name: product.name,
@@ -210,9 +228,89 @@ export default function Catalog() {
       category_ids: categoryIds,
       customer_ids: customerIds,
       images,
-    });
+    };
+  };
+
+  const handleEditProduct = async (product: Product) => {
+    setEditingProduct(prepareProductFormData(product));
+    setIsDuplicating(false);
+    setOriginalProductForDuplicate(null);
     setProductFormOpen(true);
     setDetailOpen(false);
+  };
+
+  const handleViewProduct = (product: Product) => {
+    setSelectedProduct(product);
+    setDetailOpen(true);
+  };
+
+  const handleDuplicateProduct = (product: Product) => {
+    const formData = prepareProductFormData(product);
+    // Remove the ID so it creates a new product
+    const duplicateData: ProductFormData = {
+      ...formData,
+      id: undefined,
+      sku: '', // Will be auto-generated
+    };
+    
+    // Store original for comparison
+    setOriginalProductForDuplicate(formData);
+    setEditingProduct(duplicateData);
+    setIsDuplicating(true);
+    setProductFormOpen(true);
+  };
+
+  const handleDeleteClick = (product: Product) => {
+    setProductToDelete(product);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!productToDelete) return;
+    
+    setDeleting(true);
+    try {
+      // Delete related data first
+      await Promise.all([
+        supabase.from('product_categories').delete().eq('product_id', productToDelete.id),
+        supabase.from('product_potential_customers').delete().eq('product_id', productToDelete.id),
+        supabase.from('product_images').delete().eq('product_id', productToDelete.id),
+      ]);
+      
+      // Delete the product
+      const { error } = await supabase
+        .from('products')
+        .delete()
+        .eq('id', productToDelete.id);
+      
+      if (error) throw error;
+      
+      toast({
+        title: 'Product Deleted',
+        description: `${productToDelete.name} has been deleted successfully.`,
+      });
+      
+      fetchData();
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setDeleting(false);
+      setDeleteDialogOpen(false);
+      setProductToDelete(null);
+    }
+  };
+
+  const handleFormClose = (open: boolean) => {
+    setProductFormOpen(open);
+    if (!open) {
+      setEditingProduct(null);
+      setIsDuplicating(false);
+      setOriginalProductForDuplicate(null);
+    }
   };
 
   const clearFilters = () => {
@@ -260,7 +358,12 @@ export default function Catalog() {
                 Brands
                 <Badge variant="secondary" className="ml-2">{brands.length}</Badge>
               </Button>
-              <Button onClick={() => { setEditingProduct(null); setProductFormOpen(true); }}>
+              <Button onClick={() => { 
+                setEditingProduct(null); 
+                setIsDuplicating(false);
+                setOriginalProductForDuplicate(null);
+                setProductFormOpen(true); 
+              }}>
                 <Plus className="mr-2 h-4 w-4" />
                 Add Product
               </Button>
@@ -361,6 +464,10 @@ export default function Catalog() {
               key={product.id}
               product={product}
               onClick={() => handleProductClick(product)}
+              onView={() => handleViewProduct(product)}
+              onDelete={() => handleDeleteClick(product)}
+              onDuplicate={() => handleDuplicateProduct(product)}
+              showMenu={canManage}
             />
           ))}
         </div>
@@ -385,9 +492,11 @@ export default function Catalog() {
       {/* Product Form Dialog */}
       <ProductFormDialog
         open={productFormOpen}
-        onOpenChange={setProductFormOpen}
+        onOpenChange={handleFormClose}
         product={editingProduct}
         onSuccess={fetchData}
+        isDuplicating={isDuplicating}
+        originalProduct={originalProductForDuplicate}
       />
 
       {/* Product Detail Dialog */}
@@ -397,6 +506,29 @@ export default function Catalog() {
         onOpenChange={setDetailOpen}
         onEdit={canManage ? handleEditProduct : undefined}
       />
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Product</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{productToDelete?.name}"? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDelete}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

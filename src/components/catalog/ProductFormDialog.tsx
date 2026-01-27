@@ -97,7 +97,7 @@ interface ProductImage {
   sort_order: number;
 }
 
-interface ProductFormData {
+export interface ProductFormData {
   id?: string;
   sku: string;
   name: string;
@@ -117,6 +117,8 @@ interface ProductFormDialogProps {
   onOpenChange: (open: boolean) => void;
   product?: ProductFormData | null;
   onSuccess: () => void;
+  isDuplicating?: boolean;
+  originalProduct?: ProductFormData | null;
 }
 
 const initialFormData: ProductFormData = {
@@ -137,7 +139,9 @@ export function ProductFormDialog({
   open, 
   onOpenChange, 
   product, 
-  onSuccess 
+  onSuccess,
+  isDuplicating = false,
+  originalProduct = null,
 }: ProductFormDialogProps) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
@@ -146,6 +150,14 @@ export function ProductFormDialog({
   const [categories, setCategories] = useState<Category[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [previewSku, setPreviewSku] = useState<string>('');
+
+  // Generate preview SKU for new products
+  useEffect(() => {
+    if (open && !product?.id) {
+      setPreviewSku(generateSKU());
+    }
+  }, [open, product?.id]);
 
   // Fetch lookup data
   useEffect(() => {
@@ -187,6 +199,26 @@ export function ProductFormDialog({
     return `SKU-${timestamp}`;
   };
 
+  // Check if duplicate product has been modified
+  const hasChangesFromOriginal = (): boolean => {
+    if (!isDuplicating || !originalProduct) return true;
+    
+    // Compare all relevant fields
+    return (
+      formData.name !== originalProduct.name ||
+      formData.description !== originalProduct.description ||
+      formData.size !== originalProduct.size ||
+      formData.color !== originalProduct.color ||
+      formData.brand_id !== originalProduct.brand_id ||
+      formData.country !== originalProduct.country ||
+      formData.needs_packing !== originalProduct.needs_packing ||
+      JSON.stringify([...formData.category_ids].sort()) !== JSON.stringify([...originalProduct.category_ids].sort()) ||
+      JSON.stringify([...formData.customer_ids].sort()) !== JSON.stringify([...originalProduct.customer_ids].sort()) ||
+      formData.images.length !== originalProduct.images.length ||
+      formData.images.some((img, i) => img.image_url !== originalProduct.images[i]?.image_url)
+    );
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -199,10 +231,21 @@ export function ProductFormDialog({
       return;
     }
 
+    // Check for duplicate validation
+    if (isDuplicating && !hasChangesFromOriginal()) {
+      toast({
+        title: 'No Changes Made',
+        description: 'You must modify at least one field before duplicating. Identical products are not allowed.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setSaving(true);
     
     try {
-      const sku = formData.sku || generateSKU();
+      // Use preview SKU for new products, existing SKU for edits
+      const sku = formData.id ? formData.sku : previewSku;
       
       // Prepare product data
       const productData = {
@@ -331,8 +374,18 @@ export function ProductFormDialog({
       <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
         <DialogHeader className="flex-shrink-0">
           <DialogTitle>
-            {product?.id ? 'Edit Product' : 'Add New Product'}
+            {isDuplicating ? 'Duplicate Product' : product?.id ? 'Edit Product' : 'Add New Product'}
           </DialogTitle>
+          {/* SKU Display */}
+          <div className="flex items-center gap-2 pt-2">
+            <span className="text-sm text-muted-foreground">SKU:</span>
+            <code className="text-sm font-mono bg-muted px-2 py-0.5 rounded">
+              {product?.id ? formData.sku : previewSku}
+            </code>
+            {!product?.id && (
+              <span className="text-xs text-muted-foreground">(auto-generated)</span>
+            )}
+          </div>
         </DialogHeader>
         
         {loading ? (
@@ -477,7 +530,7 @@ export function ProductFormDialog({
             <div className="flex-shrink-0 flex gap-2 pt-4 border-t mt-4">
               <Button type="submit" className="flex-1" disabled={saving}>
                 {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {product?.id ? 'Update Product' : 'Create Product'}
+                {isDuplicating ? 'Create Duplicate' : product?.id ? 'Update Product' : 'Create Product'}
               </Button>
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancel
