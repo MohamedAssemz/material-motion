@@ -37,8 +37,6 @@ const navItems: NavItem[] = [
   { title: 'Dashboard', href: '/', icon: LayoutDashboard },
   { title: 'Orders', href: '/orders', icon: ClipboardList },
   { title: 'Catalog', href: '/catalog', icon: BookOpen },
-  { title: 'Categories', href: '/catalog/categories', icon: BookOpen, roles: ['admin'] },
-  { title: 'Brands', href: '/catalog/brands', icon: BookOpen, roles: ['admin'] },
   { title: 'Manufacturing', href: '/queues/manufacturing', icon: Factory },
   { title: 'Finishing', href: '/queues/finishing', icon: Sparkles },
   { title: 'Packaging', href: '/queues/packaging', icon: Package },

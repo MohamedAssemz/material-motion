@@ -1,79 +1,85 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Switch } from '@/components/ui/switch';
+import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Package, Plus, Edit, Loader2, X, ChevronDown, ChevronRight } from 'lucide-react';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Package, Plus, Search, Loader2, Tag, Palette, X, Trash2, Edit } from 'lucide-react';
+import { ProductCard } from '@/components/catalog/ProductCard';
+import { ProductDetailDialog } from '@/components/catalog/ProductDetailDialog';
+import { ProductFormDialog } from '@/components/catalog/ProductFormDialog';
+import { SIZE_OPTIONS } from '@/lib/catalogConstants';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
-interface Customer {
+interface Category {
   id: string;
   name: string;
-  code: string | null;
+  description: string | null;
+  created_at: string;
+  product_count?: number;
 }
 
-interface ProductSize {
+interface Brand {
   id: string;
-  size_name: string;
+  name: string;
+  logo_url: string | null;
+  created_at: string;
+  product_count?: number;
 }
 
-interface ProductColor {
-  id: string;
-  color_name: string;
-}
-
-interface ProductVariant {
+interface Product {
   id: string;
   sku: string;
   name: string;
-  size_id: string | null;
-  color_id: string | null;
-  size?: ProductSize;
-  color?: ProductColor;
-}
-
-interface ParentProduct {
-  id: string;
-  parent_sku: string;
-  name: string;
   description: string | null;
-  needs_packing: boolean;
-  sizes: ProductSize[];
-  colors: ProductColor[];
-  potential_customers: Customer[];
-  variants: ProductVariant[];
+  size: string | null;
+  color: string | null;
+  country: string | null;
+  needs_packing: boolean | null;
+  brand_id: string | null;
+  created_at: string | null;
+  brand?: { id: string; name: string } | null;
+  categories?: { category: { id: string; name: string } }[];
+  images?: { id: string; image_url: string; is_main: boolean | null; sort_order: number | null }[];
+  potential_customers?: { customer: { id: string; name: string; code: string | null } }[];
 }
 
 export default function Catalog() {
   const { hasRole } = useAuth();
   const { toast } = useToast();
-  const [parentProducts, setParentProducts] = useState<ParentProduct[]>([]);
-  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [brands, setBrands] = useState<Brand[]>([]);
   const [loading, setLoading] = useState(true);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingProduct, setEditingProduct] = useState<ParentProduct | null>(null);
-  const [expandedProducts, setExpandedProducts] = useState<Set<string>>(new Set());
-  const [submitting, setSubmitting] = useState(false);
-
-  // Form state
-  const [formData, setFormData] = useState({
-    name: '',
-    description: '',
-    needs_packing: true,
-  });
-  const [sizes, setSizes] = useState<string[]>([]);
-  const [colors, setColors] = useState<string[]>([]);
-  const [selectedCustomerIds, setSelectedCustomerIds] = useState<Set<string>>(new Set());
-  const [newSize, setNewSize] = useState('');
-  const [newColor, setNewColor] = useState('');
+  
+  // Filters
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [selectedBrand, setSelectedBrand] = useState<string>('all');
+  const [selectedSize, setSelectedSize] = useState<string>('all');
+  const [selectedCountry, setSelectedCountry] = useState<string>('all');
+  
+  // Dialogs
+  const [productFormOpen, setProductFormOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<any>(null);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
+  
+  // Category/Brand management dialogs
+  const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
+  const [brandDialogOpen, setBrandDialogOpen] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [editingBrand, setEditingBrand] = useState<Brand | null>(null);
+  const [categoryForm, setCategoryForm] = useState({ name: '', description: '' });
+  const [brandForm, setBrandForm] = useState({ name: '', logo_url: '' });
+  const [savingCategory, setSavingCategory] = useState(false);
+  const [savingBrand, setSavingBrand] = useState(false);
 
   const canManage = hasRole('admin');
 
@@ -82,37 +88,48 @@ export default function Catalog() {
   }, []);
 
   const fetchData = async () => {
+    setLoading(true);
     try {
-      const [parentRes, customersRes] = await Promise.all([
-        supabase.from('parent_products').select('*').order('parent_sku'),
-        supabase.from('customers').select('id, name, code').order('name'),
+      const [productsRes, categoriesRes, brandsRes] = await Promise.all([
+        supabase.from('products').select(`
+          *,
+          brand:brands(id, name),
+          categories:product_categories(category:categories(id, name)),
+          images:product_images(id, image_url, is_main, sort_order),
+          potential_customers:product_potential_customers(customer:customers(id, name, code))
+        `).order('created_at', { ascending: false }),
+        supabase.from('categories').select('*').order('name'),
+        supabase.from('brands').select('*').order('name'),
       ]);
 
-      if (parentRes.error) throw parentRes.error;
-      if (customersRes.error) throw customersRes.error;
+      if (productsRes.error) throw productsRes.error;
+      if (categoriesRes.error) throw categoriesRes.error;
+      if (brandsRes.error) throw brandsRes.error;
 
-      setCustomers(customersRes.data || []);
-
-      // Fetch related data for each parent product
-      const parentProducts: ParentProduct[] = [];
-      for (const parent of parentRes.data || []) {
-        const [sizesRes, colorsRes, customersLinkRes, variantsRes] = await Promise.all([
-          supabase.from('product_sizes').select('id, size_name').eq('parent_product_id', parent.id),
-          supabase.from('product_colors').select('id, color_name').eq('parent_product_id', parent.id),
-          supabase.from('product_potential_customers').select('customer_id, customer:customers(id, name, code)').eq('parent_product_id', parent.id),
-          supabase.from('products').select('id, sku, name, size_id, color_id').eq('parent_product_id', parent.id),
-        ]);
-
-        parentProducts.push({
-          ...parent,
-          sizes: sizesRes.data || [],
-          colors: colorsRes.data || [],
-          potential_customers: customersLinkRes.data?.map((c: any) => c.customer).filter(Boolean) || [],
-          variants: variantsRes.data || [],
+      // Get product counts for categories and brands
+      const productCategoryCount = new Map<string, number>();
+      const productBrandCount = new Map<string, number>();
+      
+      (productsRes.data || []).forEach(p => {
+        if (p.brand_id) {
+          productBrandCount.set(p.brand_id, (productBrandCount.get(p.brand_id) || 0) + 1);
+        }
+        p.categories?.forEach((c: any) => {
+          if (c.category?.id) {
+            productCategoryCount.set(c.category.id, (productCategoryCount.get(c.category.id) || 0) + 1);
+          }
         });
-      }
+      });
 
-      setParentProducts(parentProducts);
+      setProducts(productsRes.data || []);
+      setCategories((categoriesRes.data || []).map(c => ({
+        ...c,
+        product_count: productCategoryCount.get(c.id) || 0,
+      })));
+      setBrands((brandsRes.data || []).map(b => ({
+        ...b,
+        product_count: productBrandCount.get(b.id) || 0,
+      })));
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -124,165 +141,180 @@ export default function Catalog() {
     }
   };
 
-  const handleAddSize = () => {
-    if (newSize.trim() && !sizes.includes(newSize.trim())) {
-      setSizes([...sizes, newSize.trim()]);
-      setNewSize('');
-    }
+  // Get unique countries from products
+  const uniqueCountries = useMemo(() => {
+    const countries = new Set<string>();
+    products.forEach(p => {
+      if (p.country) countries.add(p.country);
+    });
+    return Array.from(countries).sort();
+  }, [products]);
+
+  // Filter products
+  const filteredProducts = useMemo(() => {
+    return products.filter(product => {
+      // Search filter
+      if (searchTerm) {
+        const term = searchTerm.toLowerCase();
+        const matchesSearch = 
+          product.name.toLowerCase().includes(term) ||
+          product.sku.toLowerCase().includes(term) ||
+          (product.description?.toLowerCase().includes(term) ?? false);
+        if (!matchesSearch) return false;
+      }
+
+      // Category filter
+      if (selectedCategory !== 'all') {
+        const hasCategory = product.categories?.some(c => c.category?.id === selectedCategory);
+        if (!hasCategory) return false;
+      }
+
+      // Brand filter
+      if (selectedBrand !== 'all') {
+        if (product.brand_id !== selectedBrand) return false;
+      }
+
+      // Size filter
+      if (selectedSize !== 'all') {
+        if (product.size !== selectedSize) return false;
+      }
+
+      // Country filter
+      if (selectedCountry !== 'all') {
+        if (product.country !== selectedCountry) return false;
+      }
+
+      return true;
+    });
+  }, [products, searchTerm, selectedCategory, selectedBrand, selectedSize, selectedCountry]);
+
+  const handleProductClick = (product: Product) => {
+    setSelectedProduct(product);
+    setDetailOpen(true);
   };
 
-  const handleAddColor = () => {
-    if (newColor.trim() && !colors.includes(newColor.trim())) {
-      setColors([...colors, newColor.trim()]);
-      setNewColor('');
-    }
+  const handleEditProduct = async (product: Product) => {
+    // Prepare the product for editing
+    const categoryIds = product.categories?.map(c => c.category?.id).filter(Boolean) || [];
+    const customerIds = product.potential_customers?.map(c => c.customer?.id).filter(Boolean) || [];
+    const images = product.images?.map(img => ({
+      id: img.id,
+      image_url: img.image_url,
+      is_main: img.is_main ?? false,
+      sort_order: img.sort_order ?? 0,
+    })) || [];
+
+    setEditingProduct({
+      id: product.id,
+      sku: product.sku,
+      name: product.name,
+      description: product.description || '',
+      size: product.size || '',
+      color: product.color || '',
+      brand_id: product.brand_id || '',
+      country: product.country || '',
+      needs_packing: product.needs_packing ?? true,
+      category_ids: categoryIds,
+      customer_ids: customerIds,
+      images,
+    });
+    setProductFormOpen(true);
+    setDetailOpen(false);
   };
 
-  const handleRemoveSize = (size: string) => {
-    setSizes(sizes.filter(s => s !== size));
-  };
-
-  const handleRemoveColor = (color: string) => {
-    setColors(colors.filter(c => c !== color));
-  };
-
-  const toggleCustomer = (customerId: string) => {
-    const newSet = new Set(selectedCustomerIds);
-    if (newSet.has(customerId)) {
-      newSet.delete(customerId);
-    } else {
-      newSet.add(customerId);
-    }
-    setSelectedCustomerIds(newSet);
-  };
-
-  const generateVariantSKU = (parentSku: string, size: string | null, color: string | null): string => {
-    let sku = parentSku;
-    if (size) sku += `-${size.toUpperCase().replace(/\s+/g, '')}`;
-    if (color) sku += `-${color.toUpperCase().replace(/\s+/g, '')}`;
-    return sku;
-  };
-
-  const generateVariantName = (parentName: string, size: string | null, color: string | null): string => {
-    let name = parentName;
-    const parts = [];
-    if (size) parts.push(size);
-    if (color) parts.push(color);
-    if (parts.length > 0) name += ` (${parts.join(', ')})`;
-    return name;
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.name.trim()) return;
-
-    setSubmitting(true);
+  // Category CRUD
+  const handleSaveCategory = async () => {
+    if (!categoryForm.name.trim()) return;
+    setSavingCategory(true);
     try {
-      // Generate parent SKU
-      const { data: parentSku } = await supabase.rpc('generate_parent_sku');
-      
-      // Create parent product
-      const { data: parentProduct, error: parentError } = await supabase
-        .from('parent_products')
-        .insert({
-          parent_sku: parentSku || `SKU-${Date.now()}`,
-          name: formData.name.trim(),
-          description: formData.description.trim() || null,
-          needs_packing: formData.needs_packing,
-        })
-        .select()
-        .single();
-
-      if (parentError) throw parentError;
-
-      // Create sizes
-      const sizeMap = new Map<string, string>();
-      for (const size of sizes) {
-        const { data: sizeData } = await supabase
-          .from('product_sizes')
-          .insert({ parent_product_id: parentProduct.id, size_name: size })
-          .select()
-          .single();
-        if (sizeData) sizeMap.set(size, sizeData.id);
+      if (editingCategory) {
+        const { error } = await supabase
+          .from('categories')
+          .update({ name: categoryForm.name.trim(), description: categoryForm.description.trim() || null })
+          .eq('id', editingCategory.id);
+        if (error) throw error;
+        toast({ title: 'Category updated' });
+      } else {
+        const { error } = await supabase
+          .from('categories')
+          .insert({ name: categoryForm.name.trim(), description: categoryForm.description.trim() || null });
+        if (error) throw error;
+        toast({ title: 'Category created' });
       }
-
-      // Create colors
-      const colorMap = new Map<string, string>();
-      for (const color of colors) {
-        const { data: colorData } = await supabase
-          .from('product_colors')
-          .insert({ parent_product_id: parentProduct.id, color_name: color })
-          .select()
-          .single();
-        if (colorData) colorMap.set(color, colorData.id);
-      }
-
-      // Create potential customers
-      for (const customerId of selectedCustomerIds) {
-        await supabase
-          .from('product_potential_customers')
-          .insert({ parent_product_id: parentProduct.id, customer_id: customerId });
-      }
-
-      // Generate variants
-      const sizeList = sizes.length > 0 ? sizes : [null];
-      const colorList = colors.length > 0 ? colors : [null];
-
-      for (const size of sizeList) {
-        for (const color of colorList) {
-          const variantSku = generateVariantSKU(parentProduct.parent_sku, size, color);
-          const variantName = generateVariantName(formData.name.trim(), size, color);
-
-          await supabase.from('products').insert({
-            sku: variantSku,
-            name: variantName,
-            description: formData.description.trim() || null,
-            needs_packing: formData.needs_packing,
-            parent_product_id: parentProduct.id,
-            size_id: size ? sizeMap.get(size) : null,
-            color_id: color ? colorMap.get(color) : null,
-          });
-        }
-      }
-
-      toast({
-        title: 'Success',
-        description: `Created ${formData.name} with ${sizeList.length * colorList.length} variant(s)`,
-      });
-
-      setDialogOpen(false);
-      resetForm();
+      setCategoryDialogOpen(false);
+      setEditingCategory(null);
+      setCategoryForm({ name: '', description: '' });
       fetchData();
     } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.message,
-        variant: 'destructive',
-      });
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
     } finally {
-      setSubmitting(false);
+      setSavingCategory(false);
     }
   };
 
-  const resetForm = () => {
-    setFormData({ name: '', description: '', needs_packing: true });
-    setSizes([]);
-    setColors([]);
-    setSelectedCustomerIds(new Set());
-    setNewSize('');
-    setNewColor('');
-    setEditingProduct(null);
+  const handleDeleteCategory = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this category?')) return;
+    try {
+      const { error } = await supabase.from('categories').delete().eq('id', id);
+      if (error) throw error;
+      toast({ title: 'Category deleted' });
+      fetchData();
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    }
   };
 
-  const toggleExpanded = (id: string) => {
-    const newSet = new Set(expandedProducts);
-    if (newSet.has(id)) {
-      newSet.delete(id);
-    } else {
-      newSet.add(id);
+  // Brand CRUD
+  const handleSaveBrand = async () => {
+    if (!brandForm.name.trim()) return;
+    setSavingBrand(true);
+    try {
+      if (editingBrand) {
+        const { error } = await supabase
+          .from('brands')
+          .update({ name: brandForm.name.trim(), logo_url: brandForm.logo_url.trim() || null })
+          .eq('id', editingBrand.id);
+        if (error) throw error;
+        toast({ title: 'Brand updated' });
+      } else {
+        const { error } = await supabase
+          .from('brands')
+          .insert({ name: brandForm.name.trim(), logo_url: brandForm.logo_url.trim() || null });
+        if (error) throw error;
+        toast({ title: 'Brand created' });
+      }
+      setBrandDialogOpen(false);
+      setEditingBrand(null);
+      setBrandForm({ name: '', logo_url: '' });
+      fetchData();
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } finally {
+      setSavingBrand(false);
     }
-    setExpandedProducts(newSet);
   };
+
+  const handleDeleteBrand = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this brand?')) return;
+    try {
+      const { error } = await supabase.from('brands').delete().eq('id', id);
+      if (error) throw error;
+      toast({ title: 'Brand deleted' });
+      fetchData();
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    }
+  };
+
+  const clearFilters = () => {
+    setSearchTerm('');
+    setSelectedCategory('all');
+    setSelectedBrand('all');
+    setSelectedSize('all');
+    setSelectedCountry('all');
+  };
+
+  const hasActiveFilters = searchTerm || selectedCategory !== 'all' || selectedBrand !== 'all' || selectedSize !== 'all' || selectedCountry !== 'all';
 
   if (loading) {
     return (
@@ -302,245 +334,372 @@ export default function Catalog() {
           </div>
           <div>
             <h1 className="text-2xl font-bold">Product Catalog</h1>
-            <p className="text-muted-foreground">Manage products with sizes, colors, and variants</p>
+            <p className="text-muted-foreground">Manage products, categories, and brands</p>
           </div>
         </div>
         
         {canManage && (
-          <Button onClick={() => setDialogOpen(true)}>
+          <Button onClick={() => { setEditingProduct(null); setProductFormOpen(true); }}>
             <Plus className="mr-2 h-4 w-4" />
             Add Product
           </Button>
         )}
       </div>
 
-      {/* Products List */}
-      <div className="space-y-4">
-        {parentProducts.length === 0 ? (
-          <Card className="p-12 text-center">
-            <Package className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">No products yet</h3>
-            <p className="text-muted-foreground">
-              {canManage ? 'Get started by adding your first product' : 'Products will appear here once added'}
-            </p>
-          </Card>
-        ) : (
-          parentProducts.map((product) => (
-            <Card key={product.id}>
-              <Collapsible
-                open={expandedProducts.has(product.id)}
-                onOpenChange={() => toggleExpanded(product.id)}
-              >
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <CollapsibleTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-6 w-6">
-                            {expandedProducts.has(product.id) ? (
-                              <ChevronDown className="h-4 w-4" />
-                            ) : (
-                              <ChevronRight className="h-4 w-4" />
-                            )}
-                          </Button>
-                        </CollapsibleTrigger>
-                        <CardTitle className="text-lg">{product.name}</CardTitle>
-                        <Badge variant="outline" className="font-mono">{product.parent_sku}</Badge>
-                        {product.needs_packing ? (
-                          <Badge variant="secondary" className="text-xs">Needs Packing</Badge>
-                        ) : (
-                          <Badge variant="outline" className="text-xs">No Packing</Badge>
-                        )}
-                      </div>
-                      <CardDescription className="mt-1 ml-8">
-                        {product.description || 'No description'}
-                      </CardDescription>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Badge>{product.variants.length} variant{product.variants.length !== 1 ? 's' : ''}</Badge>
-                    </div>
-                  </div>
-                  
-                  {/* Quick info */}
-                  <div className="flex gap-4 mt-3 ml-8 text-sm text-muted-foreground">
-                    {product.sizes.length > 0 && (
-                      <span>Sizes: {product.sizes.map(s => s.size_name).join(', ')}</span>
-                    )}
-                    {product.colors.length > 0 && (
-                      <span>Colors: {product.colors.map(c => c.color_name).join(', ')}</span>
-                    )}
-                    {product.potential_customers.length > 0 && (
-                      <span>Customers: {product.potential_customers.map(c => c.name).join(', ')}</span>
-                    )}
-                  </div>
-                </CardHeader>
-                
-                <CollapsibleContent>
-                  <CardContent className="pt-0">
-                    <div className="ml-8 border-t pt-4">
-                      <h4 className="font-medium mb-3">Product Variants (Child SKUs)</h4>
-                      <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
-                        {product.variants.map((variant) => (
-                          <div key={variant.id} className="p-3 border rounded-lg bg-muted/30">
-                            <p className="font-mono text-sm font-medium">{variant.sku}</p>
-                            <p className="text-sm text-muted-foreground">{variant.name}</p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </CardContent>
-                </CollapsibleContent>
-              </Collapsible>
-            </Card>
-          ))
-        )}
-      </div>
+      <Tabs defaultValue="products" className="w-full">
+        <TabsList>
+          <TabsTrigger value="products">Products ({products.length})</TabsTrigger>
+          {canManage && <TabsTrigger value="categories">Categories ({categories.length})</TabsTrigger>}
+          {canManage && <TabsTrigger value="brands">Brands ({brands.length})</TabsTrigger>}
+        </TabsList>
 
-      {/* Add Product Dialog */}
-      <Dialog open={dialogOpen} onOpenChange={(open) => {
-        setDialogOpen(open);
-        if (!open) resetForm();
-      }}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Add New Product</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Basic Info */}
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="name">Product Name *</Label>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="e.g., Classic T-Shirt"
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="description">Description</Label>
-                <Textarea
-                  id="description"
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Product description..."
-                  rows={2}
-                />
-              </div>
-              <div className="flex items-center justify-between p-3 rounded-lg border">
-                <div>
-                  <Label htmlFor="needs_packing" className="font-medium">Needs Packaging</Label>
-                  <p className="text-xs text-muted-foreground">
-                    Enable if this product requires the packaging phase
-                  </p>
+        {/* Products Tab */}
+        <TabsContent value="products" className="space-y-4">
+          {/* Search and Filters */}
+          <Card className="p-4">
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col sm:flex-row gap-4">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search products by name, SKU, or description..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
                 </div>
-                <Switch
-                  id="needs_packing"
-                  checked={formData.needs_packing}
-                  onCheckedChange={(checked) => setFormData({ ...formData, needs_packing: checked })}
-                />
-              </div>
-            </div>
-
-            {/* Sizes */}
-            <div className="space-y-2">
-              <Label>Sizes (optional)</Label>
-              <div className="flex gap-2">
-                <Input
-                  value={newSize}
-                  onChange={(e) => setNewSize(e.target.value)}
-                  placeholder="e.g., Small, Medium, Large"
-                  onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddSize())}
-                />
-                <Button type="button" variant="outline" onClick={handleAddSize}>Add</Button>
-              </div>
-              {sizes.length > 0 && (
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {sizes.map((size) => (
-                    <Badge key={size} variant="secondary" className="gap-1">
-                      {size}
-                      <button type="button" onClick={() => handleRemoveSize(size)}>
-                        <X className="h-3 w-3" />
-                      </button>
-                    </Badge>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Colors */}
-            <div className="space-y-2">
-              <Label>Colors (optional)</Label>
-              <div className="flex gap-2">
-                <Input
-                  value={newColor}
-                  onChange={(e) => setNewColor(e.target.value)}
-                  placeholder="e.g., Red, Blue, Green"
-                  onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddColor())}
-                />
-                <Button type="button" variant="outline" onClick={handleAddColor}>Add</Button>
-              </div>
-              {colors.length > 0 && (
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {colors.map((color) => (
-                    <Badge key={color} variant="secondary" className="gap-1">
-                      {color}
-                      <button type="button" onClick={() => handleRemoveColor(color)}>
-                        <X className="h-3 w-3" />
-                      </button>
-                    </Badge>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Variant Preview */}
-            {(sizes.length > 0 || colors.length > 0) && (
-              <div className="p-3 bg-muted/50 rounded-lg">
-                <Label className="text-sm">Variants to be created:</Label>
-                <p className="text-sm text-muted-foreground mt-1">
-                  {(sizes.length || 1) * (colors.length || 1)} variant(s) will be created
-                </p>
-              </div>
-            )}
-
-            {/* Potential Customers */}
-            <div className="space-y-2">
-              <Label>Potential Customers (optional)</Label>
-              <div className="max-h-40 overflow-y-auto border rounded-lg p-2 space-y-2">
-                {customers.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-2">No customers available</p>
-                ) : (
-                  customers.map((customer) => (
-                    <div key={customer.id} className="flex items-center gap-2">
-                      <Checkbox
-                        id={`customer-${customer.id}`}
-                        checked={selectedCustomerIds.has(customer.id)}
-                        onCheckedChange={() => toggleCustomer(customer.id)}
-                      />
-                      <Label htmlFor={`customer-${customer.id}`} className="text-sm cursor-pointer">
-                        {customer.name}
-                        {customer.code && <span className="text-muted-foreground ml-1">({customer.code})</span>}
-                      </Label>
-                    </div>
-                  ))
+                {hasActiveFilters && (
+                  <Button variant="ghost" onClick={clearFilters} size="sm">
+                    <X className="mr-1 h-4 w-4" />
+                    Clear filters
+                  </Button>
                 )}
               </div>
+              
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Categories</SelectItem>
+                    {categories.map(c => (
+                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select value={selectedBrand} onValueChange={setSelectedBrand}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Brand" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Brands</SelectItem>
+                    {brands.map(b => (
+                      <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select value={selectedSize} onValueChange={setSelectedSize}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Size" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Sizes</SelectItem>
+                    {SIZE_OPTIONS.map(s => (
+                      <SelectItem key={s} value={s}>{s}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select value={selectedCountry} onValueChange={setSelectedCountry}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Country" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Countries</SelectItem>
+                    {uniqueCountries.map(c => (
+                      <SelectItem key={c} value={c}>{c}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </Card>
+
+          {/* Products Grid */}
+          {filteredProducts.length === 0 ? (
+            <Card className="p-12 text-center">
+              <Package className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+              <h3 className="text-lg font-semibold mb-2">
+                {products.length === 0 ? 'No products yet' : 'No products match your filters'}
+              </h3>
+              <p className="text-muted-foreground">
+                {products.length === 0 && canManage 
+                  ? 'Get started by adding your first product' 
+                  : hasActiveFilters 
+                    ? 'Try adjusting your filters' 
+                    : 'Products will appear here once added'}
+              </p>
+            </Card>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+              {filteredProducts.map((product) => (
+                <ProductCard
+                  key={product.id}
+                  product={product}
+                  onClick={() => handleProductClick(product)}
+                />
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        {/* Categories Tab (Admin only) */}
+        {canManage && (
+          <TabsContent value="categories" className="space-y-4">
+            <div className="flex justify-between items-center">
+              <p className="text-muted-foreground">Manage product categories</p>
+              <Button onClick={() => { setEditingCategory(null); setCategoryForm({ name: '', description: '' }); setCategoryDialogOpen(true); }}>
+                <Plus className="mr-2 h-4 w-4" />
+                Add Category
+              </Button>
             </div>
 
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
-                Cancel
+            <Card>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Description</TableHead>
+                    <TableHead>Products</TableHead>
+                    <TableHead>Created</TableHead>
+                    <TableHead className="w-[100px]">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {categories.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                        No categories yet. Add your first category to get started.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    categories.map((category) => (
+                      <TableRow key={category.id}>
+                        <TableCell className="font-medium">{category.name}</TableCell>
+                        <TableCell className="text-muted-foreground">{category.description || '—'}</TableCell>
+                        <TableCell>
+                          <Badge variant="secondary">{category.product_count || 0}</Badge>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-sm">
+                          {new Date(category.created_at).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => {
+                                setEditingCategory(category);
+                                setCategoryForm({ name: category.name, description: category.description || '' });
+                                setCategoryDialogOpen(true);
+                              }}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDeleteCategory(category.id)}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </Card>
+          </TabsContent>
+        )}
+
+        {/* Brands Tab (Admin only) */}
+        {canManage && (
+          <TabsContent value="brands" className="space-y-4">
+            <div className="flex justify-between items-center">
+              <p className="text-muted-foreground">Manage product brands</p>
+              <Button onClick={() => { setEditingBrand(null); setBrandForm({ name: '', logo_url: '' }); setBrandDialogOpen(true); }}>
+                <Plus className="mr-2 h-4 w-4" />
+                Add Brand
               </Button>
-              <Button type="submit" disabled={submitting || !formData.name.trim()}>
-                {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                Create Product
-              </Button>
-            </DialogFooter>
-          </form>
+            </div>
+
+            <Card>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Logo</TableHead>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Products</TableHead>
+                    <TableHead>Created</TableHead>
+                    <TableHead className="w-[100px]">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {brands.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                        No brands yet. Add your first brand to get started.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    brands.map((brand) => (
+                      <TableRow key={brand.id}>
+                        <TableCell>
+                          {brand.logo_url ? (
+                            <img src={brand.logo_url} alt={brand.name} className="h-8 w-8 object-contain rounded" />
+                          ) : (
+                            <div className="h-8 w-8 rounded bg-muted flex items-center justify-center">
+                              <Palette className="h-4 w-4 text-muted-foreground" />
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell className="font-medium">{brand.name}</TableCell>
+                        <TableCell>
+                          <Badge variant="secondary">{brand.product_count || 0}</Badge>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-sm">
+                          {new Date(brand.created_at).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => {
+                                setEditingBrand(brand);
+                                setBrandForm({ name: brand.name, logo_url: brand.logo_url || '' });
+                                setBrandDialogOpen(true);
+                              }}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDeleteBrand(brand.id)}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </Card>
+          </TabsContent>
+        )}
+      </Tabs>
+
+      {/* Category Dialog */}
+      <Dialog open={categoryDialogOpen} onOpenChange={setCategoryDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editingCategory ? 'Edit Category' : 'Add Category'}</DialogTitle>
+            <DialogDescription>
+              {editingCategory ? 'Update the category details below.' : 'Create a new product category.'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="category-name">Name *</Label>
+              <Input
+                id="category-name"
+                value={categoryForm.name}
+                onChange={(e) => setCategoryForm({ ...categoryForm, name: e.target.value })}
+                placeholder="Category name"
+              />
+            </div>
+            <div>
+              <Label htmlFor="category-description">Description</Label>
+              <Input
+                id="category-description"
+                value={categoryForm.description}
+                onChange={(e) => setCategoryForm({ ...categoryForm, description: e.target.value })}
+                placeholder="Optional description"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCategoryDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleSaveCategory} disabled={savingCategory || !categoryForm.name.trim()}>
+              {savingCategory && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {editingCategory ? 'Update' : 'Create'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Brand Dialog */}
+      <Dialog open={brandDialogOpen} onOpenChange={setBrandDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editingBrand ? 'Edit Brand' : 'Add Brand'}</DialogTitle>
+            <DialogDescription>
+              {editingBrand ? 'Update the brand details below.' : 'Create a new product brand.'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="brand-name">Name *</Label>
+              <Input
+                id="brand-name"
+                value={brandForm.name}
+                onChange={(e) => setBrandForm({ ...brandForm, name: e.target.value })}
+                placeholder="Brand name"
+              />
+            </div>
+            <div>
+              <Label htmlFor="brand-logo">Logo URL</Label>
+              <Input
+                id="brand-logo"
+                value={brandForm.logo_url}
+                onChange={(e) => setBrandForm({ ...brandForm, logo_url: e.target.value })}
+                placeholder="https://example.com/logo.png"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBrandDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleSaveBrand} disabled={savingBrand || !brandForm.name.trim()}>
+              {savingBrand && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {editingBrand ? 'Update' : 'Create'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Product Form Dialog */}
+      <ProductFormDialog
+        open={productFormOpen}
+        onOpenChange={setProductFormOpen}
+        product={editingProduct}
+        onSuccess={fetchData}
+      />
+
+      {/* Product Detail Dialog */}
+      <ProductDetailDialog
+        product={selectedProduct}
+        open={detailOpen}
+        onOpenChange={setDetailOpen}
+        onEdit={canManage ? handleEditProduct : undefined}
+      />
     </div>
   );
 }

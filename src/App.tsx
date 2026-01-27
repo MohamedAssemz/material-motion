@@ -12,8 +12,6 @@ import OrderCreate from "./pages/OrderCreate";
 import OrderDetail from "./pages/OrderDetail";
 import Products from "./pages/Products";
 import Catalog from "./pages/Catalog";
-import CatalogCategories from "./pages/CatalogCategories";
-import CatalogBrands from "./pages/CatalogBrands";
 import Customers from "./pages/Customers";
 import Machines from "./pages/Machines";
 import Boxes from "./pages/Boxes";
@@ -59,8 +57,6 @@ const App = () => (
             <Route path="/orders/create" element={<ProtectedPage><OrderCreate /></ProtectedPage>} />
             <Route path="/products" element={<ProtectedPage><Products /></ProtectedPage>} />
             <Route path="/catalog" element={<ProtectedPage><Catalog /></ProtectedPage>} />
-            <Route path="/catalog/categories" element={<ProtectedRoute requiredRole="admin"><AppLayout><CatalogCategories /></AppLayout></ProtectedRoute>} />
-            <Route path="/catalog/brands" element={<ProtectedRoute requiredRole="admin"><AppLayout><CatalogBrands /></AppLayout></ProtectedRoute>} />
             <Route path="/users" element={<ProtectedRoute requiredRole="admin"><AppLayout><Admin /></AppLayout></ProtectedRoute>} />
             <Route path="/queues/manufacturing" element={<ProtectedPage><QueueManufacturing /></ProtectedPage>} />
             <Route path="/queues/finishing" element={<ProtectedPage><QueueFinishing /></ProtectedPage>} />
