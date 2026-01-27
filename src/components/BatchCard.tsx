@@ -17,6 +17,8 @@ export interface BatchInfo {
   earliest_eta?: string;
   has_late_units: boolean;
   lead_time_days?: number;
+  needs_packing?: boolean; // Product-level: whether this product needs packaging phase
+  needs_boxing?: boolean;  // Order-item-level: whether this item needs boxing phase
 }
 
 interface BatchCardProps {
