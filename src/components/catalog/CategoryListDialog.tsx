@@ -1,11 +1,11 @@
-import { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { useState, useMemo } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Plus, Edit, Trash2, Loader2, Tag } from 'lucide-react';
+import { Plus, Edit, Trash2, Loader2, Tag, Search } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -30,12 +30,25 @@ export function CategoryListDialog({ open, onOpenChange, categories, onRefresh }
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [form, setForm] = useState({ name: '', description: '' });
   const [saving, setSaving] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const resetForm = () => {
     setShowForm(false);
     setEditingCategory(null);
     setForm({ name: '', description: '' });
   };
+
+  const filteredCategories = useMemo(() => {
+    const sorted = [...categories].sort((a, b) => 
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
+    if (!searchQuery.trim()) return sorted;
+    const query = searchQuery.toLowerCase();
+    return sorted.filter(cat => 
+      cat.name.toLowerCase().includes(query) || 
+      cat.description?.toLowerCase().includes(query)
+    );
+  }, [categories, searchQuery]);
 
   const handleSave = async () => {
     if (!form.name.trim()) return;
@@ -83,8 +96,8 @@ export function CategoryListDialog({ open, onOpenChange, categories, onRefresh }
   };
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { onOpenChange(v); if (!v) resetForm(); }}>
-      <DialogContent className="max-w-lg max-h-[80vh] flex flex-col">
+    <Dialog open={open} onOpenChange={(v) => { onOpenChange(v); if (!v) { resetForm(); setSearchQuery(''); } }}>
+      <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Tag className="h-5 w-5" />
@@ -125,21 +138,30 @@ export function CategoryListDialog({ open, onOpenChange, categories, onRefresh }
           </div>
         ) : (
           <>
-            <div className="flex justify-end">
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search categories..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
               <Button size="sm" onClick={() => setShowForm(true)}>
                 <Plus className="mr-2 h-4 w-4" />
                 Add Category
               </Button>
             </div>
 
-            <ScrollArea className="flex-1 -mx-6 px-6">
-              {categories.length === 0 ? (
+            <ScrollArea className="flex-1 -mx-6 px-6 min-h-[300px]">
+              {filteredCategories.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
-                  No categories yet. Create your first category.
+                  {searchQuery ? 'No categories match your search.' : 'No categories yet. Create your first category.'}
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {categories.map((category) => (
+                  {filteredCategories.map((category) => (
                     <div
                       key={category.id}
                       className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors"
