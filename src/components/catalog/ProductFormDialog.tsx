@@ -268,8 +268,8 @@ export function ProductFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
-        <DialogHeader>
+      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle>
             {product?.id ? 'Edit Product' : 'Add New Product'}
           </DialogTitle>
@@ -280,9 +280,8 @@ export function ProductFormDialog({
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="flex-1 overflow-hidden flex flex-col">
-            <ScrollArea className="flex-1 pr-4">
-              <div className="space-y-6 pb-4">
+          <form onSubmit={handleSubmit} className="flex-1 min-h-0 flex flex-col overflow-hidden">
+            <div className="flex-1 overflow-y-auto pr-4 space-y-6 pb-4">
                 {/* Basic Info */}
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="sm:col-span-2">
@@ -435,10 +434,9 @@ export function ProductFormDialog({
                     productId={formData.id}
                   />
                 </div>
-              </div>
-            </ScrollArea>
+            </div>
 
-            <div className="flex gap-2 pt-4 border-t mt-4">
+            <div className="flex-shrink-0 flex gap-2 pt-4 border-t mt-4">
               <Button type="submit" className="flex-1" disabled={saving}>
                 {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {product?.id ? 'Update Product' : 'Create Product'}
