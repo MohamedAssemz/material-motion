@@ -12,21 +12,20 @@ interface ProductPotentialCustomer {
     id: string;
     name: string;
     code: string | null;
-    country: string | null;
-  };
+    country?: string | null;
+  } | null;
 }
 
 interface ExtendedProductData extends ProductCardData {
   potential_customers?: ProductPotentialCustomer[];
-  created_at?: string;
+  created_at?: string | null;
 }
 
 interface ProductDetailDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   product: ExtendedProductData | null;
-  onEdit: () => void;
-  canEdit: boolean;
+  onEdit?: (product: any) => void;
 }
 
 export function ProductDetailDialog({ 
@@ -34,7 +33,6 @@ export function ProductDetailDialog({
   onOpenChange, 
   product, 
   onEdit,
-  canEdit 
 }: ProductDetailDialogProps) {
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   
@@ -51,8 +49,8 @@ export function ProductDetailDialog({
             <DialogTitle className="text-xl">{product.name}</DialogTitle>
             <p className="text-sm font-mono text-muted-foreground">{product.sku}</p>
           </div>
-          {canEdit && (
-            <Button variant="outline" size="sm" onClick={onEdit}>
+          {onEdit && (
+            <Button variant="outline" size="sm" onClick={() => onEdit(product)}>
               <Edit className="h-4 w-4 mr-2" />
               Edit
             </Button>
@@ -166,8 +164,8 @@ export function ProductDetailDialog({
                 <div>
                   <h4 className="text-sm font-medium text-muted-foreground mb-2">Categories</h4>
                   <div className="flex flex-wrap gap-1.5">
-                    {product.categories.map(pc => (
-                      <Badge key={pc.category.id} variant="secondary">
+                    {product.categories.map((pc, idx) => pc.category && (
+                      <Badge key={pc.category.id || idx} variant="secondary">
                         {pc.category.name}
                       </Badge>
                     ))}
@@ -180,8 +178,8 @@ export function ProductDetailDialog({
                 <div>
                   <h4 className="text-sm font-medium text-muted-foreground mb-2">Potential Customers</h4>
                   <div className="flex flex-wrap gap-1.5">
-                    {product.potential_customers.map(pc => (
-                      <Badge key={pc.customer.id} variant="outline">
+                    {product.potential_customers.map((pc, idx) => pc.customer && (
+                      <Badge key={pc.customer.id || idx} variant="outline">
                         {pc.customer.name}
                         {pc.customer.code && <span className="ml-1 opacity-60">({pc.customer.code})</span>}
                       </Badge>

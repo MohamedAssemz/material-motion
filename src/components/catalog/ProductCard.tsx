@@ -7,14 +7,14 @@ interface ProductCategory {
   category: {
     id: string;
     name: string;
-  };
+  } | null;
 }
 
 interface ProductImage {
   id: string;
   image_url: string;
-  is_main: boolean;
-  sort_order: number;
+  is_main: boolean | null;
+  sort_order: number | null;
 }
 
 interface ProductBrand {
@@ -31,9 +31,9 @@ export interface ProductCardData {
   color: string | null;
   country: string | null;
   needs_packing: boolean | null;
-  brand: ProductBrand | null;
-  categories: ProductCategory[];
-  images: ProductImage[];
+  brand?: ProductBrand | null;
+  categories?: ProductCategory[];
+  images?: ProductImage[];
 }
 
 interface ProductCardProps {
@@ -83,14 +83,14 @@ export function ProductCard({ product, onClick }: ProductCardProps) {
         
         {product.categories && product.categories.length > 0 && (
           <div className="flex flex-wrap gap-1">
-            {product.categories.slice(0, 3).map(pc => (
-              <Badge key={pc.category.id} variant="secondary" className="text-xs">
+            {product.categories.slice(0, 3).map((pc, idx) => pc.category && (
+              <Badge key={pc.category.id || idx} variant="secondary" className="text-xs">
                 {pc.category.name}
               </Badge>
             ))}
-            {product.categories.length > 3 && (
+            {product.categories.filter(pc => pc.category).length > 3 && (
               <Badge variant="outline" className="text-xs">
-                +{product.categories.length - 3}
+                +{product.categories.filter(pc => pc.category).length - 3}
               </Badge>
             )}
           </div>
