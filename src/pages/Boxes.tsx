@@ -14,6 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Plus, Box, Loader2, Package } from 'lucide-react';
 import { format } from 'date-fns';
+import { BoxDetailsDialog } from '@/components/BoxDetailsDialog';
 
 interface OrderBoxData {
   id: string;
@@ -22,15 +23,9 @@ interface OrderBoxData {
   created_at: string;
   content_type: string;
   items_list: any[];
-  current_batch?: {
-    id: string;
-    current_state: string;
-    quantity: number;
-    product: {
-      name: string;
-      sku: string;
-    };
-  } | null;
+  batch_count: number;
+  total_quantity: number;
+  primary_state: string | null;
 }
 
 interface ExtraBoxData {
@@ -40,6 +35,9 @@ interface ExtraBoxData {
   created_at: string;
   content_type: string;
   items_list: any[];
+  batch_count: number;
+  total_quantity: number;
+  primary_state: string | null;
 }
 
 export default function Boxes() {
@@ -53,6 +51,18 @@ export default function Boxes() {
   const [extraDialogOpen, setExtraDialogOpen] = useState(false);
   const [newBoxCount, setNewBoxCount] = useState(1);
   const [newExtraBoxCount, setNewExtraBoxCount] = useState(1);
+
+  // Details dialog state
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [selectedBox, setSelectedBox] = useState<{
+    boxType: 'order' | 'extra';
+    boxId: string;
+    boxCode: string;
+    createdAt: string;
+    isActive: boolean;
+    contentType: string;
+    primaryState: string | null;
+  } | null>(null);
 
   const canManage = hasRole('manufacture_lead') || hasRole('admin');
 
@@ -69,6 +79,12 @@ export default function Boxes() {
         fetchBoxes();
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'extra_boxes' }, () => {
+        fetchBoxes();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_batches' }, () => {
+        fetchBoxes();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'extra_batches' }, () => {
         fetchBoxes();
       })
       .subscribe();
@@ -88,38 +104,42 @@ export default function Boxes() {
 
       if (orderBoxesError) throw orderBoxesError;
 
-      // Fetch current batch for each order box from order_batches
-      const boxIds = orderBoxesData?.map(b => b.id) || [];
-      const { data: batchesData } = await supabase
+      // Fetch order batches to get counts and states per box
+      const orderBoxIds = orderBoxesData?.map(b => b.id) || [];
+      const { data: orderBatchesData } = await supabase
         .from('order_batches')
-        .select(`
-          id,
-          current_state,
-          quantity,
-          box_id,
-          product:products(name, sku)
-        `)
-        .in('box_id', boxIds)
+        .select('box_id, quantity, current_state')
+        .in('box_id', orderBoxIds)
         .eq('is_terminated', false);
 
-      const batchByBox = new Map();
-      batchesData?.forEach(batch => {
+      // Aggregate batch data per box
+      const orderBatchStats = new Map<string, { count: number; total: number; state: string | null }>();
+      orderBatchesData?.forEach(batch => {
         if (batch.box_id) {
-          batchByBox.set(batch.box_id, batch);
+          const existing = orderBatchStats.get(batch.box_id) || { count: 0, total: 0, state: null };
+          existing.count += 1;
+          existing.total += batch.quantity;
+          if (!existing.state) existing.state = batch.current_state;
+          orderBatchStats.set(batch.box_id, existing);
         }
       });
 
-      const orderBoxesWithBatches: OrderBoxData[] = (orderBoxesData || []).map(box => ({
-        id: box.id,
-        box_code: box.box_code,
-        is_active: box.is_active,
-        created_at: box.created_at,
-        content_type: box.content_type || 'EMPTY',
-        items_list: Array.isArray(box.items_list) ? box.items_list : [],
-        current_batch: batchByBox.get(box.id) || null,
-      }));
+      const orderBoxesMapped: OrderBoxData[] = (orderBoxesData || []).map(box => {
+        const stats = orderBatchStats.get(box.id) || { count: 0, total: 0, state: null };
+        return {
+          id: box.id,
+          box_code: box.box_code,
+          is_active: box.is_active,
+          created_at: box.created_at,
+          content_type: box.content_type || 'EMPTY',
+          items_list: Array.isArray(box.items_list) ? box.items_list : [],
+          batch_count: stats.count,
+          total_quantity: stats.total,
+          primary_state: stats.state,
+        };
+      });
 
-      setOrderBoxes(orderBoxesWithBatches);
+      setOrderBoxes(orderBoxesMapped);
 
       // Fetch extra boxes
       const { data: extraBoxesData, error: extraBoxesError } = await supabase
@@ -129,14 +149,39 @@ export default function Boxes() {
 
       if (extraBoxesError) throw extraBoxesError;
 
-      const extraBoxesMapped: ExtraBoxData[] = (extraBoxesData || []).map(box => ({
-        id: box.id,
-        box_code: box.box_code,
-        is_active: box.is_active,
-        created_at: box.created_at,
-        content_type: box.content_type || 'EMPTY',
-        items_list: Array.isArray(box.items_list) ? box.items_list : [],
-      }));
+      // Fetch extra batches to get counts and states per box
+      const extraBoxIds = extraBoxesData?.map(b => b.id) || [];
+      const { data: extraBatchesData } = await supabase
+        .from('extra_batches')
+        .select('box_id, quantity, current_state')
+        .in('box_id', extraBoxIds);
+
+      // Aggregate batch data per box
+      const extraBatchStats = new Map<string, { count: number; total: number; state: string | null }>();
+      extraBatchesData?.forEach(batch => {
+        if (batch.box_id) {
+          const existing = extraBatchStats.get(batch.box_id) || { count: 0, total: 0, state: null };
+          existing.count += 1;
+          existing.total += batch.quantity;
+          if (!existing.state) existing.state = batch.current_state;
+          extraBatchStats.set(batch.box_id, existing);
+        }
+      });
+
+      const extraBoxesMapped: ExtraBoxData[] = (extraBoxesData || []).map(box => {
+        const stats = extraBatchStats.get(box.id) || { count: 0, total: 0, state: null };
+        return {
+          id: box.id,
+          box_code: box.box_code,
+          is_active: box.is_active,
+          created_at: box.created_at,
+          content_type: box.content_type || 'EMPTY',
+          items_list: Array.isArray(box.items_list) ? box.items_list : [],
+          batch_count: stats.count,
+          total_quantity: stats.total,
+          primary_state: stats.state,
+        };
+      });
 
       setExtraBoxes(extraBoxesMapped);
     } catch (error: any) {
@@ -210,7 +255,8 @@ export default function Boxes() {
     }
   };
 
-  const handleToggleOrderBoxActive = async (box: OrderBoxData) => {
+  const handleToggleOrderBoxActive = async (box: OrderBoxData, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent row click
     try {
       const { error } = await supabase
         .from('boxes')
@@ -233,7 +279,8 @@ export default function Boxes() {
     }
   };
 
-  const handleToggleExtraBoxActive = async (box: ExtraBoxData) => {
+  const handleToggleExtraBoxActive = async (box: ExtraBoxData, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent row click
     try {
       const { error } = await supabase
         .from('extra_boxes')
@@ -256,7 +303,33 @@ export default function Boxes() {
     }
   };
 
-  const getStateColor = (state: string) => {
+  const handleOrderBoxClick = (box: OrderBoxData) => {
+    setSelectedBox({
+      boxType: 'order',
+      boxId: box.id,
+      boxCode: box.box_code,
+      createdAt: box.created_at,
+      isActive: box.is_active,
+      contentType: box.content_type,
+      primaryState: box.primary_state,
+    });
+    setDetailsOpen(true);
+  };
+
+  const handleExtraBoxClick = (box: ExtraBoxData) => {
+    setSelectedBox({
+      boxType: 'extra',
+      boxId: box.id,
+      boxCode: box.box_code,
+      createdAt: box.created_at,
+      isActive: box.is_active,
+      contentType: box.content_type,
+      primaryState: box.primary_state,
+    });
+    setDetailsOpen(true);
+  };
+
+  const getOrderStateColor = (state: string) => {
     const colors: Record<string, string> = {
       'pending_rm': 'bg-yellow-500',
       'in_manufacturing': 'bg-blue-500',
@@ -267,17 +340,31 @@ export default function Boxes() {
       'ready_for_boxing': 'bg-cyan-300',
       'in_boxing': 'bg-cyan-500',
       'ready_for_shipment': 'bg-teal-300',
-      'in_shipment': 'bg-green-500',
+      'shipped': 'bg-green-500',
     };
     return colors[state] || 'bg-gray-500';
   };
 
-  const emptyOrderBoxes = orderBoxes.filter(b => !b.current_batch && b.is_active);
-  const occupiedOrderBoxes = orderBoxes.filter(b => b.current_batch);
+  const getExtraStateColor = (state: string) => {
+    const colors: Record<string, string> = {
+      'extra_manufacturing': 'bg-blue-500',
+      'extra_finishing': 'bg-purple-500',
+      'extra_packaging': 'bg-orange-500',
+      'extra_boxing': 'bg-cyan-500',
+    };
+    return colors[state] || 'bg-amber-500';
+  };
+
+  const formatState = (state: string) => {
+    return state?.replace(/_/g, ' ').toUpperCase() || 'UNKNOWN';
+  };
+
+  const emptyOrderBoxes = orderBoxes.filter(b => b.batch_count === 0 && b.is_active);
+  const occupiedOrderBoxes = orderBoxes.filter(b => b.batch_count > 0);
   const inactiveOrderBoxes = orderBoxes.filter(b => !b.is_active);
 
-  const emptyExtraBoxes = extraBoxes.filter(b => (!b.items_list || b.items_list.length === 0) && b.is_active);
-  const occupiedExtraBoxes = extraBoxes.filter(b => b.items_list && b.items_list.length > 0);
+  const emptyExtraBoxes = extraBoxes.filter(b => b.batch_count === 0 && b.is_active);
+  const occupiedExtraBoxes = extraBoxes.filter(b => b.batch_count > 0);
   const inactiveExtraBoxes = extraBoxes.filter(b => !b.is_active);
 
   if (loading) {
@@ -408,21 +495,24 @@ export default function Boxes() {
                       <TableRow>
                         <TableHead>Box Code</TableHead>
                         <TableHead>Status</TableHead>
-                        <TableHead>Current Batch</TableHead>
-                        <TableHead>Product</TableHead>
-                        <TableHead>Quantity</TableHead>
+                        <TableHead>Batches</TableHead>
+                        <TableHead>Total Qty</TableHead>
                         <TableHead>Created</TableHead>
                         <TableHead className="text-right">Active</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {orderBoxes.map((box) => (
-                        <TableRow key={box.id} className={!box.is_active ? 'opacity-50' : ''}>
+                        <TableRow
+                          key={box.id}
+                          className={`cursor-pointer hover:bg-muted/50 ${!box.is_active ? 'opacity-50' : ''}`}
+                          onClick={() => handleOrderBoxClick(box)}
+                        >
                           <TableCell className="font-mono font-bold">{box.box_code}</TableCell>
                           <TableCell>
-                            {box.current_batch ? (
-                              <Badge className={getStateColor(box.current_batch.current_state)}>
-                                {box.current_batch.current_state.replace(/_/g, ' ').toUpperCase()}
+                            {box.batch_count > 0 && box.primary_state ? (
+                              <Badge className={getOrderStateColor(box.primary_state)}>
+                                {formatState(box.primary_state)}
                               </Badge>
                             ) : (
                               <Badge variant="outline" className="text-green-600 border-green-600">
@@ -431,31 +521,26 @@ export default function Boxes() {
                             )}
                           </TableCell>
                           <TableCell>
-                            {box.current_batch ? (
-                              <span className="font-mono text-sm">Batch</span>
+                            {box.batch_count > 0 ? (
+                              <span className="text-sm">{box.batch_count}</span>
                             ) : (
-                              <span className="text-muted-foreground">-</span>
+                              <span className="text-muted-foreground">0</span>
                             )}
                           </TableCell>
                           <TableCell>
-                            {box.current_batch?.product ? (
-                              <div>
-                                <p className="text-sm">{box.current_batch.product.name}</p>
-                                <p className="text-xs text-muted-foreground">{box.current_batch.product.sku}</p>
-                              </div>
+                            {box.total_quantity > 0 ? (
+                              <span className="text-sm">{box.total_quantity}</span>
                             ) : (
-                              <span className="text-muted-foreground">-</span>
+                              <span className="text-muted-foreground">0</span>
                             )}
-                          </TableCell>
-                          <TableCell>
-                            {box.current_batch ? box.current_batch.quantity : '-'}
                           </TableCell>
                           <TableCell>{format(new Date(box.created_at), 'PP')}</TableCell>
                           <TableCell className="text-right">
                             <Switch
                               checked={box.is_active}
-                              onCheckedChange={() => handleToggleOrderBoxActive(box)}
-                              disabled={!!box.current_batch}
+                              onCheckedChange={() => {}}
+                              onClick={(e) => handleToggleOrderBoxActive(box, e)}
+                              disabled={box.batch_count > 0}
                             />
                           </TableCell>
                         </TableRow>
@@ -563,46 +648,56 @@ export default function Boxes() {
                       <TableRow>
                         <TableHead>Box Code</TableHead>
                         <TableHead>Status</TableHead>
-                        <TableHead>Items</TableHead>
+                        <TableHead>Batches</TableHead>
+                        <TableHead>Total Qty</TableHead>
                         <TableHead>Created</TableHead>
                         <TableHead className="text-right">Active</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {extraBoxes.map((box) => {
-                        const itemCount = box.items_list?.length || 0;
-                        return (
-                          <TableRow key={box.id} className={!box.is_active ? 'opacity-50' : ''}>
-                            <TableCell className="font-mono font-bold">{box.box_code}</TableCell>
-                            <TableCell>
-                              {itemCount > 0 ? (
-                                <Badge className="bg-amber-500">
-                                  OCCUPIED
-                                </Badge>
-                              ) : (
-                                <Badge variant="outline" className="text-green-600 border-green-600">
-                                  EMPTY
-                                </Badge>
-                              )}
-                            </TableCell>
-                            <TableCell>
-                              {itemCount > 0 ? (
-                                <span className="text-sm">{itemCount} batch(es)</span>
-                              ) : (
-                                <span className="text-muted-foreground">-</span>
-                              )}
-                            </TableCell>
-                            <TableCell>{format(new Date(box.created_at), 'PP')}</TableCell>
-                            <TableCell className="text-right">
-                              <Switch
-                                checked={box.is_active}
-                                onCheckedChange={() => handleToggleExtraBoxActive(box)}
-                                disabled={itemCount > 0}
-                              />
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
+                      {extraBoxes.map((box) => (
+                        <TableRow
+                          key={box.id}
+                          className={`cursor-pointer hover:bg-muted/50 ${!box.is_active ? 'opacity-50' : ''}`}
+                          onClick={() => handleExtraBoxClick(box)}
+                        >
+                          <TableCell className="font-mono font-bold">{box.box_code}</TableCell>
+                          <TableCell>
+                            {box.batch_count > 0 && box.primary_state ? (
+                              <Badge className={getExtraStateColor(box.primary_state)}>
+                                {formatState(box.primary_state)}
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-green-600 border-green-600">
+                                EMPTY
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {box.batch_count > 0 ? (
+                              <span className="text-sm">{box.batch_count}</span>
+                            ) : (
+                              <span className="text-muted-foreground">0</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {box.total_quantity > 0 ? (
+                              <span className="text-sm">{box.total_quantity}</span>
+                            ) : (
+                              <span className="text-muted-foreground">0</span>
+                            )}
+                          </TableCell>
+                          <TableCell>{format(new Date(box.created_at), 'PP')}</TableCell>
+                          <TableCell className="text-right">
+                            <Switch
+                              checked={box.is_active}
+                              onCheckedChange={() => {}}
+                              onClick={(e) => handleToggleExtraBoxActive(box, e)}
+                              disabled={box.batch_count > 0}
+                            />
+                          </TableCell>
+                        </TableRow>
+                      ))}
                     </TableBody>
                   </Table>
                 )}
@@ -611,6 +706,22 @@ export default function Boxes() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Box Details Dialog */}
+      {selectedBox && (
+        <BoxDetailsDialog
+          open={detailsOpen}
+          onOpenChange={setDetailsOpen}
+          boxType={selectedBox.boxType}
+          boxId={selectedBox.boxId}
+          boxCode={selectedBox.boxCode}
+          createdAt={selectedBox.createdAt}
+          isActive={selectedBox.isActive}
+          contentType={selectedBox.contentType}
+          primaryState={selectedBox.primaryState}
+          onDeleted={fetchBoxes}
+        />
+      )}
     </div>
   );
 }
