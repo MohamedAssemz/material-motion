@@ -1,20 +1,84 @@
 
 
-## Add Explicit Box State Validation on Scan in Receive Tab
+## Add Scan Button with Popup for Barcode Scanning
 
-This change enhances the barcode scanning validation in the receive tab of production phases (Finishing, Packaging, Boxing). When scanning boxes, each scanned box will be explicitly validated to confirm it's in the expected "ready" state before being accepted.
+This change adds a dedicated "Scan" button in the receive tab that opens a focused scanning popup. The popup allows users to scan multiple boxes, validate each one, and then add all scanned boxes to the selection when confirmed.
 
 ---
 
 ### Overview
 
-Currently, the `BoxReceiveDialog` component validates scanned boxes by checking if they exist in the pre-fetched `allBoxes` list (which is already filtered by `filterState`). However, this validation happens implicitly. The user wants explicit validation where each scanned box is individually checked against the database to confirm it's in the expected state.
+The current implementation uses the `useBoxScanner` hook to detect hardware scanner input globally while the `BoxReceiveDialog` is open. The user wants a more explicit workflow:
 
-This change will:
-1. Perform an explicit database check for each scanned box
-2. Verify the box contains batches in the correct `filterState`
-3. Provide clear feedback when a box fails validation
-4. Support multiple consecutive scans with individual validation per box
+1. User clicks "Scan" button in the receive dialog
+2. A popup opens with a text field focused for scanning
+3. Each scanned barcode is validated and added to a list in the popup
+4. User can cancel (discard scanned boxes) or click "Add Selected" to add them to the main selection
+5. The main dialog then shows the scanned boxes as selected
+
+---
+
+### New Component: `BoxScanPopup.tsx`
+
+A focused scanning popup component that:
+- Opens as a nested dialog within `BoxReceiveDialog`
+- Contains a single text input field (auto-focused) for barcode scanning
+- Validates each scanned box against the database (same logic as current `handleBoxScan`)
+- Displays a list of successfully scanned boxes
+- Has "Cancel" and "Add Selected" action buttons
+
+**Props:**
+```typescript
+interface BoxScanPopupProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onAddBoxes: (boxes: SelectedBox[]) => void;
+  orderId: string;
+  filterState: UnitState;
+  alreadySelectedIds: string[]; // To prevent duplicates
+}
+```
+
+**Component Structure:**
+```text
++----------------------------------+
+|  Scan Boxes                  [X] |
++----------------------------------+
+|                                  |
+|  [____Scan barcode here____]     |
+|                                  |
+|  Scanned Boxes:                  |
+|  +----------------------------+  |
+|  | BOX-0001 (5 items)     [X] |  |
+|  | BOX-0002 (3 items)     [X] |  |
+|  +----------------------------+  |
+|                                  |
+|  [Cancel]         [Add Selected] |
++----------------------------------+
+```
+
+**Validation Logic:**
+When a barcode is scanned (Enter key pressed in the input field):
+1. Check if already in the scanned list (within popup)
+2. Check if already selected in the main dialog
+3. Query database for the box (same validation as current `handleBoxScan`)
+4. If valid: Add to scanned list with success toast
+5. If invalid: Show error toast with specific reason
+
+---
+
+### Files to Create
+
+**`src/components/BoxScanPopup.tsx`**
+
+New component with:
+- Dialog/Sheet UI for the popup
+- Input field that captures scanner input (auto-focused)
+- Local state for scanned boxes within the popup
+- Validation logic reused from `BoxReceiveDialog`
+- List display of scanned boxes with remove buttons
+- Cancel button (clears and closes)
+- "Add Selected" button (calls `onAddBoxes` with scanned boxes)
 
 ---
 
@@ -22,152 +86,99 @@ This change will:
 
 **`src/components/BoxReceiveDialog.tsx`**
 
-Update the `handleBoxScan` callback function to:
+1. Add new state for controlling the scan popup:
+   ```typescript
+   const [scanPopupOpen, setScanPopupOpen] = useState(false);
+   ```
 
-1. When a box code is scanned:
-   - First check if already selected (existing logic)
-   - Query the database directly to fetch the box and its associated batches
-   - Validate that the box exists and is active
-   - Validate that the box contains batches in the expected `filterState` for this specific order
-   - If valid, add to selected boxes
-   - If invalid, show a descriptive error toast explaining why (wrong state, different order, empty box, etc.)
+2. Add a "Scan" button in the search/scan area (next to the existing search button):
+   ```tsx
+   <Button variant="outline" onClick={() => setScanPopupOpen(true)}>
+     <QrCode className="h-4 w-4 mr-2" />
+     Scan
+   </Button>
+   ```
 
-2. The enhanced validation will check:
-   - Box exists and is active
-   - Box has batches assigned to it
-   - Batches belong to the correct order (`orderId`)
-   - Batches are in the expected state (`filterState`)
-   - Batches are not terminated
+3. Add handler for receiving scanned boxes from the popup:
+   ```typescript
+   const handleAddScannedBoxes = (boxes: SelectedBox[]) => {
+     setSelectedBoxes(prev => [...prev, ...boxes]);
+     setScanPopupOpen(false);
+     toast({
+       title: 'Boxes Added',
+       description: `Added ${boxes.length} scanned box(es)`,
+     });
+   };
+   ```
+
+4. Disable the global `useBoxScanner` when the scan popup is open (to prevent double-handling):
+   ```typescript
+   useBoxScanner({
+     onScan: handleBoxScan,
+     enabled: open && !scanPopupOpen,
+   });
+   ```
+
+5. Add the `BoxScanPopup` component at the end of the dialog:
+   ```tsx
+   <BoxScanPopup
+     open={scanPopupOpen}
+     onOpenChange={setScanPopupOpen}
+     onAddBoxes={handleAddScannedBoxes}
+     orderId={orderId}
+     filterState={filterState}
+     alreadySelectedIds={selectedBoxes.map(b => b.id)}
+   />
+   ```
 
 ---
 
-### Current Flow (Before Change)
+### User Flow
+
+1. User opens the receive dialog
+2. User clicks "Scan" button
+3. Scan popup opens with input field auto-focused
+4. User scans a box barcode with hardware scanner
+5. Input captures the code, validates it, shows success/error toast
+6. Box appears in the popup's scanned list
+7. User can scan more boxes (each validated individually)
+8. User can remove boxes from the scanned list by clicking X
+9. User clicks "Add Selected" to add all scanned boxes to main selection
+10. Popup closes, main dialog shows scanned boxes as selected
+11. User continues with normal receive flow (Accept button)
+
+---
+
+### Technical Details
+
+**Input Handling:**
+- The input field uses `onKeyDown` to detect Enter key
+- When Enter is pressed, the current value is validated
+- After validation (success or failure), the input is cleared
+- Input remains focused for continuous scanning
+
+**State Management:**
+- Popup maintains its own `scannedBoxes` state
+- On "Add Selected", boxes are passed to parent via callback
+- Parent adds them to `selectedBoxes` state
+- Popup state is cleared when closed
+
+**Validation:**
+- Reuses the same database validation logic from `handleBoxScan`
+- Checks: box exists, is active, has batches for order, batches in correct state
+- Error messages match existing behavior
+
+---
+
+### UI Placement
+
+The "Scan" button will be placed next to the search button in the existing search bar:
 
 ```text
-Box Scanned -> Check if in allBoxes (pre-filtered list)
-           -> If found: Add to selection
-           -> If not found: Check if box exists, show generic error
++-------------------------------------------------------+
+| [QR] Search box code or product...  [Search] [Scan]   |
++-------------------------------------------------------+
 ```
 
-### New Flow (After Change)
-
-```text
-Box Scanned -> Check if already selected
-           -> Query database for box with batches
-           -> Validate:
-              ✓ Box exists and is active
-              ✓ Box has batches for this order
-              ✓ Batches are in expected state (filterState)
-              ✓ Batches are not terminated
-           -> If all pass: Add to selection with success toast
-           -> If any fail: Show specific error toast:
-              - "Box not found or inactive"
-              - "Box is empty"
-              - "Box does not contain items for this order"
-              - "Box items are in [actual state], expected [expected state]"
-```
-
----
-
-### Technical Implementation
-
-The `handleBoxScan` function will be updated as follows:
-
-```typescript
-const handleBoxScan = useCallback(async (code: string) => {
-  // Check if already selected
-  const alreadySelected = selectedBoxes.find(b => b.box_code.toUpperCase() === code);
-  if (alreadySelected) {
-    toast({ title: 'Already Selected', description: `Box ${code} is already selected` });
-    return;
-  }
-
-  // Explicit database validation
-  const { data: box } = await supabase
-    .from('boxes')
-    .select('id, box_code')
-    .eq('box_code', code)
-    .eq('is_active', true)
-    .maybeSingle();
-
-  if (!box) {
-    toast({ title: 'Box Not Found', description: `No active box found with code "${code}"`, variant: 'destructive' });
-    return;
-  }
-
-  // Fetch batches in this box for this order
-  const { data: batches } = await supabase
-    .from('order_batches')
-    .select(`id, product_id, quantity, current_state, product:products(id, name, sku)`)
-    .eq('box_id', box.id)
-    .eq('order_id', orderId)
-    .eq('is_terminated', false);
-
-  if (!batches || batches.length === 0) {
-    toast({ title: 'Empty or Wrong Order', description: `Box ${code} has no items for this order`, variant: 'destructive' });
-    return;
-  }
-
-  // Check if all batches are in the expected state
-  const validBatches = batches.filter(b => b.current_state === filterState);
-  const invalidBatches = batches.filter(b => b.current_state !== filterState);
-
-  if (validBatches.length === 0) {
-    const actualState = batches[0].current_state;
-    toast({
-      title: 'Wrong State',
-      description: `Box ${code} items are in "${getStateLabel(actualState)}" state, expected "${getStateLabel(filterState)}"`,
-      variant: 'destructive',
-    });
-    return;
-  }
-
-  // Box is valid - add to selection
-  const selectedBox: SelectedBox = {
-    id: box.id,
-    box_code: box.box_code,
-    batches: validBatches.map(b => ({
-      id: b.id,
-      product_id: b.product_id,
-      product_name: (b.product as any)?.name || 'Unknown',
-      product_sku: (b.product as any)?.sku || 'N/A',
-      quantity: b.quantity,
-    })),
-    total_quantity: validBatches.reduce((sum, b) => sum + b.quantity, 0),
-  };
-
-  setSelectedBoxes(prev => [...prev, selectedBox]);
-  toast({ title: 'Box Accepted', description: `Box ${code} validated and added (${selectedBox.total_quantity} items)` });
-}, [selectedBoxes, orderId, filterState, toast]);
-```
-
----
-
-### Validation Error Messages
-
-| Scenario | Error Message |
-|----------|---------------|
-| Box not found | "No active box found with code 'XXX'" |
-| Box inactive | Same as above |
-| Box has no batches for this order | "Box XXX has no items for this order" |
-| Batches in wrong state | "Box XXX items are in 'In Finishing' state, expected 'Ready for Finishing'" |
-| Already selected | "Box XXX is already selected" |
-
----
-
-### Benefits
-
-1. **Explicit Validation**: Each scan triggers a fresh database check, ensuring data consistency
-2. **Clear Feedback**: Users receive specific error messages explaining why a box was rejected
-3. **Multi-scan Support**: Each box is independently validated, supporting workflows where multiple boxes are scanned consecutively
-4. **Order Isolation**: Validates that the box contents belong to the current order
-5. **State Verification**: Ensures items are in the exact expected state before acceptance
-
----
-
-### No Changes Required
-
-- `useBoxScanner.ts` - Hook works correctly, no changes needed
-- Database schema - No changes required
-- Other dialog components - This change is specific to `BoxReceiveDialog`
+This keeps the interface clean while providing a dedicated scanning experience when needed.
 
