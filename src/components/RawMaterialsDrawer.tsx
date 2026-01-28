@@ -10,7 +10,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
@@ -80,12 +79,17 @@ export function RawMaterialsDrawer({
         profiles?.forEach((p) => profileMap.set(p.id, p));
       }
 
-      setVersions(
-        data?.map((v) => ({
-          ...v,
-          profile: v.created_by ? profileMap.get(v.created_by) : undefined,
-        })) || []
-      );
+      const mappedVersions = data?.map((v) => ({
+        ...v,
+        profile: v.created_by ? profileMap.get(v.created_by) : undefined,
+      })) || [];
+      
+      setVersions(mappedVersions);
+      
+      // Pre-populate with latest version content for quick editing
+      if (mappedVersions.length > 0 && !newContent) {
+        setNewContent(mappedVersions[0].content);
+      }
     } catch (error) {
       console.error("Error fetching raw material versions:", error);
       toast.error("Failed to load raw materials");
@@ -224,9 +228,6 @@ export function RawMaterialsDrawer({
                         <span className="font-medium text-sm">
                           {version.profile?.full_name || version.profile?.email || "Unknown User"}
                         </span>
-                        <Badge variant={index === 0 ? "default" : "secondary"} className="text-xs">
-                          v{version.version_number}
-                        </Badge>
                         <span className="text-xs text-muted-foreground">
                           {formatTimestamp(version.created_at)}
                         </span>
