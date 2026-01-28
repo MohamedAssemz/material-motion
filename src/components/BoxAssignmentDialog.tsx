@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -13,6 +13,7 @@ import { Box, Loader2, QrCode, Search, AlertTriangle, Settings } from 'lucide-re
 import { getStateLabel, type UnitState } from '@/lib/stateMachine';
 import { useToast } from '@/hooks/use-toast';
 import { SearchableSelect } from '@/components/ui/searchable-select';
+import { useBoxScanner } from '@/hooks/useBoxScanner';
 interface Machine {
   id: string;
   name: string;
@@ -103,6 +104,68 @@ export function BoxAssignmentDialog({
       validateProductSelection();
     }
   }, [open, products, machineType]);
+
+  // Scanner handler - auto-select box when scanned
+  const handleBoxScan = useCallback(async (code: string) => {
+    // Find box in empty or compatible boxes
+    const emptyMatch = emptyBoxes.find(b => b.box_code.toUpperCase() === code);
+    if (emptyMatch) {
+      setSelectedBox(emptyMatch);
+      toast({
+        title: 'Box Selected',
+        description: `Selected empty box ${code}`,
+      });
+      return;
+    }
+
+    const compatibleMatch = compatibleBoxes.find(b => b.box_code.toUpperCase() === code);
+    if (compatibleMatch && allowMultipleItems) {
+      setSelectedBox(compatibleMatch);
+      toast({
+        title: 'Box Selected',
+        description: `Selected box ${code} (already has ${batchType} items)`,
+      });
+      return;
+    }
+
+    // Check if box exists at all
+    const { data: box } = await supabase
+      .from('boxes')
+      .select('id, box_code, content_type')
+      .eq('box_code', code)
+      .eq('is_active', true)
+      .single();
+
+    if (!box) {
+      toast({
+        title: 'Box Not Found',
+        description: `No active box found with code "${code}"`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Box exists but is incompatible
+    if (box.content_type && box.content_type !== 'EMPTY' && box.content_type !== batchType) {
+      toast({
+        title: 'Incompatible Box',
+        description: `Box ${code} contains ${box.content_type} items. Cannot mix with ${batchType} items.`,
+        variant: 'destructive',
+      });
+    } else if (!allowMultipleItems && box.content_type !== 'EMPTY') {
+      toast({
+        title: 'Box Occupied',
+        description: `Box ${code} already contains items`,
+        variant: 'destructive',
+      });
+    }
+  }, [emptyBoxes, compatibleBoxes, allowMultipleItems, batchType, toast]);
+
+  // Enable scanner when dialog is open
+  useBoxScanner({
+    onScan: handleBoxScan,
+    enabled: open,
+  });
   
   const fetchMachines = async () => {
     if (!machineType) return;

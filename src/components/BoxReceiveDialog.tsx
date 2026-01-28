@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Box, Loader2, QrCode, Search, X, Printer } from 'lucide-react';
 import { getStateLabel, type UnitState } from '@/lib/stateMachine';
 import { useToast } from '@/hooks/use-toast';
+import { useBoxScanner } from '@/hooks/useBoxScanner';
 
 interface BoxBatch {
   id: string;
@@ -58,6 +59,60 @@ export function BoxReceiveDialog({
       setSearchCode('');
     }
   }, [open, orderId, filterState]);
+
+  // Scanner handler - auto-select boxes when scanned
+  const handleBoxScan = useCallback(async (code: string) => {
+    // Check if already selected
+    const alreadySelected = selectedBoxes.find(b => b.box_code.toUpperCase() === code);
+    if (alreadySelected) {
+      toast({
+        title: 'Already Selected',
+        description: `Box ${code} is already selected`,
+      });
+      return;
+    }
+
+    // Check if box exists in the available boxes
+    const matchingBox = allBoxes.find(b => b.box_code.toUpperCase() === code);
+    if (matchingBox) {
+      setSelectedBoxes(prev => [...prev, matchingBox]);
+      toast({
+        title: 'Box Added',
+        description: `Box ${code} has been selected`,
+      });
+      return;
+    }
+
+    // Box not in the ready list - check if it exists at all
+    const { data: box } = await supabase
+      .from('boxes')
+      .select('id, box_code')
+      .eq('box_code', code)
+      .eq('is_active', true)
+      .single();
+
+    if (!box) {
+      toast({
+        title: 'Box Not Found',
+        description: `No active box found with code "${code}"`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Box exists but not in valid state for this order
+    toast({
+      title: 'Invalid Box',
+      description: `Box ${code} is not in ${getStateLabel(filterState)} state for this order`,
+      variant: 'destructive',
+    });
+  }, [selectedBoxes, allBoxes, filterState, toast]);
+
+  // Enable scanner when dialog is open
+  useBoxScanner({
+    onScan: handleBoxScan,
+    enabled: open,
+  });
 
   // Real-time filtering as user types
   useEffect(() => {

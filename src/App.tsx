@@ -20,6 +20,7 @@ import Admin from "./pages/Admin";
 import Analytics from "./pages/Analytics";
 import Auth from "./pages/Auth";
 import BatchLookup from "./pages/BatchLookup";
+import BoxLookup from "./pages/BoxLookup";
 import NotFound from "./pages/NotFound";
 import QueueManufacturing from "./pages/QueueManufacturing";
 import QueueFinishing from "./pages/QueueFinishing";
@@ -68,6 +69,8 @@ const App = () => (
             <Route path="/customers" element={<ProtectedPage><Customers /></ProtectedPage>} />
             <Route path="/batch/:code" element={<BatchLookup />} />
             <Route path="/batch" element={<BatchLookup />} />
+            <Route path="/box/:code" element={<BoxLookup />} />
+            <Route path="/box" element={<BoxLookup />} />
             <Route path="/analytics" element={<ProtectedPage><Analytics /></ProtectedPage>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
