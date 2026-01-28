@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { ArrowLeft, Box, Loader2, QrCode, CheckSquare, Truck, Printer, Package, CheckCircle, Download, Search } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { ExtraItemsTab } from '@/components/ExtraItemsTab';
+import { BoxScanPopup } from '@/components/BoxScanPopup';
 import { MoveToExtraDialog } from '@/components/MoveToExtraDialog';
 import { ProductionRateSection } from '@/components/ProductionRateSection';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -100,6 +101,7 @@ export default function OrderBoxing() {
   const [readyForShipmentSelections, setReadyForShipmentSelections] = useState<Map<string, number>>(new Map());
   const [etaDays, setEtaDays] = useState("1");
   const [receiveSearchQuery, setReceiveSearchQuery] = useState('');
+  const [scanPopupOpen, setScanPopupOpen] = useState(false);
 
   const [acceptDialogOpen, setAcceptDialogOpen] = useState(false);
   const [moveToReadyDialogOpen, setMoveToReadyDialogOpen] = useState(false);
@@ -392,6 +394,16 @@ export default function OrderBoxing() {
   const handleSelectAllBoxes = () => {
     if (selectedBoxes.size === filteredReadyBoxGroups.length) setSelectedBoxes(new Set());
     else setSelectedBoxes(new Set(filteredReadyBoxGroups.map((g) => g.box_id)));
+  };
+
+  const handleAddScannedBoxes = (boxes: Array<{ id: string; box_code: string; total_quantity: number }>) => {
+    setSelectedBoxes(prev => {
+      const next = new Set(prev);
+      boxes.forEach(box => next.add(box.id));
+      return next;
+    });
+    setScanPopupOpen(false);
+    toast.success(`Added ${boxes.length} scanned box(es) to selection`);
   };
 
   const handleAcceptBoxes = async () => {
@@ -1067,6 +1079,10 @@ export default function OrderBoxing() {
                     Clear
                   </Button>
                 )}
+                <Button variant="outline" size="sm" onClick={() => setScanPopupOpen(true)}>
+                  <QrCode className="h-4 w-4 mr-2" />
+                  Scan
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -1507,6 +1523,15 @@ export default function OrderBoxing() {
           fetchData();
         }}
         userId={user?.id}
+      />
+
+      <BoxScanPopup
+        open={scanPopupOpen}
+        onOpenChange={setScanPopupOpen}
+        onAddBoxes={handleAddScannedBoxes}
+        orderId={id!}
+        filterState="ready_for_boxing"
+        alreadySelectedIds={Array.from(selectedBoxes)}
       />
     </div>
   );
