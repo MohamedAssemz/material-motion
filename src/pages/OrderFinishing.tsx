@@ -28,6 +28,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { ExtraItemsTab } from '@/components/ExtraItemsTab';
+import { BoxScanPopup } from '@/components/BoxScanPopup';
 import { MoveToExtraDialog } from '@/components/MoveToExtraDialog';
 import {
   Select,
@@ -104,6 +105,7 @@ export default function OrderFinishing() {
   const [productSelections, setProductSelections] = useState<Map<string, number>>(new Map());
   const [etaDays, setEtaDays] = useState('1');
   const [receiveSearchQuery, setReceiveSearchQuery] = useState('');
+  const [scanPopupOpen, setScanPopupOpen] = useState(false);
   
   // Dialog states
   const [acceptDialogOpen, setAcceptDialogOpen] = useState(false);
@@ -413,6 +415,16 @@ export default function OrderFinishing() {
     }
   };
 
+  const handleAddScannedBoxes = (boxes: Array<{ id: string; box_code: string; total_quantity: number }>) => {
+    setSelectedBoxes(prev => {
+      const next = new Set(prev);
+      boxes.forEach(box => next.add(box.id));
+      return next;
+    });
+    setScanPopupOpen(false);
+    toast.success(`Added ${boxes.length} scanned box(es) to selection`);
+  };
+
   const handleAcceptBoxes = async () => {
     if (selectedBoxes.size === 0) return;
     setSubmitting(true);
@@ -707,6 +719,10 @@ export default function OrderFinishing() {
                     Clear
                   </Button>
                 )}
+                <Button variant="outline" size="sm" onClick={() => setScanPopupOpen(true)}>
+                  <QrCode className="h-4 w-4 mr-2" />
+                  Scan
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -1041,6 +1057,15 @@ export default function OrderFinishing() {
           fetchData();
         }}
         userId={user?.id}
+      />
+
+      <BoxScanPopup
+        open={scanPopupOpen}
+        onOpenChange={setScanPopupOpen}
+        onAddBoxes={handleAddScannedBoxes}
+        orderId={id!}
+        filterState="ready_for_finishing"
+        alreadySelectedIds={Array.from(selectedBoxes)}
       />
     </div>
   );
