@@ -1,37 +1,104 @@
 
 
-## Remove State Column and Delete Option from Box Details Dialog
+## Add Comments Drawer to Order Details Page
 
-Based on the provided context that all items in a box must share the same state (shown in the dialog header), the following changes will simplify the UI.
+This feature will add a timeline-based comments system to the order details page, allowing users to add notes that are saved with user details and timestamps.
 
 ---
 
-### Changes Overview
+### Overview
 
-**File: `src/components/BoxDetailsDialog.tsx`**
+A "Comments" button will be added to the order details header. When clicked, it opens a drawer (sliding panel from the right) that displays:
+- A form to add new comments
+- A timeline view of all previous comments, showing the user who added them and when
 
-1. **Remove State Column from Order Boxes Table**
-   - Remove the "State" column header from line 262
-   - Remove the State cell from each row (lines 276-280)
+---
 
-2. **Remove State Column from Extra Boxes Table**
-   - Remove the "State" column header from line 293
-   - Remove the State cell from each row (lines 308-312)
-   - Keep the "Inv State" (Inventory State) column as it shows AVAILABLE/RESERVED status which varies per batch
+### Database Changes
 
-3. **Remove Delete Button and Related Logic**
-   - Remove the Delete Box button from the dialog footer (lines 330-338)
-   - Remove the AlertDialog for delete confirmation (lines 346-372)
-   - Remove the `deleteDialogOpen` and `deleting` state variables (lines 75-76)
-   - Remove the `handleDelete` function (lines 141-168)
-   - Remove the `Trash2` icon import
-   - Remove the `onDeleted` prop since it will no longer be needed
+**Create new table: `order_comments`**
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | uuid | Primary key |
+| order_id | uuid | Reference to the order |
+| content | text | The comment text |
+| created_by | uuid | User who created the comment |
+| created_at | timestamp | When the comment was created |
+
+**RLS Policies:**
+- All authenticated users can view comments
+- All authenticated users can create comments (any role can add notes)
+
+---
+
+### New Component
+
+**File: `src/components/OrderCommentsDrawer.tsx`**
+
+A drawer component that:
+- Fetches all comments for the order, sorted newest first
+- Shows each comment with:
+  - User avatar/name
+  - Timestamp (formatted as "Jan 28, 2026 at 3:45 PM")
+  - Comment content
+- Includes a form at the top to add new comments
+- Uses the existing `Sheet` component for the drawer UI
+- Displays comments in a scrollable timeline layout with visual connectors
+
+---
+
+### Integration
+
+**File: `src/pages/OrderDetail.tsx`**
+
+1. Add a "Comments" button in the header next to the existing "Raw Materials" button
+2. Add state for controlling the drawer open/close
+3. Import and render the new `OrderCommentsDrawer` component
+
+---
+
+### UI Design
+
+The drawer will have:
+- Header with "Comments" title and close button
+- New comment form with a textarea and "Post Comment" button
+- Timeline section showing all comments with:
+  - Visual timeline connector line
+  - User info (avatar with initials, name)
+  - Relative or absolute timestamp
+  - Comment content in a card-style container
+  - Latest comment highlighted
 
 ---
 
 ### Technical Details
 
-The state is already displayed in the dialog header via the `getStatusBadge()` function which shows the `primaryState` as a colored badge. Since all batches in a box share the same state (per the constraint documented in the useful context), displaying it redundantly per row adds no value.
+**Comment Timeline Pattern:**
+```text
++---------------------------+
+| Comments           [X]    |
++---------------------------+
+| [Textarea for new comment]|
+| [Post Comment]            |
++---------------------------+
+| Timeline                  |
+|  o-- User Name            |
+|  |   Jan 28, 2026 3:45 PM |
+|  |   "Comment content..." |
+|  |                        |
+|  o-- Another User         |
+|  |   Jan 27, 2026 1:20 PM |
+|  |   "Earlier comment..." |
++---------------------------+
+```
 
-For extra boxes, the "Inv State" column will remain because individual batches can have different inventory states (AVAILABLE vs RESERVED) even within the same box.
+**Files to create:**
+- `src/components/OrderCommentsDrawer.tsx` - The drawer component
+
+**Files to modify:**
+- `src/pages/OrderDetail.tsx` - Add button and drawer state
+
+**Database migration:**
+- Create `order_comments` table with RLS policies
 
