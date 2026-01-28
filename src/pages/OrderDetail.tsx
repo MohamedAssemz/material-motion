@@ -18,7 +18,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { RawMaterialsDialog } from "@/components/RawMaterialsDialog";
+import { RawMaterialsDrawer } from "@/components/RawMaterialsDrawer";
 import { FlaggedItemsDialog } from "@/components/FlaggedItemsDialog";
 import { ShipmentDialog } from "@/components/ShipmentDialog";
 import { BoxAssignmentDialog } from "@/components/BoxAssignmentDialog";
@@ -1099,7 +1099,7 @@ export default function OrderDetail() {
       </Card>
 
       {/* Dialogs */}
-      <RawMaterialsDialog open={rawMaterialsOpen} onOpenChange={setRawMaterialsOpen} orderId={id!} />
+      <RawMaterialsDrawer open={rawMaterialsOpen} onOpenChange={setRawMaterialsOpen} orderId={id!} orderNumber={order?.order_number || ""} />
       <FlaggedItemsDialog 
         open={flaggedItemsOpen} 
         onOpenChange={setFlaggedItemsOpen} 
