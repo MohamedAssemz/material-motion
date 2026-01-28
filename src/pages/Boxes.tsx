@@ -719,7 +719,6 @@ export default function Boxes() {
           isActive={selectedBox.isActive}
           contentType={selectedBox.contentType}
           primaryState={selectedBox.primaryState}
-          onDeleted={fetchBoxes}
         />
       )}
     </div>

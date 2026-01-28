@@ -8,21 +8,11 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Trash2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface BoxDetailsDialogProps {
@@ -35,7 +25,7 @@ interface BoxDetailsDialogProps {
   isActive: boolean;
   contentType: string;
   primaryState: string | null;
-  onDeleted?: () => void;
+  
 }
 
 interface OrderBatchDetail {
@@ -65,15 +55,12 @@ export function BoxDetailsDialog({
   isActive,
   contentType,
   primaryState,
-  onDeleted,
 }: BoxDetailsDialogProps) {
   const { hasRole } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [orderBatches, setOrderBatches] = useState<OrderBatchDetail[]>([]);
   const [extraBatches, setExtraBatches] = useState<ExtraBatchDetail[]>([]);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [deleting, setDeleting] = useState(false);
 
   const isAdmin = hasRole('admin');
   const batchCount = boxType === 'order' ? orderBatches.length : extraBatches.length;
@@ -135,35 +122,6 @@ export function BoxDetailsDialog({
       });
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleDelete = async () => {
-    if (!boxId) return;
-    
-    setDeleting(true);
-    try {
-      const table = boxType === 'order' ? 'boxes' : 'extra_boxes';
-      const { error } = await supabase.from(table).delete().eq('id', boxId);
-
-      if (error) throw error;
-
-      toast({
-        title: 'Success',
-        description: `${boxCode} has been deleted`,
-      });
-
-      setDeleteDialogOpen(false);
-      onOpenChange(false);
-      onDeleted?.();
-    } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.message,
-        variant: 'destructive',
-      });
-    } finally {
-      setDeleting(false);
     }
   };
 
@@ -259,7 +217,6 @@ export function BoxDetailsDialog({
                       <TableHead>Product SKU</TableHead>
                       <TableHead>Product Name</TableHead>
                       <TableHead className="text-right">Qty</TableHead>
-                      <TableHead>State</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -273,11 +230,6 @@ export function BoxDetailsDialog({
                         </TableCell>
                         <TableCell>{batch.product?.name || '-'}</TableCell>
                         <TableCell className="text-right">{batch.quantity}</TableCell>
-                        <TableCell>
-                          <Badge className={getStateColor(batch.current_state)} variant="secondary">
-                            {formatState(batch.current_state)}
-                          </Badge>
-                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -290,7 +242,6 @@ export function BoxDetailsDialog({
                       <TableHead>Product SKU</TableHead>
                       <TableHead>Product Name</TableHead>
                       <TableHead className="text-right">Qty</TableHead>
-                      <TableHead>State</TableHead>
                       <TableHead>Inv State</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -306,12 +257,7 @@ export function BoxDetailsDialog({
                         <TableCell>{batch.product?.name || '-'}</TableCell>
                         <TableCell className="text-right">{batch.quantity}</TableCell>
                         <TableCell>
-                          <Badge className={getStateColor(batch.current_state)} variant="secondary">
-                            {formatState(batch.current_state)}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge 
+                          <Badge
                             variant={batch.inventory_state === 'RESERVED' ? 'default' : 'outline'}
                             className={batch.inventory_state === 'RESERVED' ? 'bg-amber-500' : ''}
                           >
@@ -326,50 +272,13 @@ export function BoxDetailsDialog({
             </div>
           </div>
 
-          <DialogFooter className="gap-2">
-            {isAdmin && isEmpty && !loading && (
-              <Button
-                variant="destructive"
-                onClick={() => setDeleteDialogOpen(true)}
-              >
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete Box
-              </Button>
-            )}
+          <DialogFooter>
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Close
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Box?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete {boxCode}? This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              disabled={deleting}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {deleting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Deleting...
-                </>
-              ) : (
-                'Delete'
-              )}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </>
   );
 }
