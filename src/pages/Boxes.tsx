@@ -232,11 +232,11 @@ export default function Boxes() {
     });
   }, [orderBoxes, extraBoxes, toast, openBoxDetails]);
 
-  // Enable scanner when not in a dialog
-  useBoxScanner({
-    onScan: handleBoxScan,
-    enabled: !detailsOpen && !dialogOpen && !extraDialogOpen && !printDialogOpen && !scanDialogOpen,
-  });
+  // Page-level scanner disabled - scanning only works inside the BoxLookupScanDialog
+  // useBoxScanner({
+  //   onScan: handleBoxScan,
+  //   enabled: !detailsOpen && !dialogOpen && !extraDialogOpen && !printDialogOpen && !scanDialogOpen,
+  // });
 
   useEffect(() => {
     if (!canManage) {
