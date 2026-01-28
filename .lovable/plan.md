@@ -1,47 +1,65 @@
-# Completed: Add Scan Button to Production Phase Receive Tabs
 
-✅ **Status: Implemented**
 
-The Scan button has been added to all three production phase pages' Receive tabs.
+## Keep Input Focused After Each Barcode Scan
 
----
-
-## Changes Made
-
-### Files Modified
-
-1. **`src/pages/OrderFinishing.tsx`**
-   - Imported `BoxScanPopup` component
-   - Added `scanPopupOpen` state variable
-   - Added `handleAddScannedBoxes` function
-   - Added "Scan" button in Receive tab search area
-   - Rendered `BoxScanPopup` with `filterState="ready_for_finishing"`
-
-2. **`src/pages/OrderPackaging.tsx`**
-   - Imported `BoxScanPopup` component
-   - Added `scanPopupOpen` state variable
-   - Added `handleAddScannedBoxes` function
-   - Added "Scan" button in Receive tab search area
-   - Rendered `BoxScanPopup` with `filterState="ready_for_packaging"`
-
-3. **`src/pages/OrderBoxing.tsx`**
-   - Imported `BoxScanPopup` component
-   - Added `scanPopupOpen` state variable
-   - Added `handleAddScannedBoxes` function
-   - Added "Scan" button in Receive tab search area
-   - Rendered `BoxScanPopup` with `filterState="ready_for_boxing"`
+This change ensures the input field in the scan popup stays focused after each barcode is scanned, allowing for continuous scanning without needing to click on the text field between scans.
 
 ---
 
-## User Flow
+### Overview
 
-1. Navigate to a production phase page (Finishing, Packaging, or Boxing)
-2. Open the Receive tab
-3. Click "Scan" button next to the search input
-4. BoxScanPopup opens with auto-focused input field
-5. Scan barcodes with hardware scanner
-6. Each box is validated (exists, has correct state, belongs to order)
-7. Valid boxes appear in popup list
-8. Click "Add Selected"
-9. Scanned boxes are automatically checked in the Receive tab box list
-10. Click "Accept X Box(es)" to receive them
+Currently, when you scan a barcode:
+1. The barcode value is captured in the input
+2. Enter key triggers validation
+3. Input is cleared
+4. Focus may be lost (especially after async validation completes)
+
+The fix ensures the input field is always re-focused after processing a scan, enabling seamless multi-barcode scanning workflows.
+
+---
+
+### File to Modify
+
+**`src/components/BoxScanPopup.tsx`**
+
+Update the `handleKeyDown` function to explicitly re-focus the input after clearing it:
+
+```typescript
+const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  if (e.key === 'Enter' && inputValue.trim()) {
+    e.preventDefault();
+    validateAndAddBox(inputValue);
+    setInputValue('');
+    // Keep focus on input for continuous scanning
+    inputRef.current?.focus();
+  }
+};
+```
+
+Additionally, ensure focus is maintained after the async validation completes by adding a focus call in the `finally` block of `validateAndAddBox`:
+
+```typescript
+} finally {
+  setValidating(false);
+  // Re-focus input after validation completes
+  inputRef.current?.focus();
+}
+```
+
+---
+
+### Why Both Focus Calls Are Needed
+
+1. **In `handleKeyDown`**: Immediate re-focus after clearing the input value
+2. **In `validateAndAddBox` finally block**: Re-focus after the async database validation completes (this is critical because React may have re-rendered the component during the async operation)
+
+---
+
+### User Experience After Fix
+
+1. User opens Scan popup - input is auto-focused
+2. User scans first barcode - validation runs, input clears, **focus stays**
+3. User scans second barcode - validation runs, input clears, **focus stays**
+4. User can scan unlimited barcodes without touching the mouse
+5. All scanned boxes appear in the list below the input
+
