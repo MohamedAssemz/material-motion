@@ -72,55 +72,161 @@ export default function Boxes() {
 
   const canManage = hasRole('manufacture_lead') || hasRole('admin');
 
-  // Scanner handler - opens box details when scanned on this page
-  const handleBoxScan = useCallback((code: string) => {
-    // Find box in order boxes
-    const orderBox = orderBoxes.find(b => b.box_code.toUpperCase() === code);
-    if (orderBox) {
-      setSelectedBox({
-        boxType: 'order',
-        boxId: orderBox.id,
-        boxCode: orderBox.box_code,
-        createdAt: orderBox.created_at,
-        isActive: orderBox.is_active,
-        contentType: orderBox.content_type,
-        primaryState: orderBox.primary_state,
-      });
-      setDetailsOpen(true);
-      toast({
-        title: 'Box Found',
-        description: `Opened details for ${orderBox.box_code}`,
-      });
-      return;
-    }
-
-    // Find box in extra boxes
-    const extraBox = extraBoxes.find(b => b.box_code.toUpperCase() === code);
-    if (extraBox) {
-      setSelectedBox({
-        boxType: 'extra',
-        boxId: extraBox.id,
-        boxCode: extraBox.box_code,
-        createdAt: extraBox.created_at,
-        isActive: extraBox.is_active,
-        contentType: extraBox.content_type,
-        primaryState: extraBox.primary_state,
-      });
-      setDetailsOpen(true);
-      toast({
-        title: 'Box Found',
-        description: `Opened details for ${extraBox.box_code}`,
-      });
-      return;
-    }
-
-    // Box not found
+  // Helper to open box details
+  const openBoxDetails = useCallback((
+    boxType: 'order' | 'extra',
+    boxId: string,
+    boxCode: string,
+    createdAt: string,
+    isActive: boolean,
+    contentType: string,
+    primaryState: string | null
+  ) => {
+    setSelectedBox({
+      boxType,
+      boxId,
+      boxCode,
+      createdAt,
+      isActive,
+      contentType,
+      primaryState,
+    });
+    setDetailsOpen(true);
     toast({
-      title: 'Box Not Found',
-      description: `No box found with code "${code}"`,
+      title: 'Box Found',
+      description: `Opened details for ${boxCode}`,
+    });
+  }, [toast]);
+
+  // Scanner handler - opens box details when scanned on this page
+  // Supports: raw box codes, URLs containing box codes, and batch codes
+  const handleBoxScan = useCallback(async (rawCode: string) => {
+    const normalized = rawCode.trim().toUpperCase();
+    
+    // Extract box code from URL or raw input: BOX-#### or EBOX-####
+    const boxMatch = normalized.match(/(EBOX-\d+|BOX-\d+)/);
+    // Extract batch code from URL or raw input: B-XXXXXXXX or EB-XXXXXXXX
+    const batchMatch = normalized.match(/(EB-[A-Z0-9]{8}|B-[A-Z0-9]{8})/);
+    
+    // Priority: box code first, then batch code
+    if (boxMatch) {
+      const boxCode = boxMatch[1];
+      
+      // Try to find in local order boxes first (fast path)
+      const orderBox = orderBoxes.find(b => b.box_code.toUpperCase() === boxCode);
+      if (orderBox) {
+        openBoxDetails('order', orderBox.id, orderBox.box_code, orderBox.created_at, orderBox.is_active, orderBox.content_type, orderBox.primary_state);
+        return;
+      }
+      
+      // Try to find in local extra boxes
+      const extraBox = extraBoxes.find(b => b.box_code.toUpperCase() === boxCode);
+      if (extraBox) {
+        openBoxDetails('extra', extraBox.id, extraBox.box_code, extraBox.created_at, extraBox.is_active, extraBox.content_type, extraBox.primary_state);
+        return;
+      }
+      
+      // Not in local lists - query database (handles stale data / pagination)
+      // Try order boxes table
+      const { data: dbOrderBox } = await supabase
+        .from('boxes')
+        .select('id, box_code, is_active, created_at, content_type')
+        .eq('box_code', boxCode)
+        .maybeSingle();
+      
+      if (dbOrderBox) {
+        openBoxDetails('order', dbOrderBox.id, dbOrderBox.box_code, dbOrderBox.created_at, dbOrderBox.is_active, dbOrderBox.content_type || 'EMPTY', null);
+        return;
+      }
+      
+      // Try extra boxes table
+      const { data: dbExtraBox } = await supabase
+        .from('extra_boxes')
+        .select('id, box_code, is_active, created_at, content_type')
+        .eq('box_code', boxCode)
+        .maybeSingle();
+      
+      if (dbExtraBox) {
+        openBoxDetails('extra', dbExtraBox.id, dbExtraBox.box_code, dbExtraBox.created_at, dbExtraBox.is_active, dbExtraBox.content_type || 'EMPTY', null);
+        return;
+      }
+      
+      // Box not found
+      toast({
+        title: 'Box Not Found',
+        description: `No box found with code "${boxCode}"`,
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    // Handle batch code scan - find which box contains this batch
+    if (batchMatch) {
+      const batchCode = batchMatch[1];
+      
+      // Check if it's an order batch (B-XXXXXXXX)
+      if (batchCode.startsWith('B-')) {
+        const { data: orderBatch } = await supabase
+          .from('order_batches')
+          .select('box_id, box:boxes(id, box_code, is_active, created_at, content_type)')
+          .eq('qr_code_data', batchCode)
+          .eq('is_terminated', false)
+          .maybeSingle();
+        
+        if (orderBatch) {
+          if (orderBatch.box_id && orderBatch.box) {
+            const box = orderBatch.box as any;
+            openBoxDetails('order', box.id, box.box_code, box.created_at, box.is_active, box.content_type || 'EMPTY', null);
+          } else {
+            toast({
+              title: 'Batch Not In Box',
+              description: `Batch ${batchCode} is not currently assigned to a box`,
+              variant: 'destructive',
+            });
+          }
+          return;
+        }
+      }
+      
+      // Check if it's an extra batch (EB-XXXXXXXX)
+      if (batchCode.startsWith('EB-')) {
+        const { data: extraBatch } = await supabase
+          .from('extra_batches')
+          .select('box_id, box:extra_boxes(id, box_code, is_active, created_at, content_type)')
+          .eq('qr_code_data', batchCode)
+          .maybeSingle();
+        
+        if (extraBatch) {
+          if (extraBatch.box_id && extraBatch.box) {
+            const box = extraBatch.box as any;
+            openBoxDetails('extra', box.id, box.box_code, box.created_at, box.is_active, box.content_type || 'EMPTY', null);
+          } else {
+            toast({
+              title: 'Batch Not In Box',
+              description: `Batch ${batchCode} is not currently assigned to a box`,
+              variant: 'destructive',
+            });
+          }
+          return;
+        }
+      }
+      
+      // Batch not found
+      toast({
+        title: 'Batch Not Found',
+        description: `No batch found with code "${batchCode}"`,
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    // Unrecognized scan format
+    toast({
+      title: 'Unrecognized Scan',
+      description: `Could not parse box or batch code from "${normalized.slice(0, 30)}${normalized.length > 30 ? '...' : ''}"`,
       variant: 'destructive',
     });
-  }, [orderBoxes, extraBoxes, toast]);
+  }, [orderBoxes, extraBoxes, toast, openBoxDetails]);
 
   // Enable scanner when not in a dialog
   useBoxScanner({

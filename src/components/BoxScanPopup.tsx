@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { QrCode, X, Loader2 } from 'lucide-react';
 import { getStateLabel, type UnitState } from '@/lib/stateMachine';
 import { useToast } from '@/hooks/use-toast';
+import { useBoxScanner } from '@/hooks/useBoxScanner';
 
 interface BoxBatch {
   id: string;
@@ -46,18 +47,26 @@ export function BoxScanPopup({
   const [scannedBoxes, setScannedBoxes] = useState<ScannedBox[]>([]);
   const [validating, setValidating] = useState(false);
 
+  // Deferred focus helper - ensures focus after React re-renders
+  const focusInput = useCallback(() => {
+    requestAnimationFrame(() => {
+      inputRef.current?.focus();
+    });
+  }, []);
+
   // Auto-focus input when popup opens
   useEffect(() => {
     if (open) {
       setScannedBoxes([]);
       setInputValue('');
-      setTimeout(() => {
-        inputRef.current?.focus();
-      }, 100);
+      focusInput();
     }
-  }, [open]);
+  }, [open, focusInput]);
 
   const validateAndAddBox = useCallback(async (code: string) => {
+    // Ignore if already validating
+    if (validating) return;
+    
     const normalizedCode = code.trim().toUpperCase();
     if (!normalizedCode) return;
 
@@ -67,6 +76,7 @@ export function BoxScanPopup({
         title: 'Already Scanned',
         description: `Box ${normalizedCode} is already in the scan list`,
       });
+      focusInput();
       return;
     }
 
@@ -79,6 +89,7 @@ export function BoxScanPopup({
         title: 'Already Selected',
         description: `Box ${normalizedCode} is already selected in the main list`,
       });
+      focusInput();
       return;
     }
 
@@ -174,23 +185,30 @@ export function BoxScanPopup({
       });
     } finally {
       setValidating(false);
-      // Re-focus input after validation completes
-      inputRef.current?.focus();
+      setInputValue('');
+      // Re-focus input after validation completes (deferred to ensure React has re-rendered)
+      focusInput();
     }
-  }, [scannedBoxes, alreadySelectedIds, orderId, filterState, toast]);
+  }, [scannedBoxes, alreadySelectedIds, orderId, filterState, toast, validating, focusInput]);
+
+  // Fallback scanner hook - catches scans when input loses focus (e.g., after clicking remove button)
+  // useBoxScanner ignores events when an input is focused, so no double-handling
+  useBoxScanner({
+    onScan: validateAndAddBox,
+    enabled: open,
+  });
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && inputValue.trim()) {
+    if (e.key === 'Enter' && inputValue.trim() && !validating) {
       e.preventDefault();
       validateAndAddBox(inputValue);
-      setInputValue('');
-      // Keep focus on input for continuous scanning
-      inputRef.current?.focus();
     }
   };
 
   const handleRemoveBox = (boxId: string) => {
     setScannedBoxes(prev => prev.filter(b => b.id !== boxId));
+    // Refocus input after removing so scanning continues
+    focusInput();
   };
 
   const handleAddSelected = () => {
@@ -215,7 +233,7 @@ export function BoxScanPopup({
           </DialogTitle>
         </DialogHeader>
 
-        {/* Scan Input */}
+        {/* Scan Input - NOT disabled during validation to maintain focus */}
         <div className="relative">
           <QrCode className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -223,9 +241,9 @@ export function BoxScanPopup({
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value.toUpperCase())}
             onKeyDown={handleKeyDown}
-            placeholder="Scan barcode here..."
+            placeholder={validating ? "Validating..." : "Scan barcode here..."}
             className="pl-10"
-            disabled={validating}
+            readOnly={validating}
           />
           {validating && (
             <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
