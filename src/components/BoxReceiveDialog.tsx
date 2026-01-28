@@ -11,7 +11,7 @@ import { Box, Loader2, QrCode, Search, X, Printer } from 'lucide-react';
 import { getStateLabel, type UnitState } from '@/lib/stateMachine';
 import { useToast } from '@/hooks/use-toast';
 import { useBoxScanner } from '@/hooks/useBoxScanner';
-
+import { BoxScanPopup } from '@/components/BoxScanPopup';
 interface BoxBatch {
   id: string;
   product_id: string;
@@ -51,6 +51,7 @@ export function BoxReceiveDialog({
   const [filteredBoxes, setFilteredBoxes] = useState<SelectedBox[]>([]);
   const [loading, setLoading] = useState(true);
   const [searching, setSearching] = useState(false);
+  const [scanPopupOpen, setScanPopupOpen] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -146,11 +147,21 @@ export function BoxReceiveDialog({
     });
   }, [selectedBoxes, orderId, filterState, toast]);
 
-  // Enable scanner when dialog is open
+  // Enable scanner when dialog is open (disabled when scan popup is open)
   useBoxScanner({
     onScan: handleBoxScan,
-    enabled: open,
+    enabled: open && !scanPopupOpen,
   });
+
+  // Handler for receiving scanned boxes from popup
+  const handleAddScannedBoxes = (boxes: SelectedBox[]) => {
+    setSelectedBoxes(prev => [...prev, ...boxes]);
+    setScanPopupOpen(false);
+    toast({
+      title: 'Boxes Added',
+      description: `Added ${boxes.length} scanned box(es)`,
+    });
+  };
 
   // Real-time filtering as user types
   useEffect(() => {
@@ -489,6 +500,10 @@ export function BoxReceiveDialog({
           <Button onClick={handleSearch} disabled={searching || !searchCode.trim()}>
             {searching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
           </Button>
+          <Button variant="outline" onClick={() => setScanPopupOpen(true)}>
+            <QrCode className="h-4 w-4 mr-2" />
+            Scan
+          </Button>
         </div>
 
         {/* Selected Boxes */}
@@ -579,6 +594,16 @@ export function BoxReceiveDialog({
             Receive {selectedBoxes.length} Box{selectedBoxes.length !== 1 ? 'es' : ''}
           </Button>
         </DialogFooter>
+
+        {/* Scan Popup */}
+        <BoxScanPopup
+          open={scanPopupOpen}
+          onOpenChange={setScanPopupOpen}
+          onAddBoxes={handleAddScannedBoxes}
+          orderId={orderId}
+          filterState={filterState}
+          alreadySelectedIds={selectedBoxes.map(b => b.id)}
+        />
       </DialogContent>
     </Dialog>
   );
