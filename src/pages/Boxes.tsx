@@ -16,6 +16,7 @@ import { ArrowLeft, Plus, Box, Loader2, Package, Printer, QrCode } from 'lucide-
 import { format } from 'date-fns';
 import { BoxDetailsDialog } from '@/components/BoxDetailsDialog';
 import { BoxLabelPrintDialog } from '@/components/BoxLabelPrintDialog';
+import { BoxLookupScanDialog } from '@/components/BoxLookupScanDialog';
 import { useBoxScanner } from '@/hooks/useBoxScanner';
 
 interface OrderBoxData {
@@ -69,6 +70,9 @@ export default function Boxes() {
   // Print dialog state
   const [printDialogOpen, setPrintDialogOpen] = useState(false);
   const [printBoxType, setPrintBoxType] = useState<'order' | 'extra'>('order');
+
+  // Scan lookup dialog state
+  const [scanDialogOpen, setScanDialogOpen] = useState(false);
 
   const canManage = hasRole('manufacture_lead') || hasRole('admin');
 
@@ -231,7 +235,7 @@ export default function Boxes() {
   // Enable scanner when not in a dialog
   useBoxScanner({
     onScan: handleBoxScan,
-    enabled: !detailsOpen && !dialogOpen && !extraDialogOpen && !printDialogOpen,
+    enabled: !detailsOpen && !dialogOpen && !extraDialogOpen && !printDialogOpen && !scanDialogOpen,
   });
 
   useEffect(() => {
@@ -557,6 +561,10 @@ export default function Boxes() {
               <p className="text-sm text-muted-foreground">Manage order and extra inventory boxes</p>
             </div>
           </div>
+          <Button onClick={() => setScanDialogOpen(true)}>
+            <QrCode className="mr-2 h-4 w-4" />
+            Scan
+          </Button>
         </div>
       </header>
 
@@ -921,6 +929,12 @@ export default function Boxes() {
           : extraBoxes.map(b => ({ id: b.id, box_code: b.box_code, box_type: 'extra' as const }))
         }
         title={printBoxType === 'order' ? 'Print Order Box Labels' : 'Print Extra Box Labels'}
+      />
+
+      {/* Box Lookup Scan Dialog */}
+      <BoxLookupScanDialog
+        open={scanDialogOpen}
+        onOpenChange={setScanDialogOpen}
       />
     </div>
   );
