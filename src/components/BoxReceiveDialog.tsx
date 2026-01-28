@@ -60,7 +60,7 @@ export function BoxReceiveDialog({
     }
   }, [open, orderId, filterState]);
 
-  // Scanner handler - auto-select boxes when scanned
+  // Scanner handler - explicit database validation for each scanned box
   const handleBoxScan = useCallback(async (code: string) => {
     // Check if already selected
     const alreadySelected = selectedBoxes.find(b => b.box_code.toUpperCase() === code);
@@ -72,24 +72,13 @@ export function BoxReceiveDialog({
       return;
     }
 
-    // Check if box exists in the available boxes
-    const matchingBox = allBoxes.find(b => b.box_code.toUpperCase() === code);
-    if (matchingBox) {
-      setSelectedBoxes(prev => [...prev, matchingBox]);
-      toast({
-        title: 'Box Added',
-        description: `Box ${code} has been selected`,
-      });
-      return;
-    }
-
-    // Box not in the ready list - check if it exists at all
+    // Explicit database validation - query the box
     const { data: box } = await supabase
       .from('boxes')
       .select('id, box_code')
       .eq('box_code', code)
       .eq('is_active', true)
-      .single();
+      .maybeSingle();
 
     if (!box) {
       toast({
@@ -100,13 +89,62 @@ export function BoxReceiveDialog({
       return;
     }
 
-    // Box exists but not in valid state for this order
+    // Fetch batches in this box for this order
+    const { data: batches } = await supabase
+      .from('order_batches')
+      .select(`
+        id,
+        product_id,
+        quantity,
+        current_state,
+        product:products(id, name, sku)
+      `)
+      .eq('box_id', box.id)
+      .eq('order_id', orderId)
+      .eq('is_terminated', false);
+
+    if (!batches || batches.length === 0) {
+      toast({
+        title: 'Empty or Wrong Order',
+        description: `Box ${code} has no items for this order`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Check if batches are in the expected state
+    const validBatches = batches.filter(b => b.current_state === filterState);
+
+    if (validBatches.length === 0) {
+      const actualState = batches[0].current_state;
+      toast({
+        title: 'Wrong State',
+        description: `Box ${code} items are in "${getStateLabel(actualState as UnitState)}" state, expected "${getStateLabel(filterState)}"`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Box is valid - add to selection
+    const selectedBox: SelectedBox = {
+      id: box.id,
+      box_code: box.box_code,
+      batches: validBatches.map(b => ({
+        id: b.id,
+        product_id: b.product_id,
+        product_name: (b.product as any)?.name || 'Unknown',
+        product_sku: (b.product as any)?.sku || 'N/A',
+        quantity: b.quantity,
+      })),
+      total_quantity: validBatches.reduce((sum, b) => sum + b.quantity, 0),
+    };
+
+    setSelectedBoxes(prev => [...prev, selectedBox]);
     toast({
-      title: 'Invalid Box',
-      description: `Box ${code} is not in ${getStateLabel(filterState)} state for this order`,
-      variant: 'destructive',
+      title: 'Box Accepted',
+      description: `Box ${code} validated and added (${selectedBox.total_quantity} items)`,
     });
-  }, [selectedBoxes, allBoxes, filterState, toast]);
+  }, [selectedBoxes, orderId, filterState, toast]);
 
   // Enable scanner when dialog is open
   useBoxScanner({
