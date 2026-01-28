@@ -197,6 +197,67 @@ Deno.serve(async (req) => {
         );
       }
 
+      case "update-primary-role": {
+        const { user_id, primary_role } = body;
+
+        if (!user_id || !primary_role) {
+          return new Response(
+            JSON.stringify({ error: "Missing required fields: user_id, primary_role" }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        // Get current primary role before updating
+        const { data: currentProfile } = await supabaseAdmin
+          .from("profiles")
+          .select("primary_role")
+          .eq("id", user_id)
+          .single();
+
+        const oldPrimaryRole = currentProfile?.primary_role;
+
+        // Update primary role in profiles table using admin client
+        const { error: updateProfileError } = await supabaseAdmin
+          .from("profiles")
+          .update({ primary_role })
+          .eq("id", user_id);
+
+        if (updateProfileError) {
+          return new Response(
+            JSON.stringify({ error: updateProfileError.message }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        // Ensure new primary role exists in user_roles
+        const { data: existingRole } = await supabaseAdmin
+          .from("user_roles")
+          .select("id")
+          .eq("user_id", user_id)
+          .eq("role", primary_role)
+          .single();
+
+        if (!existingRole) {
+          await supabaseAdmin
+            .from("user_roles")
+            .insert({ user_id, role: primary_role });
+        }
+
+        // Remove old primary role from user_roles if it's different and no longer needed
+        if (oldPrimaryRole && oldPrimaryRole !== primary_role) {
+          await supabaseAdmin
+            .from("user_roles")
+            .delete()
+            .eq("user_id", user_id)
+            .eq("role", oldPrimaryRole);
+        }
+
+        return new Response(
+          JSON.stringify({ success: true }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
       default:
         return new Response(
           JSON.stringify({ error: "Invalid action. Use: create, update-password, update-email, delete" }),
