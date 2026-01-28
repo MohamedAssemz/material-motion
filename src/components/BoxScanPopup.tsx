@@ -174,6 +174,8 @@ export function BoxScanPopup({
       });
     } finally {
       setValidating(false);
+      // Re-focus input after validation completes
+      inputRef.current?.focus();
     }
   }, [scannedBoxes, alreadySelectedIds, orderId, filterState, toast]);
 
@@ -182,6 +184,8 @@ export function BoxScanPopup({
       e.preventDefault();
       validateAndAddBox(inputValue);
       setInputValue('');
+      // Keep focus on input for continuous scanning
+      inputRef.current?.focus();
     }
   };
 
