@@ -25,6 +25,7 @@ import { BoxAssignmentDialog } from "@/components/BoxAssignmentDialog";
 import { LeadTimeDialog } from "@/components/LeadTimeDialog";
 import { ExtraInventoryDialog } from "@/components/ExtraInventoryDialog";
 import { StartOrderDialog } from "@/components/StartOrderDialog";
+import { OrderCommentsDrawer } from "@/components/OrderCommentsDrawer";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import {
@@ -43,6 +44,7 @@ import {
   Truck,
   Plane,
   Play,
+  MessageSquare,
 } from "lucide-react";
 import {
   getNextState,
@@ -137,6 +139,7 @@ export default function OrderDetail() {
   const [leadTimeDialogOpen, setLeadTimeDialogOpen] = useState(false);
   const [extraInventoryOpen, setExtraInventoryOpen] = useState(false);
   const [startOrderOpen, setStartOrderOpen] = useState(false);
+  const [commentsOpen, setCommentsOpen] = useState(false);
   const [selectedExtraPhase, setSelectedExtraPhase] = useState<'manufacturing' | 'finishing' | 'packaging' | 'boxing'>('manufacturing');
   const [extraInventoryCounts, setExtraInventoryCounts] = useState<Record<string, number>>({});
   const [reservedExtraCounts, setReservedExtraCounts] = useState<Record<string, number>>({});
@@ -674,6 +677,10 @@ export default function OrderDetail() {
             <FileText className="h-4 w-4 mr-1" />
             Raw Materials
           </Button>
+          <Button variant="outline" size="sm" onClick={() => setCommentsOpen(true)}>
+            <MessageSquare className="h-4 w-4 mr-1" />
+            Comments
+          </Button>
           {canDelete && (
             <AlertDialog>
               <AlertDialogTrigger asChild>
@@ -1154,6 +1161,12 @@ export default function OrderDetail() {
           fetchOrder();
           fetchExtraInventoryCounts();
         }}
+      />
+      <OrderCommentsDrawer
+        orderId={id!}
+        orderNumber={order?.order_number || ''}
+        open={commentsOpen}
+        onOpenChange={setCommentsOpen}
       />
     </div>
   );
