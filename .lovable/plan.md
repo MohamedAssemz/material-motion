@@ -1,122 +1,106 @@
 
 
-## Convert Raw Materials Timeline to a Drawer
+## Fix Primary Role Update Bug and Modernize Admin Page
 
-This change will transform the current Raw Materials Dialog (modal popup) into a Drawer that matches the design and interaction pattern of the recently implemented Comments Drawer.
-
----
-
-### Overview
-
-The Raw Materials feature will be converted from a centered modal dialog to a sliding drawer panel from the right side of the screen. This creates a consistent user experience with the Comments feature and provides a more modern, less intrusive interface.
+This plan addresses two issues:
+1. **Bug Fix**: Primary role dropdown doesn't update the primary role (only adds to additional roles)
+2. **UI Redesign**: Modernize the admin page with a cleaner, more compact layout
 
 ---
 
-### Changes Overview
+### Part 1: Fix Primary Role Update Bug
 
-**File: `src/components/RawMaterialsDialog.tsx`**
+**Problem Identified:**
 
-This file will be completely refactored into a new component `RawMaterialsDrawer.tsx` (rename/replace):
+The current code tries to update the `profiles` table directly from the client, but the database's security policy only allows users to update their **own** profile. When an admin tries to update another user's primary role, the update silently fails. The code then adds the role to the `user_roles` table (which works), making it appear as an additional role instead of a primary role change.
 
-1. **Replace Dialog with Sheet component**
-   - Change from `Dialog/DialogContent/DialogHeader/DialogTitle` to `Sheet/SheetContent/SheetHeader/SheetTitle`
-   - Use same width and layout as Comments drawer (`w-full sm:max-w-md flex flex-col`)
+**Solution:**
 
-2. **Update component props**
-   - Add `orderNumber` prop to display in the drawer title (matching Comments pattern)
-   - Keep existing `orderId`, `open`, `onOpenChange` props
+Route the primary role update through the secure backend function that has elevated permissions.
 
-3. **Redesign the input form**
-   - Move the "Add New Version" form to match Comments layout
-   - Use same textarea styling with `min-h-[80px] resize-none`
-   - Add keyboard shortcut support (Cmd/Ctrl+Enter to submit)
-   - Change button from "Save Version" to "Post" with Send icon
-   - Add helper text "Press Cmd+Enter to submit"
-   - Keep the role-based visibility (only manufacture_lead and admin can add)
+**Changes to Edge Function (`supabase/functions/admin-users/index.ts`):**
 
-4. **Redesign the timeline view**
-   - Use Avatar with user initials instead of icons
-   - Add visual timeline line connector (vertical line on the left)
-   - Match the styling: latest version highlighted with primary color
-   - Keep version badge but integrate into the new layout
-   - Use same timestamp formatting as Comments
+Add a new action `update-primary-role`:
+- Accepts `user_id` and `primary_role` in request body
+- Uses the admin client to update the `profiles` table (bypasses security restrictions)
+- Ensures the new primary role also exists in `user_roles` table
+- Removes the old primary role from `user_roles` if no longer needed
 
-5. **Update loading states**
-   - Use Skeleton components for loading (matching Comments pattern)
-   - Same empty state message pattern
+**Changes to Admin Page (`src/pages/Admin.tsx`):**
+
+Update the `updatePrimaryRole` function to:
+- Call the edge function instead of direct database update
+- Handle the response and show appropriate success/error messages
 
 ---
 
-### Visual Design
+### Part 2: Modern UI Redesign
 
-The new drawer will have this structure:
+The new design will feature:
+
+**1. Table-Based Layout**
+- Replace individual cards with a clean data table
+- More compact presentation with less vertical space
+- Columns: User (name + email), Primary Role (inline dropdown), Additional Roles (inline badges), Actions
+
+**2. Visual Improvements**
+- Subtle row hover effects
+- Inline role management (no separate "Add role" section per user)
+- Compact role badges with inline remove buttons
+- Add role via small popover button within the roles cell
+- Cleaner header with stats summary
+
+**3. Layout Structure**
 
 ```text
-+---------------------------+
-| Raw Materials - ORD-0001  |  [X]
-+---------------------------+
-| [Textarea for new version]|   <- Only visible for leads/admin
-| Press ⌘+Enter to submit   |
-|                    [Post] |
-+---------------------------+
-| Timeline                  |
-|  o-- User Name      v3    |
-|  |   Jan 28, 2026         |
-|  |   "Version content..." |
-|  |                        |
-|  o-- Another User   v2    |
-|  |   Jan 27, 2026         |
-|  |   "Earlier version..." |
-+---------------------------+
++----------------------------------------------------------+
+| [<] User Management                     [+ Create User]  |
+|     Manage user accounts and roles                       |
+|----------------------------------------------------------+
+| 3 users total                                            |
++----------------------------------------------------------+
+| User              | Primary Role    | Additional Roles   |
+|----------------------------------------------------------|
+| Mohamed Assem     | [Admin v]       | Mfg Lead [x]       |
+| admin@email.com   |                 | [+ Add]            |
+|----------------------------------------------------------|
+| John Doe          | [Viewer v]      | Packer [x]         |
+| john@email.com    |                 | Boxer [x] [+ Add]  |
++----------------------------------------------------------+
 ```
+
+**4. Component Changes**
+
+Replace the grid of cards with:
+- Use the existing Table component from shadcn/ui
+- Inline Select for primary role (smaller, no label)
+- Badge chips for additional roles with X button
+- Small "+" button to add roles (opens a popover with role selection)
+- Actions column with icon buttons (edit, delete)
 
 ---
 
-### File Changes
+### Technical Implementation
 
-**Rename/Recreate: `src/components/RawMaterialsDialog.tsx` -> `src/components/RawMaterialsDrawer.tsx`**
-- Use Sheet component instead of Dialog
-- Add orderNumber prop
-- Match OrderCommentsDrawer design patterns:
-  - Avatar with initials
-  - Timeline line connector
-  - Highlighted latest entry
-  - Keyboard shortcut support
-  - Skeleton loading states
+**Files to modify:**
 
-**Modify: `src/pages/OrderDetail.tsx`**
-- Update import from `RawMaterialsDialog` to `RawMaterialsDrawer`
-- Update component usage to pass `orderNumber` prop
-- Component remains in same location with same state management
+1. **`supabase/functions/admin-users/index.ts`**
+   - Add `update-primary-role` action case
+   - Update profiles table with admin client
+   - Sync with user_roles table
+
+2. **`src/pages/Admin.tsx`**
+   - Rewrite `updatePrimaryRole` to use edge function
+   - Replace Card-based layout with Table layout
+   - Add role management popover for adding roles inline
+   - Simplify the overall structure
 
 ---
 
-### Technical Details
+### Benefits
 
-**Key import changes in the drawer:**
-```typescript
-// From
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-
-// To
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Send } from 'lucide-react';
-```
-
-**Timeline entry structure:**
-- Avatar with user initials (highlighted for latest)
-- User name and timestamp on first line
-- Version badge (e.g., "v3") inline with user info
-- Content in a rounded card below
-
-**Keyboard shortcut:**
-```typescript
-onKeyDown={(e) => {
-  if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-    handleSave();
-  }
-}}
-```
+- **Bug Fix**: Primary role updates will work correctly for all users
+- **Better UX**: Compact table view shows more users at once
+- **Cleaner Design**: No repeated sections per user, inline editing
+- **Faster Workflow**: Fewer clicks to manage roles
 
