@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Box, Loader2, Plus, Search } from 'lucide-react';
 import { toast } from 'sonner';
+import { useBoxScanner } from '@/hooks/useBoxScanner';
 
 interface ExtraBoxOption {
   id: string;
@@ -52,6 +53,51 @@ export function ExtraBoxSelectionDialog({
       setSearchQuery('');
     }
   }, [open]);
+
+  // Scanner handler - auto-select extra box when scanned
+  const handleBoxScan = useCallback(async (code: string) => {
+    // Check if code matches an EBOX
+    if (!code.startsWith('EBOX-')) {
+      toast.error(`"${code}" is not an extra box code`);
+      return;
+    }
+
+    // Find in loaded boxes
+    const matchingBox = boxes.find(b => b.box_code.toUpperCase() === code);
+    if (matchingBox) {
+      setSelectedBoxId(matchingBox.id);
+      toast.success(`Selected ${code}`);
+      return;
+    }
+
+    // Check if box exists
+    const { data: box } = await supabase
+      .from('extra_boxes')
+      .select('id, box_code, is_active')
+      .eq('box_code', code)
+      .single();
+
+    if (!box) {
+      toast.error(`Extra box "${code}" not found`);
+      return;
+    }
+
+    if (!box.is_active) {
+      toast.error(`Extra box "${code}" is inactive`);
+      return;
+    }
+
+    // Box exists but wasn't in our list - refresh and select
+    await fetchExtraBoxes();
+    setSelectedBoxId(box.id);
+    toast.success(`Selected ${code}`);
+  }, [boxes]);
+
+  // Enable scanner when dialog is open
+  useBoxScanner({
+    onScan: handleBoxScan,
+    enabled: open,
+  });
 
   const fetchExtraBoxes = async () => {
     setLoading(true);

@@ -12,8 +12,9 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Printer } from 'lucide-react';
 import { format } from 'date-fns';
+import { generateBoxLabelHTML } from '@/components/BoxLabel';
 
 interface BoxDetailsDialogProps {
   open: boolean;
@@ -273,6 +274,23 @@ export function BoxDetailsDialog({
           </div>
 
           <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                const baseUrl = window.location.origin;
+                const html = generateBoxLabelHTML(
+                  [{ boxCode, boxType }],
+                  baseUrl
+                );
+                const blob = new Blob([html], { type: 'text/html' });
+                const url = URL.createObjectURL(blob);
+                window.open(url, '_blank', 'noopener,noreferrer');
+                setTimeout(() => URL.revokeObjectURL(url), 1000);
+              }}
+            >
+              <Printer className="h-4 w-4 mr-2" />
+              Print Label
+            </Button>
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Close
             </Button>

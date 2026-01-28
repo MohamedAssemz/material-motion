@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -12,9 +12,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Plus, Box, Loader2, Package } from 'lucide-react';
+import { ArrowLeft, Plus, Box, Loader2, Package, Printer, QrCode } from 'lucide-react';
 import { format } from 'date-fns';
 import { BoxDetailsDialog } from '@/components/BoxDetailsDialog';
+import { BoxLabelPrintDialog } from '@/components/BoxLabelPrintDialog';
+import { useBoxScanner } from '@/hooks/useBoxScanner';
 
 interface OrderBoxData {
   id: string;
@@ -64,7 +66,67 @@ export default function Boxes() {
     primaryState: string | null;
   } | null>(null);
 
+  // Print dialog state
+  const [printDialogOpen, setPrintDialogOpen] = useState(false);
+  const [printBoxType, setPrintBoxType] = useState<'order' | 'extra'>('order');
+
   const canManage = hasRole('manufacture_lead') || hasRole('admin');
+
+  // Scanner handler - opens box details when scanned on this page
+  const handleBoxScan = useCallback((code: string) => {
+    // Find box in order boxes
+    const orderBox = orderBoxes.find(b => b.box_code.toUpperCase() === code);
+    if (orderBox) {
+      setSelectedBox({
+        boxType: 'order',
+        boxId: orderBox.id,
+        boxCode: orderBox.box_code,
+        createdAt: orderBox.created_at,
+        isActive: orderBox.is_active,
+        contentType: orderBox.content_type,
+        primaryState: orderBox.primary_state,
+      });
+      setDetailsOpen(true);
+      toast({
+        title: 'Box Found',
+        description: `Opened details for ${orderBox.box_code}`,
+      });
+      return;
+    }
+
+    // Find box in extra boxes
+    const extraBox = extraBoxes.find(b => b.box_code.toUpperCase() === code);
+    if (extraBox) {
+      setSelectedBox({
+        boxType: 'extra',
+        boxId: extraBox.id,
+        boxCode: extraBox.box_code,
+        createdAt: extraBox.created_at,
+        isActive: extraBox.is_active,
+        contentType: extraBox.content_type,
+        primaryState: extraBox.primary_state,
+      });
+      setDetailsOpen(true);
+      toast({
+        title: 'Box Found',
+        description: `Opened details for ${extraBox.box_code}`,
+      });
+      return;
+    }
+
+    // Box not found
+    toast({
+      title: 'Box Not Found',
+      description: `No box found with code "${code}"`,
+      variant: 'destructive',
+    });
+  }, [orderBoxes, extraBoxes, toast]);
+
+  // Enable scanner when not in a dialog
+  useBoxScanner({
+    onScan: handleBoxScan,
+    enabled: !detailsOpen && !dialogOpen && !extraDialogOpen && !printDialogOpen,
+  });
 
   useEffect(() => {
     if (!canManage) {
@@ -401,7 +463,18 @@ export default function Boxes() {
 
           {/* Order Boxes Tab */}
           <TabsContent value="order" className="space-y-6">
-            <div className="flex justify-end">
+            <div className="flex justify-end gap-2">
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setPrintBoxType('order');
+                  setPrintDialogOpen(true);
+                }}
+                disabled={orderBoxes.length === 0}
+              >
+                <Printer className="mr-2 h-4 w-4" />
+                Print Labels
+              </Button>
               <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
                 <DialogTrigger asChild>
                   <Button>
@@ -554,7 +627,18 @@ export default function Boxes() {
 
           {/* Extra Boxes Tab */}
           <TabsContent value="extra" className="space-y-6">
-            <div className="flex justify-end">
+            <div className="flex justify-end gap-2">
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setPrintBoxType('extra');
+                  setPrintDialogOpen(true);
+                }}
+                disabled={extraBoxes.length === 0}
+              >
+                <Printer className="mr-2 h-4 w-4" />
+                Print Labels
+              </Button>
               <Dialog open={extraDialogOpen} onOpenChange={setExtraDialogOpen}>
                 <DialogTrigger asChild>
                   <Button>
@@ -721,6 +805,17 @@ export default function Boxes() {
           primaryState={selectedBox.primaryState}
         />
       )}
+
+      {/* Print Labels Dialog */}
+      <BoxLabelPrintDialog
+        open={printDialogOpen}
+        onOpenChange={setPrintDialogOpen}
+        boxes={printBoxType === 'order' 
+          ? orderBoxes.map(b => ({ id: b.id, box_code: b.box_code, box_type: 'order' as const }))
+          : extraBoxes.map(b => ({ id: b.id, box_code: b.box_code, box_type: 'extra' as const }))
+        }
+        title={printBoxType === 'order' ? 'Print Order Box Labels' : 'Print Extra Box Labels'}
+      />
     </div>
   );
 }
