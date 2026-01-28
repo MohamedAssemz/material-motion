@@ -1,104 +1,122 @@
 
 
-## Add Comments Drawer to Order Details Page
+## Convert Raw Materials Timeline to a Drawer
 
-This feature will add a timeline-based comments system to the order details page, allowing users to add notes that are saved with user details and timestamps.
+This change will transform the current Raw Materials Dialog (modal popup) into a Drawer that matches the design and interaction pattern of the recently implemented Comments Drawer.
 
 ---
 
 ### Overview
 
-A "Comments" button will be added to the order details header. When clicked, it opens a drawer (sliding panel from the right) that displays:
-- A form to add new comments
-- A timeline view of all previous comments, showing the user who added them and when
+The Raw Materials feature will be converted from a centered modal dialog to a sliding drawer panel from the right side of the screen. This creates a consistent user experience with the Comments feature and provides a more modern, less intrusive interface.
 
 ---
 
-### Database Changes
+### Changes Overview
 
-**Create new table: `order_comments`**
+**File: `src/components/RawMaterialsDialog.tsx`**
 
-| Column | Type | Description |
-|--------|------|-------------|
-| id | uuid | Primary key |
-| order_id | uuid | Reference to the order |
-| content | text | The comment text |
-| created_by | uuid | User who created the comment |
-| created_at | timestamp | When the comment was created |
+This file will be completely refactored into a new component `RawMaterialsDrawer.tsx` (rename/replace):
 
-**RLS Policies:**
-- All authenticated users can view comments
-- All authenticated users can create comments (any role can add notes)
+1. **Replace Dialog with Sheet component**
+   - Change from `Dialog/DialogContent/DialogHeader/DialogTitle` to `Sheet/SheetContent/SheetHeader/SheetTitle`
+   - Use same width and layout as Comments drawer (`w-full sm:max-w-md flex flex-col`)
 
----
+2. **Update component props**
+   - Add `orderNumber` prop to display in the drawer title (matching Comments pattern)
+   - Keep existing `orderId`, `open`, `onOpenChange` props
 
-### New Component
+3. **Redesign the input form**
+   - Move the "Add New Version" form to match Comments layout
+   - Use same textarea styling with `min-h-[80px] resize-none`
+   - Add keyboard shortcut support (Cmd/Ctrl+Enter to submit)
+   - Change button from "Save Version" to "Post" with Send icon
+   - Add helper text "Press Cmd+Enter to submit"
+   - Keep the role-based visibility (only manufacture_lead and admin can add)
 
-**File: `src/components/OrderCommentsDrawer.tsx`**
+4. **Redesign the timeline view**
+   - Use Avatar with user initials instead of icons
+   - Add visual timeline line connector (vertical line on the left)
+   - Match the styling: latest version highlighted with primary color
+   - Keep version badge but integrate into the new layout
+   - Use same timestamp formatting as Comments
 
-A drawer component that:
-- Fetches all comments for the order, sorted newest first
-- Shows each comment with:
-  - User avatar/name
-  - Timestamp (formatted as "Jan 28, 2026 at 3:45 PM")
-  - Comment content
-- Includes a form at the top to add new comments
-- Uses the existing `Sheet` component for the drawer UI
-- Displays comments in a scrollable timeline layout with visual connectors
-
----
-
-### Integration
-
-**File: `src/pages/OrderDetail.tsx`**
-
-1. Add a "Comments" button in the header next to the existing "Raw Materials" button
-2. Add state for controlling the drawer open/close
-3. Import and render the new `OrderCommentsDrawer` component
+5. **Update loading states**
+   - Use Skeleton components for loading (matching Comments pattern)
+   - Same empty state message pattern
 
 ---
 
-### UI Design
+### Visual Design
 
-The drawer will have:
-- Header with "Comments" title and close button
-- New comment form with a textarea and "Post Comment" button
-- Timeline section showing all comments with:
-  - Visual timeline connector line
-  - User info (avatar with initials, name)
-  - Relative or absolute timestamp
-  - Comment content in a card-style container
-  - Latest comment highlighted
+The new drawer will have this structure:
+
+```text
++---------------------------+
+| Raw Materials - ORD-0001  |  [X]
++---------------------------+
+| [Textarea for new version]|   <- Only visible for leads/admin
+| Press ⌘+Enter to submit   |
+|                    [Post] |
++---------------------------+
+| Timeline                  |
+|  o-- User Name      v3    |
+|  |   Jan 28, 2026         |
+|  |   "Version content..." |
+|  |                        |
+|  o-- Another User   v2    |
+|  |   Jan 27, 2026         |
+|  |   "Earlier version..." |
++---------------------------+
+```
+
+---
+
+### File Changes
+
+**Rename/Recreate: `src/components/RawMaterialsDialog.tsx` -> `src/components/RawMaterialsDrawer.tsx`**
+- Use Sheet component instead of Dialog
+- Add orderNumber prop
+- Match OrderCommentsDrawer design patterns:
+  - Avatar with initials
+  - Timeline line connector
+  - Highlighted latest entry
+  - Keyboard shortcut support
+  - Skeleton loading states
+
+**Modify: `src/pages/OrderDetail.tsx`**
+- Update import from `RawMaterialsDialog` to `RawMaterialsDrawer`
+- Update component usage to pass `orderNumber` prop
+- Component remains in same location with same state management
 
 ---
 
 ### Technical Details
 
-**Comment Timeline Pattern:**
-```text
-+---------------------------+
-| Comments           [X]    |
-+---------------------------+
-| [Textarea for new comment]|
-| [Post Comment]            |
-+---------------------------+
-| Timeline                  |
-|  o-- User Name            |
-|  |   Jan 28, 2026 3:45 PM |
-|  |   "Comment content..." |
-|  |                        |
-|  o-- Another User         |
-|  |   Jan 27, 2026 1:20 PM |
-|  |   "Earlier comment..." |
-+---------------------------+
+**Key import changes in the drawer:**
+```typescript
+// From
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+
+// To
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Send } from 'lucide-react';
 ```
 
-**Files to create:**
-- `src/components/OrderCommentsDrawer.tsx` - The drawer component
+**Timeline entry structure:**
+- Avatar with user initials (highlighted for latest)
+- User name and timestamp on first line
+- Version badge (e.g., "v3") inline with user info
+- Content in a rounded card below
 
-**Files to modify:**
-- `src/pages/OrderDetail.tsx` - Add button and drawer state
-
-**Database migration:**
-- Create `order_comments` table with RLS policies
+**Keyboard shortcut:**
+```typescript
+onKeyDown={(e) => {
+  if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+    handleSave();
+  }
+}}
+```
 
