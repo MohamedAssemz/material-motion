@@ -1,189 +1,152 @@
 
-## Add BOX- Prefix Auto-Completion for Box Search Inputs
 
-### Goal
-Simplify box searching by allowing users to enter just the numeric portion of a box code. The system will automatically prepend the "BOX-" prefix when querying. This reduces typing and prevents errors from inconsistent formatting.
+## Fix Box Search and Assignment Issues
 
----
+### Summary
 
-### Current Behavior
+Three bugs have been identified related to box searching and selection:
 
-Users must enter the full box code (e.g., `BOX-0001`) in search fields. The search functions use exact matching:
-```typescript
-.eq('box_code', boxSearchCode.trim().toUpperCase())
-```
-
-Placeholders currently show: `BOX-0001` or `Enter box code...`
+1. **Box assignment allows non-empty boxes** - The BoxSelectionDialog relies on the `content_type` column which can become stale, allowing selection of boxes that already contain order batches
+2. **Warehouse scan popup ignores numeric-only input** - The BoxLookupScanDialog uses regex matching but doesn't apply `normalizeBoxCode`, so entering "0001" fails
+3. **Receiving scan popup ignores numeric-only input** - The BoxScanPopup doesn't use `normalizeBoxCode`, so entering "0001" without "BOX-" prefix fails
 
 ---
 
-### Proposed Behavior
+### Issue 1: BoxSelectionDialog Allowing Non-Empty Boxes
 
-1. **User enters**: Just the number (e.g., `42`, `0001`, `123`)
-2. **System normalizes**: Automatically prepends `BOX-` prefix
-3. **Query**: Uses `BOX-42` or `BOX-0001` for database lookup
-4. **Placeholder update**: Show `Enter box number (e.g., 42)` to guide users
+**Problem:**
+The `BoxSelectionDialog` component (used when assigning a box to batches) filters boxes by `content_type === 'EMPTY'`, but this field can become stale. A box might still show as "EMPTY" even if it contains order batches from another order.
 
-**Normalization Logic:**
+**Root Cause:**
+The `content_type` column on the `boxes` table is not being updated when order batches are assigned. The dialog trusts this column instead of checking actual batch assignments.
+
+**Solution:**
+Add a real-time validation step that checks for existing order batches in the box before including it in the "empty" list.
+
+**Changes to `src/components/BoxSelectionDialog.tsx`:**
+- After fetching boxes, also fetch order batches grouped by `box_id`
+- Exclude any box that has non-terminated order batches from the "empty" list
+- This ensures only truly empty boxes appear in the selection
+
 ```typescript
-const normalizeBoxCode = (input: string): string => {
-  const trimmed = input.trim().toUpperCase();
+// Query order batches to find which boxes actually have items
+const { data: batchesInBoxes } = await supabase
+  .from('order_batches')
+  .select('box_id')
+  .not('box_id', 'is', null)
+  .eq('is_terminated', false);
+
+// Create set of box IDs that have batches
+const boxesWithBatches = new Set(batchesInBoxes?.map(b => b.box_id) || []);
+
+// Filter out boxes that have order batches
+allBoxes?.forEach((box) => {
+  // Check both content_type AND actual batch presence
+  const hasOrderBatches = boxesWithBatches.has(box.id);
   
-  // If already has BOX- or EBOX- prefix, use as-is
-  if (/^(E?BOX-)/i.test(trimmed)) {
-    return trimmed;
+  if (box.content_type === 'EXTRA' && !hasOrderBatches) {
+    extra.push(boxData);
+  } else if (!hasOrderBatches && (box.content_type === 'EMPTY' || !box.content_type)) {
+    empty.push(boxData);
   }
-  
-  // If it's just digits, prepend BOX-
-  if (/^\d+$/.test(trimmed)) {
-    return `BOX-${trimmed}`;
-  }
-  
-  // Otherwise return as-is (allows searching by product SKU, etc.)
-  return trimmed;
-};
+  // Boxes with order batches are excluded from both lists
+});
 ```
 
 ---
 
-### Technical Approach
+### Issue 2: BoxLookupScanDialog Not Normalizing Input
 
-#### 1. Create Shared Utility Function
+**Problem:**
+When typing "0001" in the warehouse scan popup, nothing is found because the code uses regex `/(EBOX-\d+|BOX-\d+)/` which requires the prefix.
 
-Add a new utility function in `src/lib/boxUtils.ts`:
+**Root Cause:**
+The `lookupBox` function doesn't apply `normalizeBoxCode` before regex matching. Numeric-only input passes through without the BOX- prefix.
 
-```typescript
-/**
- * Normalize box code input by auto-prepending BOX- prefix for numeric inputs.
- * Allows users to enter just "42" instead of "BOX-42".
- */
-export const normalizeBoxCode = (input: string): string => {
-  const trimmed = input.trim().toUpperCase();
-  
-  // Already has valid prefix - return as-is
-  if (/^(EBOX-|BOX-)/.test(trimmed)) {
-    return trimmed;
-  }
-  
-  // Pure digits - prepend BOX-
-  if (/^\d+$/.test(trimmed)) {
-    return `BOX-${trimmed}`;
-  }
-  
-  // Mixed input (could be product SKU/name search) - return as-is
-  return trimmed;
-};
-```
+**Solution:**
+Import and apply `normalizeBoxCode` to the input before processing.
 
-#### 2. Update Box Search Functions
+**Changes to `src/components/BoxLookupScanDialog.tsx`:**
 
-Apply normalization in each location where box codes are searched:
-
-**Files to update:**
-- `src/pages/OrderManufacturing.tsx` - `searchBox()` function
-- `src/pages/OrderFinishing.tsx` - `searchBox()` function
-- `src/pages/OrderPackaging.tsx` - `searchBox()` function
-- `src/components/BoxScanDialog.tsx` - `handleSearch()` function
-- `src/components/BoxReceiveDialog.tsx` - `handleSearch()` and scanner callback
-- `src/components/BoxAssignmentDialog.tsx` - `handleSearch()` function
-- `src/components/ExtraItemsTab.tsx` - box search function
-- `src/components/BoxLookupScanDialog.tsx` - already handles regex extraction (no change needed)
-
-**Example change in `OrderManufacturing.tsx`:**
+1. Import the utility:
 ```typescript
 import { normalizeBoxCode } from '@/lib/boxUtils';
-
-const searchBox = async () => {
-  if (!boxSearchCode.trim()) return;
-  
-  const normalizedCode = normalizeBoxCode(boxSearchCode);
-  
-  try {
-    const { data: box } = await supabase
-      .from('boxes')
-      .select('id, box_code')
-      .eq('box_code', normalizedCode)  // Use normalized code
-      .eq('is_active', true)
-      .single();
-    // ... rest unchanged
-  }
-};
 ```
 
-#### 3. Update Placeholders
+2. Normalize input at the start of `lookupBox`:
+```typescript
+const lookupBox = useCallback(async (rawCode: string) => {
+  if (validating) return;
 
-Change placeholder text to prompt for number-only input:
+  const normalized = normalizeBoxCode(rawCode); // Apply normalization first
+  if (!normalized) return;
 
-| Location | Current | New |
-|----------|---------|-----|
-| OrderManufacturing.tsx | `BOX-0001` | `Enter box number (e.g., 42)` |
-| OrderFinishing.tsx | `BOX-0001` | `Enter box number (e.g., 42)` |
-| OrderPackaging.tsx | `BOX-0001` | `Enter box number (e.g., 42)` |
-| BoxAssignmentDialog.tsx | `e.g., BOX-0001` | `Box number (e.g., 42)` |
-| ExtraItemsTab.tsx | `Enter box code...` | `Box number (e.g., 42)` |
+  // Then apply regex for URL extraction (BOX-#### or EBOX-####)
+  const boxMatch = normalized.match(/(EBOX-\d+|BOX-\d+)/);
+  // ...rest of function
+```
 
----
-
-### Files to Create/Modify
-
-**New File:**
-- `src/lib/boxUtils.ts` - Contains `normalizeBoxCode` utility function
-
-**Modified Files:**
-
-1. **`src/pages/OrderManufacturing.tsx`**
-   - Import `normalizeBoxCode`
-   - Update `searchBox()` to use normalized code
-   - Update placeholder text
-
-2. **`src/pages/OrderFinishing.tsx`**
-   - Import `normalizeBoxCode`
-   - Update `searchBox()` to use normalized code
-   - Update placeholder text
-
-3. **`src/pages/OrderPackaging.tsx`**
-   - Import `normalizeBoxCode`
-   - Update `searchBox()` to use normalized code
-   - Update placeholder text
-
-4. **`src/components/BoxScanDialog.tsx`**
-   - Import `normalizeBoxCode`
-   - Update `handleSearch()` to use normalized code for box lookup
-   - Keep product SKU/name search behavior unchanged
-
-5. **`src/components/BoxReceiveDialog.tsx`**
-   - Import `normalizeBoxCode`
-   - Update `handleSearch()` and scanner handler to use normalized code
-
-6. **`src/components/BoxAssignmentDialog.tsx`**
-   - Import `normalizeBoxCode`
-   - Update `handleSearch()` to use normalized code
-   - Update placeholder text
-
-7. **`src/components/ExtraItemsTab.tsx`**
-   - Import `normalizeBoxCode`
-   - Update box search function to use normalized code
-   - Update placeholder text
+3. Update placeholder text to guide users:
+```typescript
+placeholder={validating ? 'Looking up...' : 'Enter box number (e.g., 42)'}
+```
 
 ---
 
-### Edge Cases Handled
+### Issue 3: BoxScanPopup Not Normalizing Input
 
-| Input | Normalized Output | Behavior |
-|-------|------------------|----------|
-| `42` | `BOX-42` | Number-only input gets prefix |
-| `0001` | `BOX-0001` | Preserves leading zeros |
-| `BOX-42` | `BOX-42` | Already prefixed, unchanged |
-| `box-42` | `BOX-42` | Case normalized |
-| `EBOX-123` | `EBOX-123` | Extra box prefix preserved |
-| `ABC123` | `ABC123` | Mixed alphanumeric (product SKU) unchanged |
-| `Plaster` | `PLASTER` | Product name search unchanged |
+**Problem:**
+When typing "0001" in the receiving page scan popup, nothing is added because the code only does `code.trim().toUpperCase()` without prepending "BOX-".
+
+**Root Cause:**
+The `validateAndAddBox` function doesn't use `normalizeBoxCode`, so numeric-only inputs query the database as "0001" instead of "BOX-0001".
+
+**Solution:**
+Import and apply `normalizeBoxCode` to normalize the input before querying.
+
+**Changes to `src/components/BoxScanPopup.tsx`:**
+
+1. Import the utility:
+```typescript
+import { normalizeBoxCode } from '@/lib/boxUtils';
+```
+
+2. Use it in `validateAndAddBox`:
+```typescript
+const validateAndAddBox = useCallback(async (code: string) => {
+  if (validating) return;
+  
+  const normalizedCode = normalizeBoxCode(code); // Apply normalization
+  if (!normalizedCode) return;
+
+  // Check if already scanned in this session
+  if (scannedBoxes.some(b => b.box_code.toUpperCase() === normalizedCode)) {
+    // ...
+  }
+```
+
+3. Update placeholder text:
+```typescript
+placeholder={validating ? "Validating..." : "Enter box number (e.g., 42)"}
+```
 
 ---
 
-### Notes
+### Files to Modify
 
-- **Scanner compatibility**: Hardware scanners that output full `BOX-0001` format continue to work
-- **Backward compatible**: Users can still type full `BOX-` prefix if preferred
-- **Product search**: Dialogs that support product SKU/name search retain that functionality (alphanumeric inputs pass through unchanged)
-- **Extra boxes**: EBOX- prefix is preserved for extra inventory boxes
+| File | Change |
+|------|--------|
+| `src/components/BoxSelectionDialog.tsx` | Add order batch validation to exclude non-empty boxes |
+| `src/components/BoxLookupScanDialog.tsx` | Import and apply `normalizeBoxCode`, update placeholder |
+| `src/components/BoxScanPopup.tsx` | Import and apply `normalizeBoxCode`, update placeholder |
+
+---
+
+### Expected Behavior After Fix
+
+| Scenario | Before | After |
+|----------|--------|-------|
+| BoxSelectionDialog: Box has batches from another order | Shows as "EMPTY", can be selected | Excluded from list entirely |
+| Warehouse scan: User types "0001" | "Unrecognized Scan" error | Finds BOX-0001 successfully |
+| Receiving scan: User types "0001" | "Box Not Found" error | Adds BOX-0001 to scan list |
+
