@@ -267,8 +267,8 @@ export default function OrderPackaging() {
     try {
       const { data: box } = await supabase.from('boxes').select('id, box_code').eq('box_code', normalizedCode).eq('is_active', true).single();
       if (!box) { toast.error(`Box ${boxSearchCode} not found`); return; }
-      const { data: existingBatch } = await supabase.from('order_batches').select('id').eq('box_id', box.id).eq('is_terminated', false).maybeSingle();
-      if (existingBatch) { toast.error(`Box ${box.box_code} is already occupied`); return; }
+      const { data: existingBatches } = await supabase.from('order_batches').select('id').eq('box_id', box.id).eq('is_terminated', false).limit(1);
+      if (existingBatches && existingBatches.length > 0) { toast.error(`Box ${box.box_code} is already occupied`); return; }
       setSelectedBox(box);
       setBoxSearchCode('');
     } catch (error: any) { toast.error(error.message); }

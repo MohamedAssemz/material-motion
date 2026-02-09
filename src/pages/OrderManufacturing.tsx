@@ -241,14 +241,14 @@ export default function OrderManufacturing() {
         return;
       }
       
-      const { data: existingBatch } = await supabase
+      const { data: existingBatches } = await supabase
         .from('order_batches')
         .select('id')
         .eq('box_id', box.id)
         .eq('is_terminated', false)
-        .maybeSingle();
+        .limit(1);
       
-      if (existingBatch) {
+      if (existingBatches && existingBatches.length > 0) {
         toast.error(`Box ${box.box_code} is already occupied`);
         return;
       }
