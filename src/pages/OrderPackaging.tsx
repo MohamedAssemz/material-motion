@@ -40,6 +40,7 @@ import {
 } from '@/components/ui/select';
 import { ProductionRateSection } from '@/components/ProductionRateSection';
 import { SearchableSelect } from '@/components/ui/searchable-select';
+import { normalizeBoxCode } from '@/lib/boxUtils';
 
 interface Batch {
   id: string;
@@ -262,8 +263,9 @@ export default function OrderPackaging() {
 
   const searchBox = async () => {
     if (!boxSearchCode.trim()) return;
+    const normalizedCode = normalizeBoxCode(boxSearchCode);
     try {
-      const { data: box } = await supabase.from('boxes').select('id, box_code').eq('box_code', boxSearchCode.trim().toUpperCase()).eq('is_active', true).single();
+      const { data: box } = await supabase.from('boxes').select('id, box_code').eq('box_code', normalizedCode).eq('is_active', true).single();
       if (!box) { toast.error(`Box ${boxSearchCode} not found`); return; }
       const { data: existingBatch } = await supabase.from('order_batches').select('id').eq('box_id', box.id).eq('is_terminated', false).maybeSingle();
       if (existingBatch) { toast.error(`Box ${box.box_code} is already occupied`); return; }
@@ -902,7 +904,7 @@ export default function OrderPackaging() {
             <div>
               <Label>Search Box by Code</Label>
               <div className="flex gap-2 mt-2">
-                <Input value={boxSearchCode} onChange={(e) => setBoxSearchCode(e.target.value)} placeholder="BOX-0001" onKeyDown={(e) => e.key === 'Enter' && searchBox()} />
+                <Input value={boxSearchCode} onChange={(e) => setBoxSearchCode(e.target.value)} placeholder="Enter box number (e.g., 42)" onKeyDown={(e) => e.key === 'Enter' && searchBox()} />
                 <Button variant="outline" onClick={searchBox}><Search className="h-4 w-4" /></Button>
               </div>
             </div>

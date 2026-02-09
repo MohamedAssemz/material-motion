@@ -36,6 +36,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { MoveToExtraDialog } from '@/components/MoveToExtraDialog';
 import { SearchableSelect } from '@/components/ui/searchable-select';
+import { normalizeBoxCode } from '@/lib/boxUtils';
 
 interface Batch {
   id: string;
@@ -226,11 +227,12 @@ export default function OrderManufacturing() {
 
   const searchBox = async () => {
     if (!boxSearchCode.trim()) return;
+    const normalizedCode = normalizeBoxCode(boxSearchCode);
     try {
       const { data: box } = await supabase
         .from('boxes')
         .select('id, box_code')
-        .eq('box_code', boxSearchCode.trim().toUpperCase())
+        .eq('box_code', normalizedCode)
         .eq('is_active', true)
         .single();
       
@@ -941,7 +943,7 @@ export default function OrderManufacturing() {
                 <Input 
                   value={boxSearchCode}
                   onChange={(e) => setBoxSearchCode(e.target.value)}
-                  placeholder="BOX-0001"
+                  placeholder="Enter box number (e.g., 42)"
                   onKeyDown={(e) => e.key === 'Enter' && searchBox()}
                 />
                 <Button variant="outline" onClick={searchBox}>

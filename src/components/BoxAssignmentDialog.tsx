@@ -14,6 +14,7 @@ import { getStateLabel, type UnitState } from '@/lib/stateMachine';
 import { useToast } from '@/hooks/use-toast';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { useBoxScanner } from '@/hooks/useBoxScanner';
+import { normalizeBoxCode } from '@/lib/boxUtils';
 interface Machine {
   id: string;
   name: string;
@@ -107,23 +108,25 @@ export function BoxAssignmentDialog({
 
   // Scanner handler - auto-select box when scanned
   const handleBoxScan = useCallback(async (code: string) => {
+    const normalizedCode = normalizeBoxCode(code);
+    
     // Find box in empty or compatible boxes
-    const emptyMatch = emptyBoxes.find(b => b.box_code.toUpperCase() === code);
+    const emptyMatch = emptyBoxes.find(b => b.box_code.toUpperCase() === normalizedCode);
     if (emptyMatch) {
       setSelectedBox(emptyMatch);
       toast({
         title: 'Box Selected',
-        description: `Selected empty box ${code}`,
+        description: `Selected empty box ${normalizedCode}`,
       });
       return;
     }
 
-    const compatibleMatch = compatibleBoxes.find(b => b.box_code.toUpperCase() === code);
+    const compatibleMatch = compatibleBoxes.find(b => b.box_code.toUpperCase() === normalizedCode);
     if (compatibleMatch && allowMultipleItems) {
       setSelectedBox(compatibleMatch);
       toast({
         title: 'Box Selected',
-        description: `Selected box ${code} (already has ${batchType} items)`,
+        description: `Selected box ${normalizedCode} (already has ${batchType} items)`,
       });
       return;
     }
@@ -132,7 +135,7 @@ export function BoxAssignmentDialog({
     const { data: box } = await supabase
       .from('boxes')
       .select('id, box_code, content_type')
-      .eq('box_code', code)
+      .eq('box_code', normalizedCode)
       .eq('is_active', true)
       .single();
 
@@ -250,11 +253,12 @@ export function BoxAssignmentDialog({
     if (!searchCode.trim()) return;
 
     setSearching(true);
+    const normalizedCode = normalizeBoxCode(searchCode);
     try {
       const { data: box } = await supabase
         .from('boxes')
         .select('id, box_code, content_type, items_list')
-        .eq('box_code', searchCode.trim().toUpperCase())
+        .eq('box_code', normalizedCode)
         .eq('is_active', true)
         .single();
 
@@ -450,7 +454,7 @@ export function BoxAssignmentDialog({
               <Input
                 value={searchCode}
                 onChange={(e) => setSearchCode(e.target.value.toUpperCase())}
-                placeholder="e.g., BOX-0001"
+                placeholder="Box number (e.g., 42)"
                 className="pl-10"
                 onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
               />
