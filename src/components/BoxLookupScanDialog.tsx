@@ -11,6 +11,7 @@ import { useBoxScanner } from '@/hooks/useBoxScanner';
 import { format } from 'date-fns';
 import { getStateLabel, type UnitState } from '@/lib/stateMachine';
 import { generateBoxLabelHTML } from '@/components/BoxLabel';
+import { normalizeBoxCode } from '@/lib/boxUtils';
 
 interface BatchInfo {
   id: string;
@@ -63,7 +64,8 @@ export function BoxLookupScanDialog({ open, onOpenChange }: BoxLookupScanDialogP
   const lookupBox = useCallback(async (rawCode: string) => {
     if (validating) return;
 
-    const normalized = rawCode.trim().toUpperCase();
+    // Normalize input first (handles numeric-only inputs like "0001" -> "BOX-0001")
+    const normalized = normalizeBoxCode(rawCode);
     if (!normalized) return;
 
     // Extract box code from URL or raw input: BOX-#### or EBOX-####
@@ -324,7 +326,7 @@ export function BoxLookupScanDialog({ open, onOpenChange }: BoxLookupScanDialogP
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value.toUpperCase())}
             onKeyDown={handleKeyDown}
-            placeholder={validating ? 'Looking up...' : 'Scan barcode here...'}
+            placeholder={validating ? 'Looking up...' : 'Enter box number (e.g., 42)'}
             className="pl-10"
             readOnly={validating}
           />

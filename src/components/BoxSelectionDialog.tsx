@@ -64,6 +64,16 @@ export function BoxSelectionDialog({
 
       if (boxesError) throw boxesError;
 
+      // Query order batches to find which boxes actually have items
+      const { data: batchesInBoxes } = await supabase
+        .from('order_batches')
+        .select('box_id')
+        .not('box_id', 'is', null)
+        .eq('is_terminated', false);
+
+      // Create set of box IDs that have batches
+      const boxesWithBatches = new Set(batchesInBoxes?.map(b => b.box_id) || []);
+
       // Separate empty boxes and boxes with EXTRA content
       const empty: BoxOption[] = [];
       const extra: BoxOption[] = [];
@@ -77,11 +87,15 @@ export function BoxSelectionDialog({
           items_list: (box.items_list as BoxOption['items_list']) || [],
         };
 
-        if (box.content_type === 'EXTRA') {
+        // Check both content_type AND actual batch presence
+        const hasOrderBatches = boxesWithBatches.has(box.id);
+
+        if (box.content_type === 'EXTRA' && !hasOrderBatches) {
           extra.push(boxData);
-        } else if (box.content_type === 'EMPTY' || !box.content_type) {
+        } else if (!hasOrderBatches && (box.content_type === 'EMPTY' || !box.content_type)) {
           empty.push(boxData);
         }
+        // Boxes with order batches are excluded from both lists
       });
 
       setEmptyBoxes(empty);

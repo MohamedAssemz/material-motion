@@ -8,6 +8,7 @@ import { QrCode, X, Loader2 } from 'lucide-react';
 import { getStateLabel, type UnitState } from '@/lib/stateMachine';
 import { useToast } from '@/hooks/use-toast';
 import { useBoxScanner } from '@/hooks/useBoxScanner';
+import { normalizeBoxCode } from '@/lib/boxUtils';
 
 interface BoxBatch {
   id: string;
@@ -67,7 +68,8 @@ export function BoxScanPopup({
     // Ignore if already validating
     if (validating) return;
     
-    const normalizedCode = code.trim().toUpperCase();
+    // Normalize input (handles numeric-only inputs like "0001" -> "BOX-0001")
+    const normalizedCode = normalizeBoxCode(code);
     if (!normalizedCode) return;
 
     // Check if already scanned in this session
@@ -241,7 +243,7 @@ export function BoxScanPopup({
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value.toUpperCase())}
             onKeyDown={handleKeyDown}
-            placeholder={validating ? "Validating..." : "Scan barcode here..."}
+            placeholder={validating ? "Validating..." : "Enter box number (e.g., 42)"}
             className="pl-10"
             readOnly={validating}
           />
