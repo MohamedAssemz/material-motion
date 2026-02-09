@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Settings, Loader2 } from 'lucide-react';
+import { Settings, Loader2, PackageX } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -37,6 +37,7 @@ interface GroupedBatch {
   quantity: number;
   machine_id: string | null;
   batch_ids: string[];
+  needs_boxing: boolean;
 }
 
 interface ProductionRateSectionProps {
@@ -81,7 +82,9 @@ export function ProductionRateSection({
   const groupMap = new Map<string, GroupedBatch>();
   
   batches.forEach(batch => {
-    const groupKey = `${batch.product_id}-${batch.machine_id || 'unassigned'}`;
+    const needsBoxing = batch.needs_boxing ?? true;
+    const boxingSuffix = machineType === 'boxing' ? `-${needsBoxing ? 'box' : 'nobox'}` : '';
+    const groupKey = `${batch.product_id}-${batch.machine_id || 'unassigned'}${boxingSuffix}`;
     
     if (!groupMap.has(groupKey)) {
       groupMap.set(groupKey, {
@@ -92,6 +95,7 @@ export function ProductionRateSection({
         quantity: 0,
         machine_id: batch.machine_id,
         batch_ids: [],
+        needs_boxing: needsBoxing,
       });
     }
     
@@ -138,7 +142,8 @@ export function ProductionRateSection({
     }
   };
 
-  if (batches.length === 0 || machines.length === 0) {
+  const hasNoBoxingItems = machineType === 'boxing' && groupedBatches.some(g => !g.needs_boxing);
+  if (batches.length === 0 || (machines.length === 0 && !hasNoBoxingItems)) {
     return null;
   }
 
@@ -155,6 +160,28 @@ export function ProductionRateSection({
       </div>
 
       {groupedBatches.map(group => {
+        // Static "No Boxing" card for boxing phase
+        if (machineType === 'boxing' && !group.needs_boxing) {
+          return (
+            <Card key={group.groupKey} className="border-muted bg-muted/30">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium truncate">{group.product_name}</p>
+                      <Badge variant="secondary" className="bg-muted text-muted-foreground">
+                        <PackageX className="h-3 w-3 mr-1" />
+                        No Boxing
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground">{group.product_sku} · Qty: {group.quantity}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        }
+
         const machine = machines.find(m => m.id === group.machine_id);
         const selectedMachineId = assignments.get(group.groupKey) || group.machine_id || '';
         
