@@ -79,7 +79,7 @@ export function useBoxScanner({
     }
 
     // Only accept alphanumeric and common barcode characters
-    if (event.key.length === 1 && /^[a-zA-Z0-9\-_]$/.test(event.key)) {
+    if (event.key.length === 1 && /^[a-zA-Z0-9\-_:/.?=&]$/.test(event.key)) {
       // Check if this keystroke came fast enough to be from a scanner
       const isFastEnough = timeSinceLastKey <= maxDelay || bufferRef.current.length === 0;
       
