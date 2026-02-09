@@ -1,46 +1,77 @@
 
 
-## Enforce "At Least 1 Admin" Rule
+## Fix QR Code URL Extraction and Character Corruption in Scanning
 
-### Summary
+### Problem 1: QR Code URLs Not Parsed
 
-Prevent the last remaining admin from changing their primary role to a non-admin role. The guard needs to be applied in two places: the UI (to disable the option) and the backend edge function (to enforce it server-side).
+When a QR code containing a URL like `https://...lovableproject.com/box/BOX-0006` is scanned, the scanning dialogs don't extract the box code from the URL. The `BoxLookupScanDialog` already handles this with regex extraction, but `BoxScanPopup`, `BoxReceiveDialog`, and `BoxAssignmentDialog` do not.
+
+### Problem 2: Character Corruption (EBOX-0!01)
+
+When scanning `EBOX-0001`, the input shows `EBOX-0!01`. The `!` character is `Shift+1` -- hardware scanners send rapid key events, and sometimes the Shift key timing overlaps with the next character. The current code doesn't sanitize these stray shifted characters from scanned input.
+
+### Solution
+
+Update `normalizeBoxCode` in `src/lib/boxUtils.ts` to be the single source of truth for all input normalization. It will:
+
+1. **Extract box codes from URLs**: Match `BOX-####` or `EBOX-####` patterns from full URL strings
+2. **Sanitize shifted characters**: Replace common shift-key corruptions (`!` for `1`, `@` for `2`, `#` for `3`, etc.) before processing
+
+This centralizes the fix so all scanning dialogs benefit automatically without individual changes.
 
 ### Changes
 
-**1. `src/pages/Admin.tsx` (Client-side guard)**
+**File: `src/lib/boxUtils.ts`**
 
-- Compute `adminCount`: count users whose `primary_role === 'admin'`
-- When rendering the Primary Role `<Select>` for a user whose `primary_role === 'admin'` and `adminCount === 1`:
-  - Disable the Select entirely
-  - Add a tooltip or small helper text: "Last admin"
-- This prevents the UI from even allowing the change
+Update `normalizeBoxCode` to:
 
-**2. `supabase/functions/admin-users/index.ts` (Server-side guard)**
-
-In the `update-primary-role` case, before updating, check if the user currently has `primary_role === 'admin'` and the new role is not `admin`. If so, count how many other users have `primary_role = 'admin'`. If the count is 0, reject with an error.
-
-```typescript
-// Before updating, check if this would remove the last admin
-if (oldPrimaryRole === 'admin' && primary_role !== 'admin') {
-  const { count } = await supabaseAdmin
-    .from('profiles')
-    .select('id', { count: 'exact', head: true })
-    .eq('primary_role', 'admin')
-    .neq('id', user_id);
-
-  if (count === 0) {
-    return error 403: "Cannot change role: at least one admin must exist"
-  }
-}
+```
+1. Strip the input of common shift-character corruptions
+   Map: ! -> 1, @ -> 2, # -> 3, $ -> 4, % -> 5, ^ -> 6, & -> 7, * -> 8, ( -> 9, ) -> 0
+2. Try to extract BOX-#### or EBOX-#### pattern from anywhere in the string (handles URLs)
+3. If no pattern found, fall back to existing logic (numeric prepend, passthrough)
 ```
 
-Also apply the same check in the `delete` case -- prevent deleting the last admin user.
+**File: `src/hooks/useBoxScanner.ts`**
+
+Expand the character filter regex to also accept URL characters (`:`, `/`, `.`, `?`, `=`) so that QR-scanned URLs pass through the buffer intact instead of being stripped:
+
+```
+Current:  /^[a-zA-Z0-9\-_]$/
+Updated:  /^[a-zA-Z0-9\-_:/.?=&]$/
+```
+
+**File: `src/components/BoxScanPopup.tsx`**
+
+No changes needed -- it already calls `normalizeBoxCode` which will now handle URLs.
+
+**File: `src/components/BoxReceiveDialog.tsx`**
+
+No changes needed -- same reason.
+
+**File: `src/components/BoxAssignmentDialog.tsx`**
+
+No changes needed -- same reason.
 
 ### Files to Modify
 
 | File | Change |
 |------|--------|
-| `src/pages/Admin.tsx` | Compute `adminCount`, disable primary role Select for the sole admin |
-| `supabase/functions/admin-users/index.ts` | Add server-side guard in `update-primary-role` and `delete` cases |
+| `src/lib/boxUtils.ts` | Add URL extraction and shift-character sanitization to `normalizeBoxCode` |
+| `src/hooks/useBoxScanner.ts` | Expand character filter to accept URL characters |
 
+### How It Works
+
+```text
+QR scan: "https://...com/box/BOX-0006"
+  -> useBoxScanner accepts URL chars -> passes full string
+  -> normalizeBoxCode extracts "BOX-0006" via regex
+  -> lookup proceeds normally
+
+Corrupted scan: "EBOX-0!01"
+  -> normalizeBoxCode sanitizes ! -> 1 -> "EBOX-0001"
+  -> lookup proceeds normally
+
+Normal scan: "BOX-0006" or "42"
+  -> existing behavior unchanged
+```
