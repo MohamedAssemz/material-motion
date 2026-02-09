@@ -213,6 +213,8 @@ export default function Admin() {
                 const isCurrentUser = user.id === currentUser?.id;
                 const additionalRoles = user.roles.filter(r => r !== user.primary_role);
                 const availableToAdd = AVAILABLE_ROLES.filter(r => !user.roles.includes(r.value));
+                const adminCount = users.filter(u => u.primary_role === 'admin').length;
+                const isLastAdmin = user.primary_role === 'admin' && adminCount === 1;
 
                 return (
                   <TableRow key={user.id}>
@@ -233,26 +235,31 @@ export default function Admin() {
 
                     {/* Primary Role */}
                     <TableCell>
-                      <Select
-                        value={user.primary_role}
-                        onValueChange={(value: AppRole) => updatePrimaryRole(user.id, value)}
-                        disabled={updatingRole === user.id}
-                      >
-                        <SelectTrigger className="h-8 w-[130px] text-xs">
-                          {updatingRole === user.id ? (
-                            <Loader2 className="h-3 w-3 animate-spin" />
-                          ) : (
-                            <SelectValue />
-                          )}
-                        </SelectTrigger>
-                        <SelectContent>
-                          {AVAILABLE_ROLES.map(role => (
-                            <SelectItem key={role.value} value={role.value} className="text-xs">
-                              {role.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <div className="flex items-center gap-1.5">
+                        <Select
+                          value={user.primary_role}
+                          onValueChange={(value: AppRole) => updatePrimaryRole(user.id, value)}
+                          disabled={updatingRole === user.id || isLastAdmin}
+                        >
+                          <SelectTrigger className="h-8 w-[130px] text-xs">
+                            {updatingRole === user.id ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <SelectValue />
+                            )}
+                          </SelectTrigger>
+                          <SelectContent>
+                            {AVAILABLE_ROLES.map(role => (
+                              <SelectItem key={role.value} value={role.value} className="text-xs">
+                                {role.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {isLastAdmin && (
+                          <span className="text-[10px] text-muted-foreground whitespace-nowrap">Last admin</span>
+                        )}
+                      </div>
                     </TableCell>
 
                     {/* Additional Roles */}
@@ -315,7 +322,8 @@ export default function Admin() {
                           size="sm"
                           className="h-7 w-7 p-0 text-destructive hover:text-destructive"
                           onClick={() => { setSelectedUser(user); setDeleteDialogOpen(true); }}
-                          disabled={isCurrentUser}
+                          disabled={isCurrentUser || isLastAdmin}
+                          title={isLastAdmin ? 'Cannot delete the last admin' : undefined}
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
