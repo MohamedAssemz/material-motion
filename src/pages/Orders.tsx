@@ -12,7 +12,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { ArrowLeft, Plus, Search, AlertCircle, Download, Filter, CalendarIcon, X } from 'lucide-react';
+import { ArrowLeft, Plus, Search, AlertCircle, Download, Filter, CalendarIcon, X, Package } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { format, isWithinInterval, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
 
@@ -38,6 +39,7 @@ interface Order {
   customer?: {
     name: string;
   } | null;
+  extra_count?: number;
 }
 
 interface OrderItem {
@@ -100,15 +102,16 @@ export default function Orders() {
 
       if (error) throw error;
 
-      // Fetch order items to calculate total units per order
+      // Fetch order items to calculate total units per order and extra inventory counts
       const { data: itemsData } = await supabase
         .from('order_items')
-        .select('id, order_id, quantity, product:products(name, sku)')
+        .select('id, order_id, quantity, deducted_to_extra, product:products(name, sku)')
         .in('order_id', ordersData?.map(o => o.id) || []);
 
-      // Build items map and calculate total units per order
+      // Build items map and calculate total units per order + extra counts
       const itemsMap = new Map<string, OrderItem[]>();
       const orderUnitCounts = new Map<string, number>();
+      const extraCountsByOrder = new Map<string, number>();
       (itemsData || []).forEach((item: any) => {
         const existing = itemsMap.get(item.order_id) || [];
         existing.push(item);
@@ -118,6 +121,12 @@ export default function Orders() {
         orderUnitCounts.set(
           item.order_id, 
           (orderUnitCounts.get(item.order_id) || 0) + item.quantity
+        );
+        
+        // Sum deducted_to_extra for extra inventory indicator
+        extraCountsByOrder.set(
+          item.order_id,
+          (extraCountsByOrder.get(item.order_id) || 0) + (item.deducted_to_extra || 0)
         );
       });
       setOrderItems(itemsMap);
@@ -165,6 +174,7 @@ export default function Orders() {
             unit_count: unitCount,
             shipped_count: shippedCount,
             computed_status,
+            extra_count: extraCountsByOrder.get(order.id) || 0,
           };
         })
       );
@@ -254,7 +264,7 @@ export default function Orders() {
 
   const exportOrders = () => {
     // Build CSV content
-    const headers = ['Order Number', 'Customer', 'Priority', 'Status', 'Total Items', 'Shipped', 'Created At', 'EFT', 'Notes', 'Item SKU', 'Item Name', 'Item Quantity'];
+    const headers = ['Order Number', 'Customer', 'Priority', 'Status', 'Total Items', 'Shipped', 'Added to Extra', 'Created At', 'EFT', 'Notes', 'Item SKU', 'Item Name', 'Item Quantity'];
     const rows: string[][] = [];
 
     filteredOrders.forEach(order => {
@@ -267,6 +277,7 @@ export default function Orders() {
           order.computed_status || '',
           String(order.unit_count || 0),
           String(order.shipped_count || 0),
+          String(order.extra_count || 0),
           format(new Date(order.created_at), 'yyyy-MM-dd HH:mm'),
           order.estimated_fulfillment_time ? format(new Date(order.estimated_fulfillment_time), 'yyyy-MM-dd') : '',
           order.notes || '',
@@ -281,6 +292,7 @@ export default function Orders() {
             idx === 0 ? (order.computed_status || '') : '',
             idx === 0 ? String(order.unit_count || 0) : '',
             idx === 0 ? String(order.shipped_count || 0) : '',
+            idx === 0 ? String(order.extra_count || 0) : '',
             idx === 0 ? format(new Date(order.created_at), 'yyyy-MM-dd HH:mm') : '',
             idx === 0 && order.estimated_fulfillment_time ? format(new Date(order.estimated_fulfillment_time), 'yyyy-MM-dd') : '',
             idx === 0 ? (order.notes || '') : '',
@@ -529,7 +541,7 @@ export default function Orders() {
                               )}
                               onClick={() => navigate(`/orders/${order.id}`)}
                             >
-                              <TableCell className="font-medium">
+                            <TableCell className="font-medium">
                                 <div className="flex items-center gap-2">
                                   {order.priority === 'high' && (
                                     <AlertCircle className="h-4 w-4 text-destructive" />
@@ -537,6 +549,18 @@ export default function Orders() {
                                   <span className="text-primary hover:underline">
                                     {order.order_number}
                                   </span>
+                                  {(order.extra_count || 0) > 0 && (
+                                    <TooltipProvider>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Package className="h-4 w-4 text-orange-500" />
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                          <p>{order.extra_count} items moved to extra inventory</p>
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    </TooltipProvider>
+                                  )}
                                 </div>
                               </TableCell>
                               <TableCell>{order.customer?.name || '-'}</TableCell>
