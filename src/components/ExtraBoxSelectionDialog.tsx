@@ -10,6 +10,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Box, Loader2, Plus, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import { useBoxScanner } from '@/hooks/useBoxScanner';
+import { normalizeBoxCode } from '@/lib/boxUtils';
 
 interface ExtraBoxOption {
   id: string;
@@ -56,14 +57,22 @@ export function ExtraBoxSelectionDialog({
 
   // Scanner handler - auto-select extra box when scanned
   const handleBoxScan = useCallback(async (code: string) => {
+    const normalizedCode = normalizeBoxCode(code);
+
+    // Detect order box scans
+    if (normalizedCode.startsWith('BOX-') && !normalizedCode.startsWith('EBOX-')) {
+      toast.error('This is an order box. It cannot be used for extra inventory.');
+      return;
+    }
+
     // Check if code matches an EBOX
-    if (!code.startsWith('EBOX-')) {
+    if (!normalizedCode.startsWith('EBOX-')) {
       toast.error(`"${code}" is not an extra box code`);
       return;
     }
 
     // Find in loaded boxes
-    const matchingBox = boxes.find(b => b.box_code.toUpperCase() === code);
+    const matchingBox = boxes.find(b => b.box_code.toUpperCase() === normalizedCode);
     if (matchingBox) {
       setSelectedBoxId(matchingBox.id);
       toast.success(`Selected ${code}`);
@@ -74,7 +83,7 @@ export function ExtraBoxSelectionDialog({
     const { data: box } = await supabase
       .from('extra_boxes')
       .select('id, box_code, is_active')
-      .eq('box_code', code)
+      .eq('box_code', normalizedCode)
       .single();
 
     if (!box) {
