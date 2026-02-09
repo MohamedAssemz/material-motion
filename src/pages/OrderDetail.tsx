@@ -439,18 +439,11 @@ export default function OrderDetail() {
     const printWindow = window.open("", "_blank");
     if (!printWindow) return;
 
-    const itemsByProduct = new Map<string, { name: string; sku: string; quantity: number }>();
-    order.batches
-      .filter((b) => !b.is_terminated)
-      .forEach((batch) => {
-        const existing = itemsByProduct.get(batch.product_id) || {
-          name: batch.product?.name || "Unknown",
-          sku: batch.product?.sku || "N/A",
-          quantity: 0,
-        };
-        existing.quantity += batch.quantity;
-        itemsByProduct.set(batch.product_id, existing);
-      });
+    const itemsList = orderItems.map(item => ({
+      name: item.product?.name || 'Unknown',
+      sku: item.product?.sku || 'N/A',
+      quantity: item.quantity,
+    }));
 
     const html = `
       <!DOCTYPE html>
@@ -488,7 +481,7 @@ export default function OrderDetail() {
             <div class="section-title">Order Items</div>
             <table>
               <tr><th>Product</th><th>SKU</th><th>Quantity</th></tr>
-              ${Array.from(itemsByProduct.values())
+              ${itemsList
                 .map(
                   (item) => `
                 <tr><td>${item.name}</td><td>${item.sku}</td><td>${item.quantity}</td></tr>
