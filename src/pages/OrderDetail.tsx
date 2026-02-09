@@ -706,46 +706,62 @@ export default function OrderDetail() {
       </div>
 
       {/* Order Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Total Items</p>
-            <p className="text-2xl font-bold">{totalItems}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Shipped</p>
-            <p className="text-2xl font-bold text-green-600">{shippedItems}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Shipping</p>
-            <p className="text-2xl font-bold flex items-center gap-2">
-              {order.shipping_type === "international" ? (
-                <>
-                  <Plane className="h-5 w-5" /> International
-                </>
-              ) : (
-                <>
-                  <Truck className="h-5 w-5" /> Domestic
-                </>
-              )}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">EFT</p>
-            <p className="text-2xl font-bold">
-              {order.estimated_fulfillment_time
-                ? format(new Date(order.estimated_fulfillment_time), "MMM d")
-                : "Not set"}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+      {(() => {
+        const totalAddedToExtra = Object.values(addedToExtraCounts).reduce((sum, count) => sum + count, 0);
+        return (
+          <div className={`grid grid-cols-1 gap-4 ${totalAddedToExtra > 0 ? 'md:grid-cols-5' : 'md:grid-cols-4'}`}>
+            <Card>
+              <CardContent className="p-4">
+                <p className="text-sm text-muted-foreground">Total Items</p>
+                <p className="text-2xl font-bold">{totalItems}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <p className="text-sm text-muted-foreground">Shipped</p>
+                <p className="text-2xl font-bold text-green-600">{shippedItems}</p>
+              </CardContent>
+            </Card>
+            {totalAddedToExtra > 0 && (
+              <Card>
+                <CardContent className="p-4">
+                  <p className="text-sm text-muted-foreground">Added to Extra</p>
+                  <p className="text-2xl font-bold text-orange-500 flex items-center gap-2">
+                    <Package className="h-5 w-5" />
+                    {totalAddedToExtra}
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+            <Card>
+              <CardContent className="p-4">
+                <p className="text-sm text-muted-foreground">Shipping</p>
+                <p className="text-2xl font-bold flex items-center gap-2">
+                  {order.shipping_type === "international" ? (
+                    <>
+                      <Plane className="h-5 w-5" /> International
+                    </>
+                  ) : (
+                    <>
+                      <Truck className="h-5 w-5" /> Domestic
+                    </>
+                  )}
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <p className="text-sm text-muted-foreground">EFT</p>
+                <p className="text-2xl font-bold">
+                  {order.estimated_fulfillment_time
+                    ? format(new Date(order.estimated_fulfillment_time), "MMM d")
+                    : "Not set"}
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        );
+      })()}
 
       {/* Notes & Alerts */}
       {(order.notes || flaggedCount > 0 || redoCount > 0) && (
