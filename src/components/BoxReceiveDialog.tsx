@@ -12,6 +12,7 @@ import { getStateLabel, type UnitState } from '@/lib/stateMachine';
 import { useToast } from '@/hooks/use-toast';
 import { useBoxScanner } from '@/hooks/useBoxScanner';
 import { BoxScanPopup } from '@/components/BoxScanPopup';
+import { normalizeBoxCode } from '@/lib/boxUtils';
 interface BoxBatch {
   id: string;
   product_id: string;
@@ -63,12 +64,14 @@ export function BoxReceiveDialog({
 
   // Scanner handler - explicit database validation for each scanned box
   const handleBoxScan = useCallback(async (code: string) => {
+    const normalizedCode = normalizeBoxCode(code);
+    
     // Check if already selected
-    const alreadySelected = selectedBoxes.find(b => b.box_code.toUpperCase() === code);
+    const alreadySelected = selectedBoxes.find(b => b.box_code.toUpperCase() === normalizedCode);
     if (alreadySelected) {
       toast({
         title: 'Already Selected',
-        description: `Box ${code} is already selected`,
+        description: `Box ${normalizedCode} is already selected`,
       });
       return;
     }
@@ -77,7 +80,7 @@ export function BoxReceiveDialog({
     const { data: box } = await supabase
       .from('boxes')
       .select('id, box_code')
-      .eq('box_code', code)
+      .eq('box_code', normalizedCode)
       .eq('is_active', true)
       .maybeSingle();
 
@@ -267,12 +270,13 @@ export function BoxReceiveDialog({
     setSearching(true);
     try {
       const searchTerm = searchCode.trim().toUpperCase();
+      const normalizedCode = normalizeBoxCode(searchCode);
       
       // First try to find a box by code
       const { data: box } = await supabase
         .from('boxes')
         .select('id, box_code')
-        .eq('box_code', searchTerm)
+        .eq('box_code', normalizedCode)
         .eq('is_active', true)
         .single();
 

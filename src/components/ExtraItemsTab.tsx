@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { updateExtraBoxItemsList } from '@/lib/extraInventoryOperations';
+import { normalizeBoxCode } from '@/lib/boxUtils';
 
 interface ExtraBatch {
   id: string;
@@ -189,12 +190,13 @@ export function ExtraItemsTab({ orderId, phase, onRefresh }: ExtraItemsTabProps)
 
   const searchBox = async () => {
     if (!boxSearchCode.trim()) return;
+    const normalizedCode = normalizeBoxCode(boxSearchCode);
     try {
       // Search in ORDER boxes (not extra_boxes)
       const { data: box } = await supabase
         .from('boxes')
         .select('id, box_code')
-        .eq('box_code', boxSearchCode.trim().toUpperCase())
+        .eq('box_code', normalizedCode)
         .eq('is_active', true)
         .single();
       
@@ -677,7 +679,7 @@ export function ExtraItemsTab({ orderId, phase, onRefresh }: ExtraItemsTabProps)
             {/* Search Box */}
             <div className="flex gap-2">
               <Input
-                placeholder="Enter box code..."
+                placeholder="Box number (e.g., 42)"
                 value={boxSearchCode}
                 onChange={e => setBoxSearchCode(e.target.value.toUpperCase())}
                 onKeyDown={e => e.key === 'Enter' && searchBox()}

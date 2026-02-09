@@ -9,6 +9,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Box, Loader2, QrCode, Search, Check, X, Printer } from 'lucide-react';
 import { getStateLabel, type UnitState } from '@/lib/stateMachine';
 import { useToast } from '@/hooks/use-toast';
+import { normalizeBoxCode } from '@/lib/boxUtils';
 
 interface BoxWithBatch {
   id: string;
@@ -166,11 +167,12 @@ export function BoxScanDialog({
     if (!searchCode.trim()) return;
 
     setSearching(true);
+    const normalizedCode = normalizeBoxCode(searchCode);
     try {
       const { data: box } = await supabase
         .from('boxes')
         .select('id, box_code')
-        .eq('box_code', searchCode.trim().toUpperCase())
+        .eq('box_code', normalizedCode)
         .eq('is_active', true)
         .single();
 
