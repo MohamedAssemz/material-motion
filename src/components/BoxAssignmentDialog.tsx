@@ -109,6 +109,16 @@ export function BoxAssignmentDialog({
   // Scanner handler - auto-select box when scanned
   const handleBoxScan = useCallback(async (code: string) => {
     const normalizedCode = normalizeBoxCode(code);
+
+    // Detect extra box scans
+    if (normalizedCode.startsWith('EBOX-')) {
+      toast({
+        title: 'Wrong Box Type',
+        description: 'This is an extra box (EBOX). It cannot be used for orders.',
+        variant: 'destructive',
+      });
+      return;
+    }
     
     // Find box in empty or compatible boxes
     const emptyMatch = emptyBoxes.find(b => b.box_code.toUpperCase() === normalizedCode);
@@ -254,6 +264,19 @@ export function BoxAssignmentDialog({
 
     setSearching(true);
     const normalizedCode = normalizeBoxCode(searchCode);
+
+    // Detect extra box scans
+    if (normalizedCode.startsWith('EBOX-')) {
+      toast({
+        title: 'Wrong Box Type',
+        description: 'This is an extra box (EBOX). It cannot be used for orders.',
+        variant: 'destructive',
+      });
+      setSearchCode('');
+      setSearching(false);
+      return;
+    }
+
     try {
       const { data: box } = await supabase
         .from('boxes')
@@ -300,7 +323,6 @@ export function BoxAssignmentDialog({
       }
 
       setSelectedBox(boxData);
-      setSearchCode('');
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -308,6 +330,7 @@ export function BoxAssignmentDialog({
         variant: 'destructive',
       });
     } finally {
+      setSearchCode('');
       setSearching(false);
     }
   };
