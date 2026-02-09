@@ -1,99 +1,62 @@
 
+## Two Fixes: Boxing Phase Static Display + Print Quantity Bug
 
-## Fix Box Assignment Validation Bug
+### Fix 1: Show "No Boxing" items as static rows in Production Rate (Boxing phase only)
 
-### Problem Identified
+**Clarification from user:** The static "No Boxing" display only applies in the **boxing phase**. Items with `needs_boxing = false` still get machine assignments in manufacturing, finishing, and packaging phases as normal.
 
-When searching for box "0001", BOX-0001 was selected and items were assigned even though the box already contained 3 active order batches.
+**Changes to `src/components/ProductionRateSection.tsx`:**
 
-### Root Cause
+1. Add `needs_boxing` to `GroupedBatch` interface
+2. Include `needs_boxing` in grouping key so boxing vs no-boxing items stay separate
+3. Propagate `needs_boxing` from batch data into the group
+4. Import `PackageX` icon from lucide-react
+5. When `machineType === 'boxing'` and group has `needs_boxing === false`:
+   - Render a static card with a muted style (e.g., `bg-muted/30`)
+   - Show a `PackageX` icon and "No Boxing" badge instead of machine controls
+   - No Select dropdown or Assign button
+6. Fix the early return: currently returns `null` if `machines.length === 0`, but boxing phase might have no-boxing items to display even without machines. Change condition to account for this.
 
-The `searchBox` function in `OrderManufacturing.tsx` uses `.maybeSingle()` to check for existing batches:
-
-```typescript
-const { data: existingBatch } = await supabase
-  .from('order_batches')
-  .select('id')
-  .eq('box_id', box.id)
-  .eq('is_terminated', false)
-  .maybeSingle();
+**Rendering logic:**
+```
+if machineType === 'boxing' && group.needs_boxing === false:
+  -> Static card: product name, SKU, qty, PackageX icon, "No Boxing" badge
+else:
+  -> Normal card with machine select + assign button (existing behavior)
 ```
 
-**The problem**: `.maybeSingle()` returns `null` when there are **zero OR multiple** matching rows. Since BOX-0001 has 3 active batches, the query returns multiple rows, causing `.maybeSingle()` to return `null`, which makes `existingBatch` falsy, and the validation incorrectly passes.
+---
 
-### Solution
+### Fix 2: Print uses original order item quantities
 
-Change the query to use `.limit(1).single()` or check for any existence without assuming a single row. The safest approach is to select with `.limit(1)` or use a count query.
+**Problem:** `handlePrintOrder` in `OrderDetail.tsx` sums `batch.quantity` for non-terminated batches, which gives incorrect totals when batches have been split or terminated. The order items have the correct planned quantities.
 
-**Recommended fix**: Use `.select('id').limit(1)` instead of `.maybeSingle()`:
+**Changes to `src/pages/OrderDetail.tsx` (lines 442-453):**
 
+Replace the batch-based quantity calculation:
 ```typescript
-const { data: existingBatches } = await supabase
-  .from('order_batches')
-  .select('id')
-  .eq('box_id', box.id)
-  .eq('is_terminated', false)
-  .limit(1);
-
-if (existingBatches && existingBatches.length > 0) {
-  toast.error(`Box ${box.box_code} is already occupied`);
-  return;
-}
+const itemsByProduct = new Map();
+order.batches.filter(b => !b.is_terminated).forEach(batch => {
+  // ... sums batch quantities
+});
 ```
+
+With direct use of `orderItems`:
+```typescript
+const itemsList = orderItems.map(item => ({
+  name: item.product?.name || 'Unknown',
+  sku: item.product?.sku || 'N/A',
+  quantity: item.quantity,
+}));
+```
+
+Then update the HTML template (lines 491-497) to iterate over `itemsList` instead of `itemsByProduct.values()`.
 
 ---
 
 ### Files to Modify
 
-The same bug pattern may exist in other phase pages. All three phase pages need to be checked and fixed:
-
-| File | Function | Issue |
-|------|----------|-------|
-| `src/pages/OrderManufacturing.tsx` | `searchBox()` | Uses `.maybeSingle()` - needs fix |
-| `src/pages/OrderFinishing.tsx` | `searchBox()` | Need to verify if same issue exists |
-| `src/pages/OrderPackaging.tsx` | `searchBox()` | Need to verify if same issue exists |
-
----
-
-### Changes Required
-
-**1. `src/pages/OrderManufacturing.tsx`** (lines 244-254)
-
-Replace:
-```typescript
-const { data: existingBatch } = await supabase
-  .from('order_batches')
-  .select('id')
-  .eq('box_id', box.id)
-  .eq('is_terminated', false)
-  .maybeSingle();
-
-if (existingBatch) {
-```
-
-With:
-```typescript
-const { data: existingBatches } = await supabase
-  .from('order_batches')
-  .select('id')
-  .eq('box_id', box.id)
-  .eq('is_terminated', false)
-  .limit(1);
-
-if (existingBatches && existingBatches.length > 0) {
-```
-
-**2. Check and apply same fix to `src/pages/OrderFinishing.tsx`** if it has the same pattern.
-
-**3. Check and apply same fix to `src/pages/OrderPackaging.tsx`** if it has the same pattern.
-
----
-
-### Expected Result
-
-| Scenario | Before | After |
-|----------|--------|-------|
-| Search for box with 1 active batch | "Box is already occupied" ✓ | "Box is already occupied" ✓ |
-| Search for box with 3 active batches | No error, assignment allowed ✗ | "Box is already occupied" ✓ |
-| Search for empty box | Assignment allowed ✓ | Assignment allowed ✓ |
-
+| File | Change |
+|------|--------|
+| `src/components/ProductionRateSection.tsx` | Add `needs_boxing` to grouping, render static cards for no-boxing items in boxing phase |
+| `src/pages/OrderDetail.tsx` | Use `orderItems` quantities instead of batch sums in `handlePrintOrder` |
