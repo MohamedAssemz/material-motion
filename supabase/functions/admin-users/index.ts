@@ -182,6 +182,28 @@ Deno.serve(async (req) => {
           );
         }
 
+        // Prevent deleting the last admin
+        const { data: deleteTargetProfile } = await supabaseAdmin
+          .from("profiles")
+          .select("primary_role")
+          .eq("id", user_id)
+          .single();
+
+        if (deleteTargetProfile?.primary_role === "admin") {
+          const { count: otherAdminCount } = await supabaseAdmin
+            .from("profiles")
+            .select("id", { count: "exact", head: true })
+            .eq("primary_role", "admin")
+            .neq("id", user_id);
+
+          if ((otherAdminCount ?? 0) === 0) {
+            return new Response(
+              JSON.stringify({ error: "Cannot delete the last admin user" }),
+              { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+        }
+
         const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(user_id);
 
         if (deleteError) {
@@ -215,6 +237,22 @@ Deno.serve(async (req) => {
           .single();
 
         const oldPrimaryRole = currentProfile?.primary_role;
+
+        // Prevent removing the last admin
+        if (oldPrimaryRole === "admin" && primary_role !== "admin") {
+          const { count: otherAdminCount } = await supabaseAdmin
+            .from("profiles")
+            .select("id", { count: "exact", head: true })
+            .eq("primary_role", "admin")
+            .neq("id", user_id);
+
+          if ((otherAdminCount ?? 0) === 0) {
+            return new Response(
+              JSON.stringify({ error: "Cannot change role: at least one admin must exist" }),
+              { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+        }
 
         // Update primary role in profiles table using admin client
         const { error: updateProfileError } = await supabaseAdmin
