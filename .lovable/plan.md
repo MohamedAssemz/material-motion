@@ -1,123 +1,189 @@
 
-## Add Extra Inventory Indicator to Orders List
+## Add BOX- Prefix Auto-Completion for Box Search Inputs
 
 ### Goal
-Show an indicator on the Orders list page and Order Details summary for orders that have had items moved to extra inventory. This helps users quickly identify which orders contributed surplus items.
+Simplify box searching by allowing users to enter just the numeric portion of a box code. The system will automatically prepend the "BOX-" prefix when querying. This reduces typing and prevents errors from inconsistent formatting.
 
 ---
 
-### Why `extra_batch_history` Should NOT Be Deleted
+### Current Behavior
 
-The `extra_batch_history` table is **actively used** throughout the application:
-
-1. **OrderDetail.tsx** - `fetchAddedToExtraCounts()` queries `CREATED` events to display "Added to Extra" counts per phase in the production timeline
-2. **OrderManufacturing.tsx, OrderFinishing.tsx, OrderPackaging.tsx, OrderBoxing.tsx** - All query `CREATED` events to show "Added to Extra Inventory" sections in their Completed tabs  
-3. **MoveToExtraDialog.tsx** - Creates `CREATED` event records when items are moved to surplus
-
-The table provides **permanent audit trail** - even after extra batches are consumed, deleted, or consolidated, the history preserves which orders contributed to surplus inventory. This is critical for traceability and reporting.
-
----
-
-### Implementation Approach
-
-We will use `order_items.deducted_to_extra` column (already maintained by `MoveToExtraDialog`) for efficiency rather than querying history on each load.
-
----
-
-### Changes to Orders List (`src/pages/Orders.tsx`)
-
-**1. Update Order Interface**
-Add `extra_count` property to track total items moved to extra inventory.
-
-**2. Modify `fetchOrders()` Function**
-When fetching order items, also retrieve `deducted_to_extra` and aggregate per order:
-- Modify query: `select('id, order_id, quantity, deducted_to_extra, product:products(...)')`
-- Calculate extra counts:
-  ```typescript
-  const extraCountsByOrder = new Map<string, number>();
-  (itemsData || []).forEach((item: any) => {
-    const current = extraCountsByOrder.get(item.order_id) || 0;
-    extraCountsByOrder.set(item.order_id, current + (item.deducted_to_extra || 0));
-  });
-  ```
-- Add `extra_count` to each order object
-
-**3. Add Visual Indicator in Table**
-Display a subtle orange package icon with tooltip next to orders with extra inventory:
-- Import `Package` from lucide-react and `Tooltip` components
-- Show icon when `order.extra_count > 0`
-- Tooltip shows exact count: "15 items moved to extra inventory"
-
-**4. Update CSV Export**
-Add "Extra Count" column to exported data.
-
----
-
-### Changes to Order Details (`src/pages/OrderDetail.tsx`)
-
-**1. Add Summary Card for Total Extra**
-In the summary cards grid (Total Items, Shipped, Shipping, EFT), add a new card showing total items added to extra inventory across all phases.
-
-Calculate total:
+Users must enter the full box code (e.g., `BOX-0001`) in search fields. The search functions use exact matching:
 ```typescript
-const totalAddedToExtra = Object.values(addedToExtraCounts).reduce((sum, count) => sum + count, 0);
+.eq('box_code', boxSearchCode.trim().toUpperCase())
 ```
 
-Only show the card if `totalAddedToExtra > 0`.
-
-**Card Design:**
-- Label: "Added to Extra"
-- Value: Total count in orange color
-- Small package icon
+Placeholders currently show: `BOX-0001` or `Enter box code...`
 
 ---
 
-### UI Preview
+### Proposed Behavior
 
-**Orders List Table:**
-```
-+------------------------------------------------------------------+
-| Order Number  | Customer | Priority | Status | Units | ... |
-+------------------------------------------------------------------+
-| ORD-0042 [📦] | ACME     | normal   | In Prog| 5/100 | ... |
-| ORD-0043      | Beta     | high     | Pending| 0/50  | ... |
-| ORD-0044 [📦] | Gamma    | normal   | In Prog| 20/80 | ... |
-+------------------------------------------------------------------+
+1. **User enters**: Just the number (e.g., `42`, `0001`, `123`)
+2. **System normalizes**: Automatically prepends `BOX-` prefix
+3. **Query**: Uses `BOX-42` or `BOX-0001` for database lookup
+4. **Placeholder update**: Show `Enter box number (e.g., 42)` to guide users
 
-[📦] = Orange package icon with tooltip "15 items added to extra inventory"
+**Normalization Logic:**
+```typescript
+const normalizeBoxCode = (input: string): string => {
+  const trimmed = input.trim().toUpperCase();
+  
+  // If already has BOX- or EBOX- prefix, use as-is
+  if (/^(E?BOX-)/i.test(trimmed)) {
+    return trimmed;
+  }
+  
+  // If it's just digits, prepend BOX-
+  if (/^\d+$/.test(trimmed)) {
+    return `BOX-${trimmed}`;
+  }
+  
+  // Otherwise return as-is (allows searching by product SKU, etc.)
+  return trimmed;
+};
 ```
-
-**Order Details Summary Cards:**
-```
-+---------------+---------------+---------------+---------------+---------------+
-| Total Items   | Shipped       | Added to Extra| Shipping      | EFT           |
-|     100       |     45        |   [📦] 15     |   Domestic    |    Feb 15     |
-+---------------+---------------+---------------+---------------+---------------+
-```
-(Added to Extra card only appears if count > 0)
 
 ---
 
-### Files to Modify
+### Technical Approach
 
-**1. `src/pages/Orders.tsx`**
-- Add `extra_count?: number` to Order interface
-- Modify order items query to include `deducted_to_extra`
-- Calculate and store extra counts per order
-- Import Tooltip components
-- Add package icon with tooltip in table row
-- Update CSV export to include extra count
+#### 1. Create Shared Utility Function
 
-**2. `src/pages/OrderDetail.tsx`**  
-- Calculate `totalAddedToExtra` from `addedToExtraCounts`
-- Add conditional summary card for extra inventory
-- Position it after "Shipped" card in the grid
+Add a new utility function in `src/lib/boxUtils.ts`:
+
+```typescript
+/**
+ * Normalize box code input by auto-prepending BOX- prefix for numeric inputs.
+ * Allows users to enter just "42" instead of "BOX-42".
+ */
+export const normalizeBoxCode = (input: string): string => {
+  const trimmed = input.trim().toUpperCase();
+  
+  // Already has valid prefix - return as-is
+  if (/^(EBOX-|BOX-)/.test(trimmed)) {
+    return trimmed;
+  }
+  
+  // Pure digits - prepend BOX-
+  if (/^\d+$/.test(trimmed)) {
+    return `BOX-${trimmed}`;
+  }
+  
+  // Mixed input (could be product SKU/name search) - return as-is
+  return trimmed;
+};
+```
+
+#### 2. Update Box Search Functions
+
+Apply normalization in each location where box codes are searched:
+
+**Files to update:**
+- `src/pages/OrderManufacturing.tsx` - `searchBox()` function
+- `src/pages/OrderFinishing.tsx` - `searchBox()` function
+- `src/pages/OrderPackaging.tsx` - `searchBox()` function
+- `src/components/BoxScanDialog.tsx` - `handleSearch()` function
+- `src/components/BoxReceiveDialog.tsx` - `handleSearch()` and scanner callback
+- `src/components/BoxAssignmentDialog.tsx` - `handleSearch()` function
+- `src/components/ExtraItemsTab.tsx` - box search function
+- `src/components/BoxLookupScanDialog.tsx` - already handles regex extraction (no change needed)
+
+**Example change in `OrderManufacturing.tsx`:**
+```typescript
+import { normalizeBoxCode } from '@/lib/boxUtils';
+
+const searchBox = async () => {
+  if (!boxSearchCode.trim()) return;
+  
+  const normalizedCode = normalizeBoxCode(boxSearchCode);
+  
+  try {
+    const { data: box } = await supabase
+      .from('boxes')
+      .select('id, box_code')
+      .eq('box_code', normalizedCode)  // Use normalized code
+      .eq('is_active', true)
+      .single();
+    // ... rest unchanged
+  }
+};
+```
+
+#### 3. Update Placeholders
+
+Change placeholder text to prompt for number-only input:
+
+| Location | Current | New |
+|----------|---------|-----|
+| OrderManufacturing.tsx | `BOX-0001` | `Enter box number (e.g., 42)` |
+| OrderFinishing.tsx | `BOX-0001` | `Enter box number (e.g., 42)` |
+| OrderPackaging.tsx | `BOX-0001` | `Enter box number (e.g., 42)` |
+| BoxAssignmentDialog.tsx | `e.g., BOX-0001` | `Box number (e.g., 42)` |
+| ExtraItemsTab.tsx | `Enter box code...` | `Box number (e.g., 42)` |
 
 ---
 
-### Technical Notes
+### Files to Create/Modify
 
-- Uses existing `deducted_to_extra` column - no new queries needed
-- Tooltip provides detail without cluttering the table
-- Orange color matches the existing "Added to Extra" styling in production timeline
-- Extra card only shows when relevant (count > 0)
+**New File:**
+- `src/lib/boxUtils.ts` - Contains `normalizeBoxCode` utility function
+
+**Modified Files:**
+
+1. **`src/pages/OrderManufacturing.tsx`**
+   - Import `normalizeBoxCode`
+   - Update `searchBox()` to use normalized code
+   - Update placeholder text
+
+2. **`src/pages/OrderFinishing.tsx`**
+   - Import `normalizeBoxCode`
+   - Update `searchBox()` to use normalized code
+   - Update placeholder text
+
+3. **`src/pages/OrderPackaging.tsx`**
+   - Import `normalizeBoxCode`
+   - Update `searchBox()` to use normalized code
+   - Update placeholder text
+
+4. **`src/components/BoxScanDialog.tsx`**
+   - Import `normalizeBoxCode`
+   - Update `handleSearch()` to use normalized code for box lookup
+   - Keep product SKU/name search behavior unchanged
+
+5. **`src/components/BoxReceiveDialog.tsx`**
+   - Import `normalizeBoxCode`
+   - Update `handleSearch()` and scanner handler to use normalized code
+
+6. **`src/components/BoxAssignmentDialog.tsx`**
+   - Import `normalizeBoxCode`
+   - Update `handleSearch()` to use normalized code
+   - Update placeholder text
+
+7. **`src/components/ExtraItemsTab.tsx`**
+   - Import `normalizeBoxCode`
+   - Update box search function to use normalized code
+   - Update placeholder text
+
+---
+
+### Edge Cases Handled
+
+| Input | Normalized Output | Behavior |
+|-------|------------------|----------|
+| `42` | `BOX-42` | Number-only input gets prefix |
+| `0001` | `BOX-0001` | Preserves leading zeros |
+| `BOX-42` | `BOX-42` | Already prefixed, unchanged |
+| `box-42` | `BOX-42` | Case normalized |
+| `EBOX-123` | `EBOX-123` | Extra box prefix preserved |
+| `ABC123` | `ABC123` | Mixed alphanumeric (product SKU) unchanged |
+| `Plaster` | `PLASTER` | Product name search unchanged |
+
+---
+
+### Notes
+
+- **Scanner compatibility**: Hardware scanners that output full `BOX-0001` format continue to work
+- **Backward compatible**: Users can still type full `BOX-` prefix if preferred
+- **Product search**: Dialogs that support product SKU/name search retain that functionality (alphanumeric inputs pass through unchanged)
+- **Extra boxes**: EBOX- prefix is preserved for extra inventory boxes
