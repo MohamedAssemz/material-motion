@@ -93,10 +93,6 @@ export function generateBoxLabelHTML(
             padding: 20px;
           }
           .labels-container {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 20px;
-            justify-content: flex-start;
           }
           .label {
             width: 240px;
@@ -106,7 +102,12 @@ export function generateBoxLabelHTML(
             display: flex;
             flex-direction: column;
             align-items: center;
+            page-break-after: always;
             page-break-inside: avoid;
+            margin: 0 auto;
+          }
+          .label:last-child {
+            page-break-after: avoid;
           }
           .qr-container {
             margin-bottom: 12px;
