@@ -1,83 +1,47 @@
 
 
-## Cross-Type Box Detection + Clear Search Field on Scan
+## Fix: Box Label Print Dialog Selection Flickering
 
-### Summary
+### Root Cause
 
-Four changes across two dialogs to (1) detect and warn when scanning the wrong box type, and (2) always clear the search field after a scan regardless of outcome.
+The `useEffect` in `BoxLabelPrintDialog` resets selections every time `preselectedBoxIds` changes:
 
----
-
-### Changes to `src/components/BoxAssignmentDialog.tsx` (Order Box Dialog)
-
-**1. Detect EBOX scans in `handleBoxScan`**
-
-After `normalizeBoxCode`, check if the code starts with `EBOX-`. If so, show a toast error: "This is an extra box (EBOX). It cannot be used for orders." and return early.
-
-**2. Detect EBOX scans in `handleSearch`**
-
-Same check after normalizing the search input. If it starts with `EBOX-`, show the same error, clear `searchCode`, and return.
-
-**3. Clear search field on all outcomes in `handleSearch`**
-
-Currently `setSearchCode('')` only happens on success (line 303). Move it to the `finally` block so the field is always cleared -- whether the box was found, not found, or incompatible. This also handles clearing URLs from the field.
-
----
-
-### Changes to `src/components/ExtraBoxSelectionDialog.tsx` (Extra Box Dialog)
-
-**1. Detect order box scans in `handleBoxScan`**
-
-After normalizing the scanned code (need to add `normalizeBoxCode` import), check if the code starts with `BOX-` (but not `EBOX-`). If so, show toast error: "This is an order box. It cannot be used for extra inventory." and return early.
-
-**2. Clear search field after scan**
-
-The `ExtraBoxSelectionDialog` uses a `searchQuery` field for filtering, not for scan-based lookup. The scanner auto-selects via `handleBoxScan`. The `searchQuery` field is a filter input, not a scan target. Since scanned input goes through `useBoxScanner` (which intercepts keydown events when no input is focused), the search field shouldn't receive scanned text. However, if the user manually types a URL into the search field, it will just filter -- no special handling needed since it's a local filter, not a DB lookup.
-
-Actually, re-reading the ExtraBoxSelectionDialog: it only has a local filter search, no manual "lookup by code" like BoxAssignmentDialog. The scanner goes through `handleBoxScan`. So for this dialog, the main change is just adding the order-box detection in `handleBoxScan`.
-
----
-
-### Technical Details
-
-**BoxAssignmentDialog.tsx changes:**
-
-```
-// In handleBoxScan, after normalizeBoxCode:
-if (normalizedCode.startsWith('EBOX-')) {
-  toast({ title: 'Wrong Box Type', description: 'This is an extra box (EBOX). It cannot be used for orders.', variant: 'destructive' });
-  return;
-}
-
-// In handleSearch, after normalizeBoxCode:
-if (normalizedCode.startsWith('EBOX-')) {
-  toast({ title: 'Wrong Box Type', description: 'This is an extra box (EBOX). It cannot be used for orders.', variant: 'destructive' });
-  setSearchCode('');
-  return;
-}
-
-// Move setSearchCode('') from success-only (line 303) to the finally block
+```typescript
+useEffect(() => {
+  if (open) {
+    setSelectedIds(new Set(preselectedBoxIds));
+  }
+}, [open, preselectedBoxIds]);
 ```
 
-**ExtraBoxSelectionDialog.tsx changes:**
+The problem: `preselectedBoxIds` defaults to `[]` in the function signature, which creates a **new array reference on every render**. React sees a new dependency each time and re-runs the effect, resetting `selectedIds` back to empty -- causing the "select then immediately unselect" flicker.
 
-```
-// Import normalizeBoxCode
-import { normalizeBoxCode } from '@/lib/boxUtils';
+### Fix
 
-// In handleBoxScan, normalize the code first, then check:
-const normalizedCode = normalizeBoxCode(code);
-if (normalizedCode.startsWith('BOX-') && !normalizedCode.startsWith('EBOX-')) {
-  toast.error('This is an order box. It cannot be used for extra inventory.');
-  return;
-}
-// Then use normalizedCode instead of raw code for the EBOX- check
+**File: `src/components/BoxLabelPrintDialog.tsx`**
+
+1. Replace the `useEffect` dependency on `preselectedBoxIds` (unstable reference) with a dependency that only triggers when the dialog **opens** (transition from closed to open). Use a `useRef` to track the previous `open` state and only reset selections on the rising edge.
+
+2. Alternatively (simpler): use `JSON.stringify(preselectedBoxIds)` as the dependency key, or define a stable empty array constant outside the component.
+
+**Chosen approach** (simplest, most robust): Only reset selections when the dialog transitions from closed to open, by tracking the previous `open` value with a ref:
+
+```typescript
+const prevOpen = useRef(false);
+
+useEffect(() => {
+  if (open && !prevOpen.current) {
+    // Dialog just opened -- initialize selections
+    setSelectedIds(new Set(preselectedBoxIds));
+  }
+  prevOpen.current = open;
+}, [open, preselectedBoxIds]);
 ```
+
+This way, selections are initialized once when the dialog opens and never reset while it remains open, regardless of parent re-renders.
 
 ### Files to Modify
 
 | File | Change |
 |------|--------|
-| `src/components/BoxAssignmentDialog.tsx` | Add EBOX detection in scan + search handlers; clear search field in `finally` |
-| `src/components/ExtraBoxSelectionDialog.tsx` | Add `normalizeBoxCode`, detect order box scans, use normalized code |
-
+| `src/components/BoxLabelPrintDialog.tsx` | Replace useEffect with ref-guarded open transition check |
