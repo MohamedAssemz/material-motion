@@ -265,7 +265,6 @@ export default function OrderManufacturing() {
 
       if (!box) {
         toast.error(`Box ${boxSearchCode} not found`);
-        setSelectedBox(box);
         setBoxSearchCode("");
         return;
       }
@@ -279,7 +278,6 @@ export default function OrderManufacturing() {
 
       if (existingBatches && existingBatches.length > 0) {
         toast.error(`Box ${box.box_code} is already occupied`);
-        setSelectedBox(box);
         setBoxSearchCode("");
         return;
       }
