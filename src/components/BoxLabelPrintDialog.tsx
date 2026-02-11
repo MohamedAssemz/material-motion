@@ -137,7 +137,7 @@ export function BoxLabelPrintDialog({
                       }`}
                       onClick={() => handleToggle(box.id)}
                     >
-                      <Checkbox checked={isSelected} />
+                      <Checkbox checked={isSelected} className="pointer-events-none" />
                       <Box className={`h-4 w-4 ${isSelected ? 'text-primary' : 'text-muted-foreground'}`} />
                       <span className="font-mono font-medium flex-1">{box.box_code}</span>
                       <Badge variant="outline" className="text-xs">
