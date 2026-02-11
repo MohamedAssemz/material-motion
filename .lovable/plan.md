@@ -1,38 +1,52 @@
 
 
-## Universal Input Clearing After Scan/Search in All Dialogs
+## Fix: Search Field Not Clearing After Scan in BoxAssignmentDialog
 
-### Problem
-When scanning a QR code or searching for a box that is occupied, invalid, or unavailable, the search/scan input field retains the scanned value. This forces users to manually clear it before the next scan, which is especially problematic with hardware barcode scanners that append to existing text.
+### Root Cause
 
-### Affected Files and Changes
+When a hardware barcode scanner sends a QR code URL, it types characters rapidly and ends with Enter. However, some scanners send trailing characters **after** Enter due to buffering. The current flow:
 
-#### 1. `src/components/BoxScanDialog.tsx` -- `handleSearch()`
-The search code is only cleared on success (line 253). On all failure paths (lines 185, 194, 212, 238), the function returns early without clearing. 
+1. Scanner types URL into the focused input (onChange sets searchCode)
+2. Scanner sends Enter, triggering handleSearch
+3. handleSearch runs async, queries the database
+4. In the finally block, setSearchCode('') clears the field
+5. Late-arriving scanner characters trigger onChange, **re-setting searchCode back to a non-empty value**
 
-**Fix**: Move `setSearchCode('')` into the `finally` block so it always runs.
+### Fix (two parts)
 
-#### 2. `src/components/BoxReceiveDialog.tsx` -- `handleSearch()`
-Similar issue: `searchCode` is cleared on some success paths but not on failure paths (lines 314, 361).
+**File: `src/components/BoxAssignmentDialog.tsx`**
 
-**Fix**: Move `setSearchCode('')` into the `finally` block.
+**Part 1 -- Clear immediately and capture value**
 
-#### 3. `src/components/BoxAssignmentDialog.tsx` -- `handleBoxScan()` (scanner callback)
-The scanner handler (lines 110-175) never updates `searchCode` since it operates via the hardware scanner hook, but it also doesn't clear the manual input field after a scan attempt. Additionally, the manual `handleSearch()` already clears in `finally` (line 333) -- this one is fine.
+Move the clearing of `searchCode` to the top of `handleSearch`, right after capturing the current value in a local variable. This gives immediate visual feedback and prevents the stale value from lingering:
 
-**Fix**: Add `setSearchCode('')` at the start of `handleBoxScan` so any lingering manual input is cleared when a scan fires.
+```typescript
+const handleSearch = async () => {
+  if (!searchCode.trim()) return;
+  
+  const codeToSearch = searchCode; // capture before clearing
+  setSearchCode('');               // clear immediately
+  setSearching(true);
+  const normalizedCode = normalizeBoxCode(codeToSearch);
+  // ... rest uses normalizedCode / codeToSearch instead of searchCode
+```
 
-#### 4. `src/components/BoxScanPopup.tsx` -- `validateAndAddBox()`
-Already clears `inputValue` in the `finally` block (line 261) -- no change needed.
+**Part 2 -- Block late scanner characters with readOnly**
 
-#### 5. `src/components/BoxLookupScanDialog.tsx` -- scan handler
-Already clears `inputValue` in the `finally` block (line 261) -- no change needed.
+Make the input `readOnly` while `searching` is true. This prevents any late-arriving scanner keystrokes from re-populating the field via onChange:
 
-### Technical Summary
+```html
+<Input
+  value={searchCode}
+  onChange={(e) => setSearchCode(e.target.value.toUpperCase())}
+  readOnly={searching}
+  ...
+/>
+```
 
-| File | Function | Current Behavior | Fix |
-|------|----------|-----------------|-----|
-| `BoxScanDialog.tsx` | `handleSearch` | Clears only on success | Move `setSearchCode('')` to `finally` |
-| `BoxReceiveDialog.tsx` | `handleSearch` | Clears only on some paths | Move `setSearchCode('')` to `finally` |
-| `BoxAssignmentDialog.tsx` | `handleBoxScan` | Never clears search input | Add `setSearchCode('')` at start |
+### Summary of Changes
+
+| File | Change |
+|------|--------|
+| `src/components/BoxAssignmentDialog.tsx` | 1. Clear searchCode at the top of handleSearch (before try block) and use a local variable for the search value. 2. Add `readOnly={searching}` to the Input element. |
 
