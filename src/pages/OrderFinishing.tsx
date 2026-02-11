@@ -1,45 +1,24 @@
-import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { toast } from 'sonner';
-import { 
-  ArrowLeft, 
-  Sparkles, 
-  Box, 
-  Loader2, 
-  QrCode, 
-  Search,
-  CheckSquare,
-  Package
-} from 'lucide-react';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog';
-import { ExtraItemsTab } from '@/components/ExtraItemsTab';
-import { BoxScanPopup } from '@/components/BoxScanPopup';
-import { MoveToExtraDialog } from '@/components/MoveToExtraDialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { ProductionRateSection } from '@/components/ProductionRateSection';
-import { SearchableSelect } from '@/components/ui/searchable-select';
-import { normalizeBoxCode } from '@/lib/boxUtils';
+import { useEffect, useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { toast } from "sonner";
+import { ArrowLeft, Sparkles, Box, Loader2, QrCode, Search, CheckSquare, Package } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { ExtraItemsTab } from "@/components/ExtraItemsTab";
+import { BoxScanPopup } from "@/components/BoxScanPopup";
+import { MoveToExtraDialog } from "@/components/MoveToExtraDialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ProductionRateSection } from "@/components/ProductionRateSection";
+import { SearchableSelect } from "@/components/ui/searchable-select";
+import { normalizeBoxCode } from "@/lib/boxUtils";
 
 interface Batch {
   id: string;
@@ -98,95 +77,125 @@ export default function OrderFinishing() {
   const [order, setOrder] = useState<Order | null>(null);
   const [batches, setBatches] = useState<Batch[]>([]);
   const [completedBatches, setCompletedBatches] = useState<Batch[]>([]);
-  const [addedToExtraItems, setAddedToExtraItems] = useState<Array<{ product_id: string; product_name: string; product_sku: string; quantity: number }>>([]);
+  const [addedToExtraItems, setAddedToExtraItems] = useState<
+    Array<{ product_id: string; product_name: string; product_sku: string; quantity: number }>
+  >([]);
   const [loading, setLoading] = useState(true);
-  
+
   // Selection states
   const [selectedBoxes, setSelectedBoxes] = useState<Set<string>>(new Set());
   const [productSelections, setProductSelections] = useState<Map<string, number>>(new Map());
-  const [etaDays, setEtaDays] = useState('1');
-  const [receiveSearchQuery, setReceiveSearchQuery] = useState('');
+  const [etaDays, setEtaDays] = useState("1");
+  const [receiveSearchQuery, setReceiveSearchQuery] = useState("");
   const [scanPopupOpen, setScanPopupOpen] = useState(false);
-  
+
   // Dialog states
   const [acceptDialogOpen, setAcceptDialogOpen] = useState(false);
   const [boxAssignDialogOpen, setBoxAssignDialogOpen] = useState(false);
   const [moveToExtraDialogOpen, setMoveToExtraDialogOpen] = useState(false);
-  const [boxSearchCode, setBoxSearchCode] = useState('');
+  const [boxSearchCode, setBoxSearchCode] = useState("");
   const [selectedBox, setSelectedBox] = useState<{ id: string; box_code: string } | null>(null);
   const [availableBoxes, setAvailableBoxes] = useState<Array<{ id: string; box_code: string }>>([]);
   const [loadingBoxes, setLoadingBoxes] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  
+
   // Machine selection state
   const [machines, setMachines] = useState<Array<{ id: string; name: string }>>([]);
   const [selectedMachine, setSelectedMachine] = useState<string | null>(null);
   const [loadingMachines, setLoadingMachines] = useState(false);
 
-  const canManage = hasRole('manufacture_lead') || hasRole('packaging_manager') || hasRole('packer') || hasRole('admin');
+  const canManage =
+    hasRole("manufacture_lead") || hasRole("packaging_manager") || hasRole("packer") || hasRole("admin");
 
   useEffect(() => {
     fetchData();
     fetchAddedToExtra();
     const channel = supabase
       .channel(`order-finishing-${id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_batches', filter: `order_id=eq.${id}` }, () => {
-        fetchData();
-        fetchAddedToExtra();
-      })
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "order_batches", filter: `order_id=eq.${id}` },
+        () => {
+          fetchData();
+          fetchAddedToExtra();
+        },
+      )
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [id]);
 
   const fetchData = async () => {
     try {
       const [orderRes, batchesRes, completedRes] = await Promise.all([
-        supabase.from('orders').select('id, order_number, priority, customer:customers(name)').eq('id', id).single(),
-        supabase.from('order_batches')
-          .select('id, qr_code_data, current_state, quantity, product_id, order_item_id, box_id, manufacturing_machine_id, finishing_machine_id, product:products(id, name, sku, needs_packing)')
-          .eq('order_id', id)
-          .eq('is_terminated', false)
-          .in('current_state', ['ready_for_finishing', 'in_finishing']),
+        supabase.from("orders").select("id, order_number, priority, customer:customers(name)").eq("id", id).single(),
+        supabase
+          .from("order_batches")
+          .select(
+            "id, qr_code_data, current_state, quantity, product_id, order_item_id, box_id, manufacturing_machine_id, finishing_machine_id, product:products(id, name, sku, needs_packing)",
+          )
+          .eq("order_id", id)
+          .eq("is_terminated", false)
+          .in("current_state", ["ready_for_finishing", "in_finishing"]),
         // Fetch completed items for this phase (moved to next phases)
-        supabase.from('order_batches')
-          .select('id, qr_code_data, current_state, quantity, product_id, order_item_id, box_id, manufacturing_machine_id, finishing_machine_id, product:products(id, name, sku, needs_packing)')
-          .eq('order_id', id)
-          .eq('is_terminated', false)
-          .in('current_state', ['ready_for_packaging', 'in_packaging', 'ready_for_boxing', 'in_boxing', 'ready_for_shipment', 'shipped'])
+        supabase
+          .from("order_batches")
+          .select(
+            "id, qr_code_data, current_state, quantity, product_id, order_item_id, box_id, manufacturing_machine_id, finishing_machine_id, product:products(id, name, sku, needs_packing)",
+          )
+          .eq("order_id", id)
+          .eq("is_terminated", false)
+          .in("current_state", [
+            "ready_for_packaging",
+            "in_packaging",
+            "ready_for_boxing",
+            "in_boxing",
+            "ready_for_shipment",
+            "shipped",
+          ]),
       ]);
-      
+
       if (orderRes.error) throw orderRes.error;
       if (batchesRes.error) throw batchesRes.error;
-      
+
       // Fetch box info for all batches
       const allBatchData = [...(batchesRes.data || []), ...(completedRes.data || [])];
       const boxIds = allBatchData.filter((b: any) => b.box_id).map((b: any) => b.box_id);
       let boxMap = new Map();
       if (boxIds.length > 0) {
-        const { data: boxesData } = await supabase.from('boxes').select('id, box_code').in('id', [...new Set(boxIds)]);
-        boxesData?.forEach(box => boxMap.set(box.id, box));
+        const { data: boxesData } = await supabase
+          .from("boxes")
+          .select("id, box_code")
+          .in("id", [...new Set(boxIds)]);
+        boxesData?.forEach((box) => boxMap.set(box.id, box));
       }
-      
+
       // Fetch order_item info for needs_boxing
       const orderItemIds = allBatchData.filter((b: any) => b.order_item_id).map((b: any) => b.order_item_id);
       let orderItemMap = new Map();
       if (orderItemIds.length > 0) {
-        const { data: orderItemsData } = await supabase.from('order_items').select('id, needs_boxing').in('id', [...new Set(orderItemIds)]);
-        orderItemsData?.forEach(oi => orderItemMap.set(oi.id, oi));
+        const { data: orderItemsData } = await supabase
+          .from("order_items")
+          .select("id, needs_boxing")
+          .in("id", [...new Set(orderItemIds)]);
+        orderItemsData?.forEach((oi) => orderItemMap.set(oi.id, oi));
       }
-      
-      const batchesWithData = batchesRes.data?.map((batch: any) => ({
-        ...batch,
-        box: batch.box_id ? boxMap.get(batch.box_id) : null,
-        order_item: batch.order_item_id ? orderItemMap.get(batch.order_item_id) : null,
-      })) || [];
-      
-      const completedWithData = completedRes.data?.map((batch: any) => ({
-        ...batch,
-        box: batch.box_id ? boxMap.get(batch.box_id) : null,
-        order_item: batch.order_item_id ? orderItemMap.get(batch.order_item_id) : null,
-      })) || [];
-      
+
+      const batchesWithData =
+        batchesRes.data?.map((batch: any) => ({
+          ...batch,
+          box: batch.box_id ? boxMap.get(batch.box_id) : null,
+          order_item: batch.order_item_id ? orderItemMap.get(batch.order_item_id) : null,
+        })) || [];
+
+      const completedWithData =
+        completedRes.data?.map((batch: any) => ({
+          ...batch,
+          box: batch.box_id ? boxMap.get(batch.box_id) : null,
+          order_item: batch.order_item_id ? orderItemMap.get(batch.order_item_id) : null,
+        })) || [];
+
       setOrder(orderRes.data as Order);
       setBatches(batchesWithData as Batch[]);
       setCompletedBatches(completedWithData as Batch[]);
@@ -201,15 +210,18 @@ export default function OrderFinishing() {
     if (!id) return;
     try {
       const { data, error } = await supabase
-        .from('extra_batch_history')
-        .select('quantity, product_id, products(name, sku)')
-        .eq('event_type', 'CREATED')
-        .eq('source_order_id', id)
-        .eq('from_state', 'in_finishing');
+        .from("extra_batch_history")
+        .select("quantity, product_id, products(name, sku)")
+        .eq("event_type", "CREATED")
+        .eq("source_order_id", id)
+        .eq("from_state", "in_finishing");
 
       if (error) throw error;
 
-      const productMap = new Map<string, { product_id: string; product_name: string; product_sku: string; quantity: number }>();
+      const productMap = new Map<
+        string,
+        { product_id: string; product_name: string; product_sku: string; quantity: number }
+      >();
       (data || []).forEach((record: any) => {
         const existing = productMap.get(record.product_id);
         if (existing) {
@@ -217,25 +229,33 @@ export default function OrderFinishing() {
         } else {
           productMap.set(record.product_id, {
             product_id: record.product_id,
-            product_name: record.products?.name || 'Unknown',
-            product_sku: record.products?.sku || 'N/A',
+            product_name: record.products?.name || "Unknown",
+            product_sku: record.products?.sku || "N/A",
             quantity: record.quantity,
           });
         }
       });
       setAddedToExtraItems(Array.from(productMap.values()));
     } catch (error) {
-      console.error('Error fetching added to extra:', error);
+      console.error("Error fetching added to extra:", error);
     }
   };
 
   const fetchEmptyBoxes = async () => {
     setLoadingBoxes(true);
     try {
-      const { data: allBoxes } = await supabase.from('boxes').select('id, box_code').eq('is_active', true).order('box_code');
-      const { data: occupiedBatches } = await supabase.from('order_batches').select('box_id').not('box_id', 'is', null).eq('is_terminated', false);
-      const occupiedIds = new Set(occupiedBatches?.map(b => b.box_id) || []);
-      setAvailableBoxes(allBoxes?.filter(box => !occupiedIds.has(box.id)) || []);
+      const { data: allBoxes } = await supabase
+        .from("boxes")
+        .select("id, box_code")
+        .eq("is_active", true)
+        .order("box_code");
+      const { data: occupiedBatches } = await supabase
+        .from("order_batches")
+        .select("box_id")
+        .not("box_id", "is", null)
+        .eq("is_terminated", false);
+      const occupiedIds = new Set(occupiedBatches?.map((b) => b.box_id) || []);
+      setAvailableBoxes(allBoxes?.filter((box) => !occupiedIds.has(box.id)) || []);
     } catch (error: any) {
       toast.error(error.message);
     } finally {
@@ -247,14 +267,14 @@ export default function OrderFinishing() {
     setLoadingMachines(true);
     try {
       const { data } = await supabase
-        .from('machines')
-        .select('id, name')
-        .eq('type', 'finishing')
-        .eq('is_active', true)
-        .order('name');
+        .from("machines")
+        .select("id, name")
+        .eq("type", "finishing")
+        .eq("is_active", true)
+        .order("name");
       setMachines(data || []);
     } catch (error) {
-      console.error('Error fetching machines:', error);
+      console.error("Error fetching machines:", error);
     } finally {
       setLoadingMachines(false);
     }
@@ -265,31 +285,33 @@ export default function OrderFinishing() {
     const normalizedCode = normalizeBoxCode(boxSearchCode);
     try {
       const { data: box } = await supabase
-        .from('boxes')
-        .select('id, box_code')
-        .eq('box_code', normalizedCode)
-        .eq('is_active', true)
+        .from("boxes")
+        .select("id, box_code")
+        .eq("box_code", normalizedCode)
+        .eq("is_active", true)
         .single();
-      
+
       if (!box) {
         toast.error(`Box ${boxSearchCode} not found`);
+        setBoxSearchCode("");
         return;
       }
-      
+
       const { data: existingBatches } = await supabase
-        .from('order_batches')
-        .select('id')
-        .eq('box_id', box.id)
-        .eq('is_terminated', false)
+        .from("order_batches")
+        .select("id")
+        .eq("box_id", box.id)
+        .eq("is_terminated", false)
         .limit(1);
-      
+
       if (existingBatches && existingBatches.length > 0) {
         toast.error(`Box ${box.box_code} is already occupied`);
+        setBoxSearchCode("");
         return;
       }
-      
+
       setSelectedBox(box);
-      setBoxSearchCode('');
+      setBoxSearchCode("");
     } catch (error: any) {
       toast.error(error.message);
     }
@@ -298,64 +320,68 @@ export default function OrderFinishing() {
   // Group ready_for_finishing by box
   const readyBoxGroups: BoxGroup[] = [];
   const boxMap = new Map<string, BoxGroup>();
-  batches.filter(b => b.current_state === 'ready_for_finishing' && b.box_id).forEach(batch => {
-    if (!boxMap.has(batch.box_id!)) {
-      boxMap.set(batch.box_id!, {
-        box_id: batch.box_id!,
-        box_code: batch.box?.box_code || 'Unknown',
-        batches: [],
-        totalQty: 0,
-      });
-    }
-    const group = boxMap.get(batch.box_id!)!;
-    group.batches.push(batch);
-    group.totalQty += batch.quantity;
-  });
-  boxMap.forEach(g => readyBoxGroups.push(g));
+  batches
+    .filter((b) => b.current_state === "ready_for_finishing" && b.box_id)
+    .forEach((batch) => {
+      if (!boxMap.has(batch.box_id!)) {
+        boxMap.set(batch.box_id!, {
+          box_id: batch.box_id!,
+          box_code: batch.box?.box_code || "Unknown",
+          batches: [],
+          totalQty: 0,
+        });
+      }
+      const group = boxMap.get(batch.box_id!)!;
+      group.batches.push(batch);
+      group.totalQty += batch.quantity;
+    });
+  boxMap.forEach((g) => readyBoxGroups.push(g));
 
   // Group in_finishing by product + needs_boxing to combine same product items
   const inFinishingGroups: OrderItemGroup[] = [];
   const orderItemGroupMap = new Map<string, OrderItemGroup>();
-  batches.filter(b => b.current_state === 'in_finishing').forEach(batch => {
-    const needsBoxing = batch.order_item?.needs_boxing ?? true;
-    const groupKey = `${batch.product_id}-${needsBoxing ? 'boxing' : 'no-boxing'}`;
-    
-    if (!orderItemGroupMap.has(groupKey)) {
-      orderItemGroupMap.set(groupKey, {
-        groupKey,
-        product_id: batch.product_id,
-        product_name: batch.product?.name || 'Unknown',
-        product_sku: batch.product?.sku || 'N/A',
-        needs_packing: batch.product?.needs_packing ?? true,
-        needs_boxing: needsBoxing,
-        quantity: 0,
-        batches: [],
-        order_item_ids: [],
-      });
-    }
-    const group = orderItemGroupMap.get(groupKey)!;
-    group.batches.push(batch);
-    group.quantity += batch.quantity;
-    if (batch.order_item_id && !group.order_item_ids.includes(batch.order_item_id)) {
-      group.order_item_ids.push(batch.order_item_id);
-    }
-  });
-  orderItemGroupMap.forEach(g => inFinishingGroups.push(g));
+  batches
+    .filter((b) => b.current_state === "in_finishing")
+    .forEach((batch) => {
+      const needsBoxing = batch.order_item?.needs_boxing ?? true;
+      const groupKey = `${batch.product_id}-${needsBoxing ? "boxing" : "no-boxing"}`;
+
+      if (!orderItemGroupMap.has(groupKey)) {
+        orderItemGroupMap.set(groupKey, {
+          groupKey,
+          product_id: batch.product_id,
+          product_name: batch.product?.name || "Unknown",
+          product_sku: batch.product?.sku || "N/A",
+          needs_packing: batch.product?.needs_packing ?? true,
+          needs_boxing: needsBoxing,
+          quantity: 0,
+          batches: [],
+          order_item_ids: [],
+        });
+      }
+      const group = orderItemGroupMap.get(groupKey)!;
+      group.batches.push(batch);
+      group.quantity += batch.quantity;
+      if (batch.order_item_id && !group.order_item_ids.includes(batch.order_item_id)) {
+        group.order_item_ids.push(batch.order_item_id);
+      }
+    });
+  orderItemGroupMap.forEach((g) => inFinishingGroups.push(g));
   inFinishingGroups.sort((a, b) => a.product_name.localeCompare(b.product_name));
 
   // Group completed items by product + needs_boxing
   const completedGroups: OrderItemGroup[] = [];
   const completedGroupMap = new Map<string, OrderItemGroup>();
-  completedBatches.forEach(batch => {
+  completedBatches.forEach((batch) => {
     const needsBoxing = batch.order_item?.needs_boxing ?? true;
-    const groupKey = `${batch.product_id}-${needsBoxing ? 'boxing' : 'no-boxing'}`;
-    
+    const groupKey = `${batch.product_id}-${needsBoxing ? "boxing" : "no-boxing"}`;
+
     if (!completedGroupMap.has(groupKey)) {
       completedGroupMap.set(groupKey, {
         groupKey,
         product_id: batch.product_id,
-        product_name: batch.product?.name || 'Unknown',
-        product_sku: batch.product?.sku || 'N/A',
+        product_name: batch.product?.name || "Unknown",
+        product_sku: batch.product?.sku || "N/A",
         needs_packing: batch.product?.needs_packing ?? true,
         needs_boxing: needsBoxing,
         quantity: 0,
@@ -370,7 +396,7 @@ export default function OrderFinishing() {
       group.order_item_ids.push(batch.order_item_id);
     }
   });
-  completedGroupMap.forEach(g => completedGroups.push(g));
+  completedGroupMap.forEach((g) => completedGroups.push(g));
   completedGroups.sort((a, b) => a.product_name.localeCompare(b.product_name));
 
   const totalReadyForFinishing = readyBoxGroups.reduce((sum, g) => sum + g.totalQty, 0);
@@ -380,31 +406,30 @@ export default function OrderFinishing() {
 
   // Prepare selections for MoveToExtraDialog - only items in "in_finishing" state
   const extraSelections = inFinishingGroups
-    .filter(g => productSelections.get(g.groupKey) && productSelections.get(g.groupKey)! > 0)
-    .map(g => ({
+    .filter((g) => productSelections.get(g.groupKey) && productSelections.get(g.groupKey)! > 0)
+    .map((g) => ({
       groupKey: g.groupKey,
       product_id: g.product_id,
       product_name: g.product_name,
       product_sku: g.product_sku,
       quantity: productSelections.get(g.groupKey) || 0,
       order_item_ids: g.order_item_ids,
-      batches: g.batches.map(b => ({
+      batches: g.batches.map((b) => ({
         id: b.id,
         quantity: b.quantity,
         current_state: b.current_state,
         order_item_id: b.order_item_id,
       })),
     }))
-    .filter(s => s.quantity > 0);
+    .filter((s) => s.quantity > 0);
 
   // Filter boxes based on search query (box code, product SKU, or product name)
   const filteredReadyBoxGroups = receiveSearchQuery.trim()
-    ? readyBoxGroups.filter(group => {
+    ? readyBoxGroups.filter((group) => {
         const query = receiveSearchQuery.trim().toUpperCase();
         if (group.box_code.toUpperCase().includes(query)) return true;
-        return group.batches.some(b => 
-          b.product?.sku?.toUpperCase().includes(query) ||
-          b.product?.name?.toUpperCase().includes(query)
+        return group.batches.some(
+          (b) => b.product?.sku?.toUpperCase().includes(query) || b.product?.name?.toUpperCase().includes(query),
         );
       })
     : readyBoxGroups;
@@ -413,14 +438,14 @@ export default function OrderFinishing() {
     if (selectedBoxes.size === filteredReadyBoxGroups.length) {
       setSelectedBoxes(new Set());
     } else {
-      setSelectedBoxes(new Set(filteredReadyBoxGroups.map(g => g.box_id)));
+      setSelectedBoxes(new Set(filteredReadyBoxGroups.map((g) => g.box_id)));
     }
   };
 
   const handleAddScannedBoxes = (boxes: Array<{ id: string; box_code: string; total_quantity: number }>) => {
-    setSelectedBoxes(prev => {
+    setSelectedBoxes((prev) => {
       const next = new Set(prev);
-      boxes.forEach(box => next.add(box.id));
+      boxes.forEach((box) => next.add(box.id));
       return next;
     });
     setScanPopupOpen(false);
@@ -430,30 +455,36 @@ export default function OrderFinishing() {
   const handleAcceptBoxes = async () => {
     if (selectedBoxes.size === 0) return;
     setSubmitting(true);
-    
+
     try {
       const etaDate = new Date();
       etaDate.setDate(etaDate.getDate() + parseInt(etaDays) || 1);
-      
+
       const batchIds = batches
-        .filter(b => b.current_state === 'ready_for_finishing' && b.box_id && selectedBoxes.has(b.box_id))
-        .map(b => b.id);
-      
+        .filter((b) => b.current_state === "ready_for_finishing" && b.box_id && selectedBoxes.has(b.box_id))
+        .map((b) => b.id);
+
       // Clear box_id when receiving - boxes become available again
-      await supabase.from('order_batches').update({
-        current_state: 'in_finishing',
-        eta: etaDate.toISOString(),
-        lead_time_days: parseInt(etaDays) || 1,
-        box_id: null, // Free up the box
-      }).in('id', batchIds);
-      
+      await supabase
+        .from("order_batches")
+        .update({
+          current_state: "in_finishing",
+          eta: etaDate.toISOString(),
+          lead_time_days: parseInt(etaDays) || 1,
+          box_id: null, // Free up the box
+        })
+        .in("id", batchIds);
+
       // Reset boxes to empty state
       const boxIds = Array.from(selectedBoxes);
-      await supabase.from('boxes').update({
-        items_list: [],
-        content_type: 'EMPTY',
-      }).in('id', boxIds);
-      
+      await supabase
+        .from("boxes")
+        .update({
+          items_list: [],
+          content_type: "EMPTY",
+        })
+        .in("id", boxIds);
+
       toast.success(`Accepted ${selectedBoxes.size} box(es) into finishing`);
       setSelectedBoxes(new Set());
       setAcceptDialogOpen(false);
@@ -467,23 +498,25 @@ export default function OrderFinishing() {
 
   const handleOpenAssignDialog = () => {
     if (totalSelected === 0) {
-      toast.error('Please select items first');
+      toast.error("Please select items first");
       return;
     }
-    
+
     // Validate: all selected items must have the same needs_packing value
-    const selectedGroups = inFinishingGroups.filter(g => 
-      productSelections.get(g.groupKey) && productSelections.get(g.groupKey)! > 0
+    const selectedGroups = inFinishingGroups.filter(
+      (g) => productSelections.get(g.groupKey) && productSelections.get(g.groupKey)! > 0,
     );
-    
-    const needsPackingValues = new Set(selectedGroups.map(g => g.needs_packing));
+
+    const needsPackingValues = new Set(selectedGroups.map((g) => g.needs_packing));
     if (needsPackingValues.size > 1) {
-      toast.error('Cannot mix items in the same box: some require packaging while others go directly to boxing. Please select items with the same packaging requirement.');
+      toast.error(
+        "Cannot mix items in the same box: some require packaging while others go directly to boxing. Please select items with the same packaging requirement.",
+      );
       return;
     }
-    
+
     setSelectedBox(null);
-    setBoxSearchCode('');
+    setBoxSearchCode("");
     setSelectedMachine(null);
     fetchEmptyBoxes();
     fetchMachines();
@@ -496,12 +529,8 @@ export default function OrderFinishing() {
     const machineId = selectedMachine;
     try {
       // Get current box data for items_list
-      const { data: boxData } = await supabase
-        .from('boxes')
-        .select('items_list')
-        .eq('id', selectedBox.id)
-        .single();
-      
+      const { data: boxData } = await supabase.from("boxes").select("items_list").eq("id", selectedBox.id).single();
+
       const currentItems = Array.isArray(boxData?.items_list) ? boxData.items_list : [];
       const newItems: Array<{
         product_id: string;
@@ -515,74 +544,87 @@ export default function OrderFinishing() {
 
       for (const [key, quantity] of productSelections.entries()) {
         if (quantity <= 0) continue;
-        
-        const group = inFinishingGroups.find(g => g.groupKey === key);
+
+        const group = inFinishingGroups.find((g) => g.groupKey === key);
         if (!group) continue;
-        
+
         // Determine next state based on needs_packing
-        const nextState = group.needs_packing ? 'ready_for_packaging' : 'ready_for_boxing';
-        
+        const nextState = group.needs_packing ? "ready_for_packaging" : "ready_for_boxing";
+
         let remainingQty = quantity;
         for (const batch of group.batches) {
           if (remainingQty <= 0) break;
-          
+
           const useQty = Math.min(batch.quantity, remainingQty);
           remainingQty -= useQty;
-          
+
           if (useQty === batch.quantity) {
-            await supabase.from('order_batches').update({
-              current_state: nextState,
-              box_id: selectedBox.id,
-              finishing_machine_id: machineId || batch.finishing_machine_id,
-            }).eq('id', batch.id);
-            
+            await supabase
+              .from("order_batches")
+              .update({
+                current_state: nextState,
+                box_id: selectedBox.id,
+                finishing_machine_id: machineId || batch.finishing_machine_id,
+              })
+              .eq("id", batch.id);
+
             newItems.push({
               product_id: group.product_id,
               product_name: group.product_name,
               product_sku: group.product_sku,
               quantity: useQty,
               batch_id: batch.id,
-              batch_type: 'ORDER',
+              batch_type: "ORDER",
               needs_boxing: group.needs_boxing,
             });
           } else {
-            const { data: qrCode } = await supabase.rpc('generate_extra_batch_code');
+            const { data: qrCode } = await supabase.rpc("generate_extra_batch_code");
             // Inherit machine IDs from parent batch
-            const { data: newBatch } = await supabase.from('order_batches').insert({
-              qr_code_data: qrCode,
-              order_id: id,
-              product_id: batch.product_id,
-              order_item_id: batch.order_item_id,
-              current_state: nextState,
-              quantity: useQty,
-              box_id: selectedBox.id,
-              created_by: user?.id,
-              manufacturing_machine_id: batch.manufacturing_machine_id,
-              finishing_machine_id: machineId || batch.finishing_machine_id,
-            }).select('id').single();
-            
-            await supabase.from('order_batches').update({ quantity: batch.quantity - useQty }).eq('id', batch.id);
-            
+            const { data: newBatch } = await supabase
+              .from("order_batches")
+              .insert({
+                qr_code_data: qrCode,
+                order_id: id,
+                product_id: batch.product_id,
+                order_item_id: batch.order_item_id,
+                current_state: nextState,
+                quantity: useQty,
+                box_id: selectedBox.id,
+                created_by: user?.id,
+                manufacturing_machine_id: batch.manufacturing_machine_id,
+                finishing_machine_id: machineId || batch.finishing_machine_id,
+              })
+              .select("id")
+              .single();
+
+            await supabase
+              .from("order_batches")
+              .update({ quantity: batch.quantity - useQty })
+              .eq("id", batch.id);
+
             newItems.push({
               product_id: group.product_id,
               product_name: group.product_name,
               product_sku: group.product_sku,
               quantity: useQty,
               batch_id: newBatch?.id || batch.id,
-              batch_type: 'ORDER',
+              batch_type: "ORDER",
               needs_boxing: group.needs_boxing,
             });
           }
         }
       }
-      
+
       // Update box with new items_list and content_type
       const updatedItems = [...currentItems, ...newItems];
-      await supabase.from('boxes').update({
-        items_list: updatedItems,
-        content_type: 'ORDER',
-      }).eq('id', selectedBox.id);
-      
+      await supabase
+        .from("boxes")
+        .update({
+          items_list: updatedItems,
+          content_type: "ORDER",
+        })
+        .eq("id", selectedBox.id);
+
       toast.success(`Assigned ${totalSelected} items to ${selectedBox.box_code}`);
       setBoxAssignDialogOpen(false);
       setProductSelections(new Map());
@@ -605,7 +647,7 @@ export default function OrderFinishing() {
   if (!order) {
     return (
       <div className="p-6">
-        <Button variant="ghost" onClick={() => navigate('/orders')}>
+        <Button variant="ghost" onClick={() => navigate("/orders")}>
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back
         </Button>
@@ -619,7 +661,7 @@ export default function OrderFinishing() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" onClick={() => navigate('/queues/finishing')}>
+          <Button variant="ghost" onClick={() => navigate("/queues/finishing")}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div className="flex items-center gap-3">
@@ -630,7 +672,11 @@ export default function OrderFinishing() {
               <h1 className="text-2xl font-bold">Finishing</h1>
               <p className="text-muted-foreground">
                 {order.order_number} {order.customer?.name && `· ${order.customer.name}`}
-                {order.priority === 'high' && <Badge variant="destructive" className="ml-2">High Priority</Badge>}
+                {order.priority === "high" && (
+                  <Badge variant="destructive" className="ml-2">
+                    High Priority
+                  </Badge>
+                )}
               </p>
             </div>
           </div>
@@ -688,7 +734,7 @@ export default function OrderFinishing() {
               <CardContent className="p-4 flex items-center justify-between">
                 <Button variant="outline" size="sm" onClick={handleSelectAllBoxes}>
                   <CheckSquare className="h-4 w-4 mr-2" />
-                  {selectedBoxes.size === filteredReadyBoxGroups.length ? 'Deselect All' : 'Select All'}
+                  {selectedBoxes.size === filteredReadyBoxGroups.length ? "Deselect All" : "Select All"}
                 </Button>
                 <Button onClick={() => setAcceptDialogOpen(true)} disabled={selectedBoxes.size === 0}>
                   Accept {selectedBoxes.size} Box(es)
@@ -711,13 +757,13 @@ export default function OrderFinishing() {
                     className="pl-10"
                     onBlur={() => {
                       if (!receiveSearchQuery.trim()) {
-                        setReceiveSearchQuery('');
+                        setReceiveSearchQuery("");
                       }
                     }}
                   />
                 </div>
                 {receiveSearchQuery && (
-                  <Button variant="ghost" size="sm" onClick={() => setReceiveSearchQuery('')}>
+                  <Button variant="ghost" size="sm" onClick={() => setReceiveSearchQuery("")}>
                     Clear
                   </Button>
                 )}
@@ -734,21 +780,21 @@ export default function OrderFinishing() {
             {filteredReadyBoxGroups.length === 0 ? (
               <Card>
                 <CardContent className="p-8 text-center text-muted-foreground">
-                  {receiveSearchQuery.trim() 
-                    ? `No boxes matching "${receiveSearchQuery}"` 
-                    : 'No boxes ready for finishing'}
+                  {receiveSearchQuery.trim()
+                    ? `No boxes matching "${receiveSearchQuery}"`
+                    : "No boxes ready for finishing"}
                 </CardContent>
               </Card>
             ) : (
-              filteredReadyBoxGroups.map(group => (
-                <Card key={group.box_id} className={selectedBoxes.has(group.box_id) ? 'border-primary' : ''}>
+              filteredReadyBoxGroups.map((group) => (
+                <Card key={group.box_id} className={selectedBoxes.has(group.box_id) ? "border-primary" : ""}>
                   <CardContent className="p-4">
                     <div className="flex items-center gap-4">
                       {canManage && (
                         <Checkbox
                           checked={selectedBoxes.has(group.box_id)}
                           onCheckedChange={(checked) => {
-                            setSelectedBoxes(prev => {
+                            setSelectedBoxes((prev) => {
                               const next = new Set(prev);
                               if (checked) next.add(group.box_id);
                               else next.delete(group.box_id);
@@ -763,7 +809,7 @@ export default function OrderFinishing() {
                       </div>
                       <Badge variant="secondary">{group.totalQty} items</Badge>
                       <div className="flex-1 text-sm text-muted-foreground">
-                        {group.batches.map(b => `${b.product?.sku} - ${b.product?.name} (${b.quantity})`).join(', ')}
+                        {group.batches.map((b) => `${b.product?.sku} - ${b.product?.name} (${b.quantity})`).join(", ")}
                       </div>
                     </div>
                   </CardContent>
@@ -777,11 +823,13 @@ export default function OrderFinishing() {
           {canManage && (
             <Card>
               <CardContent className="p-4 flex items-center justify-between">
-                <Badge variant="secondary" className="text-lg px-3 py-1">{totalSelected} selected</Badge>
+                <Badge variant="secondary" className="text-lg px-3 py-1">
+                  {totalSelected} selected
+                </Badge>
                 <div className="flex gap-2">
-                  <Button 
-                    variant="secondary" 
-                    onClick={() => setMoveToExtraDialogOpen(true)} 
+                  <Button
+                    variant="secondary"
+                    onClick={() => setMoveToExtraDialogOpen(true)}
                     disabled={totalSelected === 0}
                     title="Move selected items to Extra Inventory"
                   >
@@ -799,16 +847,19 @@ export default function OrderFinishing() {
 
           <div className="space-y-3">
             {inFinishingGroups.length === 0 ? (
-              <Card><CardContent className="p-8 text-center text-muted-foreground">No items in finishing</CardContent></Card>
+              <Card>
+                <CardContent className="p-8 text-center text-muted-foreground">No items in finishing</CardContent>
+              </Card>
             ) : (
-              inFinishingGroups.map(group => (
+              inFinishingGroups.map((group) => (
                 <Card key={group.groupKey}>
                   <CardContent className="p-4">
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="font-medium">{group.product_name}</p>
                         <p className="text-sm text-muted-foreground">
-                          {group.product_sku} · {group.needs_packing ? 'Needs Packing' : 'No Packing'} · {group.needs_boxing ? 'Needs Boxing' : 'No Boxing'}
+                          {group.product_sku} · {group.needs_packing ? "Needs Packing" : "No Packing"} ·{" "}
+                          {group.needs_boxing ? "Needs Boxing" : "No Boxing"}
                         </p>
                       </div>
                       <div className="flex items-center gap-4">
@@ -823,7 +874,7 @@ export default function OrderFinishing() {
                               value={productSelections.get(group.groupKey) || 0}
                               onChange={(e) => {
                                 const val = Math.min(Math.max(0, parseInt(e.target.value) || 0), group.quantity);
-                                setProductSelections(prev => new Map(prev).set(group.groupKey, val));
+                                setProductSelections((prev) => new Map(prev).set(group.groupKey, val));
                               }}
                               className="w-20 h-8"
                             />
@@ -839,11 +890,7 @@ export default function OrderFinishing() {
         </TabsContent>
 
         <TabsContent value="extra">
-          <ExtraItemsTab 
-            orderId={id!} 
-            phase="finishing" 
-            onRefresh={() => fetchData()} 
-          />
+          <ExtraItemsTab orderId={id!} phase="finishing" onRefresh={() => fetchData()} />
         </TabsContent>
 
         <TabsContent value="completed" className="space-y-6">
@@ -852,21 +899,20 @@ export default function OrderFinishing() {
             <div className="space-y-3">
               <div className="flex items-center gap-2 pb-2 border-b border-orange-200 dark:border-orange-900">
                 <Package className="h-4 w-4 text-orange-600" />
-                <h3 className="text-sm font-semibold text-orange-700 dark:text-orange-400">
-                  Added to Extra Inventory
-                </h3>
+                <h3 className="text-sm font-semibold text-orange-700 dark:text-orange-400">Added to Extra Inventory</h3>
               </div>
-              {addedToExtraItems.map(item => (
-                <Card key={item.product_id} className="border-orange-200 dark:border-orange-900 bg-orange-50 dark:bg-orange-950/20">
+              {addedToExtraItems.map((item) => (
+                <Card
+                  key={item.product_id}
+                  className="border-orange-200 dark:border-orange-900 bg-orange-50 dark:bg-orange-950/20"
+                >
                   <CardContent className="p-4">
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="font-medium">{item.product_name}</p>
                         <p className="text-sm text-muted-foreground">{item.product_sku}</p>
                       </div>
-                      <Badge className="bg-orange-500 hover:bg-orange-600 text-white">
-                        {item.quantity} to extra
-                      </Badge>
+                      <Badge className="bg-orange-500 hover:bg-orange-600 text-white">{item.quantity} to extra</Badge>
                     </div>
                   </CardContent>
                 </Card>
@@ -879,12 +925,13 @@ export default function OrderFinishing() {
             <div className="space-y-3">
               <div className="flex items-center gap-2 pb-2 border-b border-green-200 dark:border-green-900">
                 <CheckSquare className="h-4 w-4 text-green-600" />
-                <h3 className="text-sm font-semibold text-green-700 dark:text-green-400">
-                  Moved to Next Phase
-                </h3>
+                <h3 className="text-sm font-semibold text-green-700 dark:text-green-400">Moved to Next Phase</h3>
               </div>
-              {completedGroups.map(group => (
-                <Card key={group.groupKey} className="border-green-200 dark:border-green-900 bg-green-50 dark:bg-green-950/20">
+              {completedGroups.map((group) => (
+                <Card
+                  key={group.groupKey}
+                  className="border-green-200 dark:border-green-900 bg-green-50 dark:bg-green-950/20"
+                >
                   <CardContent className="p-4">
                     <div className="flex items-center justify-between">
                       <div>
@@ -901,11 +948,11 @@ export default function OrderFinishing() {
 
           {/* Production Rate Section */}
           <ProductionRateSection
-            batches={completedBatches.map(b => ({
+            batches={completedBatches.map((b) => ({
               id: b.id,
               product_id: b.product_id,
-              product_name: b.product?.name || 'Unknown',
-              product_sku: b.product?.sku || 'N/A',
+              product_name: b.product?.name || "Unknown",
+              product_sku: b.product?.sku || "N/A",
               quantity: b.quantity,
               machine_id: b.finishing_machine_id,
               needs_boxing: b.order_item?.needs_boxing ?? true,
@@ -916,7 +963,9 @@ export default function OrderFinishing() {
           />
 
           {completedGroups.length === 0 && addedToExtraItems.length === 0 && completedBatches.length === 0 && (
-            <Card><CardContent className="p-8 text-center text-muted-foreground">No completed items yet</CardContent></Card>
+            <Card>
+              <CardContent className="p-8 text-center text-muted-foreground">No completed items yet</CardContent>
+            </Card>
           )}
         </TabsContent>
       </Tabs>
@@ -938,20 +987,25 @@ export default function OrderFinishing() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {[1, 2, 3, 5, 7, 10, 14, 21, 30].map(d => (
-                    <SelectItem key={d} value={d.toString()}>{d} day{d !== 1 ? 's' : ''}</SelectItem>
+                  {[1, 2, 3, 5, 7, 10, 14, 21, 30].map((d) => (
+                    <SelectItem key={d} value={d.toString()}>
+                      {d} day{d !== 1 ? "s" : ""}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="p-3 rounded-lg bg-muted">
               <p className="text-sm text-muted-foreground">
-                Items will be expected to complete by <strong>{new Date(Date.now() + parseInt(etaDays) * 24 * 60 * 60 * 1000).toLocaleDateString()}</strong>
+                Items will be expected to complete by{" "}
+                <strong>{new Date(Date.now() + parseInt(etaDays) * 24 * 60 * 60 * 1000).toLocaleDateString()}</strong>
               </p>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setAcceptDialogOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setAcceptDialogOpen(false)}>
+              Cancel
+            </Button>
             <Button onClick={handleAcceptBoxes} disabled={submitting}>
               {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Accept
@@ -972,7 +1026,7 @@ export default function OrderFinishing() {
               <Label>Finishing Machine (Optional)</Label>
               <div className="mt-2">
                 <SearchableSelect
-                  options={machines.map(m => ({ value: m.id, label: m.name }))}
+                  options={machines.map((m) => ({ value: m.id, label: m.name }))}
                   value={selectedMachine}
                   onValueChange={setSelectedMachine}
                   placeholder="Select a machine..."
@@ -992,11 +1046,11 @@ export default function OrderFinishing() {
             <div>
               <Label>Search Box by Code</Label>
               <div className="flex gap-2 mt-2">
-                <Input 
+                <Input
                   value={boxSearchCode}
                   onChange={(e) => setBoxSearchCode(e.target.value)}
                   placeholder="Enter box number (e.g., 42)"
-                  onKeyDown={(e) => e.key === 'Enter' && searchBox()}
+                  onKeyDown={(e) => e.key === "Enter" && searchBox()}
                 />
                 <Button variant="outline" onClick={searchBox}>
                   <Search className="h-4 w-4" />
@@ -1021,13 +1075,13 @@ export default function OrderFinishing() {
               <Label>Select Available Box</Label>
               <div className="mt-2">
                 <SearchableSelect
-                  options={availableBoxes.map(b => ({ value: b.id, label: b.box_code }))}
+                  options={availableBoxes.map((b) => ({ value: b.id, label: b.box_code }))}
                   value={selectedBox?.id || null}
                   onValueChange={(val) => {
-                    const box = availableBoxes.find(b => b.id === val);
+                    const box = availableBoxes.find((b) => b.id === val);
                     setSelectedBox(box || null);
                   }}
-                  placeholder={loadingBoxes ? 'Loading...' : 'Select a box...'}
+                  placeholder={loadingBoxes ? "Loading..." : "Select a box..."}
                   searchPlaceholder="Search boxes..."
                   emptyText="No boxes available"
                   loading={loadingBoxes}
@@ -1037,7 +1091,9 @@ export default function OrderFinishing() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setBoxAssignDialogOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setBoxAssignDialogOpen(false)}>
+              Cancel
+            </Button>
             <Button onClick={handleAssignToBox} disabled={!selectedBox || submitting}>
               {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Assign {totalSelected} Items
