@@ -250,7 +250,6 @@ export function BoxScanDialog({
         }]);
       }
 
-      setSearchCode('');
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -258,6 +257,7 @@ export function BoxScanDialog({
         variant: 'destructive',
       });
     } finally {
+      setSearchCode('');
       setSearching(false);
     }
   };

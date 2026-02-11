@@ -287,7 +287,6 @@ export function BoxReceiveDialog({
             title: 'Already Selected',
             description: `Box ${box.box_code} is already selected`,
           });
-          setSearchCode('');
           return;
         }
 
@@ -328,7 +327,6 @@ export function BoxReceiveDialog({
         };
 
         setSelectedBoxes(prev => [...prev, selectedBox]);
-        setSearchCode('');
       } else {
         // Search by product SKU or name - find boxes containing matching products
         const { data: matchingBatches } = await supabase
@@ -402,7 +400,6 @@ export function BoxReceiveDialog({
             title: 'Boxes Found',
             description: `Added ${addedCount} box(es) containing products matching "${searchCode}"`,
           });
-          setSearchCode('');
         } else {
           toast({
             title: 'Already Selected',
@@ -417,6 +414,7 @@ export function BoxReceiveDialog({
         variant: 'destructive',
       });
     } finally {
+      setSearchCode('');
       setSearching(false);
     }
   };
