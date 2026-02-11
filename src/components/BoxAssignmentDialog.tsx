@@ -263,8 +263,10 @@ export function BoxAssignmentDialog({
   const handleSearch = async () => {
     if (!searchCode.trim()) return;
 
+    const codeToSearch = searchCode;
+    setSearchCode('');
     setSearching(true);
-    const normalizedCode = normalizeBoxCode(searchCode);
+    const normalizedCode = normalizeBoxCode(codeToSearch);
 
     // Detect extra box scans
     if (normalizedCode.startsWith('EBOX-')) {
@@ -273,7 +275,6 @@ export function BoxAssignmentDialog({
         description: 'This is an extra box (EBOX). It cannot be used for orders.',
         variant: 'destructive',
       });
-      setSearchCode('');
       setSearching(false);
       return;
     }
@@ -289,7 +290,7 @@ export function BoxAssignmentDialog({
       if (!box) {
         toast({
           title: 'Not Found',
-          description: `Box ${searchCode} not found or inactive`,
+          description: `Box ${codeToSearch} not found or inactive`,
           variant: 'destructive',
         });
         return;
@@ -331,7 +332,6 @@ export function BoxAssignmentDialog({
         variant: 'destructive',
       });
     } finally {
-      setSearchCode('');
       setSearching(false);
     }
   };
@@ -478,6 +478,7 @@ export function BoxAssignmentDialog({
               <Input
                 value={searchCode}
                 onChange={(e) => setSearchCode(e.target.value.toUpperCase())}
+                readOnly={searching}
                 placeholder="Box number (e.g., 42)"
                 className="pl-10"
                 onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
