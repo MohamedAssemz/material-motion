@@ -527,10 +527,10 @@ export default function OrderManufacturing() {
       fetchData();
     } catch (error: any) {
       toast.error(error.message);
-      setSelectedBox(null);
       setBoxSearchCode("");
     } finally {
       setSubmitting(false);
+      setBoxSearchCode("");
     }
   };
 
