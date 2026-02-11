@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -31,11 +31,13 @@ export function BoxLabelPrintDialog({
 }: BoxLabelPrintDialogProps) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set(preselectedBoxIds));
   const [printing, setPrinting] = useState(false);
+  const prevOpen = useRef(false);
 
   useEffect(() => {
-    if (open) {
+    if (open && !prevOpen.current) {
       setSelectedIds(new Set(preselectedBoxIds));
     }
+    prevOpen.current = open;
   }, [open, preselectedBoxIds]);
 
   const handleToggle = (id: string) => {
