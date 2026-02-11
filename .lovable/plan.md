@@ -1,20 +1,38 @@
 
-## One Label Per Page When Printing
 
-### Summary
-Add a CSS `page-break-after: always` rule to each `.label` element in the print HTML so every box label prints on its own page.
+## Universal Input Clearing After Scan/Search in All Dialogs
 
-### Technical Details
+### Problem
+When scanning a QR code or searching for a box that is occupied, invalid, or unavailable, the search/scan input field retains the scanned value. This forces users to manually clear it before the next scan, which is especially problematic with hardware barcode scanners that append to existing text.
 
-**File: `src/components/BoxLabel.tsx`**
+### Affected Files and Changes
 
-In the `generateBoxLabelHTML` function, update the `.label` CSS class to add `page-break-after: always` and remove the flex-wrap layout from `.labels-container` since labels will now flow one per page. Also remove `page-break-after` from the last label to avoid a trailing blank page.
+#### 1. `src/components/BoxScanDialog.tsx` -- `handleSearch()`
+The search code is only cleared on success (line 253). On all failure paths (lines 185, 194, 212, 238), the function returns early without clearing. 
 
-Changes to the `<style>` block:
-- `.labels-container`: remove `display: flex`, `flex-wrap: wrap`, `gap`, and `justify-content` (no longer needed since each label is on its own page)
-- `.label`: add `page-break-after: always`, center on page with `margin: 0 auto`
-- `.label:last-child`: add `page-break-after: avoid` to prevent a trailing blank page
+**Fix**: Move `setSearchCode('')` into the `finally` block so it always runs.
 
-| File | Change |
-|------|--------|
-| `src/components/BoxLabel.tsx` | Add `page-break-after: always` to `.label`, remove flex-wrap from container, prevent trailing blank page |
+#### 2. `src/components/BoxReceiveDialog.tsx` -- `handleSearch()`
+Similar issue: `searchCode` is cleared on some success paths but not on failure paths (lines 314, 361).
+
+**Fix**: Move `setSearchCode('')` into the `finally` block.
+
+#### 3. `src/components/BoxAssignmentDialog.tsx` -- `handleBoxScan()` (scanner callback)
+The scanner handler (lines 110-175) never updates `searchCode` since it operates via the hardware scanner hook, but it also doesn't clear the manual input field after a scan attempt. Additionally, the manual `handleSearch()` already clears in `finally` (line 333) -- this one is fine.
+
+**Fix**: Add `setSearchCode('')` at the start of `handleBoxScan` so any lingering manual input is cleared when a scan fires.
+
+#### 4. `src/components/BoxScanPopup.tsx` -- `validateAndAddBox()`
+Already clears `inputValue` in the `finally` block (line 261) -- no change needed.
+
+#### 5. `src/components/BoxLookupScanDialog.tsx` -- scan handler
+Already clears `inputValue` in the `finally` block (line 261) -- no change needed.
+
+### Technical Summary
+
+| File | Function | Current Behavior | Fix |
+|------|----------|-----------------|-----|
+| `BoxScanDialog.tsx` | `handleSearch` | Clears only on success | Move `setSearchCode('')` to `finally` |
+| `BoxReceiveDialog.tsx` | `handleSearch` | Clears only on some paths | Move `setSearchCode('')` to `finally` |
+| `BoxAssignmentDialog.tsx` | `handleBoxScan` | Never clears search input | Add `setSearchCode('')` at start |
+
