@@ -108,6 +108,7 @@ export function BoxAssignmentDialog({
 
   // Scanner handler - auto-select box when scanned
   const handleBoxScan = useCallback(async (code: string) => {
+    setSearchCode('');
     const normalizedCode = normalizeBoxCode(code);
 
     // Detect extra box scans
