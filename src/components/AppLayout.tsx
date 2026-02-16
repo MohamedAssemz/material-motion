@@ -44,7 +44,7 @@ const navItems: NavItem[] = [
   { title: 'Warehouse', href: '/boxes', icon: Warehouse },
   { title: 'Extra Inventory', href: '/extra-inventory', icon: PackageOpen },
   { title: 'Machines', href: '/machines', icon: Settings, roles: ['admin'] },
-  { title: 'Reports', href: '/analytics', icon: BarChart3 },
+  { title: 'Reports & Analytics', href: '/reports', icon: BarChart3 },
   { title: 'Admin', href: '/users', icon: Settings, roles: ['admin'] },
 ];
 

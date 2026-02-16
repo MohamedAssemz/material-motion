@@ -18,6 +18,7 @@ import Boxes from "./pages/Boxes";
 import ExtraInventory from "./pages/ExtraInventory";
 import Admin from "./pages/Admin";
 import Analytics from "./pages/Analytics";
+import Reports from "./pages/Reports";
 import Auth from "./pages/Auth";
 import BatchLookup from "./pages/BatchLookup";
 import BoxLookup from "./pages/BoxLookup";
@@ -72,6 +73,7 @@ const App = () => (
             <Route path="/box/:code" element={<BoxLookup />} />
             <Route path="/box" element={<BoxLookup />} />
             <Route path="/analytics" element={<ProtectedPage><Analytics /></ProtectedPage>} />
+            <Route path="/reports" element={<ProtectedPage><Reports /></ProtectedPage>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
