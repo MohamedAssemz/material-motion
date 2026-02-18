@@ -920,32 +920,6 @@ export default function OrderFinishing() {
             </div>
           )}
 
-          {/* Moved to Next Phase Section */}
-          {completedGroups.length > 0 && (
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 pb-2 border-b border-green-200 dark:border-green-900">
-                <CheckSquare className="h-4 w-4 text-green-600" />
-                <h3 className="text-sm font-semibold text-green-700 dark:text-green-400">Moved to Next Phase</h3>
-              </div>
-              {completedGroups.map((group) => (
-                <Card
-                  key={group.groupKey}
-                  className="border-green-200 dark:border-green-900 bg-green-50 dark:bg-green-950/20"
-                >
-                  <CardContent className="p-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium">{group.product_name}</p>
-                        <p className="text-sm text-muted-foreground">{group.product_sku}</p>
-                      </div>
-                      <Badge className="bg-green-600 hover:bg-green-700 text-white">{group.quantity} completed</Badge>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-
           {/* Production Rate Section */}
           <ProductionRateSection
             batches={completedBatches.map((b) => ({
@@ -956,6 +930,7 @@ export default function OrderFinishing() {
               quantity: b.quantity,
               machine_id: b.finishing_machine_id,
               needs_boxing: b.order_item?.needs_boxing ?? true,
+              order_item_id: b.order_item_id || null,
             }))}
             machineType="finishing"
             machineColumnName="finishing_machine_id"

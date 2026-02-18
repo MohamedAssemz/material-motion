@@ -924,35 +924,6 @@ export default function OrderManufacturing() {
             </div>
           )}
 
-          {/* Moved to Next Phase Section */}
-          {completedGroups.length > 0 && (
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 pb-2 border-b border-green-200 dark:border-green-900">
-                <CheckCircle className="h-4 w-4 text-green-600" />
-                <h3 className="text-sm font-semibold text-green-700 dark:text-green-400">Moved to Next Phase</h3>
-              </div>
-              {completedGroups.map((group) => {
-                const totalQty = group.batches.reduce((sum, b) => sum + b.quantity, 0);
-                return (
-                  <Card
-                    key={group.groupKey}
-                    className="border-green-200 dark:border-green-900 bg-green-50 dark:bg-green-950/20"
-                  >
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="font-medium">{group.product_name}</p>
-                          <p className="text-sm text-muted-foreground">{group.product_sku}</p>
-                        </div>
-                        <Badge className="bg-green-600 hover:bg-green-700 text-white">{totalQty} completed</Badge>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          )}
-
           {/* Production Rate Section */}
           <ProductionRateSection
             batches={completedBatches.map((batch) => ({
@@ -963,6 +934,7 @@ export default function OrderManufacturing() {
               quantity: batch.quantity,
               machine_id: batch.manufacturing_machine_id || null,
               needs_boxing: batch.order_item?.needs_boxing ?? true,
+              order_item_id: batch.order_item_id || null,
             }))}
             machineType="manufacturing"
             machineColumnName="manufacturing_machine_id"
