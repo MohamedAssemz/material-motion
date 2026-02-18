@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Card, CardContent } from '@/components/ui/card';
 import { QrCode, Download, Printer } from 'lucide-react';
 import { getStateLabel } from '@/lib/stateMachine';
+import { escapeHtml } from '@/lib/sanitize';
 
 interface BatchQRCodeProps {
   batchCode: string;
@@ -50,11 +51,11 @@ export function BatchQRCode({
             </style>
           </head>
           <body>
-            <div class="code">${batchCode}</div>
+            <div class="code">${escapeHtml(batchCode)}</div>
             <div id="qr"></div>
-            <div class="info"><span class="label">Order:</span> <span class="value">${orderNumber}</span></div>
-            <div class="info"><span class="label">Product:</span> <span class="value">${productName}</span></div>
-            <div class="info"><span class="label">State:</span> <span class="value">${getStateLabel(state as any)}</span></div>
+            <div class="info"><span class="label">Order:</span> <span class="value">${escapeHtml(orderNumber)}</span></div>
+            <div class="info"><span class="label">Product:</span> <span class="value">${escapeHtml(productName)}</span></div>
+            <div class="info"><span class="label">State:</span> <span class="value">${escapeHtml(getStateLabel(state as any))}</span></div>
             <div class="info"><span class="label">Quantity:</span> <span class="value">${quantity}</span></div>
             ${eta ? `<div class="info"><span class="label">ETA:</span> <span class="value">${new Date(eta).toLocaleDateString()}</span></div>` : ''}
             <script>

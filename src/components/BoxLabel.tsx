@@ -71,7 +71,7 @@ export function generateBoxLabelHTML(
         <div class="qr-container">
           <img src="https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(lookupUrl)}" alt="QR Code" />
         </div>
-        <div class="box-code">${boxCode}</div>
+        <div class="box-code">${boxCode.replace(/[<>"'&]/g, c => ({'<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','&':'&amp;'}[c] || c))}</div>
         <div class="barcode">${barcodeSvg}</div>
       </div>
     `;

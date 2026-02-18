@@ -28,6 +28,7 @@ import { StartOrderDialog } from "@/components/StartOrderDialog";
 import { OrderCommentsDrawer } from "@/components/OrderCommentsDrawer";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { escapeHtml } from "@/lib/sanitize";
 import {
   ArrowLeft,
   AlertTriangle,
@@ -467,10 +468,10 @@ export default function OrderDetail() {
         </head>
         <body>
           <div class="header">
-            <div class="order-number">${order.order_number}</div>
+            <div class="order-number">${escapeHtml(order.order_number)}</div>
             <div class="meta">
-              Customer: ${order.customer?.name || "N/A"} | 
-              Priority: <span class="badge ${order.priority}">${order.priority}</span> |
+              Customer: ${escapeHtml(order.customer?.name || "N/A")} | 
+              Priority: <span class="badge ${escapeHtml(order.priority || 'normal')}">${escapeHtml(order.priority || 'normal')}</span> |
               Shipping: ${order.shipping_type === "international" ? "International" : "Domestic"}
             </div>
             <div class="meta">Created: ${format(new Date(order.created_at), "PPP")}</div>
@@ -484,14 +485,14 @@ export default function OrderDetail() {
               ${itemsList
                 .map(
                   (item) => `
-                <tr><td>${item.name}</td><td>${item.sku}</td><td>${item.quantity}</td></tr>
+                <tr><td>${escapeHtml(item.name)}</td><td>${escapeHtml(item.sku)}</td><td>${item.quantity}</td></tr>
               `,
                 )
                 .join("")}
             </table>
           </div>
 
-          ${order.notes ? `<div class="section"><div class="section-title">Notes</div><p>${order.notes}</p></div>` : ""}
+          ${order.notes ? `<div class="section"><div class="section-title">Notes</div><p>${escapeHtml(order.notes)}</p></div>` : ""}
 
           <script>
             setTimeout(function() {

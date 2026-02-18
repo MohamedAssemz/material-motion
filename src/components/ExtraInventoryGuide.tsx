@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { Printer } from 'lucide-react';
+import { escapeHtml } from '@/lib/sanitize';
 
 interface ExtraItem {
   product_name: string;
@@ -58,14 +59,14 @@ export function ExtraInventoryGuide({ phase, items }: ExtraInventoryGuideProps) 
           
           ${Array.from(boxGroups.entries()).map(([boxCode, boxItems]) => `
             <div class="box-section">
-              <div class="box-header">📦 ${boxCode}</div>
+              <div class="box-header">📦 ${escapeHtml(boxCode)}</div>
               <table>
                 <tr><th style="width: 40px;">✓</th><th>Product</th><th>SKU</th><th>Quantity</th></tr>
                 ${boxItems.map(item => `
                   <tr>
                     <td><span class="checkbox"></span></td>
-                    <td>${item.product_name}</td>
-                    <td>${item.product_sku}</td>
+                    <td>${escapeHtml(item.product_name)}</td>
+                    <td>${escapeHtml(item.product_sku)}</td>
                     <td><strong>${item.quantity}</strong></td>
                   </tr>
                 `).join('')}

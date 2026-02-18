@@ -15,6 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import { Package, Truck, Printer } from 'lucide-react';
+import { escapeHtml } from '@/lib/sanitize';
 
 interface ProductSelection {
   product_id: string;
@@ -249,8 +250,8 @@ export function ShipmentDialog({
         </head>
         <body>
           <div class="header">
-            <div class="shipment-code">${code}</div>
-            <div class="order-info">Order: ${orderNum}</div>
+            <div class="shipment-code">${escapeHtml(code)}</div>
+            <div class="order-info">Order: ${escapeHtml(orderNum)}</div>
             <div style="margin-top: 5px; color: #666;">
               Created: ${new Date().toLocaleString()}
             </div>
@@ -260,7 +261,7 @@ export function ShipmentDialog({
             <h3>Contents:</h3>
             ${items.map(item => `
               <div class="item">
-                <span>${item.product_name} (${item.product_sku})</span>
+                <span>${escapeHtml(item.product_name)} (${escapeHtml(item.product_sku)})</span>
                 <strong>${item.selected_quantity} units</strong>
               </div>
             `).join('')}
@@ -272,7 +273,7 @@ export function ShipmentDialog({
 
           ${shipmentNotes ? `
             <div class="notes">
-              <strong>Notes:</strong> ${shipmentNotes}
+              <strong>Notes:</strong> ${escapeHtml(shipmentNotes)}
             </div>
           ` : ''}
 
