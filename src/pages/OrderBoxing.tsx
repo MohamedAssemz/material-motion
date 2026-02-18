@@ -1297,6 +1297,7 @@ export default function OrderBoxing() {
               quantity: b.quantity,
               machine_id: b.boxing_machine_id,
               needs_boxing: b.order_item?.needs_boxing ?? true,
+              order_item_id: b.order_item_id || null,
             }))}
             machineType="boxing"
             machineColumnName="boxing_machine_id"
