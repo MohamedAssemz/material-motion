@@ -13,6 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Plus, Package, Loader2, Box, Printer } from 'lucide-react';
 import { format } from 'date-fns';
+import { TablePagination } from '@/components/TablePagination';
 import { ExtraBoxSelectionDialog } from '@/components/ExtraBoxSelectionDialog';
 
 interface Product {
@@ -70,6 +71,8 @@ export default function ExtraInventory() {
   });
   const [selectedBoxCode, setSelectedBoxCode] = useState<string>(''); // For display
   const [submitting, setSubmitting] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 25;
 
   const canManage = hasRole('manufacture_lead') || hasRole('admin');
 
@@ -558,6 +561,7 @@ export default function ExtraInventory() {
                 <p className="text-sm">Create batches when overproduction occurs</p>
               </div>
             ) : (
+              <>
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -572,7 +576,7 @@ export default function ExtraInventory() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {batches.map((batch) => (
+                  {batches.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE).map((batch) => (
                     <TableRow key={batch.id}>
                       <TableCell className="font-mono font-medium">{batch.qr_code_data || '-'}</TableCell>
                       <TableCell>
@@ -623,6 +627,13 @@ export default function ExtraInventory() {
                   ))}
                 </TableBody>
               </Table>
+              <TablePagination
+                currentPage={currentPage}
+                totalItems={batches.length}
+                pageSize={PAGE_SIZE}
+                onPageChange={setCurrentPage}
+              />
+              </>
             )}
           </CardContent>
         </Card>

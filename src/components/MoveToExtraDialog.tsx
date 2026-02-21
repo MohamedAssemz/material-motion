@@ -162,129 +162,25 @@ export function MoveToExtraDialog({
     try {
       const targetBox = boxes.find(b => b.id === selectedBoxId);
 
-      // Process each product selection
-      for (const selection of selections) {
-        if (selection.quantity <= 0) continue;
+      // Build selections payload for the RPC
+      const rpcSelections = selections
+        .filter(s => s.quantity > 0)
+        .map(s => ({
+          product_id: s.product_id,
+          quantity: s.quantity,
+          batches: s.batches
+            .filter(b => b.current_state === phase)
+            .map(b => ({ batch_id: b.id, quantity: b.quantity, order_item_id: b.order_item_id })),
+        }));
 
-        let remainingQty = selection.quantity;
+      const { data, error } = await supabase.rpc('move_order_batches_to_extra', {
+        p_selections: rpcSelections,
+        p_target_box_id: selectedBoxId,
+        p_phase: phase,
+        p_user_id: userId || null,
+      });
 
-        // Sort batches: prioritize "in_*" state batches
-        const sortedBatches = [...selection.batches]
-          .filter(b => b.current_state === phase)
-          .sort((a, b) => b.quantity - a.quantity);
-
-        // Track how much to deduct per order_item_id
-        const deductionsByOrderItem = new Map<string, number>();
-
-        for (const batch of sortedBatches) {
-          if (remainingQty <= 0) break;
-
-          const useQty = Math.min(batch.quantity, remainingQty);
-          remainingQty -= useQty;
-
-          // Track deduction for this order_item_id
-          if (batch.order_item_id) {
-            const current = deductionsByOrderItem.get(batch.order_item_id) || 0;
-            deductionsByOrderItem.set(batch.order_item_id, current + useQty);
-          }
-
-          // Generate QR code for extra batch
-          const { data: extraBatchCode } = await supabase.rpc('generate_extra_batch_code');
-
-          // Check if there's an existing extra batch in this box with same product & state
-          const { data: existingBatch } = await supabase
-            .from('extra_batches')
-            .select('id, quantity')
-            .eq('box_id', selectedBoxId)
-            .eq('product_id', selection.product_id)
-            .eq('current_state', extraState)
-            .eq('inventory_state', 'AVAILABLE')
-            .maybeSingle();
-
-          if (existingBatch) {
-            // Merge with existing batch
-            await supabase
-              .from('extra_batches')
-              .update({ quantity: existingBatch.quantity + useQty })
-              .eq('id', existingBatch.id);
-
-            // Log CREATED event in history (even for merge, we track the source)
-            await supabase.from('extra_batch_history').insert({
-              extra_batch_id: existingBatch.id,
-              event_type: 'CREATED',
-              quantity: useQty,
-              from_state: phase,
-              source_order_id: orderId,
-              source_order_item_id: batch.order_item_id,
-              product_id: selection.product_id,
-              performed_by: userId,
-            });
-          } else {
-            // Create new extra batch
-            const { data: newExtraBatch } = await supabase
-              .from('extra_batches')
-              .insert({
-                qr_code_data: extraBatchCode || `EB-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-                product_id: selection.product_id,
-                quantity: useQty,
-                current_state: extraState,
-                inventory_state: 'AVAILABLE',
-                box_id: selectedBoxId,
-                order_id: null,
-                order_item_id: null,
-                created_by: userId,
-              })
-              .select('id')
-              .single();
-
-            // Log CREATED event in history
-            if (newExtraBatch) {
-              await supabase.from('extra_batch_history').insert({
-                extra_batch_id: newExtraBatch.id,
-                event_type: 'CREATED',
-                quantity: useQty,
-                from_state: phase,
-                source_order_id: orderId,
-                source_order_item_id: batch.order_item_id,
-                product_id: selection.product_id,
-                performed_by: userId,
-              });
-            }
-          }
-
-          // Update or delete the order batch
-          const remainingBatchQty = batch.quantity - useQty;
-          if (remainingBatchQty <= 0) {
-            await supabase
-              .from('order_batches')
-              .delete()
-              .eq('id', batch.id);
-          } else {
-            await supabase
-              .from('order_batches')
-              .update({ quantity: remainingBatchQty })
-              .eq('id', batch.id);
-          }
-        }
-
-        // Update deducted_to_extra for each affected order_item
-        for (const [orderItemId, deductedQty] of deductionsByOrderItem.entries()) {
-          const { data: orderItem } = await supabase
-            .from('order_items')
-            .select('deducted_to_extra')
-            .eq('id', orderItemId)
-            .single();
-
-          if (orderItem) {
-            await supabase
-              .from('order_items')
-              .update({ 
-                deducted_to_extra: (orderItem.deducted_to_extra || 0) + deductedQty 
-              })
-              .eq('id', orderItemId);
-          }
-        }
-      }
+      if (error) throw error;
 
       toast.success(`Moved ${totalQuantity} items to ${targetBox?.box_code || 'extra inventory'}`);
       onSuccess();

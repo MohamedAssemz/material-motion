@@ -1427,6 +1427,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      assign_machine_to_batches: {
+        Args: {
+          p_batch_ids: string[]
+          p_machine_column: string
+          p_machine_id: string
+          p_requested_qty: number
+        }
+        Returns: Json
+      }
       check_late_units: { Args: never; Returns: undefined }
       generate_batch_code: { Args: never; Returns: string }
       generate_box_code: { Args: never; Returns: string }
@@ -1440,6 +1449,15 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      move_order_batches_to_extra: {
+        Args: {
+          p_phase: string
+          p_selections: Json
+          p_target_box_id: string
+          p_user_id: string
+        }
+        Returns: Json
       }
     }
     Enums: {
