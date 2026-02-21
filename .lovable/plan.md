@@ -1,104 +1,121 @@
 
-
-## Redesign Production Rate Section with Collapsible Order Item Entries
+## Scale & Harden: Indexes, Atomic Transactions, and Pagination
 
 ### Overview
 
-Replace the current "Moved to Next Phase" section + flat "Production Rate" cards with a single, unified **Production Rate** section. Each entry represents an **order item** (product), shows total completed quantity, and provides inline machine assignment. Assigned sub-quantities are displayed as expandable/collapsible sub-entries grouped by machine.
+Three production-readiness improvements: (1) database indexes for fast queries at scale, (2) Postgres functions for atomic batch operations, and (3) client-side pagination on the three heaviest list pages.
 
-### New Behavior
+---
 
-```text
-Production Rate
-+---------------------------------------------------------------+
-| Prod A (SKU-001) - QTY 100  [qty input] [machine dropdown] [Assign] |
-|   v Machine A: 25                                              |
-|   v Machine B: 75                                              |
-+---------------------------------------------------------------+
-| Prod B (SKU-002) - QTY 50   [qty input] [machine dropdown] [Assign] |
-|   (no assignments yet)                                         |
-+---------------------------------------------------------------+
-```
+### 1. Database Indexes (Migration)
 
-- Clicking "Assign" assigns the entered quantity (or full remaining unassigned qty) to the selected machine
-- The system splits batches as needed: it picks unassigned batches, assigns the machine column, and if partial, splits a batch into assigned + remainder
-- Sub-entries are grouped by machine, showing summed quantity per machine
-- Each entry is collapsible (collapsed by default if all assigned, expanded if any unassigned)
+Create a single migration adding indexes on the most frequently queried columns:
 
-### Technical Plan
+**order_batches:**
+- `(order_id, is_terminated)` -- used by every phase page and order detail
+- `(current_state)` -- used for queue pages and filtering
+- `(box_id)` -- used by Boxes page aggregation
+- `(product_id)` -- used by grouping logic
+- `(shipment_id)` -- used by boxing/shipment queries
+- `(order_item_id)` -- used by ProductionRateSection grouping
 
-#### 1. Rewrite `src/components/ProductionRateSection.tsx`
+**extra_batches:**
+- `(box_id)` -- used by extra box aggregation
+- `(inventory_state, current_state)` -- used by ExtraInventoryDialog filtering
+- `(product_id)` -- used by grouping
+- `(order_id)` -- used by reserved batch lookups
 
-**New props interface** -- add `order_item_id` to `BatchData`:
+**shipments:**
+- `(order_id)` -- used by OrderBoxing and OrderDetail
 
-```typescript
-interface BatchData {
-  id: string;
-  product_id: string;
-  product_name: string;
-  product_sku: string;
-  quantity: number;
-  machine_id: string | null;
-  needs_boxing?: boolean;
-  order_item_id: string | null; // NEW
-}
-```
+**order_items:**
+- `(order_id)` -- used by every order detail/phase page
 
-**New grouping logic** -- group by `order_item_id` (falling back to `product_id`) instead of `product_id + machine_id`:
+**extra_batch_history:**
+- `(source_order_id)` -- used by "added to extra" aggregations
+- `(consuming_order_id)` -- used by "reserved/consumed" lookups
 
-- Each group = one order item entry
-- Within each group, compute:
-  - `totalQty`: sum of all batch quantities
-  - `assignedByMachine`: Map of machine_id to { machineName, qty, batch_ids }
-  - `unassignedQty`: sum of batches with null machine_id
-  - `unassignedBatchIds`: batch IDs with no machine
+All indexes use `CREATE INDEX IF NOT EXISTS` and `CONCURRENTLY` is not used (migration context).
 
-**New UI per entry** -- use Radix `Collapsible`:
+---
 
-- Header row: Product name, SKU, total qty badge, qty input field (defaulting to unassigned qty), machine dropdown, Assign button
-- Collapsible content: list of machine sub-entries showing machine name and quantity
-- "No Boxing" entries in boxing phase remain as static read-only cards
+### 2. Atomic Postgres Functions (Migration)
 
-**New assign logic**:
+Two new database functions to replace multi-step client-side operations:
 
-- User enters a quantity and selects a machine
-- `handleAssign` picks unassigned batches from the group, assigns the machine column
-- If the requested quantity is less than total unassigned, it assigns full batches first, then splits the last batch if needed (update one batch's quantity, insert a new batch with the remainder)
-- After assignment, refresh data via `onAssigned()`
+**A. `move_order_batches_to_extra(...)` -- replaces MoveToExtraDialog's handleConfirm logic**
 
-#### 2. Update all 4 phase pages to pass `order_item_id`
+Parameters:
+- `p_selections jsonb` -- array of `{ batch_id, quantity, order_item_id, product_id }`
+- `p_target_box_id uuid`
+- `p_phase text` (e.g. `in_manufacturing`)
+- `p_user_id uuid`
 
-**Manufacturing** (`OrderManufacturing.tsx`, ~line 957-970):
-- Remove the "Moved to Next Phase" section (lines 927-953)
-- Add `order_item_id` to the batch mapping for ProductionRateSection
+Inside a single transaction:
+1. Validate all source batches exist and are in the expected phase
+2. For each selection: reduce or delete the order batch
+3. Check for existing extra batch in target box (same product + state) and merge, or create new
+4. Insert extra_batch_history records
+5. Update order_items.deducted_to_extra
+6. Return a summary jsonb
 
-**Finishing** (`OrderFinishing.tsx`, ~line 923-963):
-- Remove the "Moved to Next Phase" section (lines 923-946)
-- Add `order_item_id` to the batch mapping
+**B. `assign_machine_to_batches(...)` -- replaces ProductionRateSection's handleAssign logic**
 
-**Packaging** (`OrderPackaging.tsx`, ~line 942-982):
-- Remove the "Moved to Next Phase" section (lines 942-965)
-- Add `order_item_id` to the batch mapping
+Parameters:
+- `p_batch_ids uuid[]` -- unassigned batch IDs to pick from
+- `p_machine_id uuid`
+- `p_machine_column text` -- column name to set
+- `p_requested_qty integer`
 
-**Boxing** (`OrderBoxing.tsx`, ~line 1291-1303):
-- Add `order_item_id` to the batch mapping (no "Moved to Next Phase" section here)
+Inside a single transaction:
+1. Lock and sort the specified batches
+2. Fully assign batches until remaining qty is less than next batch
+3. If partial: update the batch with assigned qty + machine, insert a new batch for the remainder (copying order_id, product_id, order_item_id, current_state)
+4. Return count of assigned
 
-#### 3. Batch splitting for partial assignment
+Both functions use `SECURITY DEFINER` and validate inputs.
 
-When the user assigns a sub-quantity to a machine, the system needs to handle partial batches:
+**Client-side changes:**
 
-1. Sort unassigned batches by quantity (ascending)
-2. Walk through batches, fully assigning until the remaining requested qty is less than the next batch's qty
-3. If partial: update the current batch's quantity to the assigned portion and set its machine, then insert a new batch with the leftover quantity (same order_item_id, product_id, order_id, current_state, no machine)
-4. This uses `supabase.from('order_batches').update(...)` and `.insert(...)` as needed
+- **`MoveToExtraDialog.tsx`**: Replace the `handleConfirm` loop (~lines 158-297) with a single `supabase.rpc('move_order_batches_to_extra', { ... })` call
+- **`ProductionRateSection.tsx`**: Replace `handleAssign` (~lines 167-273) with a single `supabase.rpc('assign_machine_to_batches', { ... })` call
+
+---
+
+### 3. Pagination
+
+Add pagination (25 rows per page) to three pages using the existing `Pagination` UI component already in the project (`src/components/ui/pagination.tsx`).
+
+**A. Orders page (`src/pages/Orders.tsx`)**
+
+- Add `currentPage` state, reset to 1 when filters/tab change
+- Slice `filteredOrders` by page: `filteredOrders.slice((page-1)*25, page*25)`
+- Render `Pagination` component below the table
+- The data fetch stays the same (orders are already fetched with status computation), pagination is applied to the filtered result
+
+**B. Boxes page (`src/pages/Boxes.tsx`)**
+
+- Add `orderPage` and `extraPage` states
+- Slice `orderBoxes` and `extraBoxes` arrays by page
+- Render pagination below each tab's table
+
+**C. Extra Inventory page (`src/pages/ExtraInventory.tsx`)**
+
+- Add `currentPage` state
+- Slice the `batches` array by page
+- Render pagination below the batches table
+
+Each pagination renders: Previous, page numbers (with ellipsis for large sets), Next. Using the existing `Pagination*` components from `src/components/ui/pagination.tsx`.
+
+---
 
 ### Summary of Changes
 
 | File | Change |
 |------|--------|
-| `src/components/ProductionRateSection.tsx` | Full rewrite: group by order_item_id, collapsible UI with qty input + machine dropdown, batch splitting on assign |
-| `src/pages/OrderManufacturing.tsx` | Remove "Moved to Next Phase" section, add `order_item_id` to ProductionRateSection batch mapping |
-| `src/pages/OrderFinishing.tsx` | Remove "Moved to Next Phase" section, add `order_item_id` to ProductionRateSection batch mapping |
-| `src/pages/OrderPackaging.tsx` | Remove "Moved to Next Phase" section, add `order_item_id` to ProductionRateSection batch mapping |
-| `src/pages/OrderBoxing.tsx` | Add `order_item_id` to ProductionRateSection batch mapping |
-
+| New migration SQL | Indexes on 6 tables + 2 new Postgres functions |
+| `src/components/MoveToExtraDialog.tsx` | Replace loop with single RPC call |
+| `src/components/ProductionRateSection.tsx` | Replace assign logic with single RPC call |
+| `src/pages/Orders.tsx` | Add pagination state + UI below table |
+| `src/pages/Boxes.tsx` | Add pagination state + UI for both tabs |
+| `src/pages/ExtraInventory.tsx` | Add pagination state + UI below table |
