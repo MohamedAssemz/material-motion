@@ -16,6 +16,7 @@ import { ArrowLeft, Plus, Search, AlertCircle, Download, Filter, CalendarIcon, X
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { format, isWithinInterval, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { TablePagination } from '@/components/TablePagination';
 
 type OrderStatus = 'pending' | 'in_progress' | 'completed';
 type TabStatus = 'pending' | 'completed';
@@ -73,6 +74,8 @@ export default function Orders() {
   const [eftRange, setEftRange] = useState<DateRange>({ from: undefined, to: undefined });
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
   const [showFilters, setShowFilters] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 25;
 
   useEffect(() => {
     fetchOrders();
@@ -251,6 +254,15 @@ export default function Orders() {
       return true;
     });
   }, [orders, searchTerm, activeTab, dateRange, minQty, maxQty, eftRange, priorityFilter]);
+
+  const filteredCount = filteredOrders.length;
+  const paginatedOrders = useMemo(() => {
+    const start = (currentPage - 1) * PAGE_SIZE;
+    return filteredOrders.slice(start, start + PAGE_SIZE);
+  }, [filteredOrders, currentPage]);
+
+  // Reset page on filter/tab change
+  useEffect(() => { setCurrentPage(1); }, [searchTerm, activeTab, dateRange, minQty, maxQty, eftRange, priorityFilter]);
 
   const clearFilters = () => {
     setDateRange({ from: undefined, to: undefined });
@@ -512,6 +524,7 @@ export default function Orders() {
                       <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-primary border-r-transparent"></div>
                     </div>
                   ) : (
+                    <>
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -525,14 +538,14 @@ export default function Orders() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {filteredOrders.length === 0 ? (
+                        {paginatedOrders.length === 0 ? (
                           <TableRow>
                             <TableCell colSpan={tab === 'pending' ? 7 : 6} className="text-center text-muted-foreground">
                               No orders found
                             </TableCell>
                           </TableRow>
                         ) : (
-                          filteredOrders.map((order) => (
+                          paginatedOrders.map((order) => (
                             <TableRow 
                               key={order.id} 
                               className={cn(
@@ -596,6 +609,13 @@ export default function Orders() {
                         )}
                       </TableBody>
                     </Table>
+                    <TablePagination
+                      currentPage={currentPage}
+                      totalItems={filteredCount}
+                      pageSize={PAGE_SIZE}
+                      onPageChange={setCurrentPage}
+                    />
+                    </>
                   )}
                 </CardContent>
               </Card>

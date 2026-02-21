@@ -179,80 +179,14 @@ export function ProductionRateSection({
 
     setAssigning(group.groupKey);
     try {
-      // Get unassigned batches for this group, sorted ascending by quantity
-      const unassignedBatches = batches
-        .filter(b => group.unassignedBatchIds.includes(b.id))
-        .sort((a, b) => a.quantity - b.quantity);
+      const { data, error } = await supabase.rpc('assign_machine_to_batches', {
+        p_batch_ids: group.unassignedBatchIds,
+        p_machine_id: machineId,
+        p_machine_column: machineColumnName,
+        p_requested_qty: requestedQty,
+      });
 
-      let remaining = requestedQty;
-      const fullyAssignIds: string[] = [];
-      let splitBatch: { id: string; assignQty: number; remainderQty: number } | null = null;
-
-      for (const batch of unassignedBatches) {
-        if (remaining <= 0) break;
-
-        if (batch.quantity <= remaining) {
-          fullyAssignIds.push(batch.id);
-          remaining -= batch.quantity;
-        } else {
-          // Partial split needed
-          splitBatch = {
-            id: batch.id,
-            assignQty: remaining,
-            remainderQty: batch.quantity - remaining,
-          };
-          remaining = 0;
-        }
-      }
-
-      // Fully assign batches
-      if (fullyAssignIds.length > 0) {
-        const { error } = await supabase
-          .from('order_batches')
-          .update({ [machineColumnName]: machineId })
-          .in('id', fullyAssignIds);
-        if (error) throw error;
-      }
-
-      // Handle partial split
-      if (splitBatch) {
-        // Get the original batch to copy fields
-        const originalBatch = batches.find(b => b.id === splitBatch!.id)!;
-
-        // Update original batch with assigned portion
-        const { error: updateErr } = await supabase
-          .from('order_batches')
-          .update({
-            quantity: splitBatch.assignQty,
-            [machineColumnName]: machineId,
-          })
-          .eq('id', splitBatch.id);
-        if (updateErr) throw updateErr;
-
-        // Get full batch row for the insert
-        const { data: fullBatch, error: fetchErr } = await supabase
-          .from('order_batches')
-          .select('*')
-          .eq('id', splitBatch.id)
-          .single();
-        if (fetchErr) throw fetchErr;
-
-        // Insert remainder batch (no machine)
-        const { error: insertErr } = await supabase
-          .from('order_batches')
-          .insert({
-            order_id: fullBatch.order_id,
-            product_id: fullBatch.product_id,
-            order_item_id: fullBatch.order_item_id,
-            current_state: fullBatch.current_state,
-            quantity: splitBatch.remainderQty,
-            [machineColumnName]: null,
-            created_by: fullBatch.created_by,
-            eta: fullBatch.eta,
-            lead_time_days: fullBatch.lead_time_days,
-          });
-        if (insertErr) throw insertErr;
-      }
+      if (error) throw error;
 
       toast.success('Machine assigned successfully');
       setSelectedMachines(prev => {

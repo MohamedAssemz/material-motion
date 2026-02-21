@@ -18,6 +18,7 @@ import { BoxDetailsDialog } from '@/components/BoxDetailsDialog';
 import { BoxLabelPrintDialog } from '@/components/BoxLabelPrintDialog';
 import { BoxLookupScanDialog } from '@/components/BoxLookupScanDialog';
 import { useBoxScanner } from '@/hooks/useBoxScanner';
+import { TablePagination } from '@/components/TablePagination';
 
 interface OrderBoxData {
   id: string;
@@ -75,6 +76,9 @@ export default function Boxes() {
   const [scanDialogOpen, setScanDialogOpen] = useState(false);
 
   const canManage = hasRole('manufacture_lead') || hasRole('admin');
+  const [orderPage, setOrderPage] = useState(1);
+  const [extraPage, setExtraPage] = useState(1);
+  const PAGE_SIZE = 25;
 
   // Helper to open box details
   const openBoxDetails = useCallback((
@@ -677,6 +681,7 @@ export default function Boxes() {
                     <p className="text-sm">Create boxes to start tracking order batches</p>
                   </div>
                 ) : (
+                  <>
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -689,7 +694,7 @@ export default function Boxes() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {orderBoxes.map((box) => (
+                      {orderBoxes.slice((orderPage - 1) * PAGE_SIZE, orderPage * PAGE_SIZE).map((box) => (
                         <TableRow
                           key={box.id}
                           className={`cursor-pointer hover:bg-muted/50 ${!box.is_active ? 'opacity-50' : ''}`}
@@ -734,6 +739,13 @@ export default function Boxes() {
                       ))}
                     </TableBody>
                   </Table>
+                  <TablePagination
+                    currentPage={orderPage}
+                    totalItems={orderBoxes.length}
+                    pageSize={PAGE_SIZE}
+                    onPageChange={setOrderPage}
+                  />
+                  </>
                 )}
               </CardContent>
             </Card>
@@ -841,6 +853,7 @@ export default function Boxes() {
                     <p className="text-sm">Create extra boxes to store surplus inventory</p>
                   </div>
                 ) : (
+                  <>
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -853,7 +866,7 @@ export default function Boxes() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {extraBoxes.map((box) => (
+                      {extraBoxes.slice((extraPage - 1) * PAGE_SIZE, extraPage * PAGE_SIZE).map((box) => (
                         <TableRow
                           key={box.id}
                           className={`cursor-pointer hover:bg-muted/50 ${!box.is_active ? 'opacity-50' : ''}`}
@@ -898,6 +911,13 @@ export default function Boxes() {
                       ))}
                     </TableBody>
                   </Table>
+                  <TablePagination
+                    currentPage={extraPage}
+                    totalItems={extraBoxes.length}
+                    pageSize={PAGE_SIZE}
+                    onPageChange={setExtraPage}
+                  />
+                  </>
                 )}
               </CardContent>
             </Card>
