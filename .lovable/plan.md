@@ -1,121 +1,64 @@
 
-## Scale & Harden: Indexes, Atomic Transactions, and Pagination
+
+## Add Packaging Reference to Order Notes
 
 ### Overview
 
-Three production-readiness improvements: (1) database indexes for fast queries at scale, (2) Postgres functions for atomic batch operations, and (3) client-side pagination on the three heaviest list pages.
+Add a "Packaging Reference" feature to the order creation flow that lets users pre-define how items should be split across shipments. This structured data is stored inside the `notes` field as a formatted table, and displayed wherever notes are shown (Order Detail, Boxing page).
 
----
+### Changes
 
-### 1. Database Indexes (Migration)
+#### 1. OrderCreate.tsx -- Move notes + add packaging reference
 
-Create a single migration adding indexes on the most frequently queried columns:
+**Move notes section**: Remove the notes `Textarea` from the "Order Details" card (lines 463-472) and place it in a new card after the "Order Items" card (before the submit buttons).
 
-**order_batches:**
-- `(order_id, is_terminated)` -- used by every phase page and order detail
-- `(current_state)` -- used for queue pages and filtering
-- `(box_id)` -- used by Boxes page aggregation
-- `(product_id)` -- used by grouping logic
-- `(shipment_id)` -- used by boxing/shipment queries
-- `(order_item_id)` -- used by ProductionRateSection grouping
+**Add packaging reference state**:
+- `showPackagingRef: boolean` (default false)
+- `packagingRows: Array<{ item_product_id: string; quantity: number }>` (starts empty)
 
-**extra_batches:**
-- `(box_id)` -- used by extra box aggregation
-- `(inventory_state, current_state)` -- used by ExtraInventoryDialog filtering
-- `(product_id)` -- used by grouping
-- `(order_id)` -- used by reserved batch lookups
+**New UI in the Notes card**:
+- Notes textarea (same as current)
+- A button: `+ Packaging Reference` -- clicking it sets `showPackagingRef = true` and adds one empty row
+- When expanded, show a table with columns: **Shipment #** (auto-numbered), **Item** (dropdown of selected order items), **Quantity** (number input)
+- `+ Add Shipment` button below the table to add rows
+- Each row has a delete button
+- Quantity validation: for each selected product across all shipment rows, the total cannot exceed the quantity defined in order items
 
-**shipments:**
-- `(order_id)` -- used by OrderBoxing and OrderDetail
+**On submit**: If packaging reference rows exist, append a formatted text block to the notes string before saving:
 
-**order_items:**
-- `(order_id)` -- used by every order detail/phase page
+```
+---PACKAGING_REFERENCE---
+Shipment 1: [SKU] Product Name x 25
+Shipment 2: [SKU] Product Name x 50
+Shipment 3: [SKU2] Other Product x 10
+---END_PACKAGING_REFERENCE---
+```
 
-**extra_batch_history:**
-- `(source_order_id)` -- used by "added to extra" aggregations
-- `(consuming_order_id)` -- used by "reserved/consumed" lookups
+This keeps everything in the existing `notes` column -- no schema changes needed.
 
-All indexes use `CREATE INDEX IF NOT EXISTS` and `CONCURRENTLY` is not used (migration context).
+#### 2. New component: PackagingReferenceDisplay.tsx
 
----
+A small component that parses the `---PACKAGING_REFERENCE---` block from notes text and renders it as a formatted table. If no packaging reference block exists, it returns null. It also renders the remaining notes text (everything outside the block).
 
-### 2. Atomic Postgres Functions (Migration)
+Used in:
+- OrderDetail.tsx (replace raw `order.notes` display)
+- OrderBoxing.tsx (new button)
 
-Two new database functions to replace multi-step client-side operations:
+#### 3. OrderDetail.tsx -- Use PackagingReferenceDisplay
 
-**A. `move_order_batches_to_extra(...)` -- replaces MoveToExtraDialog's handleConfirm logic**
+Replace the current plain text notes display (line 767) with `<PackagingReferenceDisplay notes={order.notes} />` so the packaging reference renders as a table.
 
-Parameters:
-- `p_selections jsonb` -- array of `{ batch_id, quantity, order_item_id, product_id }`
-- `p_target_box_id uuid`
-- `p_phase text` (e.g. `in_manufacturing`)
-- `p_user_id uuid`
+#### 4. OrderBoxing.tsx -- Add Notes button
 
-Inside a single transaction:
-1. Validate all source batches exist and are in the expected phase
-2. For each selection: reduce or delete the order batch
-3. Check for existing extra batch in target box (same product + state) and merge, or create new
-4. Insert extra_batch_history records
-5. Update order_items.deducted_to_extra
-6. Return a summary jsonb
+Add a "View Notes" button next to "View Order Details" (line 1000-1002). Clicking it opens a dialog/sheet showing `<PackagingReferenceDisplay notes={order.notes} />`. The order's notes are already fetched in the existing `order` state.
 
-**B. `assign_machine_to_batches(...)` -- replaces ProductionRateSection's handleAssign logic**
-
-Parameters:
-- `p_batch_ids uuid[]` -- unassigned batch IDs to pick from
-- `p_machine_id uuid`
-- `p_machine_column text` -- column name to set
-- `p_requested_qty integer`
-
-Inside a single transaction:
-1. Lock and sort the specified batches
-2. Fully assign batches until remaining qty is less than next batch
-3. If partial: update the batch with assigned qty + machine, insert a new batch for the remainder (copying order_id, product_id, order_item_id, current_state)
-4. Return count of assigned
-
-Both functions use `SECURITY DEFINER` and validate inputs.
-
-**Client-side changes:**
-
-- **`MoveToExtraDialog.tsx`**: Replace the `handleConfirm` loop (~lines 158-297) with a single `supabase.rpc('move_order_batches_to_extra', { ... })` call
-- **`ProductionRateSection.tsx`**: Replace `handleAssign` (~lines 167-273) with a single `supabase.rpc('assign_machine_to_batches', { ... })` call
-
----
-
-### 3. Pagination
-
-Add pagination (25 rows per page) to three pages using the existing `Pagination` UI component already in the project (`src/components/ui/pagination.tsx`).
-
-**A. Orders page (`src/pages/Orders.tsx`)**
-
-- Add `currentPage` state, reset to 1 when filters/tab change
-- Slice `filteredOrders` by page: `filteredOrders.slice((page-1)*25, page*25)`
-- Render `Pagination` component below the table
-- The data fetch stays the same (orders are already fetched with status computation), pagination is applied to the filtered result
-
-**B. Boxes page (`src/pages/Boxes.tsx`)**
-
-- Add `orderPage` and `extraPage` states
-- Slice `orderBoxes` and `extraBoxes` arrays by page
-- Render pagination below each tab's table
-
-**C. Extra Inventory page (`src/pages/ExtraInventory.tsx`)**
-
-- Add `currentPage` state
-- Slice the `batches` array by page
-- Render pagination below the batches table
-
-Each pagination renders: Previous, page numbers (with ellipsis for large sets), Next. Using the existing `Pagination*` components from `src/components/ui/pagination.tsx`.
-
----
-
-### Summary of Changes
+### Technical Details
 
 | File | Change |
 |------|--------|
-| New migration SQL | Indexes on 6 tables + 2 new Postgres functions |
-| `src/components/MoveToExtraDialog.tsx` | Replace loop with single RPC call |
-| `src/components/ProductionRateSection.tsx` | Replace assign logic with single RPC call |
-| `src/pages/Orders.tsx` | Add pagination state + UI below table |
-| `src/pages/Boxes.tsx` | Add pagination state + UI for both tabs |
-| `src/pages/ExtraInventory.tsx` | Add pagination state + UI below table |
+| `src/pages/OrderCreate.tsx` | Move notes after items card, add packaging reference UI with validation |
+| `src/components/PackagingReferenceDisplay.tsx` | New component: parse + render packaging reference from notes string |
+| `src/pages/OrderDetail.tsx` | Use PackagingReferenceDisplay for notes display |
+| `src/pages/OrderBoxing.tsx` | Add "View Notes" button + dialog using PackagingReferenceDisplay |
+
+No database changes required -- packaging reference data is stored as structured text within the existing `notes` column.
