@@ -26,6 +26,7 @@ import { LeadTimeDialog } from "@/components/LeadTimeDialog";
 import { ExtraInventoryDialog } from "@/components/ExtraInventoryDialog";
 import { StartOrderDialog } from "@/components/StartOrderDialog";
 import { OrderCommentsDrawer } from "@/components/OrderCommentsDrawer";
+import { PackagingReferenceDisplay } from "@/components/PackagingReferenceDisplay";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { escapeHtml } from "@/lib/sanitize";
@@ -760,12 +761,12 @@ export default function OrderDetail() {
       {/* Notes & Alerts */}
       {(order.notes || flaggedCount > 0 || redoCount > 0) && (
         <div className="space-y-2">
-          {order.notes && (
-            <Card>
-              <CardContent className="p-4">
-                <p className="text-sm font-medium">Notes</p>
-                <p className="text-sm text-muted-foreground">{order.notes}</p>
-              </CardContent>
+           {order.notes && (
+             <Card>
+               <CardContent className="p-4">
+                 <p className="text-sm font-medium mb-1">Notes</p>
+                 <PackagingReferenceDisplay notes={order.notes} />
+               </CardContent>
             </Card>
           )}
           {(flaggedCount > 0 || redoCount > 0) && (
