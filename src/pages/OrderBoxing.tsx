@@ -10,7 +10,8 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { ArrowLeft, Box, Loader2, QrCode, CheckSquare, Truck, Printer, Package, CheckCircle, Download, Search } from "lucide-react";
+import { ArrowLeft, Box, Loader2, QrCode, CheckSquare, Truck, Printer, Package, CheckCircle, Download, Search, FileText } from "lucide-react";
+import { PackagingReferenceDisplay } from "@/components/PackagingReferenceDisplay";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { ExtraItemsTab } from '@/components/ExtraItemsTab';
 import { BoxScanPopup } from '@/components/BoxScanPopup';
@@ -41,6 +42,7 @@ interface Order {
   id: string;
   order_number: string;
   priority: string;
+  notes: string | null;
   customer?: { name: string };
 }
 
@@ -109,6 +111,7 @@ export default function OrderBoxing() {
   const [moveToExtraDialogOpen, setMoveToExtraDialogOpen] = useState(false);
   const [shipmentNotes, setShipmentNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [notesDialogOpen, setNotesDialogOpen] = useState(false);
 
 
   const canManage = hasRole("boxing_manager") || hasRole("boxer") || hasRole("admin");
@@ -131,7 +134,7 @@ export default function OrderBoxing() {
   const fetchData = async () => {
     try {
       const [orderRes, batchesRes] = await Promise.all([
-        supabase.from("orders").select("id, order_number, priority, customer:customers(name)").eq("id", id).single(),
+        supabase.from("orders").select("id, order_number, priority, notes, customer:customers(name)").eq("id", id).single(),
         supabase
           .from("order_batches")
           .select(
@@ -997,9 +1000,17 @@ export default function OrderBoxing() {
             </div>
           </div>
         </div>
-        <Button variant="outline" onClick={() => navigate(`/orders/${id}`)}>
-          View Order Details
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => navigate(`/orders/${id}`)}>
+            View Order Details
+          </Button>
+          {order.notes && (
+            <Button variant="outline" onClick={() => setNotesDialogOpen(true)}>
+              <Package className="mr-2 h-4 w-4" />
+              View Notes
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Stats */}
@@ -1534,6 +1545,14 @@ export default function OrderBoxing() {
         filterState="ready_for_boxing"
         alreadySelectedIds={Array.from(selectedBoxes)}
       />
+      <Dialog open={notesDialogOpen} onOpenChange={setNotesDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Order Notes</DialogTitle>
+          </DialogHeader>
+          <PackagingReferenceDisplay notes={order?.notes || null} />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

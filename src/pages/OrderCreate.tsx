@@ -24,7 +24,9 @@ import {
   CalendarIcon,
   Plane,
   Truck,
+  Package,
 } from "lucide-react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { z } from "zod";
@@ -77,6 +79,8 @@ export default function OrderCreate() {
   const [eftOpen, setEftOpen] = useState(false);
   const [items, setItems] = useState<OrderItem[]>([{ product_id: "", quantity: 1, needs_boxing: true }]);
   const [customerProductMapping, setCustomerProductMapping] = useState<Map<string, Set<string>>>(new Map());
+  const [showPackagingRef, setShowPackagingRef] = useState(false);
+  const [packagingRows, setPackagingRows] = useState<Array<{ item_product_id: string; quantity: number }>>([]);
 
   useEffect(() => {
     if (!hasRole("manufacture_lead") && !hasRole("admin")) {
@@ -186,11 +190,23 @@ export default function OrderCreate() {
       setSubmitting(true);
 
       // Create order
+      // Build final notes with packaging reference
+      let finalNotes = notes.trim();
+      const validPackagingRows = packagingRows.filter(r => r.item_product_id && r.quantity > 0);
+      if (validPackagingRows.length > 0) {
+        const packagingBlock = validPackagingRows.map((row, i) => {
+          const product = products.find(p => p.id === row.item_product_id);
+          return `Shipment ${i + 1}: [${product?.sku || "?"}] ${product?.name || "Unknown"} x ${row.quantity}`;
+        }).join("\n");
+        const block = `\n---PACKAGING_REFERENCE---\n${packagingBlock}\n---END_PACKAGING_REFERENCE---`;
+        finalNotes = finalNotes ? finalNotes + block : block.trim();
+      }
+
       const { data: order, error: orderError } = await supabase
         .from("orders")
         .insert({
           order_number: orderNumber.trim(),
-          notes: notes.trim() || null,
+          notes: finalNotes || null,
           priority: priority,
           shipping_type: shippingType,
           estimated_fulfillment_time: estimatedFulfillment?.toISOString() || null,
@@ -460,17 +476,7 @@ export default function OrderCreate() {
                   rows={3}
                 />
               </div>
-              <div>
-                <Label htmlFor="notes">Notes</Label>
-                <Textarea
-                  id="notes"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Optional order notes..."
-                  rows={2}
-                  maxLength={500}
-                />
-              </div>
+              {/* Notes moved below items card */}
             </CardContent>
           </Card>
 
@@ -595,6 +601,150 @@ export default function OrderCreate() {
                   </Button>
                 </div>
               ))}
+            </CardContent>
+          </Card>
+
+          {/* Notes & Packaging Reference */}
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle>Notes & Packaging Reference</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label htmlFor="notes">Notes</Label>
+                <Textarea
+                  id="notes"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Optional order notes..."
+                  rows={2}
+                  maxLength={500}
+                />
+              </div>
+
+              {!showPackagingRef ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setShowPackagingRef(true);
+                    if (packagingRows.length === 0) {
+                      setPackagingRows([{ item_product_id: "", quantity: 1 }]);
+                    }
+                  }}
+                >
+                  <Package className="mr-2 h-4 w-4" />
+                  + Packaging Reference
+                </Button>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Package className="h-4 w-4 text-primary" />
+                      <p className="text-sm font-medium">Packaging Reference</p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setShowPackagingRef(false);
+                        setPackagingRows([]);
+                      }}
+                    >
+                      Remove
+                    </Button>
+                  </div>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[100px]">Shipment</TableHead>
+                        <TableHead>Item</TableHead>
+                        <TableHead className="w-[120px]">Quantity</TableHead>
+                        <TableHead className="w-[50px]"></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {packagingRows.map((row, index) => {
+                        const validItems = items.filter(it => it.product_id);
+                        // Calculate max allowed quantity for selected product
+                        const orderItem = items.find(it => it.product_id === row.item_product_id);
+                        const totalAllocated = packagingRows
+                          .filter((r, i) => i !== index && r.item_product_id === row.item_product_id)
+                          .reduce((sum, r) => sum + r.quantity, 0);
+                        const maxQty = orderItem ? orderItem.quantity - totalAllocated : 1;
+
+                        return (
+                          <TableRow key={index}>
+                            <TableCell className="font-medium">#{index + 1}</TableCell>
+                            <TableCell>
+                              <Select
+                                value={row.item_product_id}
+                                onValueChange={(val) => {
+                                  const newRows = [...packagingRows];
+                                  newRows[index] = { ...newRows[index], item_product_id: val, quantity: 1 };
+                                  setPackagingRows(newRows);
+                                }}
+                              >
+                                <SelectTrigger className="w-full">
+                                  <SelectValue placeholder="Select item..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {validItems.map((it, i) => {
+                                    const product = products.find(p => p.id === it.product_id);
+                                    return (
+                                      <SelectItem key={`${it.product_id}-${i}`} value={it.product_id}>
+                                        {product?.sku} - {product?.name} (qty: {it.quantity})
+                                      </SelectItem>
+                                    );
+                                  })}
+                                </SelectContent>
+                              </Select>
+                            </TableCell>
+                            <TableCell>
+                              <Input
+                                type="number"
+                                min={1}
+                                max={maxQty > 0 ? maxQty : 1}
+                                value={row.quantity}
+                                onChange={(e) => {
+                                  const newRows = [...packagingRows];
+                                  const val = parseInt(e.target.value) || 1;
+                                  newRows[index] = { ...newRows[index], quantity: Math.min(val, maxQty > 0 ? maxQty : 1) };
+                                  setPackagingRows(newRows);
+                                }}
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => {
+                                  setPackagingRows(packagingRows.filter((_, i) => i !== index));
+                                  if (packagingRows.length === 1) setShowPackagingRef(false);
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPackagingRows([...packagingRows, { item_product_id: "", quantity: 1 }])}
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Shipment
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
           <div className="flex gap-4">
