@@ -95,6 +95,7 @@ export function ExtraInventoryDialog({
   const [searchQuery, setSearchQuery] = useState('');
   const [selections, setSelections] = useState<Map<string, number>>(new Map());
   const [submitting, setSubmitting] = useState(false);
+  const [reservedPerOrderItem, setReservedPerOrderItem] = useState<Map<string, number>>(new Map());
 
   useEffect(() => {
     if (open) {
@@ -115,9 +116,25 @@ export function ExtraInventoryDialog({
         setLoading(false);
         return;
       }
+
+      // Fetch already-reserved extra batches for this order to deduct from capacity
+      const { data: reservedData, error: reservedError } = await supabase
+        .from('extra_batches')
+        .select('order_item_id, quantity')
+        .eq('order_id', orderId)
+        .eq('inventory_state', 'RESERVED');
+
+      if (reservedError) throw reservedError;
+
+      const reservedMap = new Map<string, number>();
+      (reservedData || []).forEach(rb => {
+        if (rb.order_item_id) {
+          reservedMap.set(rb.order_item_id, (reservedMap.get(rb.order_item_id) || 0) + rb.quantity);
+        }
+      });
+      setReservedPerOrderItem(reservedMap);
       
       // Determine which products have needs_boxing=true order items
-      // This affects which extra batch states we can fetch
       const productNeedsBoxingMap = new Map<string, { hasNeedsBoxing: boolean; hasNoBoxing: boolean }>();
       orderItems.forEach(oi => {
         const existing = productNeedsBoxingMap.get(oi.product_id) || { hasNeedsBoxing: false, hasNoBoxing: false };
@@ -133,18 +150,14 @@ export function ExtraInventoryDialog({
       const targetState = PHASE_CURRENT_STATE_MAP[phase];
       
       // Check if any order item can use this phase's state
-      // extra_boxing can only be used by needs_boxing=true items
       let hasEligibleOrderItem = false;
       if (targetState === 'extra_boxing') {
-        // extra_boxing only usable if at least one order item needs boxing
         hasEligibleOrderItem = Array.from(productNeedsBoxingMap.values()).some(v => v.hasNeedsBoxing);
       } else {
-        // extra_manufacturing, extra_finishing, extra_packaging can be used by any item
         hasEligibleOrderItem = true;
       }
       
       if (!hasEligibleOrderItem) {
-        // No order items can use this phase's extra batches
         setBatches([]);
         setLoading(false);
         return;
@@ -258,15 +271,17 @@ export function ExtraInventoryDialog({
     return orderItems
       .filter(oi => {
         if (oi.product_id !== productId) return false;
-        // If we have a specific batch state, only count order items that can use it
         if (batchState) {
           return canOrderItemUseBatch(oi, batchState);
         }
         return true;
       })
-      .reduce((sum, oi) => sum + oi.quantity, 0);
+      .reduce((sum, oi) => {
+        const alreadyReserved = reservedPerOrderItem.get(oi.id) || 0;
+        return sum + Math.max(0, oi.quantity - alreadyReserved);
+      }, 0);
   };
-  
+
   // Get order items for a product sorted with needs_boxing=true first (priority deduction)
   // Also filters by batch state compatibility
   const getOrderItemsForProduct = (productId: string, batchState?: string): OrderItem[] => {
@@ -356,9 +371,10 @@ export function ExtraInventoryDialog({
       // This ensures we distribute extra batches across all matching order items
       const orderItemCapacity = new Map<string, { remaining: number; productId: string }>();
       orderItems.forEach(oi => {
-        orderItemCapacity.set(oi.id, { remaining: oi.quantity, productId: oi.product_id });
+        const alreadyReserved = reservedPerOrderItem.get(oi.id) || 0;
+        orderItemCapacity.set(oi.id, { remaining: Math.max(0, oi.quantity - alreadyReserved), productId: oi.product_id });
       });
-      
+
       // Track quantities to reduce from order batches per order_item_id
       const orderItemReductions = new Map<string, number>();
       
