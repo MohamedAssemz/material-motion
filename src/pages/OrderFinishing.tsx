@@ -80,7 +80,11 @@ export default function OrderFinishing() {
   const [addedToExtraItems, setAddedToExtraItems] = useState<
     Array<{ product_id: string; product_name: string; product_sku: string; quantity: number }>
   >([]);
+  const [extraBatchesForRate, setExtraBatchesForRate] = useState<
+    Array<{ id: string; product_id: string; product_name: string; product_sku: string; quantity: number; finishing_machine_id: string | null }>
+  >([]);
   const [loading, setLoading] = useState(true);
+
 
   // Selection states
   const [selectedBoxes, setSelectedBoxes] = useState<Set<string>>(new Set());
@@ -211,7 +215,7 @@ export default function OrderFinishing() {
     try {
       const { data, error } = await supabase
         .from("extra_batch_history")
-        .select("quantity, product_id, products(name, sku)")
+        .select("quantity, product_id, extra_batch_id, products(name, sku)")
         .eq("event_type", "CREATED")
         .eq("source_order_id", id)
         .eq("from_state", "in_finishing");
@@ -222,7 +226,9 @@ export default function OrderFinishing() {
         string,
         { product_id: string; product_name: string; product_sku: string; quantity: number }
       >();
+      const extraBatchIds = new Set<string>();
       (data || []).forEach((record: any) => {
+        if (record.extra_batch_id) extraBatchIds.add(record.extra_batch_id);
         const existing = productMap.get(record.product_id);
         if (existing) {
           existing.quantity += record.quantity;
@@ -236,6 +242,25 @@ export default function OrderFinishing() {
         }
       });
       setAddedToExtraItems(Array.from(productMap.values()));
+
+      if (extraBatchIds.size > 0) {
+        const { data: extraBatches } = await supabase
+          .from("extra_batches")
+          .select("id, product_id, quantity, finishing_machine_id, product:products(name, sku)")
+          .in("id", Array.from(extraBatchIds));
+        setExtraBatchesForRate(
+          (extraBatches || []).map((eb: any) => ({
+            id: eb.id,
+            product_id: eb.product_id,
+            product_name: eb.product?.name || "Unknown",
+            product_sku: eb.product?.sku || "N/A",
+            quantity: eb.quantity,
+            finishing_machine_id: eb.finishing_machine_id,
+          }))
+        );
+      } else {
+        setExtraBatchesForRate([]);
+      }
     } catch (error) {
       console.error("Error fetching added to extra:", error);
     }
@@ -922,19 +947,32 @@ export default function OrderFinishing() {
 
           {/* Production Rate Section */}
           <ProductionRateSection
-            batches={completedBatches.map((b) => ({
-              id: b.id,
-              product_id: b.product_id,
-              product_name: b.product?.name || "Unknown",
-              product_sku: b.product?.sku || "N/A",
-              quantity: b.quantity,
-              machine_id: b.finishing_machine_id,
-              needs_boxing: b.order_item?.needs_boxing ?? true,
-              order_item_id: b.order_item_id || null,
-            }))}
+            batches={[
+              ...completedBatches.map((b) => ({
+                id: b.id,
+                product_id: b.product_id,
+                product_name: b.product?.name || "Unknown",
+                product_sku: b.product?.sku || "N/A",
+                quantity: b.quantity,
+                machine_id: b.finishing_machine_id,
+                needs_boxing: b.order_item?.needs_boxing ?? true,
+                order_item_id: b.order_item_id || null,
+              })),
+              ...extraBatchesForRate.map((eb) => ({
+                id: eb.id,
+                product_id: eb.product_id,
+                product_name: eb.product_name,
+                product_sku: eb.product_sku,
+                quantity: eb.quantity,
+                machine_id: eb.finishing_machine_id,
+                needs_boxing: true,
+                order_item_id: null,
+                isExtraBatch: true,
+              })),
+            ]}
             machineType="finishing"
             machineColumnName="finishing_machine_id"
-            onAssigned={fetchData}
+            onAssigned={() => { fetchData(); fetchAddedToExtra(); }}
           />
 
           {completedGroups.length === 0 && addedToExtraItems.length === 0 && completedBatches.length === 0 && (

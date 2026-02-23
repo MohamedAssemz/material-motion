@@ -204,13 +204,17 @@ export type Database = {
       extra_batches: {
         Row: {
           box_id: string
+          boxing_machine_id: string | null
           created_at: string
           created_by: string | null
           current_state: string
+          finishing_machine_id: string | null
           id: string
           inventory_state: string
+          manufacturing_machine_id: string | null
           order_id: string | null
           order_item_id: string | null
+          packaging_machine_id: string | null
           product_id: string
           qr_code_data: string | null
           quantity: number
@@ -218,13 +222,17 @@ export type Database = {
         }
         Insert: {
           box_id: string
+          boxing_machine_id?: string | null
           created_at?: string
           created_by?: string | null
           current_state?: string
+          finishing_machine_id?: string | null
           id?: string
           inventory_state?: string
+          manufacturing_machine_id?: string | null
           order_id?: string | null
           order_item_id?: string | null
+          packaging_machine_id?: string | null
           product_id: string
           qr_code_data?: string | null
           quantity?: number
@@ -232,13 +240,17 @@ export type Database = {
         }
         Update: {
           box_id?: string
+          boxing_machine_id?: string | null
           created_at?: string
           created_by?: string | null
           current_state?: string
+          finishing_machine_id?: string | null
           id?: string
           inventory_state?: string
+          manufacturing_machine_id?: string | null
           order_id?: string | null
           order_item_id?: string | null
+          packaging_machine_id?: string | null
           product_id?: string
           qr_code_data?: string | null
           quantity?: number
@@ -253,6 +265,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "extra_batches_boxing_machine_id_fkey"
+            columns: ["boxing_machine_id"]
+            isOneToOne: false
+            referencedRelation: "machines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "extra_batches_finishing_machine_id_fkey"
+            columns: ["finishing_machine_id"]
+            isOneToOne: false
+            referencedRelation: "machines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "extra_batches_manufacturing_machine_id_fkey"
+            columns: ["manufacturing_machine_id"]
+            isOneToOne: false
+            referencedRelation: "machines"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "extra_batches_order_id_fkey"
             columns: ["order_id"]
             isOneToOne: false
@@ -264,6 +297,13 @@ export type Database = {
             columns: ["order_item_id"]
             isOneToOne: false
             referencedRelation: "order_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "extra_batches_packaging_machine_id_fkey"
+            columns: ["packaging_machine_id"]
+            isOneToOne: false
+            referencedRelation: "machines"
             referencedColumns: ["id"]
           },
           {
