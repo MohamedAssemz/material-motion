@@ -34,6 +34,7 @@ export interface BatchData {
   machine_id: string | null;
   needs_boxing?: boolean;
   order_item_id: string | null;
+  isExtraBatch?: boolean;
 }
 
 interface MachineGroup {
@@ -179,14 +180,49 @@ export function ProductionRateSection({
 
     setAssigning(group.groupKey);
     try {
-      const { data, error } = await supabase.rpc('assign_machine_to_batches', {
-        p_batch_ids: group.unassignedBatchIds,
-        p_machine_id: machineId,
-        p_machine_column: machineColumnName,
-        p_requested_qty: requestedQty,
+      // Separate extra batch IDs from order batch IDs
+      const extraBatchIds: string[] = [];
+      const orderBatchIds: string[] = [];
+      group.unassignedBatchIds.forEach(batchId => {
+        const batch = batches.find(b => b.id === batchId);
+        if (batch?.isExtraBatch) {
+          extraBatchIds.push(batchId);
+        } else {
+          orderBatchIds.push(batchId);
+        }
       });
 
-      if (error) throw error;
+      let remainingQty = requestedQty;
+
+      // Assign order batches via RPC
+      if (orderBatchIds.length > 0 && remainingQty > 0) {
+        const orderQty = Math.min(remainingQty, orderBatchIds.reduce((sum, bid) => {
+          const b = batches.find(x => x.id === bid);
+          return sum + (b?.quantity || 0);
+        }, 0));
+        const { error } = await supabase.rpc('assign_machine_to_batches', {
+          p_batch_ids: orderBatchIds,
+          p_machine_id: machineId,
+          p_machine_column: machineColumnName,
+          p_requested_qty: orderQty,
+        });
+        if (error) throw error;
+        remainingQty -= orderQty;
+      }
+
+      // Assign extra batches via direct update
+      if (extraBatchIds.length > 0 && remainingQty > 0) {
+        for (const ebId of extraBatchIds) {
+          if (remainingQty <= 0) break;
+          const { error } = await supabase
+            .from('extra_batches')
+            .update({ [machineColumnName]: machineId })
+            .eq('id', ebId);
+          if (error) throw error;
+          const b = batches.find(x => x.id === ebId);
+          remainingQty -= (b?.quantity || 0);
+        }
+      }
 
       toast.success('Machine assigned successfully');
       setSelectedMachines(prev => {
