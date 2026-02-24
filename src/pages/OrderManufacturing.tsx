@@ -89,6 +89,7 @@ export default function OrderManufacturing() {
   const [extraBatchesForRate, setExtraBatchesForRate] = useState<
     Array<{ id: string; product_id: string; product_name: string; product_sku: string; quantity: number; manufacturing_machine_id: string | null }>
   >([]);
+  const [extraConsumedSkipped, setExtraConsumedSkipped] = useState(0);
   const [loading, setLoading] = useState(true);
 
   // Selection & action states
@@ -233,6 +234,19 @@ export default function OrderManufacturing() {
       } else {
         setExtraBatchesForRate([]);
       }
+
+      // Fetch CONSUMED extra_batch_history to subtract items that skipped manufacturing
+      const { data: consumedData } = await supabase
+        .from("extra_batch_history")
+        .select("quantity, from_state")
+        .eq("event_type", "CONSUMED")
+        .eq("consuming_order_id", id);
+
+      const skippedStates = ['extra_finishing', 'extra_packaging', 'extra_boxing'];
+      const skippedQty = (consumedData || [])
+        .filter((r: any) => skippedStates.includes(r.from_state))
+        .reduce((sum: number, r: any) => sum + r.quantity, 0);
+      setExtraConsumedSkipped(skippedQty);
     } catch (error) {
       console.error("Error fetching added to extra:", error);
     }
@@ -384,7 +398,8 @@ export default function OrderManufacturing() {
   completedGroupMap.forEach((g) => completedGroups.push(g));
   completedGroups.sort((a, b) => a.product_name.localeCompare(b.product_name));
 
-  const totalCompleted = completedGroups.reduce((sum, g) => g.batches.reduce((s, b) => s + b.quantity, 0) + sum, 0);
+  const totalAddedToExtra = addedToExtraItems.reduce((sum, item) => sum + item.quantity, 0);
+  const totalCompleted = completedGroups.reduce((sum, g) => g.batches.reduce((s, b) => s + b.quantity, 0) + sum, 0) + totalAddedToExtra - extraConsumedSkipped;
   const totalSelected = Array.from(productSelections.values()).reduce((a, b) => a + b, 0);
 
   // Calculate how many selected items are from "in_manufacturing" state (eligible for move to extra)

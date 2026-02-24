@@ -80,7 +80,7 @@ export default function OrderCreate() {
   const [items, setItems] = useState<OrderItem[]>([{ product_id: "", quantity: 1, needs_boxing: true }]);
   const [customerProductMapping, setCustomerProductMapping] = useState<Map<string, Set<string>>>(new Map());
   const [showPackagingRef, setShowPackagingRef] = useState(false);
-  const [packagingRows, setPackagingRows] = useState<Array<{ item_product_id: string; quantity: number }>>([]);
+  const [packagingRows, setPackagingRows] = useState<Array<{ item_index: number; quantity: number }>>([]);
 
   useEffect(() => {
     if (!hasRole("manufacture_lead") && !hasRole("admin")) {
@@ -192,11 +192,13 @@ export default function OrderCreate() {
       // Create order
       // Build final notes with packaging reference
       let finalNotes = notes.trim();
-      const validPackagingRows = packagingRows.filter(r => r.item_product_id && r.quantity > 0);
+      const validPackagingRows = packagingRows.filter(r => r.item_index >= 0 && r.quantity > 0);
       if (validPackagingRows.length > 0) {
         const packagingBlock = validPackagingRows.map((row, i) => {
-          const product = products.find(p => p.id === row.item_product_id);
-          return `Shipment ${i + 1}: [${product?.sku || "?"}] ${product?.name || "Unknown"} x ${row.quantity}`;
+          const item = items[row.item_index];
+          const product = item ? products.find(p => p.id === item.product_id) : null;
+          const boxingLabel = item ? (item.needs_boxing ? '' : ' [No Boxing]') : '';
+          return `Shipment ${i + 1}: [${product?.sku || "?"}] ${product?.name || "Unknown"}${boxingLabel} x ${row.quantity}`;
         }).join("\n");
         const block = `\n---PACKAGING_REFERENCE---\n${packagingBlock}\n---END_PACKAGING_REFERENCE---`;
         finalNotes = finalNotes ? finalNotes + block : block.trim();
@@ -630,7 +632,7 @@ export default function OrderCreate() {
                   onClick={() => {
                     setShowPackagingRef(true);
                     if (packagingRows.length === 0) {
-                      setPackagingRows([{ item_product_id: "", quantity: 1 }]);
+                      setPackagingRows([{ item_index: -1, quantity: 1 }]);
                     }
                   }}
                 >
@@ -668,10 +670,10 @@ export default function OrderCreate() {
                     <TableBody>
                       {packagingRows.map((row, index) => {
                         const validItems = items.filter(it => it.product_id);
-                        // Calculate max allowed quantity for selected product
-                        const orderItem = items.find(it => it.product_id === row.item_product_id);
+                        // Calculate max allowed quantity for selected item (by index)
+                        const orderItem = row.item_index >= 0 ? items[row.item_index] : undefined;
                         const totalAllocated = packagingRows
-                          .filter((r, i) => i !== index && r.item_product_id === row.item_product_id)
+                          .filter((r, i) => i !== index && r.item_index === row.item_index && r.item_index >= 0)
                           .reduce((sum, r) => sum + r.quantity, 0);
                         const maxQty = orderItem ? orderItem.quantity - totalAllocated : 1;
 
@@ -680,10 +682,10 @@ export default function OrderCreate() {
                             <TableCell className="font-medium">#{index + 1}</TableCell>
                             <TableCell>
                               <Select
-                                value={row.item_product_id}
+                                value={row.item_index >= 0 ? String(row.item_index) : ""}
                                 onValueChange={(val) => {
                                   const newRows = [...packagingRows];
-                                  newRows[index] = { ...newRows[index], item_product_id: val, quantity: 1 };
+                                  newRows[index] = { ...newRows[index], item_index: parseInt(val), quantity: 1 };
                                   setPackagingRows(newRows);
                                 }}
                               >
@@ -691,11 +693,12 @@ export default function OrderCreate() {
                                   <SelectValue placeholder="Select item..." />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  {validItems.map((it, i) => {
+                                  {validItems.map((it) => {
+                                    const originalIndex = items.indexOf(it);
                                     const product = products.find(p => p.id === it.product_id);
                                     return (
-                                      <SelectItem key={`${it.product_id}-${i}`} value={it.product_id}>
-                                        {product?.sku} - {product?.name} (qty: {it.quantity})
+                                      <SelectItem key={originalIndex} value={String(originalIndex)}>
+                                        {product?.sku} - {product?.name} ({it.needs_boxing ? 'Boxing' : 'No Boxing'}) x{it.quantity}
                                       </SelectItem>
                                     );
                                   })}
@@ -738,7 +741,7 @@ export default function OrderCreate() {
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() => setPackagingRows([...packagingRows, { item_product_id: "", quantity: 1 }])}
+                    onClick={() => setPackagingRows([...packagingRows, { item_index: -1, quantity: 1 }])}
                   >
                     <Plus className="mr-2 h-4 w-4" />
                     Add Shipment

@@ -80,6 +80,7 @@ export default function OrderPackaging() {
   const [extraBatchesForRate, setExtraBatchesForRate] = useState<
     Array<{ id: string; product_id: string; product_name: string; product_sku: string; quantity: number; packaging_machine_id: string | null }>
   >([]);
+  const [extraConsumedSkipped, setExtraConsumedSkipped] = useState(0);
   const [loading, setLoading] = useState(true);
 
   const [selectedBoxes, setSelectedBoxes] = useState<Set<string>>(new Set());
@@ -252,6 +253,19 @@ export default function OrderPackaging() {
       } else {
         setExtraBatchesForRate([]);
       }
+
+      // Fetch CONSUMED extra_batch_history to subtract items that skipped packaging
+      const { data: consumedData } = await supabase
+        .from("extra_batch_history")
+        .select("quantity, from_state")
+        .eq("event_type", "CONSUMED")
+        .eq("consuming_order_id", id);
+
+      const skippedStates = ['extra_boxing'];
+      const skippedQty = (consumedData || [])
+        .filter((r: any) => skippedStates.includes(r.from_state))
+        .reduce((sum: number, r: any) => sum + r.quantity, 0);
+      setExtraConsumedSkipped(skippedQty);
     } catch (error) {
       console.error("Error fetching added to extra:", error);
     }
@@ -431,7 +445,8 @@ export default function OrderPackaging() {
   });
   completedGroupMap.forEach((g) => completedGroups.push(g));
   completedGroups.sort((a, b) => a.product_name.localeCompare(b.product_name));
-  const totalCompleted = completedGroups.reduce((sum, g) => sum + g.quantity, 0);
+  const totalAddedToExtra = addedToExtraItems.reduce((sum, item) => sum + item.quantity, 0);
+  const totalCompleted = completedGroups.reduce((sum, g) => sum + g.quantity, 0) + totalAddedToExtra - extraConsumedSkipped;
 
   // Filter boxes based on search query (box code, product SKU, or product name)
   const filteredReadyBoxGroups = receiveSearchQuery.trim()
