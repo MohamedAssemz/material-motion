@@ -678,12 +678,12 @@ export function ExtraInventoryDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[80vh]">
+      <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle>{PHASE_LABELS[phase]}</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="flex flex-col flex-1 min-h-0 space-y-4">
           {/* Search */}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -709,7 +709,7 @@ export function ExtraInventoryDialog({
             <ScrollArea className="h-[400px] pr-4">
               <div className="space-y-4">
                 {filteredGroups.map(group => {
-                  const maxOrder = getMaxForProduct(group.product_id);
+                  const maxOrder = getMaxForProduct(group.product_id, PHASE_CURRENT_STATE_MAP[phase]);
                   const currentProductSelected = group.boxes.reduce((sum, box) => 
                     sum + box.batches.reduce((s, b) => s + (selections.get(b.id) || 0), 0), 0
                   );
