@@ -244,10 +244,18 @@ export default function OrderFinishing() {
       });
       setAddedToExtraItems(Array.from(productMap.values()));
 
+      // Build production rate data from history quantities
+      const historyByBatch = new Map<string, number>();
+      (data || []).forEach((record: any) => {
+        if (record.extra_batch_id) {
+          historyByBatch.set(record.extra_batch_id, (historyByBatch.get(record.extra_batch_id) || 0) + record.quantity);
+        }
+      });
+
       if (extraBatchIds.size > 0) {
         const { data: extraBatches } = await supabase
           .from("extra_batches")
-          .select("id, product_id, quantity, finishing_machine_id, product:products(name, sku)")
+          .select("id, product_id, finishing_machine_id, product:products(name, sku)")
           .in("id", Array.from(extraBatchIds));
         setExtraBatchesForRate(
           (extraBatches || []).map((eb: any) => ({
@@ -255,7 +263,7 @@ export default function OrderFinishing() {
             product_id: eb.product_id,
             product_name: eb.product?.name || "Unknown",
             product_sku: eb.product?.sku || "N/A",
-            quantity: eb.quantity,
+            quantity: historyByBatch.get(eb.id) || 0,
             finishing_machine_id: eb.finishing_machine_id,
           }))
         );
