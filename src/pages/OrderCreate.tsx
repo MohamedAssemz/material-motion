@@ -696,6 +696,13 @@ export default function OrderCreate() {
                                   {validItems.map((it) => {
                                     const originalIndex = items.indexOf(it);
                                     const product = products.find(p => p.id === it.product_id);
+                                    // Calculate remaining capacity for this item across ALL rows
+                                    const totalAllocatedForItem = packagingRows
+                                      .filter((r, ri) => ri !== index && r.item_index === originalIndex)
+                                      .reduce((sum, r) => sum + r.quantity, 0);
+                                    const remaining = it.quantity - totalAllocatedForItem;
+                                    // Only show items that still have capacity OR are already selected in this row
+                                    if (remaining <= 0 && row.item_index !== originalIndex) return null;
                                     return (
                                       <SelectItem key={originalIndex} value={String(originalIndex)}>
                                         {product?.sku} - {product?.name} ({it.needs_boxing ? 'Boxing' : 'No Boxing'}) x{it.quantity}

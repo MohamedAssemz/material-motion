@@ -313,18 +313,28 @@ export function ExtraItemsTab({ orderId, phase, onRefresh }: ExtraItemsTabProps)
           });
         
         if (insertError) throw insertError;
+
+        // Log CONSUMED event in extra_batch_history
+        await supabase.from('extra_batch_history').insert({
+          extra_batch_id: batch.id,
+          event_type: 'CONSUMED',
+          quantity: useQty,
+          from_state: batch.current_state,
+          consuming_order_id: orderId,
+          consuming_order_item_id: batch.order_item_id,
+          product_id: batch.product_id,
+          performed_by: user?.id,
+        });
         
         // Delete or reduce the extra_batch
         const extraBoxId = batch.box_id;
         if (useQty >= batch.quantity) {
-          // Full quantity used - delete the extra batch entirely
           const { error: deleteError } = await supabase
             .from('extra_batches')
             .delete()
             .eq('id', batch.id);
           if (deleteError) throw deleteError;
         } else {
-          // Partial quantity used - reduce the extra_batch quantity
           const { error: updateError } = await supabase
             .from('extra_batches')
             .update({ quantity: batch.quantity - useQty })
@@ -432,18 +442,28 @@ export function ExtraItemsTab({ orderId, phase, onRefresh }: ExtraItemsTabProps)
           quantity: useQty,
           batch_id: newOrderBatch?.id || '',
         });
+
+        // Log CONSUMED event in extra_batch_history
+        await supabase.from('extra_batch_history').insert({
+          extra_batch_id: batch.id,
+          event_type: 'CONSUMED',
+          quantity: useQty,
+          from_state: batch.current_state,
+          consuming_order_id: orderId,
+          consuming_order_item_id: batch.order_item_id,
+          product_id: batch.product_id,
+          performed_by: user?.id,
+        });
         
         // Delete or reduce the extra_batch
         const extraBoxId = batch.box_id;
         if (useQty >= batch.quantity) {
-          // Full quantity used - delete the extra batch entirely
           const { error: deleteError } = await supabase
             .from('extra_batches')
             .delete()
             .eq('id', batch.id);
           if (deleteError) throw deleteError;
         } else {
-          // Partial quantity used - reduce the extra_batch quantity
           const { error: updateError } = await supabase
             .from('extra_batches')
             .update({ quantity: batch.quantity - useQty })

@@ -215,11 +215,20 @@ export default function OrderManufacturing() {
       });
       setAddedToExtraItems(Array.from(productMap.values()));
 
-      // Fetch actual extra batch records for production rate
+      // Build production rate data from history quantities (not current extra_batch quantities)
+      // Group history records by extra_batch_id and sum their quantities
+      const historyByBatch = new Map<string, number>();
+      (data || []).forEach((record: any) => {
+        if (record.extra_batch_id) {
+          historyByBatch.set(record.extra_batch_id, (historyByBatch.get(record.extra_batch_id) || 0) + record.quantity);
+        }
+      });
+
       if (extraBatchIds.size > 0) {
+        // Still fetch extra_batches for machine IDs only
         const { data: extraBatches } = await supabase
           .from("extra_batches")
-          .select("id, product_id, quantity, manufacturing_machine_id, product:products(name, sku)")
+          .select("id, product_id, manufacturing_machine_id, product:products(name, sku)")
           .in("id", Array.from(extraBatchIds));
         setExtraBatchesForRate(
           (extraBatches || []).map((eb: any) => ({
@@ -227,7 +236,7 @@ export default function OrderManufacturing() {
             product_id: eb.product_id,
             product_name: eb.product?.name || "Unknown",
             product_sku: eb.product?.sku || "N/A",
-            quantity: eb.quantity,
+            quantity: historyByBatch.get(eb.id) || 0,
             manufacturing_machine_id: eb.manufacturing_machine_id,
           }))
         );
