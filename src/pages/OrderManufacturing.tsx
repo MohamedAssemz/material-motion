@@ -251,7 +251,7 @@ export default function OrderManufacturing() {
         .eq("event_type", "CONSUMED")
         .eq("consuming_order_id", id);
 
-      const skippedStates = ['extra_finishing', 'extra_packaging', 'extra_boxing'];
+      const skippedStates = ['extra_manufacturing', 'extra_finishing', 'extra_packaging', 'extra_boxing'];
       const skippedQty = (consumedData || [])
         .filter((r: any) => skippedStates.includes(r.from_state))
         .reduce((sum: number, r: any) => sum + r.quantity, 0);
