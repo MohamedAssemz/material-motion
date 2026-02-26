@@ -17,12 +17,13 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Package, Plus, Search, Loader2, Tag, Palette, X } from 'lucide-react';
+import { Package, Plus, Search, Loader2, Tag, Palette, X, Upload } from 'lucide-react';
 import { ProductCard } from '@/components/catalog/ProductCard';
 import { ProductDetailDialog } from '@/components/catalog/ProductDetailDialog';
 import { ProductFormDialog, ProductFormData } from '@/components/catalog/ProductFormDialog';
 import { CategoryListDialog } from '@/components/catalog/CategoryListDialog';
 import { BrandListDialog } from '@/components/catalog/BrandListDialog';
+import { BulkUploadDialog } from '@/components/catalog/BulkUploadDialog';
 import { CountrySelect } from '@/components/catalog/CountrySelect';
 import { SIZE_OPTIONS } from '@/lib/catalogConstants';
 
@@ -92,6 +93,7 @@ export default function Catalog() {
   // Category/Brand list dialogs
   const [categoryListOpen, setCategoryListOpen] = useState(false);
   const [brandListOpen, setBrandListOpen] = useState(false);
+  const [bulkUploadOpen, setBulkUploadOpen] = useState(false);
 
   const canManage = hasRole('admin');
 
@@ -358,6 +360,10 @@ export default function Catalog() {
                 Brands
                 <Badge variant="secondary" className="ml-2">{brands.length}</Badge>
               </Button>
+              <Button variant="outline" size="sm" onClick={() => setBulkUploadOpen(true)}>
+                <Upload className="mr-2 h-4 w-4" />
+                Bulk Upload
+              </Button>
               <Button onClick={() => { 
                 setEditingProduct(null); 
                 setIsDuplicating(false);
@@ -505,6 +511,15 @@ export default function Catalog() {
         open={detailOpen}
         onOpenChange={setDetailOpen}
         onEdit={canManage ? handleEditProduct : undefined}
+      />
+
+      {/* Bulk Upload Dialog */}
+      <BulkUploadDialog
+        open={bulkUploadOpen}
+        onOpenChange={setBulkUploadOpen}
+        brands={brands}
+        categories={categories}
+        onSuccess={fetchData}
       />
 
       {/* Delete Confirmation Dialog */}
