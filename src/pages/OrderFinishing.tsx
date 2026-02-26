@@ -83,7 +83,7 @@ export default function OrderFinishing() {
   const [extraBatchesForRate, setExtraBatchesForRate] = useState<
     Array<{ id: string; product_id: string; product_name: string; product_sku: string; quantity: number; finishing_machine_id: string | null }>
   >([]);
-  const [extraConsumedSkipped, setExtraConsumedSkipped] = useState(0);
+  
   const [loading, setLoading] = useState(true);
 
 
@@ -147,7 +147,7 @@ export default function OrderFinishing() {
         supabase
           .from("order_batches")
           .select(
-            "id, qr_code_data, current_state, quantity, product_id, order_item_id, box_id, manufacturing_machine_id, finishing_machine_id, product:products(id, name, sku, needs_packing)",
+            "id, qr_code_data, current_state, quantity, product_id, order_item_id, box_id, manufacturing_machine_id, finishing_machine_id, from_extra_state, product:products(id, name, sku, needs_packing)",
           )
           .eq("order_id", id)
           .eq("is_terminated", false)
@@ -203,7 +203,9 @@ export default function OrderFinishing() {
 
       setOrder(orderRes.data as Order);
       setBatches(batchesWithData as Batch[]);
-      setCompletedBatches(completedWithData as Batch[]);
+      // Filter out batches from extra inventory that skipped finishing
+      const skippedStates = ['extra_finishing', 'extra_packaging', 'extra_boxing'];
+      setCompletedBatches((completedWithData as any[]).filter((b: any) => !b.from_extra_state || !skippedStates.includes(b.from_extra_state)) as Batch[]);
     } catch (error: any) {
       toast.error(error.message);
     } finally {
@@ -271,18 +273,6 @@ export default function OrderFinishing() {
         setExtraBatchesForRate([]);
       }
 
-      // Fetch CONSUMED extra_batch_history to subtract items that skipped finishing
-      const { data: consumedData } = await supabase
-        .from("extra_batch_history")
-        .select("quantity, from_state")
-        .eq("event_type", "CONSUMED")
-        .eq("consuming_order_id", id);
-
-      const skippedStates = ['extra_finishing', 'extra_packaging', 'extra_boxing'];
-      const skippedQty = (consumedData || [])
-        .filter((r: any) => skippedStates.includes(r.from_state))
-        .reduce((sum: number, r: any) => sum + r.quantity, 0);
-      setExtraConsumedSkipped(skippedQty);
     } catch (error) {
       console.error("Error fetching added to extra:", error);
     }
@@ -449,7 +439,7 @@ export default function OrderFinishing() {
   const totalReadyForFinishing = readyBoxGroups.reduce((sum, g) => sum + g.totalQty, 0);
   const totalInFinishing = inFinishingGroups.reduce((sum, g) => sum + g.quantity, 0);
   const totalAddedToExtra = addedToExtraItems.reduce((sum, item) => sum + item.quantity, 0);
-  const totalCompleted = completedGroups.reduce((sum, g) => sum + g.quantity, 0) + totalAddedToExtra - extraConsumedSkipped;
+  const totalCompleted = completedGroups.reduce((sum, g) => sum + g.quantity, 0) + totalAddedToExtra;
   const totalSelected = Array.from(productSelections.values()).reduce((a, b) => a + b, 0);
 
   // Prepare selections for MoveToExtraDialog - only items in "in_finishing" state

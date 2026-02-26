@@ -146,7 +146,7 @@ export default function OrderDetail() {
   const [extraInventoryCounts, setExtraInventoryCounts] = useState<Record<string, number>>({});
   const [reservedExtraCounts, setReservedExtraCounts] = useState<Record<string, number>>({});
   const [addedToExtraCounts, setAddedToExtraCounts] = useState<Record<string, number>>({});
-  const [consumedExtraSkippedCounts, setConsumedExtraSkippedCounts] = useState<Record<string, number>>({});
+  
 
   // Selection states for inline actions
   const [productSelections, setProductSelections] = useState<Map<string, number>>(new Map());
@@ -157,8 +157,6 @@ export default function OrderDetail() {
     fetchOrder();
     fetchReservedExtraCounts();
     fetchAddedToExtraCounts();
-    fetchConsumedExtraSkippedCounts();
-
     const channel = supabase
       .channel(`order-${id}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "order_batches", filter: `order_id=eq.${id}` }, () => {
@@ -172,7 +170,6 @@ export default function OrderDetail() {
         fetchExtraInventoryCounts();
         fetchReservedExtraCounts();
         fetchAddedToExtraCounts();
-        fetchConsumedExtraSkippedCounts();
       })
       .subscribe();
 
@@ -222,7 +219,7 @@ export default function OrderDetail() {
       // Fetch batches separately
       const { data: batchesData, error: batchesError } = await supabase
         .from("order_batches")
-        .select("id, qr_code_data, current_state, quantity, product_id, order_item_id, eta, lead_time_days, box_id, is_terminated, is_redo, is_flagged, product:products(id, name, sku, needs_packing)")
+        .select("id, qr_code_data, current_state, quantity, product_id, order_item_id, eta, lead_time_days, box_id, is_terminated, is_redo, is_flagged, from_extra_state, product:products(id, name, sku, needs_packing)")
         .eq("order_id", id);
 
       if (batchesError) throw batchesError;
@@ -406,48 +403,6 @@ export default function OrderDetail() {
     }
   };
 
-  const fetchConsumedExtraSkippedCounts = async () => {
-    if (!id) return;
-    try {
-      const { data, error } = await supabase
-        .from('extra_batch_history')
-        .select('from_state, quantity')
-        .eq('event_type', 'CONSUMED')
-        .eq('consuming_order_id', id);
-
-      if (error) throw error;
-
-      // Map: which phases does each extra state skip?
-      // extra_manufacturing → skips manufacturing
-      // extra_finishing → skips manufacturing, finishing
-      // extra_packaging → skips manufacturing, finishing, packaging
-      // extra_boxing → skips manufacturing, finishing, packaging, boxing
-      const skipMap: Record<string, string[]> = {
-        'extra_manufacturing': ['manufacturing'],
-        'extra_finishing': ['manufacturing', 'finishing'],
-        'extra_packaging': ['manufacturing', 'finishing', 'packaging'],
-        'extra_boxing': ['manufacturing', 'finishing', 'packaging', 'boxing'],
-      };
-
-      const counts: Record<string, number> = {
-        manufacturing: 0,
-        finishing: 0,
-        packaging: 0,
-        boxing: 0,
-      };
-
-      (data || []).forEach((record) => {
-        const skippedPhases = skipMap[record.from_state || ''] || [];
-        skippedPhases.forEach((phase) => {
-          counts[phase] += record.quantity;
-        });
-      });
-
-      setConsumedExtraSkippedCounts(counts);
-    } catch (error) {
-      console.error('Error fetching consumed extra skipped counts:', error);
-    }
-  };
 
   const handleDeleteOrder = async () => {
     try {
@@ -606,11 +561,26 @@ export default function OrderDetail() {
       : 0;
     const inProgress = relevantBatches.filter((b) => b.current_state === inState).reduce((sum, b) => sum + b.quantity, 0);
     const stateIndex = getAllStates().indexOf(inState as UnitState);
-    const rawCompleted = relevantBatches
-      .filter((b) => getAllStates().indexOf(b.current_state as UnitState) > stateIndex)
+    
+    // Define which from_extra_state values to exclude per phase
+    const extraExcludeMap: Record<string, string[] | 'all'> = {
+      manufacturing: 'all', // exclude any batch from extra inventory
+      finishing: ['extra_finishing', 'extra_packaging', 'extra_boxing'],
+      packaging: ['extra_packaging', 'extra_boxing'],
+      boxing: ['extra_boxing'],
+    };
+    const excludeRule = extraExcludeMap[phaseName];
+    
+    const completed = relevantBatches
+      .filter((b) => {
+        if (getAllStates().indexOf(b.current_state as UnitState) <= stateIndex) return false;
+        // Filter out batches from extra inventory that skipped this phase
+        const fromExtra = (b as any).from_extra_state;
+        if (!fromExtra) return true;
+        if (excludeRule === 'all') return false;
+        return !excludeRule?.includes(fromExtra);
+      })
       .reduce((sum, b) => sum + b.quantity, 0);
-    const consumedSkipped = consumedExtraSkippedCounts[phaseName] || 0;
-    const completed = Math.max(0, rawCompleted - consumedSkipped);
     const addedToExtra = addedToExtraCounts[phaseName] || 0;
     const extraToRetrieve = reservedExtraCounts[phaseName] || 0;
     return { waiting, inProgress, completed, addedToExtra, extraToRetrieve };
