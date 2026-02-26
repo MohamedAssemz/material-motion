@@ -1,54 +1,50 @@
 
 
-## Upgrade Bulk Upload Template to Excel with Dropdowns
+## Search, Filter, and Table Redesign for Extra Inventory and Box Management
 
-### Overview
-Replace the current CSV template with a proper Excel (.xlsx) file that includes dropdown validations for size, brand, and needs_packing columns. Remove the country and categories columns as requested.
+### 1. Extra Inventory Page (`src/pages/ExtraInventory.tsx`)
 
-### Template Structure
-| Column | Type | Validation |
-|--------|------|------------|
-| name | Free text | Required |
-| description | Free text | Optional |
-| size | Dropdown | XXS, XS, S, M, L, XL, 2XL, 3XL, 4XL, 5XL, 6XL |
-| color | Free text | Optional |
-| brand | Dropdown | Populated from existing brands in the database |
-| needs_packing | Dropdown | true, false |
+**Search and Filter Bar** (added above the batches table):
+- Text search input: filters by product name or SKU (client-side)
+- State filter dropdown: "All States", "Extra Manufacturing", "Extra Finishing", "Extra Packaging", "Extra Boxing"
+- Status filter dropdown: "All", "Available", "Reserved"
+- Product filter dropdown: filter by specific product
 
-### Changes
+**Table Redesign**:
+- Remove the "QR Code" column
+- Keep columns: Product (name + SKU), Quantity, Current State (badge), Status (badge), Box (code or assign button), Created
+- Replace the non-functional "Print" action button with a row-click to open a detail/action popover or just remove the actions column entirely -- the "Assign EBox" action already exists inline in the Box column
+- Filtered results respect pagination (reset to page 1 on filter change)
 
-**1. Add `exceljs` dependency**
-- Install `exceljs` library for creating and reading Excel files with data validation (dropdown lists)
+**Filtering Logic**:
+- All filtering is client-side using `useMemo` over the `batches` array
+- Search matches against `product.name` or `product.sku` (case-insensitive)
+- State and status filters use exact match
+- Pagination resets to page 1 when any filter changes
 
-**2. Update `src/components/catalog/BulkUploadDialog.tsx`**
+### 2. Box Management Page (`src/pages/Boxes.tsx`)
 
-Download template changes:
-- Replace CSV generation with Excel workbook creation using `exceljs`
-- Create a "Products" sheet with the 6 column headers (name, description, size, color, brand, needs_packing)
-- Add data validation (dropdown lists) on the size column using SIZE_OPTIONS values
-- Add data validation on the brand column using the current list of brand names passed as props
-- Add data validation on needs_packing column with "true" / "false" options
-- Style header row (bold, colored background) for clarity
-- Set column widths for readability
-- Add one example row
-- Download as .xlsx file
+**Search and Filter Bar** (added inside each tab, above the stats cards or between stats and table):
+- Text search input: filters by box code (with auto BOX-/EBOX- prefix normalization)
+- Status filter dropdown: "All", "Empty", "Occupied", "Inactive"
+- Batch count filter: min/max inputs or a simple dropdown ("Any", "0", "1-5", "6-10", "10+")
+- Quantity filter: min/max inputs or dropdown ("Any", "0", "1-10", "11-50", "50+")
+- Date filter: date range picker (From/To) using existing Calendar/Popover pattern
 
-Upload/parsing changes:
-- Accept both `.csv` and `.xlsx` files in the file input
-- For .xlsx files: use `exceljs` to read the workbook, iterate rows from the first sheet
-- Remove all country and categories processing logic (no more `country` field in insert, no more `categoryIds` or `product_categories` inserts)
-- Keep brand matching logic (case-insensitive name to ID lookup)
-- Keep size validation against SIZE_OPTIONS
+**Filtering Logic**:
+- Client-side filtering with `useMemo`
+- Search normalizes input (prepends BOX-/EBOX- to pure numbers per existing convention)
+- Status filter maps to: Empty = `batch_count === 0 && is_active`, Occupied = `batch_count > 0`, Inactive = `!is_active`
+- Batch count and quantity use range matching
+- Date filter uses `isWithinInterval` from date-fns
+- Both order and extra tabs get independent filter state
+- Pagination resets on filter change
 
-**3. Update `src/pages/Catalog.tsx`**
-- Remove `categories` prop from `BulkUploadDialog` (no longer needed)
+### Technical Details
 
-**4. Update `BulkUploadDialog` props**
-- Remove `categories` from the interface since they are no longer used in bulk upload
+**Files to modify:**
+- `src/pages/ExtraInventory.tsx`: Add filter state variables, search/filter UI row, update table columns, wrap batches in `useMemo` with filters, remove QR Code column and Actions column
+- `src/pages/Boxes.tsx`: Add filter state variables per tab, search/filter UI row, wrap `orderBoxes`/`extraBoxes` in `useMemo` with filters
 
-### UI Text Updates
-- Change "Download CSV Template" to "Download Excel Template"
-- Change "Upload Completed CSV" to "Upload Completed File"
-- Update description text to mention Excel format
-- Update file accept to `.csv,.xlsx,.xls`
+**No new dependencies or database changes needed.** All filtering is client-side on already-fetched data.
 
