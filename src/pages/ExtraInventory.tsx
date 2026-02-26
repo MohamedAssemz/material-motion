@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Plus, Package, Loader2, Box, Printer } from 'lucide-react';
+import { ArrowLeft, Plus, Package, Loader2, Box, Search } from 'lucide-react';
 import { format } from 'date-fns';
 import { TablePagination } from '@/components/TablePagination';
 import { ExtraBoxSelectionDialog } from '@/components/ExtraBoxSelectionDialog';
@@ -67,14 +67,47 @@ export default function ExtraInventory() {
     product_id: '',
     quantity: 1,
     current_state: 'extra_manufacturing',
-    box_id: '', // Required field - EBox selection
+    box_id: '',
   });
-  const [selectedBoxCode, setSelectedBoxCode] = useState<string>(''); // For display
+  const [selectedBoxCode, setSelectedBoxCode] = useState<string>('');
   const [submitting, setSubmitting] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 25;
 
+  // Filter state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [stateFilter, setStateFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
+
   const canManage = hasRole('manufacture_lead') || hasRole('admin');
+
+  // Filtered batches
+  const filteredBatches = useMemo(() => {
+    let result = batches;
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(b =>
+        b.product.name.toLowerCase().includes(q) ||
+        b.product.sku.toLowerCase().includes(q)
+      );
+    }
+
+    if (stateFilter !== 'all') {
+      result = result.filter(b => b.current_state === stateFilter);
+    }
+
+    if (statusFilter !== 'all') {
+      result = result.filter(b => b.inventory_state === statusFilter);
+    }
+
+    return result;
+  }, [batches, searchQuery, stateFilter, statusFilter]);
+
+  // Reset page on filter change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, stateFilter, statusFilter]);
 
   useEffect(() => {
     if (!canManage) {
@@ -118,7 +151,6 @@ export default function ExtraInventory() {
       if (productsRes.error) throw productsRes.error;
       if (batchesRes.error) throw batchesRes.error;
 
-      // Fetch box info for batches with box_id from extra_boxes
       const boxIds = batchesRes.data?.filter(b => b.box_id).map(b => b.box_id) || [];
       let boxMap = new Map();
       
@@ -173,7 +205,6 @@ export default function ExtraInventory() {
 
     setSubmitting(true);
     try {
-      // Validate: Check if the box already has batches with a different state
       const { data: boxBatches } = await supabase
         .from('extra_batches')
         .select('current_state')
@@ -190,7 +221,6 @@ export default function ExtraInventory() {
         return;
       }
 
-      // Check if an existing extra_batch with same product, box, and state exists
       const { data: existingBatch } = await supabase
         .from('extra_batches')
         .select('id, quantity')
@@ -201,7 +231,6 @@ export default function ExtraInventory() {
         .maybeSingle();
 
       if (existingBatch) {
-        // Merge: update existing batch quantity
         const { error } = await supabase
           .from('extra_batches')
           .update({ 
@@ -217,7 +246,6 @@ export default function ExtraInventory() {
           description: `Added ${formData.quantity} units to existing batch (total: ${existingBatch.quantity + formData.quantity})`,
         });
       } else {
-        // Create new batch
         const { data: qrCode } = await supabase.rpc('generate_extra_batch_code');
 
         const { error } = await supabase.from('extra_batches').insert({
@@ -237,8 +265,6 @@ export default function ExtraInventory() {
           description: 'Extra inventory batch created',
         });
       }
-
-      // Note: EBox items_list is automatically updated by database trigger
 
       setDialogOpen(false);
       setFormData({ product_id: '', quantity: 1, current_state: 'extra_manufacturing', box_id: '' });
@@ -262,12 +288,11 @@ export default function ExtraInventory() {
     if (!batch) return;
 
     try {
-      // Validate: Check if the target box already has batches with a different state
       const { data: boxBatches } = await supabase
         .from('extra_batches')
         .select('current_state')
         .eq('box_id', boxId)
-        .neq('id', batch.id) // Exclude current batch if it's already in this box
+        .neq('id', batch.id)
         .limit(1);
 
       if (boxBatches && boxBatches.length > 0 && boxBatches[0].current_state !== batch.current_state) {
@@ -279,7 +304,6 @@ export default function ExtraInventory() {
         return;
       }
 
-      // Check if target box already has a batch with same product and state
       const { data: existingBatch } = await supabase
         .from('extra_batches')
         .select('id, quantity')
@@ -287,11 +311,10 @@ export default function ExtraInventory() {
         .eq('box_id', boxId)
         .eq('current_state', batch.current_state)
         .eq('inventory_state', batch.inventory_state)
-        .neq('id', batch.id) // Exclude current batch
+        .neq('id', batch.id)
         .maybeSingle();
 
       if (existingBatch) {
-        // Merge into existing batch and delete the current one
         const { error: updateError } = await supabase
           .from('extra_batches')
           .update({ 
@@ -302,7 +325,6 @@ export default function ExtraInventory() {
 
         if (updateError) throw updateError;
 
-        // Delete the batch being moved (it's merged)
         const { error: deleteError } = await supabase
           .from('extra_batches')
           .delete()
@@ -315,7 +337,6 @@ export default function ExtraInventory() {
           description: `Merged ${batch.quantity} units into existing batch`,
         });
       } else {
-        // Just update batch with new box_id
         const { error: batchError } = await supabase
           .from('extra_batches')
           .update({ box_id: boxId })
@@ -328,8 +349,6 @@ export default function ExtraInventory() {
           description: 'Box assigned to batch',
         });
       }
-
-      // Note: EBox items_list is automatically updated by database trigger
 
       setSelectedBatchForBox(null);
       setBoxDialogOpen(false);
@@ -353,7 +372,6 @@ export default function ExtraInventory() {
 
   const availableBatches = batches.filter(b => b.inventory_state === 'AVAILABLE');
   const reservedBatches = batches.filter(b => b.inventory_state === 'RESERVED');
-
   const totalAvailable = availableBatches.reduce((sum, b) => sum + b.quantity, 0);
 
   if (loading) {
@@ -440,7 +458,6 @@ export default function ExtraInventory() {
                   </p>
                 </div>
                 
-                {/* EBox Selection - Required */}
                 <div>
                   <Label>Extra Box (EBox) *</Label>
                   <div className="flex gap-2">
@@ -497,7 +514,6 @@ export default function ExtraInventory() {
         </div>
       </header>
 
-      {/* EBox Selection Dialog for Create Form */}
       <ExtraBoxSelectionDialog
         open={createBoxDialogOpen}
         onOpenChange={setCreateBoxDialogOpen}
@@ -548,37 +564,92 @@ export default function ExtraInventory() {
           </Card>
         </div>
 
+        {/* Search and Filters */}
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+              <div className="flex-1">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search by product name or SKU..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
+              </div>
+              <div className="w-full sm:w-[180px]">
+                <Select value={stateFilter} onValueChange={setStateFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="All States" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All States</SelectItem>
+                    <SelectItem value="extra_manufacturing">Extra Manufacturing</SelectItem>
+                    <SelectItem value="extra_finishing">Extra Finishing</SelectItem>
+                    <SelectItem value="extra_packaging">Extra Packaging</SelectItem>
+                    <SelectItem value="extra_boxing">Extra Boxing</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="w-full sm:w-[150px]">
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="All Statuses" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Statuses</SelectItem>
+                    <SelectItem value="AVAILABLE">Available</SelectItem>
+                    <SelectItem value="RESERVED">Reserved</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Batches Table */}
         <Card>
           <CardHeader>
-            <CardTitle>Extra Inventory Batches</CardTitle>
+            <CardTitle>
+              Extra Inventory Batches
+              {filteredBatches.length !== batches.length && (
+                <span className="ml-2 text-sm font-normal text-muted-foreground">
+                  ({filteredBatches.length} of {batches.length})
+                </span>
+              )}
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            {batches.length === 0 ? (
+            {filteredBatches.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 <Package className="mx-auto h-12 w-12 mb-4 opacity-50" />
-                <p>No extra inventory batches</p>
-                <p className="text-sm">Create batches when overproduction occurs</p>
+                {batches.length === 0 ? (
+                  <>
+                    <p>No extra inventory batches</p>
+                    <p className="text-sm">Create batches when overproduction occurs</p>
+                  </>
+                ) : (
+                  <p>No batches match the current filters</p>
+                )}
               </div>
             ) : (
               <>
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>QR Code</TableHead>
                     <TableHead>Product</TableHead>
                     <TableHead>Quantity</TableHead>
                     <TableHead>Current State</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Box</TableHead>
                     <TableHead>Created</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {batches.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE).map((batch) => (
+                  {filteredBatches.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE).map((batch) => (
                     <TableRow key={batch.id}>
-                      <TableCell className="font-mono font-medium">{batch.qr_code_data || '-'}</TableCell>
                       <TableCell>
                         <div>
                           <p className="font-medium">{batch.product.name}</p>
@@ -618,18 +689,13 @@ export default function ExtraInventory() {
                         )}
                       </TableCell>
                       <TableCell>{format(new Date(batch.created_at), 'PP')}</TableCell>
-                      <TableCell className="text-right">
-                        <Button variant="ghost" size="sm">
-                          <Printer className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
               <TablePagination
                 currentPage={currentPage}
-                totalItems={batches.length}
+                totalItems={filteredBatches.length}
                 pageSize={PAGE_SIZE}
                 onPageChange={setCurrentPage}
               />
