@@ -7,24 +7,13 @@ import { Download, Upload, Loader2, FileText, CheckCircle2, AlertTriangle } from
 import { Badge } from '@/components/ui/badge';
 import { SIZE_OPTIONS } from '@/lib/catalogConstants';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import ExcelJS from 'exceljs';
 
 interface BulkUploadDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   brands: { id: string; name: string }[];
-  categories: { id: string; name: string }[];
   onSuccess: () => void;
-}
-
-interface ParsedRow {
-  name: string;
-  description: string;
-  size: string;
-  color: string;
-  brand: string;
-  country: string;
-  needs_packing: string;
-  categories: string;
 }
 
 interface UploadResult {
@@ -63,7 +52,7 @@ function generateSKU(index: number): string {
   return `PRD-${timestamp}-${String(index).padStart(3, '0')}`;
 }
 
-export function BulkUploadDialog({ open, onOpenChange, brands, categories, onSuccess }: BulkUploadDialogProps) {
+export function BulkUploadDialog({ open, onOpenChange, brands, onSuccess }: BulkUploadDialogProps) {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -72,18 +61,133 @@ export function BulkUploadDialog({ open, onOpenChange, brands, categories, onSuc
 
   const sizeSet = new Set(SIZE_OPTIONS as readonly string[]);
 
-  const handleDownloadTemplate = () => {
-    const headers = ['name', 'description', 'size', 'color', 'brand', 'country', 'needs_packing', 'categories'];
-    const exampleRow = ['Example Product', 'A sample description', 'M', 'Red', 'MyBrand', 'US', 'true', 'Category1; Category2'];
-    const csv = [headers.join(','), exampleRow.map(v => `"${v}"`).join(',')].join('\n');
+  const handleDownloadTemplate = async () => {
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Products');
 
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    // Define columns
+    sheet.columns = [
+      { header: 'name', key: 'name', width: 30 },
+      { header: 'description', key: 'description', width: 40 },
+      { header: 'size', key: 'size', width: 12 },
+      { header: 'color', key: 'color', width: 15 },
+      { header: 'brand', key: 'brand', width: 20 },
+      { header: 'needs_packing', key: 'needs_packing', width: 15 },
+    ];
+
+    // Style header row
+    const headerRow = sheet.getRow(1);
+    headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4472C4' } };
+    headerRow.alignment = { horizontal: 'center' };
+
+    // Add example row
+    sheet.addRow({
+      name: 'Example Product',
+      description: 'A sample description',
+      size: 'M',
+      color: 'Red',
+      brand: brands.length > 0 ? brands[0].name : 'MyBrand',
+      needs_packing: 'true',
+    });
+
+    // Add data validations for rows 2-1000
+    const sizeList = `"${(SIZE_OPTIONS as readonly string[]).join(',')}"`;
+    const brandList = `"${brands.map(b => b.name).join(',')}"`;
+    const boolList = '"true,false"';
+
+    for (let row = 2; row <= 1000; row++) {
+      sheet.getCell(`C${row}`).dataValidation = {
+        type: 'list',
+        allowBlank: true,
+        formulae: [sizeList],
+        showErrorMessage: true,
+        errorTitle: 'Invalid Size',
+        error: 'Please select a valid size from the dropdown.',
+      };
+
+      if (brands.length > 0) {
+        sheet.getCell(`E${row}`).dataValidation = {
+          type: 'list',
+          allowBlank: true,
+          formulae: [brandList],
+          showErrorMessage: true,
+          errorTitle: 'Invalid Brand',
+          error: 'Please select a valid brand from the dropdown.',
+        };
+      }
+
+      sheet.getCell(`F${row}`).dataValidation = {
+        type: 'list',
+        allowBlank: true,
+        formulae: [boolList],
+        showErrorMessage: true,
+        errorTitle: 'Invalid Value',
+        error: 'Please select true or false.',
+      };
+    }
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'product_template.csv';
+    a.download = 'product_template.xlsx';
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const processRows = (rows: { name: string; description: string; size: string; color: string; brand: string; needs_packing: string }[]) => {
+    const brandMap = new Map(brands.map(b => [b.name.toLowerCase(), b.id]));
+    const warnings: string[] = [];
+    const productsToInsert: {
+      sku: string;
+      name: string;
+      description: string | null;
+      size: string | null;
+      color: string | null;
+      brand_id: string | null;
+      needs_packing: boolean;
+    }[] = [];
+
+    rows.forEach((row, idx) => {
+      const rowNum = idx + 2; // account for header
+      const name = row.name?.trim();
+      if (!name) {
+        warnings.push(`Row ${rowNum}: Skipped – missing name.`);
+        return;
+      }
+
+      let size: string | null = row.size?.trim().toUpperCase() || null;
+      if (size && !sizeSet.has(size)) {
+        warnings.push(`Row ${rowNum}: Invalid size "${size}" – cleared.`);
+        size = null;
+      }
+
+      const brandName = row.brand?.trim();
+      let brand_id: string | null = null;
+      if (brandName) {
+        brand_id = brandMap.get(brandName.toLowerCase()) ?? null;
+        if (!brand_id) {
+          warnings.push(`Row ${rowNum}: Brand "${brandName}" not found – skipped.`);
+        }
+      }
+
+      const needsPackingRaw = row.needs_packing?.trim().toLowerCase();
+      const needs_packing = needsPackingRaw === 'false' ? false : true;
+
+      productsToInsert.push({
+        sku: generateSKU(idx),
+        name,
+        description: row.description?.trim() || null,
+        size,
+        color: row.color?.trim() || null,
+        brand_id,
+        needs_packing,
+      });
+    });
+
+    return { productsToInsert, warnings };
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -94,141 +198,95 @@ export function BulkUploadDialog({ open, onOpenChange, brands, categories, onSuc
     setUploading(true);
 
     try {
-      const text = await file.text();
-      const lines = text.split(/\r?\n/).filter(l => l.trim());
-      
-      if (lines.length < 2) {
-        toast({ title: 'Error', description: 'CSV file must have a header row and at least one data row.', variant: 'destructive' });
-        setUploading(false);
-        return;
-      }
+      let rows: { name: string; description: string; size: string; color: string; brand: string; needs_packing: string }[] = [];
+      const isExcel = file.name.match(/\.xlsx?$/i);
 
-      const headers = parseCSVLine(lines[0]).map(h => h.toLowerCase().trim());
-      const nameIdx = headers.indexOf('name');
+      if (isExcel) {
+        const buffer = await file.arrayBuffer();
+        const workbook = new ExcelJS.Workbook();
+        await workbook.xlsx.load(buffer);
+        const sheet = workbook.worksheets[0];
+        if (!sheet) throw new Error('No worksheet found in the file.');
 
-      if (nameIdx === -1) {
-        toast({ title: 'Error', description: 'CSV must contain a "name" column.', variant: 'destructive' });
-        setUploading(false);
-        return;
-      }
-
-      const getVal = (values: string[], col: string) => {
-        const idx = headers.indexOf(col);
-        return idx >= 0 && idx < values.length ? values[idx] : '';
-      };
-
-      // Build lookup maps
-      const brandMap = new Map(brands.map(b => [b.name.toLowerCase(), b.id]));
-      const categoryMap = new Map(categories.map(c => [c.name.toLowerCase(), c.id]));
-
-      const warnings: string[] = [];
-      const productsToInsert: {
-        sku: string;
-        name: string;
-        description: string | null;
-        size: string | null;
-        color: string | null;
-        brand_id: string | null;
-        country: string | null;
-        needs_packing: boolean;
-        categoryIds: string[];
-      }[] = [];
-
-      for (let i = 1; i < lines.length; i++) {
-        const values = parseCSVLine(lines[i]);
-        const name = getVal(values, 'name').replace(/^"|"$/g, '');
-
-        if (!name) {
-          warnings.push(`Row ${i + 1}: Skipped – missing name.`);
-          continue;
-        }
-
-        const description = getVal(values, 'description').replace(/^"|"$/g, '') || null;
-        let size: string | null = getVal(values, 'size').replace(/^"|"$/g, '').toUpperCase() || null;
-        const color = getVal(values, 'color').replace(/^"|"$/g, '') || null;
-        const brandName = getVal(values, 'brand').replace(/^"|"$/g, '');
-        const country = getVal(values, 'country').replace(/^"|"$/g, '').toUpperCase() || null;
-        const needsPackingRaw = getVal(values, 'needs_packing').replace(/^"|"$/g, '').toLowerCase();
-        const categoriesRaw = getVal(values, 'categories').replace(/^"|"$/g, '');
-
-        // Validate size
-        if (size && !sizeSet.has(size)) {
-          warnings.push(`Row ${i + 1}: Invalid size "${size}" – cleared.`);
-          size = null;
-        }
-
-        // Match brand
-        let brand_id: string | null = null;
-        if (brandName) {
-          brand_id = brandMap.get(brandName.toLowerCase()) ?? null;
-          if (!brand_id) {
-            warnings.push(`Row ${i + 1}: Brand "${brandName}" not found – skipped.`);
-          }
-        }
-
-        // Match categories
-        const categoryIds: string[] = [];
-        if (categoriesRaw) {
-          const catNames = categoriesRaw.split(/[;,]/).map(s => s.trim()).filter(Boolean);
-          for (const cn of catNames) {
-            const catId = categoryMap.get(cn.toLowerCase());
-            if (catId) {
-              categoryIds.push(catId);
-            } else {
-              warnings.push(`Row ${i + 1}: Category "${cn}" not found – skipped.`);
-            }
-          }
-        }
-
-        const needs_packing = needsPackingRaw === 'false' ? false : true;
-
-        productsToInsert.push({
-          sku: generateSKU(i),
-          name,
-          description,
-          size,
-          color,
-          brand_id,
-          country,
-          needs_packing,
-          categoryIds,
+        const headers: string[] = [];
+        sheet.getRow(1).eachCell((cell, colNumber) => {
+          headers[colNumber - 1] = String(cell.value ?? '').toLowerCase().trim();
         });
+
+        sheet.eachRow((row, rowNumber) => {
+          if (rowNumber === 1) return;
+          const vals: string[] = [];
+          row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+            vals[colNumber - 1] = String(cell.value ?? '').trim();
+          });
+          const getVal = (col: string) => {
+            const idx = headers.indexOf(col);
+            return idx >= 0 ? vals[idx] ?? '' : '';
+          };
+          rows.push({
+            name: getVal('name'),
+            description: getVal('description'),
+            size: getVal('size'),
+            color: getVal('color'),
+            brand: getVal('brand'),
+            needs_packing: getVal('needs_packing'),
+          });
+        });
+      } else {
+        // CSV parsing
+        const text = await file.text();
+        const lines = text.split(/\r?\n/).filter(l => l.trim());
+        if (lines.length < 2) {
+          toast({ title: 'Error', description: 'File must have a header row and at least one data row.', variant: 'destructive' });
+          setUploading(false);
+          return;
+        }
+        const headers = parseCSVLine(lines[0]).map(h => h.toLowerCase().trim());
+        if (!headers.includes('name')) {
+          toast({ title: 'Error', description: 'File must contain a "name" column.', variant: 'destructive' });
+          setUploading(false);
+          return;
+        }
+        const getVal = (values: string[], col: string) => {
+          const idx = headers.indexOf(col);
+          return idx >= 0 && idx < values.length ? values[idx].replace(/^"|"$/g, '') : '';
+        };
+        for (let i = 1; i < lines.length; i++) {
+          const values = parseCSVLine(lines[i]);
+          rows.push({
+            name: getVal(values, 'name'),
+            description: getVal(values, 'description'),
+            size: getVal(values, 'size'),
+            color: getVal(values, 'color'),
+            brand: getVal(values, 'brand'),
+            needs_packing: getVal(values, 'needs_packing'),
+          });
+        }
       }
+
+      if (rows.length === 0) {
+        toast({ title: 'Error', description: 'No data rows found.', variant: 'destructive' });
+        setUploading(false);
+        return;
+      }
+
+      const { productsToInsert, warnings } = processRows(rows);
 
       if (productsToInsert.length === 0) {
-        setResult({ created: 0, skipped: lines.length - 1, warnings });
+        setResult({ created: 0, skipped: rows.length, warnings });
         setUploading(false);
         return;
       }
 
-      // Batch insert products
       const { data: inserted, error } = await supabase
         .from('products')
-        .insert(productsToInsert.map(({ categoryIds, ...p }) => p))
+        .insert(productsToInsert)
         .select('id');
 
       if (error) throw error;
 
-      // Insert category associations
-      const categoryLinks: { product_id: string; category_id: string }[] = [];
-      if (inserted) {
-        inserted.forEach((prod, idx) => {
-          const catIds = productsToInsert[idx].categoryIds;
-          catIds.forEach(catId => {
-            categoryLinks.push({ product_id: prod.id, category_id: catId });
-          });
-        });
-      }
-
-      if (categoryLinks.length > 0) {
-        const { error: catError } = await supabase.from('product_categories').insert(categoryLinks);
-        if (catError) {
-          warnings.push(`Warning: Products created but category links failed: ${catError.message}`);
-        }
-      }
-
       const created = inserted?.length ?? 0;
-      setResult({ created, skipped: (lines.length - 1) - created, warnings });
+      setResult({ created, skipped: rows.length - created, warnings });
       onSuccess();
     } catch (err: any) {
       toast({ title: 'Upload Failed', description: err.message, variant: 'destructive' });
@@ -254,26 +312,24 @@ export function BulkUploadDialog({ open, onOpenChange, brands, categories, onSuc
         <DialogHeader>
           <DialogTitle>Bulk Upload Products</DialogTitle>
           <DialogDescription>
-            Download the CSV template, fill in your products, then upload the file.
+            Download the Excel template, fill in your products, then upload the file.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6 py-2">
-          {/* Step 1: Download Template */}
           <div className="space-y-2">
             <h4 className="text-sm font-medium">1. Download Template</h4>
             <p className="text-xs text-muted-foreground">
-              The template includes columns: name (required), description, size, color, brand, country, needs_packing, categories.
+              The template includes columns: name (required), description, size, color, brand, needs_packing. Size, brand, and needs_packing have dropdown lists.
             </p>
             <Button variant="outline" size="sm" onClick={handleDownloadTemplate}>
               <Download className="mr-2 h-4 w-4" />
-              Download CSV Template
+              Download Excel Template
             </Button>
           </div>
 
-          {/* Step 2: Upload */}
           <div className="space-y-2">
-            <h4 className="text-sm font-medium">2. Upload Completed CSV</h4>
+            <h4 className="text-sm font-medium">2. Upload Completed File</h4>
             <div className="flex items-center gap-3">
               <Button
                 variant="outline"
@@ -298,13 +354,12 @@ export function BulkUploadDialog({ open, onOpenChange, brands, categories, onSuc
             <input
               ref={fileInputRef}
               type="file"
-              accept=".csv"
+              accept=".csv,.xlsx,.xls"
               className="hidden"
               onChange={handleFileChange}
             />
           </div>
 
-          {/* Results */}
           {result && (
             <div className="space-y-3 rounded-lg border p-4">
               <div className="flex items-center gap-4">
