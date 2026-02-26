@@ -1,12 +1,13 @@
 import { useState, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { Download, Upload, Loader2, FileText, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { SIZE_OPTIONS } from '@/lib/catalogConstants';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import ExcelJS from 'exceljs';
 
 interface BulkUploadDialogProps {
@@ -20,6 +21,23 @@ interface UploadResult {
   created: number;
   skipped: number;
   warnings: string[];
+}
+
+interface ParsedProduct {
+  sku: string;
+  name: string;
+  description: string | null;
+  size: string | null;
+  color: string | null;
+  brand_id: string | null;
+  brand_name: string;
+  needs_packing: boolean;
+}
+
+interface ParsedData {
+  productsToInsert: ParsedProduct[];
+  warnings: string[];
+  totalRows: number;
 }
 
 function parseCSVLine(line: string): string[] {
@@ -56,8 +74,10 @@ export function BulkUploadDialog({ open, onOpenChange, brands, onSuccess }: Bulk
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
+  const [inserting, setInserting] = useState(false);
   const [result, setResult] = useState<UploadResult | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
+  const [parsedData, setParsedData] = useState<ParsedData | null>(null);
 
   const sizeSet = new Set(SIZE_OPTIONS as readonly string[]);
 
@@ -65,7 +85,6 @@ export function BulkUploadDialog({ open, onOpenChange, brands, onSuccess }: Bulk
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet('Products');
 
-    // Define columns
     sheet.columns = [
       { header: 'name', key: 'name', width: 30 },
       { header: 'description', key: 'description', width: 40 },
@@ -75,13 +94,11 @@ export function BulkUploadDialog({ open, onOpenChange, brands, onSuccess }: Bulk
       { header: 'needs_packing', key: 'needs_packing', width: 15 },
     ];
 
-    // Style header row
     const headerRow = sheet.getRow(1);
     headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
     headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4472C4' } };
     headerRow.alignment = { horizontal: 'center' };
 
-    // Add example row
     sheet.addRow({
       name: 'Example Product',
       description: 'A sample description',
@@ -91,39 +108,24 @@ export function BulkUploadDialog({ open, onOpenChange, brands, onSuccess }: Bulk
       needs_packing: 'true',
     });
 
-    // Add data validations for rows 2-1000
     const sizeList = `"${(SIZE_OPTIONS as readonly string[]).join(',')}"`;
     const brandList = `"${brands.map(b => b.name).join(',')}"`;
     const boolList = '"true,false"';
 
     for (let row = 2; row <= 1000; row++) {
       sheet.getCell(`C${row}`).dataValidation = {
-        type: 'list',
-        allowBlank: true,
-        formulae: [sizeList],
-        showErrorMessage: true,
-        errorTitle: 'Invalid Size',
-        error: 'Please select a valid size from the dropdown.',
+        type: 'list', allowBlank: true, formulae: [sizeList],
+        showErrorMessage: true, errorTitle: 'Invalid Size', error: 'Please select a valid size from the dropdown.',
       };
-
       if (brands.length > 0) {
         sheet.getCell(`E${row}`).dataValidation = {
-          type: 'list',
-          allowBlank: true,
-          formulae: [brandList],
-          showErrorMessage: true,
-          errorTitle: 'Invalid Brand',
-          error: 'Please select a valid brand from the dropdown.',
+          type: 'list', allowBlank: true, formulae: [brandList],
+          showErrorMessage: true, errorTitle: 'Invalid Brand', error: 'Please select a valid brand from the dropdown.',
         };
       }
-
       sheet.getCell(`F${row}`).dataValidation = {
-        type: 'list',
-        allowBlank: true,
-        formulae: [boolList],
-        showErrorMessage: true,
-        errorTitle: 'Invalid Value',
-        error: 'Please select true or false.',
+        type: 'list', allowBlank: true, formulae: [boolList],
+        showErrorMessage: true, errorTitle: 'Invalid Value', error: 'Please select true or false.',
       };
     }
 
@@ -137,21 +139,13 @@ export function BulkUploadDialog({ open, onOpenChange, brands, onSuccess }: Bulk
     URL.revokeObjectURL(url);
   };
 
-  const processRows = (rows: { name: string; description: string; size: string; color: string; brand: string; needs_packing: string }[]) => {
+  const processRows = (rows: { name: string; description: string; size: string; color: string; brand: string; needs_packing: string }[]): ParsedData => {
     const brandMap = new Map(brands.map(b => [b.name.toLowerCase(), b.id]));
     const warnings: string[] = [];
-    const productsToInsert: {
-      sku: string;
-      name: string;
-      description: string | null;
-      size: string | null;
-      color: string | null;
-      brand_id: string | null;
-      needs_packing: boolean;
-    }[] = [];
+    const productsToInsert: ParsedProduct[] = [];
 
     rows.forEach((row, idx) => {
-      const rowNum = idx + 2; // account for header
+      const rowNum = idx + 2;
       const name = row.name?.trim();
       if (!name) {
         warnings.push(`Row ${rowNum}: Skipped – missing name.`);
@@ -183,11 +177,12 @@ export function BulkUploadDialog({ open, onOpenChange, brands, onSuccess }: Bulk
         size,
         color: row.color?.trim() || null,
         brand_id,
+        brand_name: brandName || '',
         needs_packing,
       });
     });
 
-    return { productsToInsert, warnings };
+    return { productsToInsert, warnings, totalRows: rows.length };
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -195,6 +190,7 @@ export function BulkUploadDialog({ open, onOpenChange, brands, onSuccess }: Bulk
     if (!file) return;
     setFileName(file.name);
     setResult(null);
+    setParsedData(null);
     setUploading(true);
 
     try {
@@ -233,7 +229,6 @@ export function BulkUploadDialog({ open, onOpenChange, brands, onSuccess }: Bulk
           });
         });
       } else {
-        // CSV parsing
         const text = await file.text();
         const lines = text.split(/\r?\n/).filter(l => l.trim());
         if (lines.length < 2) {
@@ -270,24 +265,15 @@ export function BulkUploadDialog({ open, onOpenChange, brands, onSuccess }: Bulk
         return;
       }
 
-      const { productsToInsert, warnings } = processRows(rows);
+      const parsed = processRows(rows);
 
-      if (productsToInsert.length === 0) {
-        setResult({ created: 0, skipped: rows.length, warnings });
+      if (parsed.productsToInsert.length === 0) {
+        setResult({ created: 0, skipped: rows.length, warnings: parsed.warnings });
         setUploading(false);
         return;
       }
 
-      const { data: inserted, error } = await supabase
-        .from('products')
-        .insert(productsToInsert)
-        .select('id');
-
-      if (error) throw error;
-
-      const created = inserted?.length ?? 0;
-      setResult({ created, skipped: rows.length - created, warnings });
-      onSuccess();
+      setParsedData(parsed);
     } catch (err: any) {
       toast({ title: 'Upload Failed', description: err.message, variant: 'destructive' });
     } finally {
@@ -296,100 +282,194 @@ export function BulkUploadDialog({ open, onOpenChange, brands, onSuccess }: Bulk
     }
   };
 
+  const handleConfirmInsert = async () => {
+    if (!parsedData) return;
+    setInserting(true);
+
+    try {
+      const toInsert = parsedData.productsToInsert.map(({ brand_name, ...p }) => p);
+      const { data: inserted, error } = await supabase
+        .from('products')
+        .insert(toInsert)
+        .select('id');
+
+      if (error) throw error;
+
+      const created = inserted?.length ?? 0;
+      setResult({ created, skipped: parsedData.totalRows - created, warnings: parsedData.warnings });
+      setParsedData(null);
+      onSuccess();
+    } catch (err: any) {
+      toast({ title: 'Upload Failed', description: err.message, variant: 'destructive' });
+    } finally {
+      setInserting(false);
+    }
+  };
+
+  const handleCancelInsert = () => {
+    setParsedData(null);
+    setFileName(null);
+  };
+
   const handleClose = (open: boolean) => {
-    if (!uploading) {
+    if (!uploading && !inserting) {
       onOpenChange(open);
       if (!open) {
         setResult(null);
         setFileName(null);
+        setParsedData(null);
       }
     }
   };
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Bulk Upload Products</DialogTitle>
           <DialogDescription>
-            Download the Excel template, fill in your products, then upload the file.
+            {parsedData
+              ? `Review the ${parsedData.productsToInsert.length} product(s) below before confirming.`
+              : 'Download the Excel template, fill in your products, then upload the file.'}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6 py-2">
-          <div className="space-y-2">
-            <h4 className="text-sm font-medium">1. Download Template</h4>
-            <p className="text-xs text-muted-foreground">
-              The template includes columns: name (required), description, size, color, brand, needs_packing. Size, brand, and needs_packing have dropdown lists.
-            </p>
-            <Button variant="outline" size="sm" onClick={handleDownloadTemplate}>
-              <Download className="mr-2 h-4 w-4" />
-              Download Excel Template
-            </Button>
-          </div>
+        {/* Confirmation preview */}
+        {parsedData && !result && (
+          <div className="space-y-4">
+            {parsedData.warnings.length > 0 && (
+              <ScrollArea className="max-h-24">
+                <ul className="space-y-1 text-xs text-muted-foreground">
+                  {parsedData.warnings.map((w, i) => (
+                    <li key={i} className="flex items-start gap-1">
+                      <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0 text-yellow-500" />
+                      {w}
+                    </li>
+                  ))}
+                </ul>
+              </ScrollArea>
+            )}
 
-          <div className="space-y-2">
-            <h4 className="text-sm font-medium">2. Upload Completed File</h4>
-            <div className="flex items-center gap-3">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploading}
-              >
-                {uploading ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Upload className="mr-2 h-4 w-4" />
-                )}
-                {uploading ? 'Processing...' : 'Choose File'}
+            <ScrollArea className="max-h-72 border rounded-md">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="text-xs">Name</TableHead>
+                    <TableHead className="text-xs">Size</TableHead>
+                    <TableHead className="text-xs">Color</TableHead>
+                    <TableHead className="text-xs">Brand</TableHead>
+                    <TableHead className="text-xs">Packing</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {parsedData.productsToInsert.map((p, i) => (
+                    <TableRow key={i}>
+                      <TableCell className="text-xs font-medium">{p.name}</TableCell>
+                      <TableCell className="text-xs">{p.size || '—'}</TableCell>
+                      <TableCell className="text-xs">{p.color || '—'}</TableCell>
+                      <TableCell className="text-xs">{p.brand_name || '—'}</TableCell>
+                      <TableCell className="text-xs">{p.needs_packing ? 'Yes' : 'No'}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </ScrollArea>
+
+            <DialogFooter>
+              <Button variant="outline" size="sm" onClick={handleCancelInsert} disabled={inserting}>
+                Cancel
               </Button>
-              {fileName && (
-                <span className="text-xs text-muted-foreground flex items-center gap-1">
-                  <FileText className="h-3 w-3" />
-                  {fileName}
-                </span>
-              )}
-            </div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".csv,.xlsx,.xls"
-              className="hidden"
-              onChange={handleFileChange}
-            />
+              <Button size="sm" onClick={handleConfirmInsert} disabled={inserting}>
+                {inserting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Inserting...
+                  </>
+                ) : (
+                  `Confirm & Create ${parsedData.productsToInsert.length} Product(s)`
+                )}
+              </Button>
+            </DialogFooter>
           </div>
+        )}
 
-          {result && (
-            <div className="space-y-3 rounded-lg border p-4">
-              <div className="flex items-center gap-4">
-                <Badge variant="default" className="flex items-center gap-1">
-                  <CheckCircle2 className="h-3 w-3" />
-                  {result.created} created
-                </Badge>
-                {result.skipped > 0 && (
-                  <Badge variant="secondary" className="flex items-center gap-1">
-                    <AlertTriangle className="h-3 w-3" />
-                    {result.skipped} skipped
-                  </Badge>
+        {/* Initial upload UI */}
+        {!parsedData && (
+          <div className="space-y-6 py-2">
+            <div className="space-y-2">
+              <h4 className="text-sm font-medium">1. Download Template</h4>
+              <p className="text-xs text-muted-foreground">
+                The template includes columns: name (required), description, size, color, brand, needs_packing. Size, brand, and needs_packing have dropdown lists.
+              </p>
+              <Button variant="outline" size="sm" onClick={handleDownloadTemplate}>
+                <Download className="mr-2 h-4 w-4" />
+                Download Excel Template
+              </Button>
+            </div>
+
+            <div className="space-y-2">
+              <h4 className="text-sm font-medium">2. Upload Completed File</h4>
+              <div className="flex items-center gap-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                >
+                  {uploading ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Upload className="mr-2 h-4 w-4" />
+                  )}
+                  {uploading ? 'Processing...' : 'Choose File'}
+                </Button>
+                {fileName && (
+                  <span className="text-xs text-muted-foreground flex items-center gap-1">
+                    <FileText className="h-3 w-3" />
+                    {fileName}
+                  </span>
                 )}
               </div>
-
-              {result.warnings.length > 0 && (
-                <ScrollArea className="max-h-40">
-                  <ul className="space-y-1 text-xs text-muted-foreground">
-                    {result.warnings.map((w, i) => (
-                      <li key={i} className="flex items-start gap-1">
-                        <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0 text-yellow-500" />
-                        {w}
-                      </li>
-                    ))}
-                  </ul>
-                </ScrollArea>
-              )}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv,.xlsx,.xls"
+                className="hidden"
+                onChange={handleFileChange}
+              />
             </div>
-          )}
-        </div>
+
+            {result && (
+              <div className="space-y-3 rounded-lg border p-4">
+                <div className="flex items-center gap-4">
+                  <Badge variant="default" className="flex items-center gap-1">
+                    <CheckCircle2 className="h-3 w-3" />
+                    {result.created} created
+                  </Badge>
+                  {result.skipped > 0 && (
+                    <Badge variant="secondary" className="flex items-center gap-1">
+                      <AlertTriangle className="h-3 w-3" />
+                      {result.skipped} skipped
+                    </Badge>
+                  )}
+                </div>
+
+                {result.warnings.length > 0 && (
+                  <ScrollArea className="max-h-40">
+                    <ul className="space-y-1 text-xs text-muted-foreground">
+                      {result.warnings.map((w, i) => (
+                        <li key={i} className="flex items-start gap-1">
+                          <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0 text-yellow-500" />
+                          {w}
+                        </li>
+                      ))}
+                    </ul>
+                  </ScrollArea>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );
