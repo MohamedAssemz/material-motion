@@ -518,7 +518,6 @@ export default function Catalog() {
         open={bulkUploadOpen}
         onOpenChange={setBulkUploadOpen}
         brands={brands}
-        categories={categories}
         onSuccess={fetchData}
       />
 
