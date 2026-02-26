@@ -310,6 +310,7 @@ export function ExtraItemsTab({ orderId, phase, onRefresh }: ExtraItemsTabProps)
             quantity: useQty,
             box_id: null,
             created_by: user?.id,
+            from_extra_state: batch.current_state,
           });
         
         if (insertError) throw insertError;
@@ -429,6 +430,7 @@ export function ExtraItemsTab({ orderId, phase, onRefresh }: ExtraItemsTabProps)
             quantity: useQty,
             box_id: selectedBox.id,
             created_by: user?.id,
+            from_extra_state: batch.current_state,
           })
           .select('id')
           .single();

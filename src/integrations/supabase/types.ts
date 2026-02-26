@@ -505,6 +505,7 @@ export type Database = {
           finishing_machine_id: string | null
           flagged_by: string | null
           flagged_reason: string | null
+          from_extra_state: string | null
           id: string
           is_flagged: boolean | null
           is_redo: boolean | null
@@ -534,6 +535,7 @@ export type Database = {
           finishing_machine_id?: string | null
           flagged_by?: string | null
           flagged_reason?: string | null
+          from_extra_state?: string | null
           id?: string
           is_flagged?: boolean | null
           is_redo?: boolean | null
@@ -563,6 +565,7 @@ export type Database = {
           finishing_machine_id?: string | null
           flagged_by?: string | null
           flagged_reason?: string | null
+          from_extra_state?: string | null
           id?: string
           is_flagged?: boolean | null
           is_redo?: boolean | null

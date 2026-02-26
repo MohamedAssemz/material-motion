@@ -80,7 +80,7 @@ export default function OrderPackaging() {
   const [extraBatchesForRate, setExtraBatchesForRate] = useState<
     Array<{ id: string; product_id: string; product_name: string; product_sku: string; quantity: number; packaging_machine_id: string | null }>
   >([]);
-  const [extraConsumedSkipped, setExtraConsumedSkipped] = useState(0);
+  
   const [loading, setLoading] = useState(true);
 
   const [selectedBoxes, setSelectedBoxes] = useState<Set<string>>(new Set());
@@ -141,7 +141,7 @@ export default function OrderPackaging() {
         supabase
           .from("order_batches")
           .select(
-            "id, qr_code_data, current_state, quantity, product_id, order_item_id, box_id, manufacturing_machine_id, finishing_machine_id, packaging_machine_id, product:products(id, name, sku, needs_packing)",
+            "id, qr_code_data, current_state, quantity, product_id, order_item_id, box_id, manufacturing_machine_id, finishing_machine_id, packaging_machine_id, from_extra_state, product:products(id, name, sku, needs_packing)",
           )
           .eq("order_id", id)
           .eq("is_terminated", false)
@@ -183,9 +183,12 @@ export default function OrderPackaging() {
       // Filter completed batches to only include items that actually went through packaging
       // Items with needs_packing = false skip packaging entirely (go from Finishing -> Boxing)
       // and should NOT appear in the Packaging completed list
+      // Filter: exclude items that skip packaging (needs_packing=false) AND items from extra that skipped packaging
+      const skippedExtraStates = ['extra_packaging', 'extra_boxing'];
       const completedWithData =
         completedRes.data
           ?.filter((batch: any) => batch.product?.needs_packing !== false)
+          .filter((batch: any) => !batch.from_extra_state || !skippedExtraStates.includes(batch.from_extra_state))
           .map((batch: any) => ({
             ...batch,
             box: batch.box_id ? boxMap.get(batch.box_id) : null,
@@ -262,18 +265,6 @@ export default function OrderPackaging() {
         setExtraBatchesForRate([]);
       }
 
-      // Fetch CONSUMED extra_batch_history to subtract items that skipped packaging
-      const { data: consumedData } = await supabase
-        .from("extra_batch_history")
-        .select("quantity, from_state")
-        .eq("event_type", "CONSUMED")
-        .eq("consuming_order_id", id);
-
-      const skippedStates = ['extra_packaging', 'extra_boxing'];
-      const skippedQty = (consumedData || [])
-        .filter((r: any) => skippedStates.includes(r.from_state))
-        .reduce((sum: number, r: any) => sum + r.quantity, 0);
-      setExtraConsumedSkipped(skippedQty);
     } catch (error) {
       console.error("Error fetching added to extra:", error);
     }
@@ -454,7 +445,7 @@ export default function OrderPackaging() {
   completedGroupMap.forEach((g) => completedGroups.push(g));
   completedGroups.sort((a, b) => a.product_name.localeCompare(b.product_name));
   const totalAddedToExtra = addedToExtraItems.reduce((sum, item) => sum + item.quantity, 0);
-  const totalCompleted = completedGroups.reduce((sum, g) => sum + g.quantity, 0) + totalAddedToExtra - extraConsumedSkipped;
+  const totalCompleted = completedGroups.reduce((sum, g) => sum + g.quantity, 0) + totalAddedToExtra;
 
   // Filter boxes based on search query (box code, product SKU, or product name)
   const filteredReadyBoxGroups = receiveSearchQuery.trim()

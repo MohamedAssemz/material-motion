@@ -89,7 +89,7 @@ export default function OrderManufacturing() {
   const [extraBatchesForRate, setExtraBatchesForRate] = useState<
     Array<{ id: string; product_id: string; product_name: string; product_sku: string; quantity: number; manufacturing_machine_id: string | null }>
   >([]);
-  const [extraConsumedSkipped, setExtraConsumedSkipped] = useState(0);
+  
   const [loading, setLoading] = useState(true);
 
   // Selection & action states
@@ -152,7 +152,7 @@ export default function OrderManufacturing() {
         supabase
           .from("order_batches")
           .select(
-            "id, qr_code_data, current_state, quantity, product_id, order_item_id, eta, lead_time_days, box_id, is_flagged, is_redo, manufacturing_machine_id, product:products(id, name, sku, needs_packing), order_item:order_items(needs_boxing)",
+            "id, qr_code_data, current_state, quantity, product_id, order_item_id, eta, lead_time_days, box_id, is_flagged, is_redo, manufacturing_machine_id, from_extra_state, product:products(id, name, sku, needs_packing), order_item:order_items(needs_boxing)",
           )
           .eq("order_id", id)
           .eq("is_terminated", false)
@@ -173,7 +173,11 @@ export default function OrderManufacturing() {
 
       setOrder(orderRes.data as Order);
       setBatches((batchesRes.data || []) as unknown as Batch[]);
-      setCompletedBatches((completedRes.data || []) as unknown as Batch[]);
+      // Filter out batches that came from extra inventory (they skipped manufacturing)
+      const filteredCompleted = ((completedRes.data || []) as any[]).filter(
+        (b: any) => !b.from_extra_state
+      );
+      setCompletedBatches(filteredCompleted as unknown as Batch[]);
     } catch (error: any) {
       toast.error(error.message);
     } finally {
@@ -244,18 +248,6 @@ export default function OrderManufacturing() {
         setExtraBatchesForRate([]);
       }
 
-      // Fetch CONSUMED extra_batch_history to subtract items that skipped manufacturing
-      const { data: consumedData } = await supabase
-        .from("extra_batch_history")
-        .select("quantity, from_state")
-        .eq("event_type", "CONSUMED")
-        .eq("consuming_order_id", id);
-
-      const skippedStates = ['extra_manufacturing', 'extra_finishing', 'extra_packaging', 'extra_boxing'];
-      const skippedQty = (consumedData || [])
-        .filter((r: any) => skippedStates.includes(r.from_state))
-        .reduce((sum: number, r: any) => sum + r.quantity, 0);
-      setExtraConsumedSkipped(skippedQty);
     } catch (error) {
       console.error("Error fetching added to extra:", error);
     }
@@ -408,7 +400,7 @@ export default function OrderManufacturing() {
   completedGroups.sort((a, b) => a.product_name.localeCompare(b.product_name));
 
   const totalAddedToExtra = addedToExtraItems.reduce((sum, item) => sum + item.quantity, 0);
-  const totalCompleted = completedGroups.reduce((sum, g) => g.batches.reduce((s, b) => s + b.quantity, 0) + sum, 0) + totalAddedToExtra - extraConsumedSkipped;
+  const totalCompleted = completedGroups.reduce((sum, g) => g.batches.reduce((s, b) => s + b.quantity, 0) + sum, 0) + totalAddedToExtra;
   const totalSelected = Array.from(productSelections.values()).reduce((a, b) => a + b, 0);
 
   // Calculate how many selected items are from "in_manufacturing" state (eligible for move to extra)

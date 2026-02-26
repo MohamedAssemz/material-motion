@@ -1,0 +1,1 @@
+ALTER TABLE public.order_batches ADD COLUMN from_extra_state text DEFAULT NULL;
