@@ -75,6 +75,13 @@ const PHASE_NEXT_STATE_MAP: Record<string, string> = {
   boxing: 'extra_boxing',
 };
 
+// Map phase to the "in" state of the next phase for direct moves (skipping box + receive)
+const PHASE_DIRECT_MOVE_STATE: Record<string, string> = {
+  manufacturing: 'in_finishing',
+  finishing: 'in_packaging',
+  packaging: 'in_boxing',
+};
+
 const PHASE_LABELS: Record<string, string> = {
   manufacturing: 'Extra Manufacturing',
   finishing: 'Extra Finishing',
@@ -360,6 +367,91 @@ export function ExtraItemsTab({ orderId, phase, onRefresh }: ExtraItemsTabProps)
     }
   };
 
+  // Direct move to the next phase's "in" state (no box, no receive step)
+  const handleMoveDirectly = async () => {
+    if (totalSelected === 0) return;
+    const directState = PHASE_DIRECT_MOVE_STATE[phase];
+    if (!directState) return;
+    setSubmitting(true);
+    
+    try {
+      const operations: Array<{ batch: ExtraBatch; useQty: number }> = [];
+      
+      for (const [productId, quantity] of productSelections.entries()) {
+        if (quantity <= 0) continue;
+        const group = productGroups.find(g => g.product_id === productId);
+        if (!group) continue;
+        
+        let remainingQty = quantity;
+        for (const batch of group.batches) {
+          if (remainingQty <= 0) break;
+          const useQty = Math.min(batch.quantity, remainingQty);
+          remainingQty -= useQty;
+          operations.push({ batch, useQty });
+        }
+      }
+      
+      for (const { batch, useQty } of operations) {
+        const { data: batchCode } = await supabase.rpc('generate_extra_batch_code');
+        const { error: insertError } = await supabase
+          .from('order_batches')
+          .insert({
+            qr_code_data: batchCode || `OB-${Date.now()}`,
+            order_id: orderId,
+            order_item_id: batch.order_item_id,
+            product_id: batch.product_id,
+            current_state: directState,
+            quantity: useQty,
+            box_id: null,
+            created_by: user?.id,
+            from_extra_state: batch.current_state,
+          });
+        
+        if (insertError) throw insertError;
+
+        await supabase.from('extra_batch_history').insert({
+          extra_batch_id: batch.id,
+          event_type: 'CONSUMED',
+          quantity: useQty,
+          from_state: batch.current_state,
+          consuming_order_id: orderId,
+          consuming_order_item_id: batch.order_item_id,
+          product_id: batch.product_id,
+          performed_by: user?.id,
+        });
+        
+        const extraBoxId = batch.box_id;
+        if (useQty >= batch.quantity) {
+          const { error: deleteError } = await supabase
+            .from('extra_batches')
+            .delete()
+            .eq('id', batch.id);
+          if (deleteError) throw deleteError;
+        } else {
+          const { error: updateError } = await supabase
+            .from('extra_batches')
+            .update({ quantity: batch.quantity - useQty })
+            .eq('id', batch.id);
+          if (updateError) throw updateError;
+        }
+        
+        if (extraBoxId) {
+          await updateExtraBoxItemsList(extraBoxId);
+        }
+      }
+      
+      const stateLabel = directState.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+      toast.success(`Moved ${totalSelected} items directly to ${stateLabel}`);
+      setProductSelections(new Map());
+      fetchExtraBatches();
+      onRefresh?.();
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const handleAssignToBox = async () => {
     if (!selectedBox || totalSelected === 0) return;
     setSubmitting(true);
@@ -610,6 +702,16 @@ export function ExtraItemsTab({ orderId, phase, onRefresh }: ExtraItemsTabProps)
               <Printer className="h-4 w-4 mr-2" />
               Print Guide
             </Button>
+            {phase !== 'boxing' && (
+              <Button 
+                variant="secondary"
+                onClick={handleMoveDirectly} 
+                disabled={totalSelected === 0 || submitting}
+              >
+                {submitting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ArrowRight className="h-4 w-4 mr-2" />}
+                Move Directly
+              </Button>
+            )}
             <Button onClick={handleOpenBoxDialog} disabled={totalSelected === 0 || submitting}>
               {phase === 'boxing' ? (
                 <>

@@ -1249,12 +1249,38 @@ export default function OrderBoxing() {
           </div>
         </TabsContent>
 
-        <TabsContent value="extra">
+        <TabsContent value="extra" className="space-y-6">
           <ExtraItemsTab 
             orderId={id!} 
             phase="boxing" 
             onRefresh={() => fetchData()} 
           />
+
+          {/* Added to Extra Inventory from this Order */}
+          {addedToExtraItems.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 pb-2 border-b border-orange-200 dark:border-orange-900">
+                <Package className="h-4 w-4 text-orange-600" />
+                <h3 className="text-sm font-semibold text-orange-700 dark:text-orange-400">Added to Extra from this Order</h3>
+              </div>
+              {addedToExtraItems.map((item) => (
+                <Card
+                  key={item.product_id}
+                  className="border-orange-200 dark:border-orange-900 bg-orange-50 dark:bg-orange-950/20"
+                >
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium">{item.product_name}</p>
+                        <p className="text-sm text-muted-foreground">{item.product_sku}</p>
+                      </div>
+                      <Badge className="bg-orange-500 hover:bg-orange-600 text-white">{item.quantity} to extra</Badge>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
         </TabsContent>
 
         <TabsContent value="ready" className="space-y-4">
