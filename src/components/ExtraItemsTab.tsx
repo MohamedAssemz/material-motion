@@ -16,6 +16,16 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -102,6 +112,7 @@ export function ExtraItemsTab({ orderId, phase, onRefresh }: ExtraItemsTabProps)
   const [availableBoxes, setAvailableBoxes] = useState<Array<{ id: string; box_code: string }>>([]);
   const [loadingBoxes, setLoadingBoxes] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [moveDirectlyConfirmOpen, setMoveDirectlyConfirmOpen] = useState(false);
 
   useEffect(() => {
     fetchExtraBatches();
@@ -705,7 +716,7 @@ export function ExtraItemsTab({ orderId, phase, onRefresh }: ExtraItemsTabProps)
             {phase !== 'boxing' && (
               <Button 
                 variant="secondary"
-                onClick={handleMoveDirectly} 
+                onClick={() => setMoveDirectlyConfirmOpen(true)} 
                 disabled={totalSelected === 0 || submitting}
               >
                 {submitting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ArrowRight className="h-4 w-4 mr-2" />}
@@ -864,6 +875,24 @@ export function ExtraItemsTab({ orderId, phase, onRefresh }: ExtraItemsTabProps)
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Move Directly Confirmation */}
+      <AlertDialog open={moveDirectlyConfirmOpen} onOpenChange={setMoveDirectlyConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Move Directly to Next Phase?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will move {totalSelected} item(s) directly into the next phase without assigning them to a box or requiring a receive step. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { setMoveDirectlyConfirmOpen(false); handleMoveDirectly(); }}>
+              Confirm Move
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
