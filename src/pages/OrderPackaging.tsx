@@ -946,17 +946,15 @@ export default function OrderPackaging() {
           </div>
         </TabsContent>
 
-        <TabsContent value="extra">
+        <TabsContent value="extra" className="space-y-6">
           <ExtraItemsTab orderId={id!} phase="packaging" onRefresh={() => fetchData()} />
-        </TabsContent>
 
-        <TabsContent value="completed" className="space-y-6">
-          {/* Added to Extra Inventory Section */}
+          {/* Added to Extra Inventory from this Order */}
           {addedToExtraItems.length > 0 && (
             <div className="space-y-3">
               <div className="flex items-center gap-2 pb-2 border-b border-orange-200 dark:border-orange-900">
                 <Package className="h-4 w-4 text-orange-600" />
-                <h3 className="text-sm font-semibold text-orange-700 dark:text-orange-400">Added to Extra Inventory</h3>
+                <h3 className="text-sm font-semibold text-orange-700 dark:text-orange-400">Added to Extra from this Order</h3>
               </div>
               {addedToExtraItems.map((item) => (
                 <Card
@@ -976,7 +974,9 @@ export default function OrderPackaging() {
               ))}
             </div>
           )}
+        </TabsContent>
 
+        <TabsContent value="completed" className="space-y-6">
           {/* Production Rate Section */}
           <ProductionRateSection
             batches={[
@@ -1007,7 +1007,7 @@ export default function OrderPackaging() {
             onAssigned={() => { fetchData(); fetchAddedToExtra(); }}
           />
 
-          {completedGroups.length === 0 && addedToExtraItems.length === 0 && completedBatches.length === 0 && (
+          {completedGroups.length === 0 && completedBatches.length === 0 && (
             <Card>
               <CardContent className="p-8 text-center text-muted-foreground">No completed items yet</CardContent>
             </Card>
