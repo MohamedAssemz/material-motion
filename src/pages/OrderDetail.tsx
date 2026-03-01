@@ -404,7 +404,7 @@ export default function OrderDetail() {
   };
 
 
-  const handleDeleteOrder = async () => {
+  const handleCancelOrder = async () => {
     try {
       // Release reserved extra batches back to AVAILABLE
       await supabase
@@ -417,23 +417,17 @@ export default function OrderDetail() {
         .eq("order_id", id)
         .eq("inventory_state", "RESERVED");
 
-      // Delete shipments for this order
-      await supabase.from("shipments").delete().eq("order_id", id);
-
-      // Delete order batches
-      await supabase.from("order_batches").delete().eq("order_id", id);
-      await supabase.from("order_items").delete().eq("order_id", id);
-      await supabase.from("raw_material_versions").delete().eq("order_id", id);
-      await supabase.from("notifications").delete().eq("order_id", id);
-
-      const { error } = await supabase.from("orders").delete().eq("id", id);
+      const { error } = await supabase
+        .from("orders")
+        .update({ status: "cancelled" })
+        .eq("id", id);
       if (error) throw error;
 
-      toast.success("Order deleted successfully");
+      toast.success("Order cancelled successfully");
       navigate("/orders");
     } catch (error) {
-      console.error("Error deleting order:", error);
-      toast.error("Failed to delete order");
+      console.error("Error cancelling order:", error);
+      toast.error("Failed to cancel order");
     }
   };
 
@@ -694,23 +688,26 @@ export default function OrderDetail() {
             <MessageSquare className="h-4 w-4 mr-1" />
             Comments
           </Button>
-          {canDelete && (
+          {canDelete && order?.status !== 'cancelled' && (
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button variant="destructive" size="sm">
-                  <Trash2 className="h-4 w-4" />
+                  <Trash2 className="h-4 w-4 mr-1" />
+                  Cancel Order
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Delete Order</AlertDialogTitle>
+                  <AlertDialogTitle>Cancel Order</AlertDialogTitle>
                   <AlertDialogDescription>
-                    This will permanently delete the order and all associated data. This action cannot be undone.
+                    This will cancel the order and release any reserved extra inventory. The order will be moved to the Cancelled tab. This action cannot be undone.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleDeleteOrder}>Delete</AlertDialogAction>
+                  <AlertDialogCancel>Go Back</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleCancelOrder} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                    Cancel Order
+                  </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
