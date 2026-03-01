@@ -5,8 +5,12 @@ import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { CalendarIcon, CheckCircle2 } from 'lucide-react';
+import { CalendarIcon, CheckCircle2, XCircle, ChevronDown, ChevronRight, Globe, Users } from 'lucide-react';
+import { getCountryByCode, getCountryByName } from '@/lib/countries';
 import {
   LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
@@ -20,12 +24,14 @@ interface Order {
   created_at: string | null;
   updated_at: string | null;
   estimated_fulfillment_time: string | null;
+  customer_id?: string | null;
 }
 
 interface OrderPerformanceTabProps {
   orders: Order[];
   products: { id: string; name: string }[];
-  orderItems: { order_id: string; product_id: string }[];
+  orderItems: { order_id: string; product_id: string; quantity?: number }[];
+  customers?: { id: string; name: string; code: string | null; country: string | null }[];
 }
 
 const CHART_COLORS = {
@@ -33,6 +39,7 @@ const CHART_COLORS = {
   completed: 'hsl(142, 76%, 36%)',
   inProgress: 'hsl(38, 92%, 50%)',
   pending: 'hsl(263, 70%, 50%)',
+  cancelled: 'hsl(0, 72%, 51%)',
 };
 
 const tooltipStyle = {
@@ -42,12 +49,14 @@ const tooltipStyle = {
   color: 'hsl(var(--card-foreground))',
 };
 
-export function OrderPerformanceTab({ orders, products, orderItems }: OrderPerformanceTabProps) {
+export function OrderPerformanceTab({ orders, products, orderItems, customers = [] }: OrderPerformanceTabProps) {
   const [dateFrom, setDateFrom] = useState<Date>(subDays(new Date(), 30));
   const [dateTo, setDateTo] = useState<Date>(new Date());
   const [priority, setPriority] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [productFilter, setProductFilter] = useState<string>('all');
+  const [expandedCountries, setExpandedCountries] = useState<Set<string>>(new Set());
+  const [expandedCustomers, setExpandedCustomers] = useState<Set<string>>(new Set());
 
   const filteredOrders = useMemo(() => {
     return orders.filter(order => {
@@ -56,10 +65,12 @@ export function OrderPerformanceTab({ orders, products, orderItems }: OrderPerfo
       if (priority !== 'all' && order.priority !== priority) return false;
       if (statusFilter !== 'all') {
         const isCompleted = order.status === 'finished' || order.status === 'shipped';
-        const isInProgress = !isCompleted && order.status !== 'waiting_for_rm';
+        const isCancelled = order.status === 'cancelled';
+        const isInProgress = !isCompleted && !isCancelled && order.status !== 'waiting_for_rm';
         if (statusFilter === 'completed' && !isCompleted) return false;
         if (statusFilter === 'in_progress' && !isInProgress) return false;
         if (statusFilter === 'pending' && order.status !== 'waiting_for_rm') return false;
+        if (statusFilter === 'cancelled' && !isCancelled) return false;
       }
       if (productFilter !== 'all') {
         const orderProductIds = orderItems.filter(oi => oi.order_id === order.id).map(oi => oi.product_id);
@@ -68,6 +79,31 @@ export function OrderPerformanceTab({ orders, products, orderItems }: OrderPerfo
       return true;
     });
   }, [orders, dateFrom, dateTo, priority, statusFilter, productFilter, orderItems]);
+
+  // Filtered order items based on filtered orders
+  const filteredItems = useMemo(() => {
+    const ids = new Set(filteredOrders.map(o => o.id));
+    return orderItems.filter(oi => ids.has(oi.order_id));
+  }, [filteredOrders, orderItems]);
+
+  // Maps
+  const productMap = useMemo(() => {
+    const m = new Map<string, any>();
+    products.forEach(p => m.set(p.id, p));
+    return m;
+  }, [products]);
+
+  const customerMap = useMemo(() => {
+    const m = new Map<string, any>();
+    customers.forEach(c => m.set(c.id, c));
+    return m;
+  }, [customers]);
+
+  const orderCustomerMap = useMemo(() => {
+    const m = new Map<string, string>();
+    filteredOrders.forEach(o => { if (o.customer_id) m.set(o.id, o.customer_id); });
+    return m;
+  }, [filteredOrders]);
 
   // Chart A: Orders Created vs Completed over time
   const createdVsCompleted = useMemo(() => {
@@ -88,7 +124,7 @@ export function OrderPerformanceTab({ orders, products, orderItems }: OrderPerfo
     return Array.from(dayMap.values()).sort((a, b) => a.date.localeCompare(b.date));
   }, [filteredOrders]);
 
-  // Chart B: Orders Completed per period (bar)
+  // Chart B: Completed per period
   const completedPerPeriod = useMemo(() => {
     const completed = filteredOrders.filter(o => o.status === 'finished' || o.status === 'shipped');
     const weekMap = new Map<string, number>();
@@ -101,12 +137,13 @@ export function OrderPerformanceTab({ orders, products, orderItems }: OrderPerfo
     return Array.from(weekMap.entries()).map(([period, count]) => ({ period, count }));
   }, [filteredOrders]);
 
-  // Chart C: Orders by Status (donut)
+  // Chart C: Status distribution
   const statusDistribution = useMemo(() => {
-    let pending = 0, inProgress = 0, completed = 0;
+    let pending = 0, inProgress = 0, completed = 0, cancelled = 0;
     filteredOrders.forEach(order => {
       const isCompleted = order.status === 'finished' || order.status === 'shipped';
       if (isCompleted) completed++;
+      else if (order.status === 'cancelled') cancelled++;
       else if (order.status === 'waiting_for_rm') pending++;
       else inProgress++;
     });
@@ -114,10 +151,11 @@ export function OrderPerformanceTab({ orders, products, orderItems }: OrderPerfo
       { name: 'Pending', value: pending, color: CHART_COLORS.pending },
       { name: 'In Progress', value: inProgress, color: CHART_COLORS.inProgress },
       { name: 'Completed', value: completed, color: CHART_COLORS.completed },
+      { name: 'Cancelled', value: cancelled, color: CHART_COLORS.cancelled },
     ].filter(d => d.value > 0);
   }, [filteredOrders]);
 
-  // Chart D: On-Time Completion Rate
+  // On-Time Rate
   const onTimeRate = useMemo(() => {
     const completed = filteredOrders.filter(o => o.status === 'finished' || o.status === 'shipped');
     if (completed.length === 0) return 0;
@@ -128,9 +166,9 @@ export function OrderPerformanceTab({ orders, products, orderItems }: OrderPerfo
     return Math.round((onTime / completed.length) * 100);
   }, [filteredOrders]);
 
-  // Chart E: Average Order Lead Time
+  // Avg Lead Time
   const avgLeadTimeData = useMemo(() => {
-    const completed = filteredOrders.filter(o => 
+    const completed = filteredOrders.filter(o =>
       (o.status === 'finished' || o.status === 'shipped') && o.created_at && o.updated_at
     );
     const monthMap = new Map<string, { total: number; count: number }>();
@@ -147,6 +185,88 @@ export function OrderPerformanceTab({ orders, products, orderItems }: OrderPerfo
       avgDays: Math.round(data.total / data.count * 10) / 10,
     }));
   }, [filteredOrders]);
+
+  // Cancelled count
+  const cancelledCount = useMemo(() => {
+    return filteredOrders.filter(o => o.status === 'cancelled').length;
+  }, [filteredOrders]);
+
+  // Top countries
+  const topCountries = useMemo(() => {
+    const agg = new Map<string, { qty: number; orderIds: Set<string>; products: Map<string, number> }>();
+    filteredItems.forEach(i => {
+      const custId = orderCustomerMap.get(i.order_id);
+      if (!custId) return;
+      const cust = customerMap.get(custId);
+      const country = cust?.country || 'Unknown';
+      const e = agg.get(country) || { qty: 0, orderIds: new Set(), products: new Map() };
+      e.qty += i.quantity || 0;
+      e.orderIds.add(i.order_id);
+      e.products.set(i.product_id, (e.products.get(i.product_id) || 0) + (i.quantity || 0));
+      agg.set(country, e);
+    });
+    return Array.from(agg.entries())
+      .map(([country, { qty, orderIds, products: prodMap }]) => {
+        const info = getCountryByCode(country) || getCountryByName(country);
+        return {
+          country,
+          flag: info?.flag || '🌍',
+          displayName: info?.name || country,
+          quantity: qty,
+          orders: orderIds.size,
+          products: Array.from(prodMap.entries())
+            .map(([pid, q]) => ({ name: productMap.get(pid)?.name || 'Unknown', quantity: q }))
+            .sort((a, b) => b.quantity - a.quantity),
+        };
+      })
+      .sort((a, b) => b.quantity - a.quantity);
+  }, [filteredItems, orderCustomerMap, customerMap, productMap]);
+
+  // Top customers
+  const topCustomers = useMemo(() => {
+    const agg = new Map<string, { qty: number; orderIds: Set<string>; products: Map<string, number> }>();
+    filteredItems.forEach(i => {
+      const custId = orderCustomerMap.get(i.order_id);
+      if (!custId) return;
+      const e = agg.get(custId) || { qty: 0, orderIds: new Set(), products: new Map() };
+      e.qty += i.quantity || 0;
+      e.orderIds.add(i.order_id);
+      e.products.set(i.product_id, (e.products.get(i.product_id) || 0) + (i.quantity || 0));
+      agg.set(custId, e);
+    });
+    return Array.from(agg.entries())
+      .map(([custId, { qty, orderIds, products: prodMap }]) => {
+        const cust = customerMap.get(custId);
+        return {
+          id: custId,
+          name: cust?.name || 'Unknown',
+          code: cust?.code || '',
+          country: cust?.country || '',
+          quantity: qty,
+          orders: orderIds.size,
+          products: Array.from(prodMap.entries())
+            .map(([pid, q]) => ({ name: productMap.get(pid)?.name || 'Unknown', quantity: q }))
+            .sort((a, b) => b.quantity - a.quantity),
+        };
+      })
+      .sort((a, b) => b.quantity - a.quantity);
+  }, [filteredItems, orderCustomerMap, customerMap, productMap]);
+
+  const toggleCountry = (c: string) => {
+    setExpandedCountries(prev => {
+      const next = new Set(prev);
+      next.has(c) ? next.delete(c) : next.add(c);
+      return next;
+    });
+  };
+
+  const toggleCustomer = (id: string) => {
+    setExpandedCustomers(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
 
   return (
     <div className="space-y-6">
@@ -204,6 +324,7 @@ export function OrderPerformanceTab({ orders, products, orderItems }: OrderPerfo
                   <SelectItem value="pending">Pending</SelectItem>
                   <SelectItem value="in_progress">In Progress</SelectItem>
                   <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="cancelled">Cancelled</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -223,8 +344,8 @@ export function OrderPerformanceTab({ orders, products, orderItems }: OrderPerfo
         </CardContent>
       </Card>
 
-      {/* KPI Card: On-Time Completion */}
-      <div className="grid gap-4 md:grid-cols-3">
+      {/* KPI Cards */}
+      <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">On-Time Completion Rate</CardTitle>
@@ -245,6 +366,15 @@ export function OrderPerformanceTab({ orders, products, orderItems }: OrderPerfo
             <div className="text-3xl font-bold text-primary">
               {filteredOrders.filter(o => o.status === 'finished' || o.status === 'shipped').length}
             </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Cancelled</CardTitle>
+            <XCircle className="h-4 w-4 text-destructive" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-destructive">{cancelledCount}</div>
           </CardContent>
         </Card>
       </div>
@@ -352,6 +482,101 @@ export function OrderPerformanceTab({ orders, products, orderItems }: OrderPerfo
                 <div className="flex items-center justify-center h-full text-muted-foreground text-sm">No completed orders with dates</div>
               )}
             </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Top Countries & Top Customers */}
+      <div className="grid md:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Globe className="h-5 w-5 text-primary" />
+              Top Ordering Countries
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {topCountries.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">No country data for selected range</p>
+            ) : (
+              <ScrollArea className="max-h-[400px]">
+                <div className="space-y-1">
+                  {topCountries.map((c, idx) => (
+                    <Collapsible key={c.country} open={expandedCountries.has(c.country)} onOpenChange={() => toggleCountry(c.country)}>
+                      <CollapsibleTrigger className="w-full">
+                        <div className="flex items-center gap-3 py-2.5 px-3 rounded-md hover:bg-muted/50 cursor-pointer">
+                          <span className="text-sm font-mono text-muted-foreground w-6 text-right">#{idx + 1}</span>
+                          <span className="text-xl">{c.flag}</span>
+                          <span className="flex-1 text-sm font-medium text-left truncate">{c.displayName}</span>
+                          <Badge variant="secondary">{c.quantity.toLocaleString()} units</Badge>
+                          <span className="text-xs text-muted-foreground">{c.orders} orders</span>
+                          {expandedCountries.has(c.country) ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                        </div>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <div className="ml-14 mb-2 space-y-1 border-l-2 border-muted pl-3">
+                          {c.products.map(p => (
+                            <div key={p.name} className="flex items-center justify-between py-1 text-sm">
+                              <span className="text-muted-foreground truncate">{p.name}</span>
+                              <span className="font-medium tabular-nums">{p.quantity.toLocaleString()}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </CollapsibleContent>
+                    </Collapsible>
+                  ))}
+                </div>
+              </ScrollArea>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Users className="h-5 w-5 text-primary" />
+              Top Ordering Customers
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {topCustomers.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">No customer data for selected range</p>
+            ) : (
+              <ScrollArea className="max-h-[400px]">
+                <div className="space-y-1">
+                  {topCustomers.map((c, idx) => {
+                    const countryInfo = c.country ? (getCountryByCode(c.country) || getCountryByName(c.country)) : null;
+                    return (
+                      <Collapsible key={c.id} open={expandedCustomers.has(c.id)} onOpenChange={() => toggleCustomer(c.id)}>
+                        <CollapsibleTrigger className="w-full">
+                          <div className="flex items-center gap-3 py-2.5 px-3 rounded-md hover:bg-muted/50 cursor-pointer">
+                            <span className="text-sm font-mono text-muted-foreground w-6 text-right">#{idx + 1}</span>
+                            {countryInfo && <span className="text-lg">{countryInfo.flag}</span>}
+                            <div className="flex-1 text-left">
+                              <span className="text-sm font-medium truncate block">{c.name}</span>
+                              {c.code && <span className="text-xs text-muted-foreground">{c.code}</span>}
+                            </div>
+                            <Badge variant="secondary">{c.quantity.toLocaleString()} units</Badge>
+                            <span className="text-xs text-muted-foreground">{c.orders} orders</span>
+                            {expandedCustomers.has(c.id) ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                          </div>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent>
+                          <div className="ml-14 mb-2 space-y-1 border-l-2 border-muted pl-3">
+                            {c.products.map(p => (
+                              <div key={p.name} className="flex items-center justify-between py-1 text-sm">
+                                <span className="text-muted-foreground truncate">{p.name}</span>
+                                <span className="font-medium tabular-nums">{p.quantity.toLocaleString()}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </CollapsibleContent>
+                      </Collapsible>
+                    );
+                  })}
+                </div>
+              </ScrollArea>
+            )}
           </CardContent>
         </Card>
       </div>

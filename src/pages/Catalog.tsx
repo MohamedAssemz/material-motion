@@ -17,7 +17,8 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Package, Plus, Search, Loader2, Tag, Palette, X, Upload } from 'lucide-react';
+import { Package, Plus, Search, Loader2, Tag, Palette, X, Upload, BarChart3 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { ProductCard } from '@/components/catalog/ProductCard';
 import { ProductDetailDialog } from '@/components/catalog/ProductDetailDialog';
 import { ProductFormDialog, ProductFormData } from '@/components/catalog/ProductFormDialog';
@@ -61,6 +62,7 @@ interface Product {
 }
 
 export default function Catalog() {
+  const navigate = useNavigate();
   const { hasRole } = useAuth();
   const { toast } = useToast();
   const [products, setProducts] = useState<Product[]>([]);
@@ -348,6 +350,10 @@ export default function Catalog() {
         </div>
         
         <div className="flex items-center gap-2 flex-wrap">
+          <Button variant="outline" size="sm" onClick={() => navigate('/reports?tab=catalog-insights')}>
+            <BarChart3 className="mr-2 h-4 w-4" />
+            Catalog Insights
+          </Button>
           {canManage && (
             <>
               <Button variant="outline" size="sm" onClick={() => setCategoryListOpen(true)}>

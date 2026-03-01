@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
 import { BarChart3, FileDown, ClipboardList, Factory, Warehouse, Tag } from 'lucide-react';
 import { ExportsTab } from '@/components/reports/ExportsTab';
 import { OrderPerformanceTab } from '@/components/reports/OrderPerformanceTab';
@@ -19,7 +21,14 @@ export default function Reports() {
   const [shipments, setShipments] = useState<any[]>([]);
   const [extraHistory, setExtraHistory] = useState<any[]>([]);
   const [customers, setCustomers] = useState<any[]>([]);
+  const [searchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'order-performance');
+  const [showExports, setShowExports] = useState(false);
 
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab) setActiveTab(tab);
+  }, [searchParams]);
   useEffect(() => {
     fetchAllData();
   }, []);
@@ -72,24 +81,43 @@ export default function Reports() {
     );
   }
 
+  if (showExports) {
+    return (
+      <div className="container mx-auto p-6 space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3 mb-1">
+            <FileDown className="h-7 w-7 text-primary" />
+            <h1 className="text-2xl font-bold">Exports</h1>
+          </div>
+          <Button variant="outline" onClick={() => setShowExports(false)}>
+            ← Back to Reports
+          </Button>
+        </div>
+        <ExportsTab />
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto p-6 space-y-6">
-      <div>
-        <div className="flex items-center gap-3 mb-1">
-          <BarChart3 className="h-7 w-7 text-primary" />
-          <h1 className="text-2xl font-bold">Reports & Analytics</h1>
+      <div className="flex items-center justify-between">
+        <div>
+          <div className="flex items-center gap-3 mb-1">
+            <BarChart3 className="h-7 w-7 text-primary" />
+            <h1 className="text-2xl font-bold">Reports & Analytics</h1>
+          </div>
+          <p className="text-muted-foreground text-sm ml-10">
+            Operational insights across orders, production, and inventory
+          </p>
         </div>
-        <p className="text-muted-foreground text-sm ml-10">
-          Operational insights across orders, production, and inventory
-        </p>
+        <Button onClick={() => setShowExports(true)} className="bg-blue-600 hover:bg-blue-700 text-white">
+          <FileDown className="mr-2 h-4 w-4" />
+          Exports
+        </Button>
       </div>
 
-      <Tabs defaultValue="order-performance" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5 h-11">
-          <TabsTrigger value="exports" className="flex items-center gap-2 text-xs sm:text-sm">
-            <FileDown className="h-4 w-4 hidden sm:block" />
-            Exports
-          </TabsTrigger>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <TabsList className="grid w-full grid-cols-4 h-11">
           <TabsTrigger value="order-performance" className="flex items-center gap-2 text-xs sm:text-sm">
             <ClipboardList className="h-4 w-4 hidden sm:block" />
             Order Performance
@@ -108,12 +136,8 @@ export default function Reports() {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="exports">
-          <ExportsTab />
-        </TabsContent>
-
         <TabsContent value="order-performance">
-          <OrderPerformanceTab orders={orders} products={products} orderItems={orderItems} />
+          <OrderPerformanceTab orders={orders} products={products} orderItems={orderItems} customers={customers} />
         </TabsContent>
 
         <TabsContent value="production-flow">
