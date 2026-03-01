@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { BarChart3, FileDown, ClipboardList, Factory, Warehouse } from 'lucide-react';
+import { BarChart3, FileDown, ClipboardList, Factory, Warehouse, Tag } from 'lucide-react';
 import { ExportsTab } from '@/components/reports/ExportsTab';
 import { OrderPerformanceTab } from '@/components/reports/OrderPerformanceTab';
 import { ProductionFlowTab } from '@/components/reports/ProductionFlowTab';
 import { InventoryBoxesTab } from '@/components/reports/InventoryBoxesTab';
+import { CatalogInsightsTab } from '@/components/reports/CatalogInsightsTab';
 
 export default function Reports() {
   const [loading, setLoading] = useState(true);
@@ -17,6 +18,7 @@ export default function Reports() {
   const [boxes, setBoxes] = useState<any[]>([]);
   const [shipments, setShipments] = useState<any[]>([]);
   const [extraHistory, setExtraHistory] = useState<any[]>([]);
+  const [customers, setCustomers] = useState<any[]>([]);
 
   useEffect(() => {
     fetchAllData();
@@ -34,9 +36,9 @@ export default function Reports() {
         shipmentsRes,
         extraHistoryRes,
       ] = await Promise.all([
-        supabase.from('orders').select('id, order_number, status, priority, created_at, updated_at, estimated_fulfillment_time'),
+        supabase.from('orders').select('id, order_number, status, priority, created_at, updated_at, estimated_fulfillment_time, customer_id'),
         supabase.from('products').select('id, name'),
-        supabase.from('order_items').select('order_id, product_id'),
+        supabase.from('order_items').select('order_id, product_id, quantity'),
         supabase.from('unit_history').select('unit_id, prev_state, new_state, created_at'),
         supabase.from('units').select('id, state, product_id'),
         supabase.from('boxes').select('id, box_code, created_at, items_list'),
@@ -52,6 +54,9 @@ export default function Reports() {
       setBoxes(boxesRes.data || []);
       setShipments(shipmentsRes.data || []);
       setExtraHistory(extraHistoryRes.data || []);
+
+      const customersRes = await supabase.from('customers').select('id, name, code, country');
+      setCustomers(customersRes.data || []);
     } catch (error) {
       console.error('Error fetching report data:', error);
     } finally {
@@ -80,7 +85,7 @@ export default function Reports() {
       </div>
 
       <Tabs defaultValue="order-performance" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4 h-11">
+        <TabsList className="grid w-full grid-cols-5 h-11">
           <TabsTrigger value="exports" className="flex items-center gap-2 text-xs sm:text-sm">
             <FileDown className="h-4 w-4 hidden sm:block" />
             Exports
@@ -96,6 +101,10 @@ export default function Reports() {
           <TabsTrigger value="inventory-boxes" className="flex items-center gap-2 text-xs sm:text-sm">
             <Warehouse className="h-4 w-4 hidden sm:block" />
             Inventory & Boxes
+          </TabsTrigger>
+          <TabsTrigger value="catalog-insights" className="flex items-center gap-2 text-xs sm:text-sm">
+            <Tag className="h-4 w-4 hidden sm:block" />
+            Catalog Insights
           </TabsTrigger>
         </TabsList>
 
@@ -113,6 +122,10 @@ export default function Reports() {
 
         <TabsContent value="inventory-boxes">
           <InventoryBoxesTab boxes={boxes} shipments={shipments} extraHistory={extraHistory} products={products} />
+        </TabsContent>
+
+        <TabsContent value="catalog-insights">
+          <CatalogInsightsTab orders={orders} orderItems={orderItems} products={products} customers={customers} />
         </TabsContent>
       </Tabs>
     </div>
