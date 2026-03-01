@@ -7,6 +7,12 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -17,7 +23,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Package, Plus, Search, Loader2, Tag, Palette, X, Upload, BarChart3 } from 'lucide-react';
+import { Package, Plus, Search, Loader2, Tag, Palette, X, Upload, BarChart3, Settings2, Users } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { ProductCard } from '@/components/catalog/ProductCard';
 import { ProductDetailDialog } from '@/components/catalog/ProductDetailDialog';
@@ -356,16 +362,30 @@ export default function Catalog() {
           </Button>
           {canManage && (
             <>
-              <Button variant="outline" size="sm" onClick={() => setCategoryListOpen(true)}>
-                <Tag className="mr-2 h-4 w-4" />
-                Categories
-                <Badge variant="secondary" className="ml-2">{categories.length}</Badge>
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => setBrandListOpen(true)}>
-                <Palette className="mr-2 h-4 w-4" />
-                Brands
-                <Badge variant="secondary" className="ml-2">{brands.length}</Badge>
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <Settings2 className="mr-2 h-4 w-4" />
+                    Manage
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuItem onClick={() => setCategoryListOpen(true)}>
+                    <Tag className="mr-2 h-4 w-4" />
+                    Categories
+                    <Badge variant="secondary" className="ml-auto">{categories.length}</Badge>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setBrandListOpen(true)}>
+                    <Palette className="mr-2 h-4 w-4" />
+                    Brands
+                    <Badge variant="secondary" className="ml-auto">{brands.length}</Badge>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate('/customers')}>
+                    <Users className="mr-2 h-4 w-4" />
+                    Customers
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
               <Button variant="outline" size="sm" onClick={() => setBulkUploadOpen(true)}>
                 <Upload className="mr-2 h-4 w-4" />
                 Bulk Upload
