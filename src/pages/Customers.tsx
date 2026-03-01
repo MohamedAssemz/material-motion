@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { CountrySelect } from '@/components/catalog/CountrySelect';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogT
 import { ArrowLeft, Plus, Users, Loader2, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
+import { getCountryByCode } from '@/lib/countries';
 
 interface Customer {
   id: string;
@@ -155,12 +157,11 @@ export default function Customers() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="country">Country</Label>
-                  <Input
-                    id="country"
+                  <Label>Country</Label>
+                  <CountrySelect
                     value={newCustomer.country}
-                    onChange={(e) => setNewCustomer(prev => ({ ...prev, country: e.target.value }))}
-                    placeholder="e.g., Egypt"
+                    onValueChange={(val) => setNewCustomer(prev => ({ ...prev, country: val === 'all' ? '' : val }))}
+                    placeholder="Select country"
                   />
                 </div>
                 <div className="flex items-center space-x-2">
@@ -215,9 +216,14 @@ export default function Customers() {
                         {customer.code && (
                           <span className="text-sm text-muted-foreground font-mono">{customer.code}</span>
                         )}
-                        {customer.country && (
-                          <span className="text-sm text-muted-foreground">• {customer.country}</span>
-                        )}
+                        {customer.country && (() => {
+                          const info = getCountryByCode(customer.country);
+                          return (
+                            <span className="text-sm text-muted-foreground">
+                              • {info ? `${info.flag} ${info.name}` : customer.country}
+                            </span>
+                          );
+                        })()}
                       </div>
                     </div>
                     <Badge variant={customer.is_domestic ? 'secondary' : 'outline'}>
