@@ -801,14 +801,27 @@ export default function OrderDetail() {
       {/* Notes & Alerts */}
       {(order.notes || flaggedCount > 0 || redoCount > 0) && (
         <div className="space-y-2">
-           {order.notes && (
-             <Card>
-               <CardContent className="p-4">
-                 <p className="text-sm font-medium mb-1">Notes</p>
-                 <PackagingReferenceDisplay notes={order.notes} />
-               </CardContent>
-            </Card>
-          )}
+           {(() => {
+              // Show notes without packaging reference block
+              const notes = order.notes || '';
+              const startTag = "---PACKAGING_REFERENCE---";
+              const endTag = "---END_PACKAGING_REFERENCE---";
+              const startIdx = notes.indexOf(startTag);
+              const endIdx = notes.indexOf(endTag);
+              let displayNotes = notes;
+              if (startIdx !== -1 && endIdx !== -1) {
+                displayNotes = (notes.substring(0, startIdx) + notes.substring(endIdx + endTag.length)).trim();
+              }
+              if (!displayNotes) return null;
+              return (
+                <Card>
+                  <CardContent className="p-4">
+                    <p className="text-sm font-medium mb-1">Notes</p>
+                    <p className="text-sm text-muted-foreground whitespace-pre-wrap">{displayNotes}</p>
+                  </CardContent>
+                </Card>
+              );
+           })()}
           {(flaggedCount > 0 || redoCount > 0) && (
             <Card className="border-warning">
               <CardContent className="p-4 flex items-center gap-4">
