@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { BarChart3, FileDown, ClipboardList, Factory, Warehouse, Tag } from 'lucide-react';
+import { BarChart3, FileDown, ClipboardList, Factory, Warehouse, Tag, ArrowLeft } from 'lucide-react';
 import { ExportsTab } from '@/components/reports/ExportsTab';
 import { OrderPerformanceTab } from '@/components/reports/OrderPerformanceTab';
 import { ProductionFlowTab } from '@/components/reports/ProductionFlowTab';
@@ -86,6 +86,9 @@ export default function Reports() {
       <div className="container mx-auto p-6 space-y-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3 mb-1">
+            <button onClick={() => setShowExports(false)} className="p-1 rounded-md hover:bg-muted transition-colors">
+              <ArrowLeft className="h-6 w-6 text-muted-foreground" />
+            </button>
             <FileDown className="h-7 w-7 text-primary" />
             <h1 className="text-2xl font-bold">Exports</h1>
           </div>
