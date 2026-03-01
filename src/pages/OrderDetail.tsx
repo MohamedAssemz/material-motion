@@ -18,6 +18,13 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { RawMaterialsDrawer } from "@/components/RawMaterialsDrawer";
 import { FlaggedItemsDialog } from "@/components/FlaggedItemsDialog";
 import { ShipmentDialog } from "@/components/ShipmentDialog";
@@ -47,6 +54,8 @@ import {
   Plane,
   Play,
   MessageSquare,
+  StickyNote,
+  ChevronDown,
 } from "lucide-react";
 import {
   getNextState,
@@ -142,6 +151,7 @@ export default function OrderDetail() {
   const [extraInventoryOpen, setExtraInventoryOpen] = useState(false);
   const [startOrderOpen, setStartOrderOpen] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
+  const [packagingRefOpen, setPackagingRefOpen] = useState(false);
   const [selectedExtraPhase, setSelectedExtraPhase] = useState<'manufacturing' | 'finishing' | 'packaging' | 'boxing'>('manufacturing');
   const [extraInventoryCounts, setExtraInventoryCounts] = useState<Record<string, number>>({});
   const [reservedExtraCounts, setReservedExtraCounts] = useState<Record<string, number>>({});
@@ -680,14 +690,29 @@ export default function OrderDetail() {
             <Printer className="h-4 w-4 mr-1" />
             Print
           </Button>
-          <Button variant="outline" size="sm" onClick={() => setRawMaterialsOpen(true)}>
-            <FileText className="h-4 w-4 mr-1" />
-            Raw Materials
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => setCommentsOpen(true)}>
-            <MessageSquare className="h-4 w-4 mr-1" />
-            Comments
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm">
+                <StickyNote className="h-4 w-4 mr-1" />
+                Notes
+                <ChevronDown className="h-3 w-3 ml-1" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setRawMaterialsOpen(true)}>
+                <FileText className="h-4 w-4 mr-2" />
+                Raw Materials
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setPackagingRefOpen(true)}>
+                <Package className="h-4 w-4 mr-2" />
+                Packaging Reference
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setCommentsOpen(true)}>
+                <MessageSquare className="h-4 w-4 mr-2" />
+                Comments
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           {canDelete && order?.status !== 'cancelled' && (
             <AlertDialog>
               <AlertDialogTrigger asChild>
@@ -1194,6 +1219,20 @@ export default function OrderDetail() {
         open={commentsOpen}
         onOpenChange={setCommentsOpen}
       />
+      <Dialog open={packagingRefOpen} onOpenChange={setPackagingRefOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Package className="h-5 w-5" />
+              Packaging Reference
+            </DialogTitle>
+          </DialogHeader>
+          <PackagingReferenceDisplay notes={order?.notes || null} />
+          {!order?.notes?.includes('---PACKAGING_REFERENCE---') && (
+            <p className="text-sm text-muted-foreground text-center py-4">No packaging reference defined for this order.</p>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
