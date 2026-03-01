@@ -1060,12 +1060,10 @@ export default function OrderBoxing() {
           <Button variant="outline" onClick={() => navigate(`/orders/${id}`)}>
             View Order Details
           </Button>
-          {order.notes && (
-            <Button variant="outline" onClick={() => setNotesDialogOpen(true)}>
-              <Package className="mr-2 h-4 w-4" />
-              View Notes
-            </Button>
-          )}
+          <Button variant="outline" onClick={() => setNotesDialogOpen(true)}>
+            <Package className="mr-2 h-4 w-4" />
+            Packaging Reference
+          </Button>
         </div>
       </div>
 
@@ -1667,11 +1665,62 @@ export default function OrderBoxing() {
         alreadySelectedIds={Array.from(selectedBoxes)}
       />
       <Dialog open={notesDialogOpen} onOpenChange={setNotesDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Order Notes</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <Package className="h-5 w-5" />
+              Packaging Reference
+            </DialogTitle>
           </DialogHeader>
           <PackagingReferenceDisplay notes={order?.notes || null} />
+          {!order?.notes?.includes('---PACKAGING_REFERENCE---') && (
+            <p className="text-sm text-muted-foreground text-center py-4">No packaging reference defined for this order.</p>
+          )}
+          {order?.notes?.includes('---PACKAGING_REFERENCE---') && (
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  // Parse and download as CSV
+                  const notes = order?.notes || '';
+                  const startTag = "---PACKAGING_REFERENCE---";
+                  const endTag = "---END_PACKAGING_REFERENCE---";
+                  const startIdx = notes.indexOf(startTag);
+                  const endIdx = notes.indexOf(endTag);
+                  if (startIdx === -1 || endIdx === -1) return;
+                  const block = notes.substring(startIdx + startTag.length, endIdx).trim();
+                  const rows: string[][] = [['Shipment', 'SKU', 'Product', 'Quantity', 'Length (cm)', 'Width (cm)', 'Height (cm)', 'Weight (kg)']];
+                  for (const line of block.split("\n")) {
+                    const match = line.match(/^Shipment (\d+): \[(.+?)\] (.+?) x (\d+)(?:\s*\{(.+?)\})?$/);
+                    if (match) {
+                      const dims: Record<string, string> = {};
+                      if (match[5]) {
+                        for (const part of match[5].split(/\s+/)) {
+                          const [key, val] = part.split(':');
+                          if (key === 'L') dims.length = val;
+                          else if (key === 'W') dims.width = val;
+                          else if (key === 'H') dims.height = val;
+                          else if (key === 'Wt') dims.weight = val;
+                        }
+                      }
+                      rows.push([match[1], match[2], match[3], match[4], dims.length || '', dims.width || '', dims.height || '', dims.weight || '']);
+                    }
+                  }
+                  const csv = rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n');
+                  const blob = new Blob([csv], { type: 'text/csv' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `packaging-reference-${order.order_number}.csv`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                }}
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Download
+              </Button>
+            </DialogFooter>
+          )}
         </DialogContent>
       </Dialog>
     </div>
