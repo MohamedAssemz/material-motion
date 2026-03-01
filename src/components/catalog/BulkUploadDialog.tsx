@@ -111,26 +111,7 @@ export function BulkUploadDialog({ open, onOpenChange, brands, onSuccess }: Bulk
       image_url: 'https://example.com/image.jpg',
     });
 
-    const sizeList = `"${(SIZE_OPTIONS as readonly string[]).join(',')}"`;
-    const brandList = `"${brands.map(b => b.name).join(',')}"`;
-    const boolList = '"true,false"';
 
-    for (let row = 2; row <= 1000; row++) {
-      sheet.getCell(`C${row}`).dataValidation = {
-        type: 'list', allowBlank: true, formulae: [sizeList],
-        showErrorMessage: true, errorTitle: 'Invalid Size', error: 'Please select a valid size from the dropdown.',
-      };
-      if (brands.length > 0) {
-        sheet.getCell(`E${row}`).dataValidation = {
-          type: 'list', allowBlank: true, formulae: [brandList],
-          showErrorMessage: true, errorTitle: 'Invalid Brand', error: 'Please select a valid brand from the dropdown.',
-        };
-      }
-      sheet.getCell(`F${row}`).dataValidation = {
-        type: 'list', allowBlank: true, formulae: [boolList],
-        showErrorMessage: true, errorTitle: 'Invalid Value', error: 'Please select true or false.',
-      };
-    }
 
     const buffer = await workbook.xlsx.writeBuffer();
     const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
