@@ -101,15 +101,6 @@ export function BulkUploadDialog({ open, onOpenChange, brands, onSuccess }: Bulk
     headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4472C4' } };
     headerRow.alignment = { horizontal: 'center' };
 
-    sheet.addRow({
-      name: 'Example Product',
-      description: 'A sample description',
-      size: 'M',
-      color: 'Red',
-      brand: brands.length > 0 ? brands[0].name : 'MyBrand',
-      needs_packing: 'true',
-      image_url: 'https://example.com/image.jpg',
-    });
 
 
 
