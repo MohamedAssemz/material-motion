@@ -674,152 +674,94 @@ export default function OrderCreate() {
                       Remove
                     </Button>
                   </div>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                      <TableHead className="w-[80px]">Shipment</TableHead>
-                        <TableHead>Item</TableHead>
-                        <TableHead className="w-[100px]">Qty</TableHead>
-                        <TableHead className="w-[80px]">L (cm)</TableHead>
-                        <TableHead className="w-[80px]">W (cm)</TableHead>
-                        <TableHead className="w-[80px]">H (cm)</TableHead>
-                        <TableHead className="w-[80px]">Wt (kg)</TableHead>
-                        <TableHead className="w-[50px]"></TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {packagingRows.map((row, index) => {
-                        const validItems = items.filter(it => it.product_id);
-                        // Calculate max allowed quantity for selected item (by index)
-                        const orderItem = row.item_index >= 0 ? items[row.item_index] : undefined;
-                        const totalAllocated = packagingRows
-                          .filter((r, i) => i !== index && r.item_index === row.item_index && r.item_index >= 0)
-                          .reduce((sum, r) => sum + r.quantity, 0);
-                        const maxQty = orderItem ? orderItem.quantity - totalAllocated : 1;
+                  <div className="space-y-4">
+                    {packagingRows.map((row, index) => {
+                      const validItems = items.filter(it => it.product_id);
+                      const orderItem = row.item_index >= 0 ? items[row.item_index] : undefined;
+                      const totalAllocated = packagingRows
+                        .filter((r, i) => i !== index && r.item_index === row.item_index && r.item_index >= 0)
+                        .reduce((sum, r) => sum + r.quantity, 0);
+                      const maxQty = orderItem ? orderItem.quantity - totalAllocated : 1;
 
-                        return (
-                          <TableRow key={index}>
-                            <TableCell className="font-medium">#{index + 1}</TableCell>
-                            <TableCell>
-                              <Select
-                                value={row.item_index >= 0 ? String(row.item_index) : ""}
-                                onValueChange={(val) => {
-                                  const newRows = [...packagingRows];
-                                  newRows[index] = { ...newRows[index], item_index: parseInt(val), quantity: 1 };
-                                  setPackagingRows(newRows);
-                                }}
-                              >
-                                <SelectTrigger className="w-full">
-                                  <SelectValue placeholder="Select item..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {validItems.map((it) => {
-                                    const originalIndex = items.indexOf(it);
-                                    const product = products.find(p => p.id === it.product_id);
-                                    // Calculate remaining capacity for this item across ALL rows
-                                    const totalAllocatedForItem = packagingRows
-                                      .filter((r, ri) => ri !== index && r.item_index === originalIndex)
-                                      .reduce((sum, r) => sum + r.quantity, 0);
-                                    const remaining = it.quantity - totalAllocatedForItem;
-                                    // Only show items that still have capacity OR are already selected in this row
-                                    if (remaining <= 0 && row.item_index !== originalIndex) return null;
-                                    return (
-                                      <SelectItem key={originalIndex} value={String(originalIndex)}>
-                                        {product?.sku} - {product?.name} ({it.needs_boxing ? 'Boxing' : 'No Boxing'}) x{it.quantity}
-                                      </SelectItem>
-                                    );
-                                  })}
-                                </SelectContent>
-                              </Select>
-                            </TableCell>
-                            <TableCell>
-                              <Input
-                                type="number"
-                                min={1}
-                                max={maxQty > 0 ? maxQty : 1}
-                                value={row.quantity}
-                                onChange={(e) => {
-                                  const newRows = [...packagingRows];
-                                  const val = parseInt(e.target.value) || 1;
-                                  newRows[index] = { ...newRows[index], quantity: Math.min(val, maxQty > 0 ? maxQty : 1) };
-                                  setPackagingRows(newRows);
-                                }}
-                              />
-                            </TableCell>
-                            <TableCell>
-                              <Input
-                                type="number"
-                                min={0}
-                                step="0.1"
-                                value={row.length_cm}
-                                onChange={(e) => {
-                                  const newRows = [...packagingRows];
-                                  newRows[index] = { ...newRows[index], length_cm: e.target.value };
-                                  setPackagingRows(newRows);
-                                }}
-                                placeholder="—"
-                              />
-                            </TableCell>
-                            <TableCell>
-                              <Input
-                                type="number"
-                                min={0}
-                                step="0.1"
-                                value={row.width_cm}
-                                onChange={(e) => {
-                                  const newRows = [...packagingRows];
-                                  newRows[index] = { ...newRows[index], width_cm: e.target.value };
-                                  setPackagingRows(newRows);
-                                }}
-                                placeholder="—"
-                              />
-                            </TableCell>
-                            <TableCell>
-                              <Input
-                                type="number"
-                                min={0}
-                                step="0.1"
-                                value={row.height_cm}
-                                onChange={(e) => {
-                                  const newRows = [...packagingRows];
-                                  newRows[index] = { ...newRows[index], height_cm: e.target.value };
-                                  setPackagingRows(newRows);
-                                }}
-                                placeholder="—"
-                              />
-                            </TableCell>
-                            <TableCell>
-                              <Input
-                                type="number"
-                                min={0}
-                                step="0.1"
-                                value={row.weight_kg}
-                                onChange={(e) => {
-                                  const newRows = [...packagingRows];
-                                  newRows[index] = { ...newRows[index], weight_kg: e.target.value };
-                                  setPackagingRows(newRows);
-                                }}
-                                placeholder="—"
-                              />
-                            </TableCell>
-                            <TableCell>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => {
-                                  setPackagingRows(packagingRows.filter((_, i) => i !== index));
-                                  if (packagingRows.length === 1) setShowPackagingRef(false);
-                                }}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
+                      return (
+                        <div key={index} className="border rounded-lg p-3 space-y-2">
+                          <div className="flex items-center gap-2">
+                            <Badge variant="secondary" className="shrink-0">#{index + 1}</Badge>
+                            <Select
+                              value={row.item_index >= 0 ? String(row.item_index) : ""}
+                              onValueChange={(val) => {
+                                const newRows = [...packagingRows];
+                                newRows[index] = { ...newRows[index], item_index: parseInt(val), quantity: 1 };
+                                setPackagingRows(newRows);
+                              }}
+                            >
+                              <SelectTrigger className="flex-1">
+                                <SelectValue placeholder="Select item..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {validItems.map((it) => {
+                                  const originalIndex = items.indexOf(it);
+                                  const product = products.find(p => p.id === it.product_id);
+                                  const totalAllocatedForItem = packagingRows
+                                    .filter((r, ri) => ri !== index && r.item_index === originalIndex)
+                                    .reduce((sum, r) => sum + r.quantity, 0);
+                                  const remaining = it.quantity - totalAllocatedForItem;
+                                  if (remaining <= 0 && row.item_index !== originalIndex) return null;
+                                  return (
+                                    <SelectItem key={originalIndex} value={String(originalIndex)}>
+                                      {product?.sku} - {product?.name} ({it.needs_boxing ? 'Boxing' : 'No Boxing'}) x{it.quantity}
+                                    </SelectItem>
+                                  );
+                                })}
+                              </SelectContent>
+                            </Select>
+                            <Input
+                              type="number"
+                              min={1}
+                              max={maxQty > 0 ? maxQty : 1}
+                              value={row.quantity}
+                              onChange={(e) => {
+                                const newRows = [...packagingRows];
+                                const val = parseInt(e.target.value) || 1;
+                                newRows[index] = { ...newRows[index], quantity: Math.min(val, maxQty > 0 ? maxQty : 1) };
+                                setPackagingRows(newRows);
+                              }}
+                              className="w-20"
+                            />
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => {
+                                setPackagingRows(packagingRows.filter((_, i) => i !== index));
+                                if (packagingRows.length === 1) setShowPackagingRef(false);
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                          <div className="grid grid-cols-4 gap-2 pl-10">
+                            <div>
+                              <Label className="text-xs text-muted-foreground">L (cm)</Label>
+                              <Input type="number" min={0} step="0.1" value={row.length_cm} onChange={(e) => { const newRows = [...packagingRows]; newRows[index] = { ...newRows[index], length_cm: e.target.value }; setPackagingRows(newRows); }} placeholder="—" />
+                            </div>
+                            <div>
+                              <Label className="text-xs text-muted-foreground">W (cm)</Label>
+                              <Input type="number" min={0} step="0.1" value={row.width_cm} onChange={(e) => { const newRows = [...packagingRows]; newRows[index] = { ...newRows[index], width_cm: e.target.value }; setPackagingRows(newRows); }} placeholder="—" />
+                            </div>
+                            <div>
+                              <Label className="text-xs text-muted-foreground">H (cm)</Label>
+                              <Input type="number" min={0} step="0.1" value={row.height_cm} onChange={(e) => { const newRows = [...packagingRows]; newRows[index] = { ...newRows[index], height_cm: e.target.value }; setPackagingRows(newRows); }} placeholder="—" />
+                            </div>
+                            <div>
+                              <Label className="text-xs text-muted-foreground">Wt (kg)</Label>
+                              <Input type="number" min={0} step="0.1" value={row.weight_kg} onChange={(e) => { const newRows = [...packagingRows]; newRows[index] = { ...newRows[index], weight_kg: e.target.value }; setPackagingRows(newRows); }} placeholder="—" />
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                   <Button
                     type="button"
                     variant="outline"
