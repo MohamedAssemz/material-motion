@@ -199,8 +199,20 @@ export function BulkUploadDialog({ open, onOpenChange, brands, onSuccess }: Bulk
         sheet.eachRow((row, rowNumber) => {
           if (rowNumber === 1) return;
           const vals: string[] = [];
-          row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
-            vals[colNumber - 1] = String(cell.value ?? '').trim();
+         row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+            // ExcelJS can return objects for hyperlinks/rich text - extract the plain text
+            const raw = cell.value;
+            let strVal = '';
+            if (raw == null) {
+              strVal = '';
+            } else if (typeof raw === 'object') {
+              // Hyperlink cells: { text: '...', hyperlink: '...' }
+              // Rich text cells: { richText: [...] }
+              strVal = (raw as any).text ?? (raw as any).hyperlink ?? (raw as any).result ?? String(raw);
+            } else {
+              strVal = String(raw);
+            }
+            vals[colNumber - 1] = strVal.trim();
           });
           const getVal = (col: string) => {
             const idx = headers.indexOf(col);
