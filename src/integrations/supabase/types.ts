@@ -1227,7 +1227,9 @@ export type Database = {
         Row: {
           created_at: string
           created_by: string | null
+          height_cm: number | null
           id: string
+          length_cm: number | null
           notes: string | null
           order_id: string
           sealed_at: string | null
@@ -1235,11 +1237,15 @@ export type Database = {
           shipment_code: string
           status: string
           updated_at: string
+          weight_kg: number | null
+          width_cm: number | null
         }
         Insert: {
           created_at?: string
           created_by?: string | null
+          height_cm?: number | null
           id?: string
+          length_cm?: number | null
           notes?: string | null
           order_id: string
           sealed_at?: string | null
@@ -1247,11 +1253,15 @@ export type Database = {
           shipment_code: string
           status?: string
           updated_at?: string
+          weight_kg?: number | null
+          width_cm?: number | null
         }
         Update: {
           created_at?: string
           created_by?: string | null
+          height_cm?: number | null
           id?: string
+          length_cm?: number | null
           notes?: string | null
           order_id?: string
           sealed_at?: string | null
@@ -1259,6 +1269,8 @@ export type Database = {
           shipment_code?: string
           status?: string
           updated_at?: string
+          weight_kg?: number | null
+          width_cm?: number | null
         }
         Relationships: [
           {
