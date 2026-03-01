@@ -15,11 +15,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { Send } from "lucide-react";
+import { RawMaterialImageUpload } from "@/components/RawMaterialImageUpload";
 
 interface RawMaterialVersion {
   id: string;
   version_number: number;
   content: string;
+  images: string[];
   created_by: string | null;
   created_at: string;
   profile?: {
@@ -44,6 +46,7 @@ export function RawMaterialsDrawer({
   const { user, hasRole } = useAuth();
   const [versions, setVersions] = useState<RawMaterialVersion[]>([]);
   const [newContent, setNewContent] = useState("");
+  const [newImages, setNewImages] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
@@ -66,7 +69,6 @@ export function RawMaterialsDrawer({
 
       if (error) throw error;
 
-      // Fetch profiles for each version
       const profileIds = [...new Set(data?.map((v) => v.created_by).filter(Boolean))];
       let profileMap = new Map();
 
@@ -75,18 +77,17 @@ export function RawMaterialsDrawer({
           .from("profiles")
           .select("id, full_name, email")
           .in("id", profileIds);
-
         profiles?.forEach((p) => profileMap.set(p.id, p));
       }
 
       const mappedVersions = data?.map((v) => ({
         ...v,
+        images: Array.isArray(v.images) ? (v.images as string[]) : [],
         profile: v.created_by ? profileMap.get(v.created_by) : undefined,
       })) || [];
-      
+
       setVersions(mappedVersions);
-      
-      // Pre-populate with latest version content for quick editing
+
       if (mappedVersions.length > 0 && !newContent) {
         setNewContent(mappedVersions[0].content);
       }
@@ -99,7 +100,7 @@ export function RawMaterialsDrawer({
   };
 
   const handleSave = async () => {
-    if (!newContent.trim() || !user) return;
+    if ((!newContent.trim() && newImages.length === 0) || !user) return;
 
     setSubmitting(true);
     try {
@@ -109,12 +110,14 @@ export function RawMaterialsDrawer({
         order_id: orderId,
         version_number: nextVersion,
         content: newContent.trim(),
+        images: newImages,
         created_by: user.id,
       });
 
       if (error) throw error;
 
       setNewContent("");
+      setNewImages([]);
       await fetchVersions();
       toast.success("Raw materials updated");
     } catch (error) {
@@ -126,17 +129,8 @@ export function RawMaterialsDrawer({
   };
 
   const getInitials = (name: string | null | undefined, email: string | null | undefined) => {
-    if (name) {
-      return name
-        .split(" ")
-        .map((n) => n[0])
-        .join("")
-        .toUpperCase()
-        .slice(0, 2);
-    }
-    if (email) {
-      return email[0].toUpperCase();
-    }
+    if (name) return name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
+    if (email) return email[0].toUpperCase();
     return "?";
   };
 
@@ -151,7 +145,6 @@ export function RawMaterialsDrawer({
           <SheetTitle>Raw Materials - {orderNumber}</SheetTitle>
         </SheetHeader>
 
-        {/* New Version Form - Only visible for leads/admin */}
         {canEdit && (
           <div className="space-y-3 py-4 border-b">
             <Textarea
@@ -165,13 +158,18 @@ export function RawMaterialsDrawer({
                 }
               }}
             />
+            <RawMaterialImageUpload
+              images={newImages}
+              onChange={setNewImages}
+              compact
+            />
             <div className="flex justify-between items-center">
               <span className="text-xs text-muted-foreground">
                 Press ⌘+Enter to submit
               </span>
               <Button
                 onClick={handleSave}
-                disabled={!newContent.trim() || submitting}
+                disabled={(!newContent.trim() && newImages.length === 0) || submitting}
                 size="sm"
               >
                 <Send className="h-4 w-4 mr-1" />
@@ -181,7 +179,6 @@ export function RawMaterialsDrawer({
           </div>
         )}
 
-        {/* Timeline */}
         <ScrollArea className="flex-1 -mx-6 px-6">
           {loading ? (
             <div className="space-y-4 py-4">
@@ -203,13 +200,10 @@ export function RawMaterialsDrawer({
             </div>
           ) : (
             <div className="relative py-4">
-              {/* Timeline line */}
               <div className="absolute left-4 top-8 bottom-4 w-px bg-border" />
-
               <div className="space-y-6">
                 {versions.map((version, index) => (
                   <div key={version.id} className="relative flex gap-3">
-                    {/* Timeline dot */}
                     <div className="relative z-10">
                       <Avatar className="h-8 w-8 border-2 border-background">
                         <AvatarFallback
@@ -221,8 +215,6 @@ export function RawMaterialsDrawer({
                         </AvatarFallback>
                       </Avatar>
                     </div>
-
-                    {/* Version content */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-baseline gap-2 flex-wrap">
                         <span className="font-medium text-sm">
@@ -239,7 +231,28 @@ export function RawMaterialsDrawer({
                             : "bg-muted"
                         }`}
                       >
-                        <p className="whitespace-pre-wrap break-words">{version.content}</p>
+                        {version.content && (
+                          <p className="whitespace-pre-wrap break-words">{version.content}</p>
+                        )}
+                        {version.images && version.images.length > 0 && (
+                          <div className={`grid grid-cols-2 gap-2 ${version.content ? "mt-2" : ""}`}>
+                            {version.images.map((url, imgIdx) => (
+                              <a
+                                key={imgIdx}
+                                href={url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="block rounded overflow-hidden border hover:opacity-80 transition-opacity"
+                              >
+                                <img
+                                  src={url}
+                                  alt={`RM image ${imgIdx + 1}`}
+                                  className="w-full h-20 object-cover"
+                                />
+                              </a>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
