@@ -318,13 +318,13 @@ export function CatalogInsightsTab({ orders, orderItems, products, customers }: 
         </CardHeader>
         <CardContent>
           {chartData.length > 0 ? (
-            <ChartContainer config={chartConfig} className="h-[300px] w-full">
-              <BarChart data={chartData} layout="vertical" margin={{ left: 10, right: 30 }}>
-                <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                <XAxis type="number" />
-                <YAxis dataKey="name" type="category" width={140} tick={{ fontSize: 12 }} />
+            <ChartContainer config={chartConfig} className="h-[350px] w-full">
+              <BarChart data={chartData} margin={{ left: 10, right: 30, bottom: 60 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="name" type="category" tick={{ fontSize: 11 }} interval={0} height={70} angle={-35} textAnchor="end" />
+                <YAxis type="number" tick={{ fontSize: 12 }} />
                 <ChartTooltip content={<ChartTooltipContent />} />
-                <Bar dataKey="quantity" fill="var(--color-quantity)" radius={[0, 4, 4, 0]} />
+                <Bar dataKey="quantity" fill="var(--color-quantity)" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ChartContainer>
           ) : (
