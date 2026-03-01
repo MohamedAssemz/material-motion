@@ -82,7 +82,7 @@ export default function OrderCreate() {
   const [items, setItems] = useState<OrderItem[]>([{ product_id: "", quantity: 1, needs_boxing: true }]);
   const [customerProductMapping, setCustomerProductMapping] = useState<Map<string, Set<string>>>(new Map());
   const [showPackagingRef, setShowPackagingRef] = useState(false);
-  const [packagingRows, setPackagingRows] = useState<Array<{ item_index: number; quantity: number }>>([]);
+  const [packagingRows, setPackagingRows] = useState<Array<{ item_index: number; quantity: number; length_cm: string; width_cm: string; height_cm: string; weight_kg: string }>>([]);
 
   useEffect(() => {
     if (!hasRole("manufacture_lead") && !hasRole("admin")) {
@@ -200,7 +200,14 @@ export default function OrderCreate() {
           const item = items[row.item_index];
           const product = item ? products.find(p => p.id === item.product_id) : null;
           const boxingLabel = item ? (item.needs_boxing ? '' : ' [No Boxing]') : '';
-          return `Shipment ${i + 1}: [${product?.sku || "?"}] ${product?.name || "Unknown"}${boxingLabel} x ${row.quantity}`;
+          const dims = [
+            row.length_cm ? `L:${row.length_cm}` : '',
+            row.width_cm ? `W:${row.width_cm}` : '',
+            row.height_cm ? `H:${row.height_cm}` : '',
+            row.weight_kg ? `Wt:${row.weight_kg}` : '',
+          ].filter(Boolean).join(' ');
+          const dimsSuffix = dims ? ` {${dims}}` : '';
+          return `Shipment ${i + 1}: [${product?.sku || "?"}] ${product?.name || "Unknown"}${boxingLabel} x ${row.quantity}${dimsSuffix}`;
         }).join("\n");
         const block = `\n---PACKAGING_REFERENCE---\n${packagingBlock}\n---END_PACKAGING_REFERENCE---`;
         finalNotes = finalNotes ? finalNotes + block : block.trim();
@@ -641,7 +648,7 @@ export default function OrderCreate() {
                   onClick={() => {
                     setShowPackagingRef(true);
                     if (packagingRows.length === 0) {
-                      setPackagingRows([{ item_index: -1, quantity: 1 }]);
+                      setPackagingRows([{ item_index: -1, quantity: 1, length_cm: '', width_cm: '', height_cm: '', weight_kg: '' }]);
                     }
                   }}
                 >
@@ -670,9 +677,13 @@ export default function OrderCreate() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="w-[100px]">Shipment</TableHead>
+                      <TableHead className="w-[80px]">Shipment</TableHead>
                         <TableHead>Item</TableHead>
-                        <TableHead className="w-[120px]">Quantity</TableHead>
+                        <TableHead className="w-[100px]">Qty</TableHead>
+                        <TableHead className="w-[80px]">L (cm)</TableHead>
+                        <TableHead className="w-[80px]">W (cm)</TableHead>
+                        <TableHead className="w-[80px]">H (cm)</TableHead>
+                        <TableHead className="w-[80px]">Wt (kg)</TableHead>
                         <TableHead className="w-[50px]"></TableHead>
                       </TableRow>
                     </TableHeader>
@@ -736,6 +747,62 @@ export default function OrderCreate() {
                               />
                             </TableCell>
                             <TableCell>
+                              <Input
+                                type="number"
+                                min={0}
+                                step="0.1"
+                                value={row.length_cm}
+                                onChange={(e) => {
+                                  const newRows = [...packagingRows];
+                                  newRows[index] = { ...newRows[index], length_cm: e.target.value };
+                                  setPackagingRows(newRows);
+                                }}
+                                placeholder="—"
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <Input
+                                type="number"
+                                min={0}
+                                step="0.1"
+                                value={row.width_cm}
+                                onChange={(e) => {
+                                  const newRows = [...packagingRows];
+                                  newRows[index] = { ...newRows[index], width_cm: e.target.value };
+                                  setPackagingRows(newRows);
+                                }}
+                                placeholder="—"
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <Input
+                                type="number"
+                                min={0}
+                                step="0.1"
+                                value={row.height_cm}
+                                onChange={(e) => {
+                                  const newRows = [...packagingRows];
+                                  newRows[index] = { ...newRows[index], height_cm: e.target.value };
+                                  setPackagingRows(newRows);
+                                }}
+                                placeholder="—"
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <Input
+                                type="number"
+                                min={0}
+                                step="0.1"
+                                value={row.weight_kg}
+                                onChange={(e) => {
+                                  const newRows = [...packagingRows];
+                                  newRows[index] = { ...newRows[index], weight_kg: e.target.value };
+                                  setPackagingRows(newRows);
+                                }}
+                                placeholder="—"
+                              />
+                            </TableCell>
+                            <TableCell>
                               <Button
                                 type="button"
                                 variant="ghost"
@@ -757,7 +824,7 @@ export default function OrderCreate() {
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() => setPackagingRows([...packagingRows, { item_index: -1, quantity: 1 }])}
+                    onClick={() => setPackagingRows([...packagingRows, { item_index: -1, quantity: 1, length_cm: '', width_cm: '', height_cm: '', weight_kg: '' }])}
                   >
                     <Plus className="mr-2 h-4 w-4" />
                     Add Shipment

@@ -81,6 +81,10 @@ interface Shipment {
   notes: string | null;
   created_at: string;
   sealed_at: string | null;
+  length_cm: number | null;
+  width_cm: number | null;
+  height_cm: number | null;
+  weight_kg: number | null;
   batches: ShippedBatch[];
 }
 
@@ -113,6 +117,10 @@ export default function OrderBoxing() {
   const [kartonaDialogOpen, setKartonaDialogOpen] = useState(false);
   const [moveToExtraDialogOpen, setMoveToExtraDialogOpen] = useState(false);
   const [shipmentNotes, setShipmentNotes] = useState("");
+  const [shipmentLength, setShipmentLength] = useState("");
+  const [shipmentWidth, setShipmentWidth] = useState("");
+  const [shipmentHeight, setShipmentHeight] = useState("");
+  const [shipmentWeight, setShipmentWeight] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [notesDialogOpen, setNotesDialogOpen] = useState(false);
 
@@ -254,7 +262,7 @@ export default function OrderBoxing() {
     try {
       const { data: shipmentsData, error: shipmentsError } = await supabase
         .from("shipments")
-        .select("id, shipment_code, status, notes, created_at, sealed_at")
+        .select("id, shipment_code, status, notes, created_at, sealed_at, length_cm, width_cm, height_cm, weight_kg")
         .eq("order_id", id)
         .order("created_at", { ascending: false });
 
@@ -662,6 +670,10 @@ export default function OrderBoxing() {
           status: "sealed",
           sealed_at: new Date().toISOString(),
           sealed_by: user?.id,
+          length_cm: shipmentLength ? parseFloat(shipmentLength) : null,
+          width_cm: shipmentWidth ? parseFloat(shipmentWidth) : null,
+          height_cm: shipmentHeight ? parseFloat(shipmentHeight) : null,
+          weight_kg: shipmentWeight ? parseFloat(shipmentWeight) : null,
         })
         .select()
         .single();
@@ -797,6 +809,10 @@ export default function OrderBoxing() {
       setKartonaDialogOpen(false);
       setReadyForShipmentSelections(new Map());
       setShipmentNotes("");
+      setShipmentLength("");
+      setShipmentWidth("");
+      setShipmentHeight("");
+      setShipmentWeight("");
       setSubmitting(false);
 
       // Open printable tab WITHOUT auto-printing (prevents UI freeze while print dialog is open)
@@ -816,7 +832,7 @@ export default function OrderBoxing() {
   const exportShipments = () => {
     if (shipments.length === 0) return;
 
-    const headers = ['Shipment Code', 'Status', 'Created At', 'Sealed At', 'Notes', 'Product SKU', 'Product Name', 'Quantity', 'Needs Boxing'];
+    const headers = ['Shipment Code', 'Status', 'Created At', 'Sealed At', 'Notes', 'Length (cm)', 'Width (cm)', 'Height (cm)', 'Weight (kg)', 'Product SKU', 'Product Name', 'Quantity', 'Needs Boxing'];
     const rows: string[][] = [];
 
     shipments.forEach(shipment => {
@@ -828,6 +844,10 @@ export default function OrderBoxing() {
           format(new Date(shipment.created_at), 'yyyy-MM-dd HH:mm'),
           shipment.sealed_at ? format(new Date(shipment.sealed_at), 'yyyy-MM-dd HH:mm') : '',
           shipment.notes || '',
+          shipment.length_cm != null ? String(shipment.length_cm) : '',
+          shipment.width_cm != null ? String(shipment.width_cm) : '',
+          shipment.height_cm != null ? String(shipment.height_cm) : '',
+          shipment.weight_kg != null ? String(shipment.weight_kg) : '',
           '', '', '', ''
         ]);
       } else {
@@ -838,6 +858,10 @@ export default function OrderBoxing() {
             idx === 0 ? format(new Date(shipment.created_at), 'yyyy-MM-dd HH:mm') : '',
             idx === 0 && shipment.sealed_at ? format(new Date(shipment.sealed_at), 'yyyy-MM-dd HH:mm') : '',
             idx === 0 ? (shipment.notes || '') : '',
+            idx === 0 && shipment.length_cm != null ? String(shipment.length_cm) : '',
+            idx === 0 && shipment.width_cm != null ? String(shipment.width_cm) : '',
+            idx === 0 && shipment.height_cm != null ? String(shipment.height_cm) : '',
+            idx === 0 && shipment.weight_kg != null ? String(shipment.weight_kg) : '',
             batch.product?.sku || '',
             batch.product?.name || '',
             String(batch.quantity),
@@ -1441,6 +1465,14 @@ export default function OrderBoxing() {
                     {shipment.notes && (
                       <p className="text-sm text-muted-foreground mb-3">{shipment.notes}</p>
                     )}
+                    {(shipment.length_cm != null || shipment.width_cm != null || shipment.height_cm != null || shipment.weight_kg != null) && (
+                      <div className="flex gap-4 text-xs text-muted-foreground mb-3 flex-wrap">
+                        {shipment.length_cm != null && <span>L: {shipment.length_cm} cm</span>}
+                        {shipment.width_cm != null && <span>W: {shipment.width_cm} cm</span>}
+                        {shipment.height_cm != null && <span>H: {shipment.height_cm} cm</span>}
+                        {shipment.weight_kg != null && <span>Wt: {shipment.weight_kg} kg</span>}
+                      </div>
+                    )}
                     <div className="space-y-1">
                       {(() => {
                         // Group batches by order_item_id
@@ -1571,6 +1603,24 @@ export default function OrderBoxing() {
             <p className="text-sm text-muted-foreground">
               Creating a Kartona for {totalSelectedForShipment} item(s).
             </p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Length (cm)</Label>
+                <Input type="number" min={0} step="0.1" value={shipmentLength} onChange={(e) => setShipmentLength(e.target.value)} placeholder="Optional" />
+              </div>
+              <div>
+                <Label>Width (cm)</Label>
+                <Input type="number" min={0} step="0.1" value={shipmentWidth} onChange={(e) => setShipmentWidth(e.target.value)} placeholder="Optional" />
+              </div>
+              <div>
+                <Label>Height (cm)</Label>
+                <Input type="number" min={0} step="0.1" value={shipmentHeight} onChange={(e) => setShipmentHeight(e.target.value)} placeholder="Optional" />
+              </div>
+              <div>
+                <Label>Weight (kg)</Label>
+                <Input type="number" min={0} step="0.1" value={shipmentWeight} onChange={(e) => setShipmentWeight(e.target.value)} placeholder="Optional" />
+              </div>
+            </div>
             <div>
               <Label>Notes (optional)</Label>
               <Textarea
