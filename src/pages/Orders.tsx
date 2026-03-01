@@ -18,8 +18,8 @@ import { format, isWithinInterval, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { TablePagination } from '@/components/TablePagination';
 
-type OrderStatus = 'pending' | 'in_progress' | 'completed';
-type TabStatus = 'pending' | 'completed';
+type OrderStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
+type TabStatus = 'pending' | 'completed' | 'cancelled';
 
 interface Order {
   id: string;
@@ -165,7 +165,9 @@ export default function Orders() {
           // - If order.status is 'in_progress' and not fully shipped, order is in_progress
           // - Otherwise, order is pending
           let computed_status: OrderStatus = 'pending';
-          if (order.status === 'completed' || (unitCount > 0 && shippedCount >= unitCount)) {
+          if (order.status === 'cancelled') {
+            computed_status = 'cancelled';
+          } else if (order.status === 'completed' || (unitCount > 0 && shippedCount >= unitCount)) {
             computed_status = 'completed';
           } else if (order.status === 'in_progress') {
             computed_status = 'in_progress';
@@ -198,13 +200,17 @@ export default function Orders() {
         return false;
       }
 
-      // Tab filter (status) - pending tab includes both 'pending' and 'in_progress'
+      // Tab filter
       if (activeTab === 'pending') {
         if (order.computed_status !== 'pending' && order.computed_status !== 'in_progress') {
           return false;
         }
       } else if (activeTab === 'completed') {
         if (order.computed_status !== 'completed') {
+          return false;
+        }
+      } else if (activeTab === 'cancelled') {
+        if (order.computed_status !== 'cancelled') {
           return false;
         }
       }
@@ -330,6 +336,7 @@ export default function Orders() {
   const tabCounts = useMemo(() => ({
     pending: orders.filter(o => o.computed_status === 'pending' || o.computed_status === 'in_progress').length,
     completed: orders.filter(o => o.computed_status === 'completed').length,
+    cancelled: orders.filter(o => o.computed_status === 'cancelled').length,
   }), [orders]);
 
   return (
@@ -373,6 +380,10 @@ export default function Orders() {
               <TabsTrigger value="completed" className="gap-2">
                 Completed
                 <Badge variant="secondary" className="ml-1">{tabCounts.completed}</Badge>
+              </TabsTrigger>
+              <TabsTrigger value="cancelled" className="gap-2">
+                Cancelled
+                <Badge variant="secondary" className="ml-1">{tabCounts.cancelled}</Badge>
               </TabsTrigger>
             </TabsList>
 
@@ -512,7 +523,7 @@ export default function Orders() {
           )}
 
           {/* Table Content */}
-          {['pending', 'completed'].map((tab) => (
+          {['pending', 'completed', 'cancelled'].map((tab) => (
             <TabsContent key={tab} value={tab}>
               <Card>
                 <CardHeader>
