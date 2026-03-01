@@ -32,6 +32,7 @@ interface ParsedProduct {
   brand_id: string | null;
   brand_name: string;
   needs_packing: boolean;
+  image_url: string | null;
 }
 
 interface ParsedData {
@@ -92,6 +93,7 @@ export function BulkUploadDialog({ open, onOpenChange, brands, onSuccess }: Bulk
       { header: 'color', key: 'color', width: 15 },
       { header: 'brand', key: 'brand', width: 20 },
       { header: 'needs_packing', key: 'needs_packing', width: 15 },
+      { header: 'image_url', key: 'image_url', width: 40 },
     ];
 
     const headerRow = sheet.getRow(1);
@@ -106,6 +108,7 @@ export function BulkUploadDialog({ open, onOpenChange, brands, onSuccess }: Bulk
       color: 'Red',
       brand: brands.length > 0 ? brands[0].name : 'MyBrand',
       needs_packing: 'true',
+      image_url: 'https://example.com/image.jpg',
     });
 
     const sizeList = `"${(SIZE_OPTIONS as readonly string[]).join(',')}"`;
@@ -139,7 +142,7 @@ export function BulkUploadDialog({ open, onOpenChange, brands, onSuccess }: Bulk
     URL.revokeObjectURL(url);
   };
 
-  const processRows = (rows: { name: string; description: string; size: string; color: string; brand: string; needs_packing: string }[]): ParsedData => {
+  const processRows = (rows: { name: string; description: string; size: string; color: string; brand: string; needs_packing: string; image_url: string }[]): ParsedData => {
     const brandMap = new Map(brands.map(b => [b.name.toLowerCase(), b.id]));
     const warnings: string[] = [];
     const productsToInsert: ParsedProduct[] = [];
@@ -170,6 +173,8 @@ export function BulkUploadDialog({ open, onOpenChange, brands, onSuccess }: Bulk
       const needsPackingRaw = row.needs_packing?.trim().toLowerCase();
       const needs_packing = needsPackingRaw === 'false' ? false : true;
 
+      const imageUrl = row.image_url?.trim() || null;
+
       productsToInsert.push({
         sku: generateSKU(idx),
         name,
@@ -179,6 +184,7 @@ export function BulkUploadDialog({ open, onOpenChange, brands, onSuccess }: Bulk
         brand_id,
         brand_name: brandName || '',
         needs_packing,
+        image_url: imageUrl,
       });
     });
 
@@ -194,7 +200,7 @@ export function BulkUploadDialog({ open, onOpenChange, brands, onSuccess }: Bulk
     setUploading(true);
 
     try {
-      let rows: { name: string; description: string; size: string; color: string; brand: string; needs_packing: string }[] = [];
+      let rows: { name: string; description: string; size: string; color: string; brand: string; needs_packing: string; image_url: string }[] = [];
       const isExcel = file.name.match(/\.xlsx?$/i);
 
       if (isExcel) {
@@ -226,6 +232,7 @@ export function BulkUploadDialog({ open, onOpenChange, brands, onSuccess }: Bulk
             color: getVal('color'),
             brand: getVal('brand'),
             needs_packing: getVal('needs_packing'),
+            image_url: getVal('image_url'),
           });
         });
       } else {
@@ -255,6 +262,7 @@ export function BulkUploadDialog({ open, onOpenChange, brands, onSuccess }: Bulk
             color: getVal(values, 'color'),
             brand: getVal(values, 'brand'),
             needs_packing: getVal(values, 'needs_packing'),
+            image_url: getVal(values, 'image_url'),
           });
         }
       }
@@ -287,13 +295,32 @@ export function BulkUploadDialog({ open, onOpenChange, brands, onSuccess }: Bulk
     setInserting(true);
 
     try {
-      const toInsert = parsedData.productsToInsert.map(({ brand_name, ...p }) => p);
+      const toInsert = parsedData.productsToInsert.map(({ brand_name, image_url, ...p }) => p);
       const { data: inserted, error } = await supabase
         .from('products')
         .insert(toInsert)
         .select('id');
 
       if (error) throw error;
+
+      // Insert product images for any rows with image_url
+      const imageInserts = parsedData.productsToInsert
+        .map((p, i) => ({ image_url: p.image_url, product_id: inserted?.[i]?.id }))
+        .filter((item): item is { image_url: string; product_id: string } => !!item.image_url && !!item.product_id);
+
+      if (imageInserts.length > 0) {
+        const { error: imgError } = await supabase
+          .from('product_images')
+          .insert(imageInserts.map(item => ({
+            product_id: item.product_id,
+            image_url: item.image_url,
+            is_main: true,
+            sort_order: 0,
+          })));
+        if (imgError) {
+          console.error('Image insert error:', imgError);
+        }
+      }
 
       const created = inserted?.length ?? 0;
       setResult({ created, skipped: parsedData.totalRows - created, warnings: parsedData.warnings });
@@ -359,6 +386,7 @@ export function BulkUploadDialog({ open, onOpenChange, brands, onSuccess }: Bulk
                     <TableHead className="text-xs">Color</TableHead>
                     <TableHead className="text-xs">Brand</TableHead>
                     <TableHead className="text-xs">Packing</TableHead>
+                    <TableHead className="text-xs">Image</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -369,6 +397,7 @@ export function BulkUploadDialog({ open, onOpenChange, brands, onSuccess }: Bulk
                       <TableCell className="text-xs">{p.color || '—'}</TableCell>
                       <TableCell className="text-xs">{p.brand_name || '—'}</TableCell>
                       <TableCell className="text-xs">{p.needs_packing ? 'Yes' : 'No'}</TableCell>
+                      <TableCell className="text-xs truncate max-w-[120px]">{p.image_url || '—'}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
