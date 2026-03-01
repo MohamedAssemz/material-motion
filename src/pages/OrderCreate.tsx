@@ -26,6 +26,7 @@ import {
   Truck,
   Package,
 } from "lucide-react";
+import { RawMaterialImageUpload } from "@/components/RawMaterialImageUpload";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -74,6 +75,7 @@ export default function OrderCreate() {
   const [shippingType, setShippingType] = useState<"domestic" | "international">("domestic");
   const [estimatedFulfillment, setEstimatedFulfillment] = useState<Date | undefined>();
   const [rawMaterials, setRawMaterials] = useState("");
+  const [rawMaterialImages, setRawMaterialImages] = useState<string[]>([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const [customerOpen, setCustomerOpen] = useState(false);
   const [eftOpen, setEftOpen] = useState(false);
@@ -221,11 +223,12 @@ export default function OrderCreate() {
       if (orderError) throw orderError;
 
       // Save raw materials version if provided
-      if (rawMaterials.trim()) {
+      if (rawMaterials.trim() || rawMaterialImages.length > 0) {
         await supabase.from("raw_material_versions").insert({
           order_id: order.id,
           version_number: 1,
           content: rawMaterials.trim(),
+          images: rawMaterialImages,
           created_by: user?.id,
         });
       }
@@ -477,6 +480,12 @@ export default function OrderCreate() {
                   required
                   rows={3}
                 />
+                <div className="mt-2">
+                  <RawMaterialImageUpload
+                    images={rawMaterialImages}
+                    onChange={setRawMaterialImages}
+                  />
+                </div>
               </div>
               {/* Notes moved below items card */}
             </CardContent>

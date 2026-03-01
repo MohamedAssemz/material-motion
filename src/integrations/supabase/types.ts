@@ -1167,6 +1167,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           id: string
+          images: Json | null
           order_id: string
           version_number: number
         }
@@ -1175,6 +1176,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          images?: Json | null
           order_id: string
           version_number?: number
         }
@@ -1183,6 +1185,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          images?: Json | null
           order_id?: string
           version_number?: number
         }
