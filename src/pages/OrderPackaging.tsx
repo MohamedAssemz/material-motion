@@ -200,8 +200,11 @@ export default function OrderPackaging() {
 
       setOrder(orderRes.data as Order);
       setBatches(batchesWithData as Batch[]);
-      // Show ALL completed batches in production rate (no from_extra_state filtering)
-      setCompletedBatches(allCompletedWithData as Batch[]);
+      // Filter out batches that skipped this phase (retrieved from extra_packaging)
+      const processedCompleted = (allCompletedWithData as any[]).filter(
+        (b: any) => b.from_extra_state !== 'extra_packaging'
+      );
+      setCompletedBatches(processedCompleted as Batch[]);
     } catch (error: any) {
       toast.error(error.message);
     } finally {

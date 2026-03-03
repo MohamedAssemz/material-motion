@@ -210,8 +210,11 @@ export default function OrderFinishing() {
 
       setOrder(orderRes.data as Order);
       setBatches(batchesWithData as Batch[]);
-      // Show ALL completed batches in production rate (no from_extra_state filtering)
-      setCompletedBatches(completedWithData as Batch[]);
+      // Filter out batches that skipped this phase (retrieved from extra_finishing)
+      const processedCompleted = (completedWithData as any[]).filter(
+        (b: any) => b.from_extra_state !== 'extra_finishing'
+      );
+      setCompletedBatches(processedCompleted as Batch[]);
     } catch (error: any) {
       toast.error(error.message);
     } finally {

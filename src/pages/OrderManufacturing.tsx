@@ -180,9 +180,12 @@ export default function OrderManufacturing() {
 
       setOrder(orderRes.data as Order);
       setBatches((batchesRes.data || []) as unknown as Batch[]);
-      // Show ALL completed batches in production rate (no from_extra_state filtering)
+      // Filter out batches that skipped this phase (retrieved from extra_manufacturing)
       const allCompleted = (completedRes.data || []) as any[];
-      setCompletedBatches(allCompleted as unknown as Batch[]);
+      const processedCompleted = allCompleted.filter(
+        (b: any) => b.from_extra_state !== 'extra_manufacturing'
+      );
+      setCompletedBatches(processedCompleted as unknown as Batch[]);
     } catch (error: any) {
       toast.error(error.message);
     } finally {
