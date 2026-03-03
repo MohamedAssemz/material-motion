@@ -609,9 +609,21 @@ export default function OrderDetail() {
     const inProgress = relevantBatches.filter((b) => b.current_state === inState).reduce((sum, b) => sum + b.quantity, 0);
     const stateIndex = getAllStates().indexOf(inState as UnitState);
     
-    const pastStateBatches = relevantBatches.filter((b) => 
-      getAllStates().indexOf(b.current_state as UnitState) > stateIndex
-    );
+    // Phase hierarchy: items retrieved from a later phase's extra state never went through earlier phases
+    const laterExtraStates: Record<string, string[]> = {
+      manufacturing: ['extra_finishing', 'extra_packaging', 'extra_boxing'],
+      finishing: ['extra_packaging', 'extra_boxing'],
+      packaging: ['extra_boxing'],
+      boxing: [],
+    };
+    const excludeStates = laterExtraStates[phaseName] || [];
+    
+    const pastStateBatches = relevantBatches.filter((b) => {
+      if (getAllStates().indexOf(b.current_state as UnitState) <= stateIndex) return false;
+      // Exclude batches that skipped this phase entirely (retrieved from a later phase's extra)
+      if (excludeStates.includes((b as any).from_extra_state)) return false;
+      return true;
+    });
     
     // Retrieved = from extra_batch_history CONSUMED events (immutable source of truth)
     const retrieved = retrievedFromExtraCounts[phaseName] || 0;
