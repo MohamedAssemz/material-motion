@@ -32,6 +32,7 @@ interface Batch {
   packaging_machine_id: string | null;
   finishing_machine_id: string | null;
   manufacturing_machine_id: string | null;
+  from_extra_state?: string | null;
   product: {
     id: string;
     name: string;
@@ -134,7 +135,7 @@ export default function OrderPackaging() {
         supabase
           .from("order_batches")
           .select(
-            "id, qr_code_data, current_state, quantity, product_id, order_item_id, box_id, manufacturing_machine_id, finishing_machine_id, packaging_machine_id, product:products(id, name, sku, needs_packing)",
+            "id, qr_code_data, current_state, quantity, product_id, order_item_id, box_id, manufacturing_machine_id, finishing_machine_id, packaging_machine_id, from_extra_state, product:products(id, name, sku, needs_packing)",
           )
           .eq("order_id", id)
           .eq("is_terminated", false)
@@ -593,6 +594,7 @@ export default function OrderPackaging() {
                 manufacturing_machine_id: batch.manufacturing_machine_id,
                 finishing_machine_id: batch.finishing_machine_id,
                 packaging_machine_id: machineId || batch.packaging_machine_id,
+                from_extra_state: batch.from_extra_state,
               })
               .select("id")
               .single();
@@ -675,6 +677,7 @@ export default function OrderPackaging() {
               eta: group.needs_boxing ? etaDate.toISOString() : null,
               lead_time_days: group.needs_boxing ? parseInt(etaDays) || 1 : null,
               created_by: user?.id,
+              from_extra_state: batch.from_extra_state,
             });
             await supabase
               .from("order_batches")

@@ -31,6 +31,7 @@ interface Batch {
   box_id: string | null;
   finishing_machine_id: string | null;
   manufacturing_machine_id: string | null;
+  from_extra_state?: string | null;
   product: {
     id: string;
     name: string;
@@ -140,7 +141,7 @@ export default function OrderFinishing() {
         supabase
           .from("order_batches")
           .select(
-            "id, qr_code_data, current_state, quantity, product_id, order_item_id, box_id, manufacturing_machine_id, finishing_machine_id, product:products(id, name, sku, needs_packing)",
+            "id, qr_code_data, current_state, quantity, product_id, order_item_id, box_id, manufacturing_machine_id, finishing_machine_id, from_extra_state, product:products(id, name, sku, needs_packing)",
           )
           .eq("order_id", id)
           .eq("is_terminated", false)
@@ -634,6 +635,7 @@ export default function OrderFinishing() {
                 created_by: user?.id,
                 manufacturing_machine_id: batch.manufacturing_machine_id,
                 finishing_machine_id: machineId || batch.finishing_machine_id,
+                from_extra_state: batch.from_extra_state,
               })
               .select("id")
               .single();

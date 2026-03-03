@@ -158,6 +158,7 @@ export default function OrderDetail() {
   const [extraInventoryCounts, setExtraInventoryCounts] = useState<Record<string, number>>({});
   const [reservedExtraCounts, setReservedExtraCounts] = useState<Record<string, number>>({});
   const [addedToExtraCounts, setAddedToExtraCounts] = useState<Record<string, number>>({});
+  const [retrievedFromExtraCounts, setRetrievedFromExtraCounts] = useState<Record<string, number>>({});
   
 
   // Selection states for inline actions
@@ -169,6 +170,7 @@ export default function OrderDetail() {
     fetchOrder();
     fetchReservedExtraCounts();
     fetchAddedToExtraCounts();
+    fetchRetrievedFromExtraCounts();
     const channel = supabase
       .channel(`order-${id}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "order_batches", filter: `order_id=eq.${id}` }, () => {
@@ -182,6 +184,7 @@ export default function OrderDetail() {
         fetchExtraInventoryCounts();
         fetchReservedExtraCounts();
         fetchAddedToExtraCounts();
+        fetchRetrievedFromExtraCounts();
       })
       .subscribe();
 
@@ -415,6 +418,44 @@ export default function OrderDetail() {
     }
   };
 
+  const fetchRetrievedFromExtraCounts = async () => {
+    if (!id) return;
+    try {
+      const { data, error } = await supabase
+        .from('extra_batch_history')
+        .select('from_state, quantity')
+        .eq('event_type', 'CONSUMED')
+        .eq('consuming_order_id', id);
+
+      if (error) throw error;
+
+      const phaseMap: Record<string, string> = {
+        'extra_manufacturing': 'manufacturing',
+        'extra_finishing': 'finishing',
+        'extra_packaging': 'packaging',
+        'extra_boxing': 'boxing',
+      };
+
+      const counts: Record<string, number> = {
+        manufacturing: 0,
+        finishing: 0,
+        packaging: 0,
+        boxing: 0,
+      };
+
+      (data || []).forEach((record) => {
+        const phase = phaseMap[record.from_state || ''];
+        if (phase) {
+          counts[phase] += record.quantity;
+        }
+      });
+
+      setRetrievedFromExtraCounts(counts);
+    } catch (error) {
+      console.error('Error fetching retrieved from extra counts:', error);
+    }
+  };
+
 
   const handleCancelOrder = async () => {
     try {
@@ -568,35 +609,18 @@ export default function OrderDetail() {
     const inProgress = relevantBatches.filter((b) => b.current_state === inState).reduce((sum, b) => sum + b.quantity, 0);
     const stateIndex = getAllStates().indexOf(inState as UnitState);
     
-    // Define which from_extra_state matches the current phase (items that skipped THIS phase)
-    const phaseExtraStateMap: Record<string, string> = {
-      manufacturing: 'extra_manufacturing',
-      finishing: 'extra_finishing',
-      packaging: 'extra_packaging',
-      boxing: 'extra_boxing',
-    };
-    const phaseExtraState = phaseExtraStateMap[phaseName];
-    
     const pastStateBatches = relevantBatches.filter((b) => 
       getAllStates().indexOf(b.current_state as UnitState) > stateIndex
     );
     
-    // Processed = items that went through this phase normally (no from_extra_state, or from an earlier phase)
-    const processed = pastStateBatches
-      .filter((b) => {
-        const fromExtra = (b as any).from_extra_state;
-        if (!fromExtra) return true;
-        return fromExtra !== phaseExtraState;
-      })
-      .reduce((sum, b) => sum + b.quantity, 0);
+    // Completed = total batches past this state
+    const completed = pastStateBatches.reduce((sum, b) => sum + b.quantity, 0);
     
-    // Retrieved = skipped this phase (from_extra_state matches current phase)
-    const retrieved = pastStateBatches
-      .filter((b) => (b as any).from_extra_state === phaseExtraState)
-      .reduce((sum, b) => sum + b.quantity, 0);
+    // Retrieved = from extra_batch_history CONSUMED events (accurate even when from_extra_state lost during splits)
+    const retrieved = retrievedFromExtraCounts[phaseName] || 0;
     
-    // Completed = total moved to next phase (processed + retrieved)
-    const completed = processed + retrieved;
+    // Processed = completed minus retrieved
+    const processed = Math.max(0, completed - retrieved);
     
     const addedToExtra = addedToExtraCounts[phaseName] || 0;
     const extraToRetrieve = reservedExtraCounts[phaseName] || 0;
