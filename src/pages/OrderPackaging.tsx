@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -111,6 +111,33 @@ export default function OrderPackaging() {
 
   const canManage = hasRole("packaging_manager") || hasRole("packer") || hasRole("admin");
 
+  // Compute processed batches for Production Rate by subtracting retrieved quantities
+  const processedBatchesForRate = useMemo(() => {
+    if (retrievedFromExtraBatches.length === 0) return completedBatches;
+    const retrievedByGroup = new Map<string, number>();
+    retrievedFromExtraBatches.forEach(rb => {
+      const key = rb.order_item_id || rb.product_id;
+      retrievedByGroup.set(key, (retrievedByGroup.get(key) || 0) + rb.quantity);
+    });
+    const remaining = new Map(retrievedByGroup);
+    const adjusted: Batch[] = [];
+    for (const batch of completedBatches) {
+      const key = batch.order_item_id || batch.product_id;
+      const toSubtract = remaining.get(key) || 0;
+      if (toSubtract >= batch.quantity) {
+        remaining.set(key, toSubtract - batch.quantity);
+        continue;
+      }
+      if (toSubtract > 0) {
+        adjusted.push({ ...batch, quantity: batch.quantity - toSubtract } as Batch);
+        remaining.set(key, 0);
+      } else {
+        adjusted.push(batch);
+      }
+    }
+    return adjusted;
+  }, [completedBatches, retrievedFromExtraBatches]);
+
   useEffect(() => {
     fetchData();
     fetchAddedToExtra();
@@ -200,11 +227,7 @@ export default function OrderPackaging() {
 
       setOrder(orderRes.data as Order);
       setBatches(batchesWithData as Batch[]);
-      // Filter out batches that skipped this phase (retrieved from extra_packaging)
-      const processedCompleted = (allCompletedWithData as any[]).filter(
-        (b: any) => b.from_extra_state !== 'extra_packaging'
-      );
-      setCompletedBatches(processedCompleted as Batch[]);
+      setCompletedBatches(allCompletedWithData as Batch[]);
     } catch (error: any) {
       toast.error(error.message);
     } finally {
@@ -1024,7 +1047,7 @@ export default function OrderPackaging() {
           {/* Production Rate Section */}
           <ProductionRateSection
             batches={[
-              ...completedBatches.map((b) => ({
+              ...processedBatchesForRate.map((b) => ({
                 id: b.id,
                 product_id: b.product_id,
                 product_name: b.product?.name || "Unknown",
