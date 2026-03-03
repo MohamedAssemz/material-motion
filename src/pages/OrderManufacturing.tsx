@@ -208,7 +208,10 @@ export default function OrderManufacturing() {
       setOrder(orderRes.data as Order);
       setBatches((batchesRes.data || []) as unknown as Batch[]);
       const allCompleted = (completedRes.data || []) as any[];
-      setCompletedBatches(allCompleted as unknown as Batch[]);
+      const filteredCompleted = allCompleted.filter(
+        (b: any) => !['extra_finishing', 'extra_packaging', 'extra_boxing'].includes(b.from_extra_state)
+      );
+      setCompletedBatches(filteredCompleted as unknown as Batch[]);
     } catch (error: any) {
       toast.error(error.message);
     } finally {
