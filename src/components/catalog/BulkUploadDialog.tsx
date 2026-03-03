@@ -67,8 +67,8 @@ function parseCSVLine(line: string): string[] {
 }
 
 function generateSKU(index: number): string {
-  const timestamp = Date.now();
-  return `PRD-${timestamp}-${String(index).padStart(3, '0')}`;
+  const timestamp = Date.now().toString(36).toUpperCase();
+  return `SKU-${timestamp}${String(index).padStart(3, '0')}`;
 }
 
 export function BulkUploadDialog({ open, onOpenChange, brands, onSuccess }: BulkUploadDialogProps) {
