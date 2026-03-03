@@ -76,7 +76,9 @@ export default function OrderPackaging() {
   const [order, setOrder] = useState<Order | null>(null);
   const [batches, setBatches] = useState<Batch[]>([]);
   const [completedBatches, setCompletedBatches] = useState<Batch[]>([]);
-  const [retrievedFromExtraBatches, setRetrievedFromExtraBatches] = useState<Batch[]>([]);
+  const [retrievedFromExtraBatches, setRetrievedFromExtraBatches] = useState<
+    Array<{ id: string; product_id: string; product_name: string; product_sku: string; quantity: number; order_item_id?: string | null }>
+  >([]);
   const [addedToExtraItems, setAddedToExtraItems] = useState<
     Array<{ product_id: string; product_name: string; product_sku: string; quantity: number }>
   >([]);
@@ -112,6 +114,7 @@ export default function OrderPackaging() {
   useEffect(() => {
     fetchData();
     fetchAddedToExtra();
+    fetchRetrievedFromExtra();
     const channel = supabase
       .channel(`order-packaging-${id}`)
       .on(
@@ -120,6 +123,7 @@ export default function OrderPackaging() {
         () => {
           fetchData();
           fetchAddedToExtra();
+          fetchRetrievedFromExtra();
         },
       )
       .subscribe();
@@ -184,10 +188,7 @@ export default function OrderPackaging() {
         })) || [];
 
       // Filter completed batches to only include items that actually went through packaging
-      // Items with needs_packing = false skip packaging entirely (go from Finishing -> Boxing)
-      // and should NOT appear in the Packaging completed list
-      // Filter: exclude items that skip packaging (needs_packing=false)
-      const skippedExtraStates = ['extra_packaging'];
+      // Items with needs_packing = false skip packaging entirely
       const allCompletedWithData =
         completedRes.data
           ?.filter((batch: any) => batch.product?.needs_packing !== false)
@@ -199,9 +200,8 @@ export default function OrderPackaging() {
 
       setOrder(orderRes.data as Order);
       setBatches(batchesWithData as Batch[]);
-      // Split: production rate vs retrieved from extra
-      setCompletedBatches(allCompletedWithData.filter((b: any) => !b.from_extra_state || !skippedExtraStates.includes(b.from_extra_state)) as Batch[]);
-      setRetrievedFromExtraBatches(allCompletedWithData.filter((b: any) => b.from_extra_state && skippedExtraStates.includes(b.from_extra_state)) as Batch[]);
+      // Show ALL completed batches in production rate (no from_extra_state filtering)
+      setCompletedBatches(allCompletedWithData as Batch[]);
     } catch (error: any) {
       toast.error(error.message);
     } finally {
@@ -271,6 +271,41 @@ export default function OrderPackaging() {
 
     } catch (error) {
       console.error("Error fetching added to extra:", error);
+    }
+  };
+
+  const fetchRetrievedFromExtra = async () => {
+    if (!id) return;
+    try {
+      const { data, error } = await supabase
+        .from('extra_batch_history')
+        .select('quantity, product_id, consuming_order_item_id, products(name, sku)')
+        .eq('event_type', 'CONSUMED')
+        .eq('consuming_order_id', id)
+        .eq('from_state', 'extra_packaging');
+
+      if (error) throw error;
+
+      const productMap = new Map<string, { id: string; product_id: string; product_name: string; product_sku: string; quantity: number; order_item_id: string | null }>();
+      (data || []).forEach((record: any) => {
+        const key = record.consuming_order_item_id || record.product_id;
+        const existing = productMap.get(key);
+        if (existing) {
+          existing.quantity += record.quantity;
+        } else {
+          productMap.set(key, {
+            id: key,
+            product_id: record.product_id,
+            product_name: record.products?.name || 'Unknown',
+            product_sku: record.products?.sku || 'N/A',
+            quantity: record.quantity,
+            order_item_id: record.consuming_order_item_id || null,
+          });
+        }
+      });
+      setRetrievedFromExtraBatches(Array.from(productMap.values()));
+    } catch (error) {
+      console.error('Error fetching retrieved from extra:', error);
     }
   };
 
@@ -1014,15 +1049,7 @@ export default function OrderPackaging() {
           />
 
           <RetrievedFromExtraSection
-            batches={retrievedFromExtraBatches.map(b => ({
-              id: b.id,
-              product_id: b.product_id,
-              product_name: b.product?.name || 'Unknown',
-              product_sku: b.product?.sku || 'N/A',
-              quantity: b.quantity,
-              from_extra_state: (b as any).from_extra_state,
-              order_item_id: b.order_item_id || null,
-            }))}
+            batches={retrievedFromExtraBatches}
           />
 
           {completedGroups.length === 0 && completedBatches.length === 0 && retrievedFromExtraBatches.length === 0 && (
