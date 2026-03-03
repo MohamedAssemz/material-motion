@@ -623,6 +623,7 @@ export default function OrderBoxing() {
                 finishing_machine_id: batch.finishing_machine_id,
                 packaging_machine_id: batch.packaging_machine_id,
                 boxing_machine_id: batch.boxing_machine_id,
+                from_extra_state: batch.from_extra_state,
               });
               if (insertError) throw insertError;
             }
@@ -778,6 +779,7 @@ export default function OrderBoxing() {
                 quantity: useQty,
                 created_by: user?.id,
                 shipment_id: shipment.id,
+                from_extra_state: batch.from_extra_state,
               });
               if (insertError) throw insertError;
             }

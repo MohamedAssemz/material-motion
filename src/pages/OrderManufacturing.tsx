@@ -46,6 +46,7 @@ interface Batch {
   is_flagged?: boolean;
   is_redo?: boolean;
   manufacturing_machine_id?: string | null;
+  from_extra_state?: string | null;
   product: {
     id: string;
     name: string;
@@ -145,7 +146,7 @@ export default function OrderManufacturing() {
         supabase
           .from("order_batches")
           .select(
-            "id, qr_code_data, current_state, quantity, product_id, order_item_id, eta, lead_time_days, box_id, is_flagged, is_redo, manufacturing_machine_id, product:products(id, name, sku, needs_packing), order_item:order_items(needs_boxing)",
+            "id, qr_code_data, current_state, quantity, product_id, order_item_id, eta, lead_time_days, box_id, is_flagged, is_redo, manufacturing_machine_id, from_extra_state, product:products(id, name, sku, needs_packing), order_item:order_items(needs_boxing)",
           )
           .eq("order_id", id)
           .eq("is_terminated", false)
@@ -528,6 +529,7 @@ export default function OrderManufacturing() {
                 box_id: selectedBox.id,
                 created_by: user?.id,
                 manufacturing_machine_id: machineId || batch.manufacturing_machine_id,
+                from_extra_state: batch.from_extra_state,
               })
               .select("id")
               .single();
