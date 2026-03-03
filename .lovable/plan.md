@@ -1,54 +1,51 @@
 
 
-## Fix Extra Inventory Filtering Issues
+## Fix Timeline Card Metrics and Remove Extra Tags
 
-### Problem 1: Packaging Completed Tab Shows Wrong Retrieved Items
-The Packaging page's `skippedExtraStates` is `['extra_packaging', 'extra_boxing']`, causing items with `from_extra_state = 'extra_boxing'` to appear in the Packaging "Retrieved from Extra" section. Per the approved rule, each phase should only show items retrieved from its own extra state.
+### Problem 1: Double-counting in timeline cards
+Currently, "Completed" includes both normally processed items AND items retrieved from earlier phases' extra inventory. The separate "Retrieved" line then shows items that skipped the current phase. But items retrieved from the current phase's extra state are also being counted somewhere, causing confusion. The user wants clearer, standardized metrics.
 
-### Problem 2: Finishing Completed Tab Has Same Issue
-The Finishing page's `skippedStates` is `['extra_finishing', 'extra_packaging', 'extra_boxing']`, which would similarly show items from later phases in Finishing's retrieved section.
-
-### Problem 3: Order Detail Timeline Cards Exclude Retrieved Items from Completed Count
-The `getPhaseStats` function in `OrderDetail.tsx` excludes all extra inventory items from the `completed` count. For Manufacturing, it uses `'all'` which means 0 completed even though 60 items were retrieved from extra and contributed to the order. The user wants retrieved items reflected in the timeline cards.
+### Problem 2: Redundant tag in Retrieved from Extra section
+The purple badge showing "From Extra Mfg" / "From Extra Finish" etc. on each entry in `RetrievedFromExtraSection` is unnecessary since the section already tells you these are from extra inventory, and per the filtering rule, they can only be from the current phase's extra state.
 
 ---
 
 ### Changes
 
-#### 1. Fix `OrderPackaging.tsx` (line 189)
-Change `skippedExtraStates` from `['extra_packaging', 'extra_boxing']` to `['extra_packaging']`.
+#### 1. Restructure timeline card metrics in `OrderDetail.tsx`
 
-This ensures only items that skipped packaging (retrieved from `extra_packaging`) appear in the "Retrieved from Extra" section. Items from `extra_boxing` were processed in packaging and belong in Production Rate.
+Rename and redefine the `PhaseStats` fields:
 
-#### 2. Fix `OrderFinishing.tsx` (line 209)
-Change `skippedStates` from `['extra_finishing', 'extra_packaging', 'extra_boxing']` to `['extra_finishing']`.
+| Field | Old meaning | New meaning |
+|-------|------------|-------------|
+| `waiting` | Same | Same (no change) |
+| `inProgress` | Same | Same (no change) |
+| `completed` | Processed + retrieved from earlier phases | **Total moved to next phase** = processed + retrieved |
+| `retrieved` | Items that skipped this phase | Same (items from current phase's extra state) |
+| `addedToExtra` | Same | Same (no change) |
+| NEW `processed` | N/A | Items processed normally (no `from_extra_state`, or from earlier phase) |
 
-Same logic: only items that skipped finishing belong in the retrieved section.
+**In `getPhaseStats`** (lines 583-599):
+- Add `processed` field: batches past this state where `from_extra_state` is null or from an earlier phase
+- Keep `retrieved` as-is: batches where `from_extra_state` matches current phase
+- Change `completed` to: `processed + retrieved` (total items that moved past this phase)
 
-#### 3. Fix `OrderDetail.tsx` -- `getPhaseStats` (lines 570-575)
-Two changes:
-- Update the `extraExcludeMap` to only exclude the current phase's extra state per phase:
-  ```typescript
-  manufacturing: ['extra_manufacturing'],
-  finishing: ['extra_finishing'],
-  packaging: ['extra_packaging'],
-  boxing: ['extra_boxing'],
-  ```
-- Add a `retrieved` field to `PhaseStats` that counts batches excluded from completed (those matching the phase's own extra state), and display it as a new "Retrieved" line in each timeline card.
+**In card rendering** (lines 896-926 and similar for all 4 phases):
+- Show: Waiting, In Progress, Processed (green), Retrieved (purple, conditional), Added to Extra (orange, conditional), then **Completed** (bold/accent, = processed + retrieved)
+- For Boxing card: "Completed" label could say "Shipped / Ready" or just "Completed"
 
-#### 4. Update `PhaseStats` interface (line 116)
-Add `retrieved: number` field.
+#### 2. Remove the source-state badge from `RetrievedFromExtraSection.tsx`
 
-#### 5. Update timeline card rendering (lines 887-912 and similar for other phases)
-Add a "Retrieved" line (purple-themed) below "Completed" showing the count of items retrieved from extra inventory for that phase. Also update "Completed" to show processed + retrieved total, or keep them separate with clear labels.
+In the component (line 80-82), remove the purple badge that shows `EXTRA_STATE_LABELS[group.from_extra_state]`. The section header already indicates these are from extra inventory, and the filtering ensures only the current phase's items appear.
 
-**Recommended approach**: Show "Completed" as the processed count, and a separate "Retrieved" line for retrieved items. This keeps it clear what was actually processed vs retrieved.
+Also remove the `EXTRA_STATE_LABELS` constant and the `from_extra_state` field from the grouping logic since it's no longer displayed.
 
-### Files to Modify
+---
+
+### Files to modify
 
 | File | Change |
 |------|--------|
-| `src/pages/OrderPackaging.tsx` | Fix `skippedExtraStates` to `['extra_packaging']` |
-| `src/pages/OrderFinishing.tsx` | Fix `skippedStates` to `['extra_finishing']` |
-| `src/pages/OrderDetail.tsx` | Fix `extraExcludeMap`, add `retrieved` to `PhaseStats`, render "Retrieved" line in timeline cards |
+| `src/pages/OrderDetail.tsx` | Add `processed` to `PhaseStats`, redefine `completed` as processed+retrieved, update card rendering for all 4 phases |
+| `src/components/RetrievedFromExtraSection.tsx` | Remove the "From Extra Mfg/Finish/etc." badge from each entry |
 
