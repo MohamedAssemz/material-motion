@@ -613,14 +613,20 @@ export default function OrderDetail() {
       getAllStates().indexOf(b.current_state as UnitState) > stateIndex
     );
     
-    // Completed = total batches past this state
-    const completed = pastStateBatches.reduce((sum, b) => sum + b.quantity, 0);
-    
-    // Retrieved = from extra_batch_history CONSUMED events (accurate even when from_extra_state lost during splits)
+    // Retrieved = from extra_batch_history CONSUMED events (immutable source of truth)
     const retrieved = retrievedFromExtraCounts[phaseName] || 0;
     
-    // Processed = completed minus retrieved
-    const processed = Math.max(0, completed - retrieved);
+    // Completed = total batches past this state
+    const totalPast = pastStateBatches.reduce((sum, b) => sum + b.quantity, 0);
+    
+    // Defensive hybrid: use both batch labels and history diff to handle corrupted provenance
+    const phaseExtraState = `extra_${phaseName}`;
+    const processedByLabels = pastStateBatches
+      .filter((b) => (b as any).from_extra_state !== phaseExtraState)
+      .reduce((sum, b) => sum + b.quantity, 0);
+    const processedByDiff = Math.max(0, totalPast - retrieved);
+    const processed = Math.max(processedByLabels, processedByDiff);
+    const completed = processed + retrieved;
     
     const addedToExtra = addedToExtraCounts[phaseName] || 0;
     const extraToRetrieve = reservedExtraCounts[phaseName] || 0;

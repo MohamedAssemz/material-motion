@@ -103,6 +103,9 @@ export default function OrderBoxing() {
   const [extraBatchesForRate, setExtraBatchesForRate] = useState<
     Array<{ id: string; product_id: string; product_name: string; product_sku: string; quantity: number; boxing_machine_id: string | null }>
   >([]);
+  const [retrievedFromExtraBatches, setRetrievedFromExtraBatches] = useState<
+    Array<{ id: string; product_id: string; product_name: string; product_sku: string; quantity: number; order_item_id?: string | null }>
+  >([]);
   const [loading, setLoading] = useState(true);
   
   // Get default tab from URL query params
@@ -133,11 +136,13 @@ export default function OrderBoxing() {
   useEffect(() => {
     fetchData();
     fetchAddedToExtra();
+    fetchRetrievedFromExtra();
     const channel = supabase
       .channel(`order-boxing-${id}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "order_batches", filter: `order_id=eq.${id}` }, () => {
         fetchData();
         fetchAddedToExtra();
+        fetchRetrievedFromExtra();
       })
       .subscribe();
     return () => {
@@ -258,6 +263,41 @@ export default function OrderBoxing() {
       }
     } catch (error) {
       console.error('Error fetching added to extra:', error);
+    }
+  };
+
+  const fetchRetrievedFromExtra = async () => {
+    if (!id) return;
+    try {
+      const { data, error } = await supabase
+        .from('extra_batch_history')
+        .select('quantity, product_id, consuming_order_item_id, products(name, sku)')
+        .eq('event_type', 'CONSUMED')
+        .eq('consuming_order_id', id)
+        .eq('from_state', 'extra_boxing');
+
+      if (error) throw error;
+
+      const productMap = new Map<string, { id: string; product_id: string; product_name: string; product_sku: string; quantity: number; order_item_id: string | null }>();
+      (data || []).forEach((record: any) => {
+        const key = record.consuming_order_item_id || record.product_id;
+        const existing = productMap.get(key);
+        if (existing) {
+          existing.quantity += record.quantity;
+        } else {
+          productMap.set(key, {
+            id: key,
+            product_id: record.product_id,
+            product_name: record.products?.name || 'Unknown',
+            product_sku: record.products?.sku || 'N/A',
+            quantity: record.quantity,
+            order_item_id: record.consuming_order_item_id || null,
+          });
+        }
+      });
+      setRetrievedFromExtraBatches(Array.from(productMap.values()));
+    } catch (error) {
+      console.error('Error fetching retrieved from extra:', error);
     }
   };
 
@@ -548,16 +588,23 @@ export default function OrderBoxing() {
 
           if (useQty === batch.quantity) {
             // Move entire batch - check if we can consolidate with existing ready_for_shipment batch
-            const { data: existingBatch } = await supabase
+            // Provenance-aware consolidation: match from_extra_state (null-safe)
+            let existingBatchQuery = supabase
               .from("order_batches")
               .select("id, quantity")
               .eq("order_id", id)
               .eq("product_id", batch.product_id)
               .eq("order_item_id", batch.order_item_id)
               .eq("current_state", "ready_for_shipment")
-              .eq("is_terminated", false)
-              .limit(1)
-              .single();
+              .eq("is_terminated", false);
+            
+            if (batch.from_extra_state) {
+              existingBatchQuery = existingBatchQuery.eq("from_extra_state", batch.from_extra_state);
+            } else {
+              existingBatchQuery = existingBatchQuery.is("from_extra_state", null);
+            }
+            
+            const { data: existingBatch } = await existingBatchQuery.limit(1).single();
             
             if (existingBatch) {
               // Consolidate: add quantity to existing batch and delete current batch
@@ -587,16 +634,23 @@ export default function OrderBoxing() {
             movedCount += useQty;
           } else {
             // Partial move - check if we can consolidate with existing ready_for_shipment batch
-            const { data: existingBatch } = await supabase
+            // Provenance-aware consolidation: match from_extra_state (null-safe)
+            let existingBatchQuery2 = supabase
               .from("order_batches")
               .select("id, quantity")
               .eq("order_id", id)
               .eq("product_id", batch.product_id)
               .eq("order_item_id", batch.order_item_id)
               .eq("current_state", "ready_for_shipment")
-              .eq("is_terminated", false)
-              .limit(1)
-              .single();
+              .eq("is_terminated", false);
+            
+            if (batch.from_extra_state) {
+              existingBatchQuery2 = existingBatchQuery2.eq("from_extra_state", batch.from_extra_state);
+            } else {
+              existingBatchQuery2 = existingBatchQuery2.is("from_extra_state", null);
+            }
+            
+            const { data: existingBatch } = await existingBatchQuery2.limit(1).single();
             
             if (existingBatch) {
               // Consolidate: add quantity to existing batch
@@ -702,7 +756,8 @@ export default function OrderBoxing() {
 
           if (useQty === batch.quantity) {
             // Ship entire batch - check if we can consolidate with existing shipped batch
-            const { data: existingBatch } = await supabase
+            // Provenance-aware consolidation: match from_extra_state + shipment_id
+            let existingShipBatchQuery = supabase
               .from("order_batches")
               .select("id, quantity")
               .eq("order_id", id)
@@ -710,9 +765,15 @@ export default function OrderBoxing() {
               .eq("order_item_id", batch.order_item_id)
               .eq("current_state", "shipped")
               .eq("shipment_id", shipment.id)
-              .eq("is_terminated", false)
-              .limit(1)
-              .single();
+              .eq("is_terminated", false);
+            
+            if (batch.from_extra_state) {
+              existingShipBatchQuery = existingShipBatchQuery.eq("from_extra_state", batch.from_extra_state);
+            } else {
+              existingShipBatchQuery = existingShipBatchQuery.is("from_extra_state", null);
+            }
+            
+            const { data: existingBatch } = await existingShipBatchQuery.limit(1).single();
             
             if (existingBatch) {
               // Consolidate: add quantity to existing shipped batch
@@ -747,16 +808,24 @@ export default function OrderBoxing() {
             shippedCount += useQty;
           } else {
             // Partial ship - check if we can consolidate with existing shipped batch
-            const { data: existingBatch } = await supabase
+            // Provenance-aware consolidation: match from_extra_state + shipment_id
+            let existingShipBatchQuery2 = supabase
               .from("order_batches")
               .select("id, quantity")
               .eq("order_id", id)
               .eq("product_id", batch.product_id)
               .eq("order_item_id", batch.order_item_id)
               .eq("current_state", "shipped")
-              .eq("is_terminated", false)
-              .limit(1)
-              .single();
+              .eq("shipment_id", shipment.id)
+              .eq("is_terminated", false);
+            
+            if (batch.from_extra_state) {
+              existingShipBatchQuery2 = existingShipBatchQuery2.eq("from_extra_state", batch.from_extra_state);
+            } else {
+              existingShipBatchQuery2 = existingShipBatchQuery2.is("from_extra_state", null);
+            }
+            
+            const { data: existingBatch } = await existingShipBatchQuery2.limit(1).single();
             
             if (existingBatch) {
               // Consolidate: add quantity to existing shipped batch
@@ -1420,17 +1489,9 @@ export default function OrderBoxing() {
             onAssigned={() => { fetchData(); fetchAddedToExtra(); }}
           />
 
-          {/* Retrieved from Extra - shipped batches that skipped boxing */}
+          {/* Retrieved from Extra - from history (immutable source of truth) */}
           <RetrievedFromExtraSection
-            batches={batches.filter(b => b.current_state === 'shipped' && b.from_extra_state === 'extra_boxing').map(b => ({
-              id: b.id,
-              product_id: b.product_id,
-              product_name: b.product?.name || 'Unknown',
-              product_sku: b.product?.sku || 'N/A',
-              quantity: b.quantity,
-              from_extra_state: b.from_extra_state!,
-              order_item_id: b.order_item_id || null,
-            }))}
+            batches={retrievedFromExtraBatches}
           />
 
           <Card>
