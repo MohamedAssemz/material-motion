@@ -236,7 +236,10 @@ export default function OrderFinishing() {
 
       setOrder(orderRes.data as Order);
       setBatches(batchesWithData as Batch[]);
-      setCompletedBatches(completedWithData as Batch[]);
+      const filteredCompleted = completedWithData.filter(
+        (b: any) => !['extra_packaging', 'extra_boxing'].includes(b.from_extra_state)
+      );
+      setCompletedBatches(filteredCompleted as Batch[]);
     } catch (error: any) {
       toast.error(error.message);
     } finally {
