@@ -1,25 +1,45 @@
 
-## COMPLETED: Fix provenance loss through consolidation merges + history-based retrieved sections
 
-### Changes Made
+## Bug: Production Rate in Completed Tab Shows Retrieved Items
 
-#### 1. Provenance-aware consolidation in OrderBoxing.tsx
-- All 4 consolidation queries (2 in `handleMoveToReadyForShipment`, 2 in `handleCreateKartona`) now include `from_extra_state` in the lookup key using null-safe comparison (`eq` for non-null, `is null` for null).
-- Shipped batch consolidation also scopes by `shipment_id` to prevent cross-shipment merges.
-- Result: Batches with different provenance are never merged together going forward.
+### Problem
+The completed tab's Production Rate section feeds ALL `completedBatches` (80 items) — including the 50 that were retrieved from extra inventory and never went through manufacturing. These 50 items should not appear as "needing machine assignment" in Production Rate.
 
-#### 2. History-based Retrieved sections in all 4 phase pages
-- All phase pages (Manufacturing, Finishing, Packaging, Boxing) now fetch `CONSUMED` events from `extra_batch_history` to populate the "Retrieved from Extra" section.
-- Completed batches are no longer filtered by `from_extra_state` — all go to Production Rate.
-- Result: Retrieved sections are accurate even for orders with previously corrupted batch-level provenance.
+The previous fix intentionally stopped filtering by `from_extra_state` because that field is unreliable (corrupted by merges). But showing everything in Production Rate is also wrong.
 
-#### 3. Defensive hybrid card math in OrderDetail.tsx
-- `processed = max(processedByCurrentLabels, completed - retrieved)` ensures cards remain correct for both clean and corrupted data.
-- `completed = processed + retrieved` ensures consistency.
+### Solution
+Since we now have reliable retrieved counts from `extra_batch_history`, we should **exclude retrieved batches from Production Rate** using a hybrid approach:
 
-### Files Modified
-- `src/pages/OrderBoxing.tsx` — provenance-safe consolidation + history-based retrieved
-- `src/pages/OrderManufacturing.tsx` — history-based retrieved
-- `src/pages/OrderFinishing.tsx` — history-based retrieved
-- `src/pages/OrderPackaging.tsx` — history-based retrieved
-- `src/pages/OrderDetail.tsx` — defensive hybrid card calculation
+1. **Filter `completedBatches` by `from_extra_state`** to remove items where `from_extra_state` matches the current phase's extra state (e.g., `extra_manufacturing`). This handles clean data.
+2. The Retrieved section already uses `extra_batch_history` as source of truth, so it remains accurate regardless.
+
+This same pattern applies to all 4 phase pages since they all have the same structure.
+
+### Changes
+
+**All 4 phase pages** (`OrderManufacturing.tsx`, `OrderFinishing.tsx`, `OrderPackaging.tsx`, `OrderBoxing.tsx`):
+
+- When setting `completedBatches`, filter OUT batches where `from_extra_state` matches the current phase's extra state. These items bypassed the phase and belong only in the Retrieved section (sourced from history).
+- The Production Rate section then only shows items that were actually processed in this phase.
+- The Retrieved section continues using `extra_batch_history` as its immutable source of truth.
+
+For Manufacturing specifically (line ~184):
+```typescript
+const allCompleted = (completedRes.data || []) as any[];
+// Filter out batches that skipped this phase (retrieved from extra_manufacturing)
+const processedCompleted = allCompleted.filter(
+  (b: any) => b.from_extra_state !== 'extra_manufacturing'
+);
+setCompletedBatches(processedCompleted as unknown as Batch[]);
+```
+
+Same pattern for Finishing (`extra_finishing`), Packaging (`extra_packaging`), Boxing (`extra_boxing`).
+
+### Files to modify
+| File | Change |
+|------|--------|
+| `src/pages/OrderManufacturing.tsx` | Filter completedBatches to exclude `from_extra_state = 'extra_manufacturing'` |
+| `src/pages/OrderFinishing.tsx` | Filter completedBatches to exclude `from_extra_state = 'extra_finishing'` |
+| `src/pages/OrderPackaging.tsx` | Filter completedBatches to exclude `from_extra_state = 'extra_packaging'` |
+| `src/pages/OrderBoxing.tsx` | Filter completedBatches to exclude `from_extra_state = 'extra_boxing'` |
+
