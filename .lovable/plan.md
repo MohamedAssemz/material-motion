@@ -1,45 +1,60 @@
 
 
-## Bug: Production Rate in Completed Tab Shows Retrieved Items
+## Bug: Retrieved items from later phases inflate earlier phases' Production Rate
 
-### Problem
-The completed tab's Production Rate section feeds ALL `completedBatches` (80 items) — including the 50 that were retrieved from extra inventory and never went through manufacturing. These 50 items should not appear as "needing machine assignment" in Production Rate.
+### Root Cause
 
-The previous fix intentionally stopped filtering by `from_extra_state` because that field is unreliable (corrupted by merges). But showing everything in Production Rate is also wrong.
+When items are retrieved from extra inventory at a later phase (e.g., `extra_finishing`) and moved directly to the next phase (e.g., `in_packaging`), these batches end up in states like `in_packaging`, `ready_for_shipment`, etc. — which are included in Manufacturing's `completedBatches` query (it fetches ALL states past manufacturing).
 
-### Solution
-Since we now have reliable retrieved counts from `extra_batch_history`, we should **exclude retrieved batches from Production Rate** using a hybrid approach:
+The current subtraction logic only subtracts `retrievedFromExtraBatches` which is sourced from `extra_batch_history` filtered to `from_state = 'extra_manufacturing'`. Items retrieved from `extra_finishing`, `extra_packaging`, or `extra_boxing` are NOT subtracted, so they inflate Production Rate in all earlier phases.
 
-1. **Filter `completedBatches` by `from_extra_state`** to remove items where `from_extra_state` matches the current phase's extra state (e.g., `extra_manufacturing`). This handles clean data.
-2. The Retrieved section already uses `extra_batch_history` as source of truth, so it remains accurate regardless.
+### Fix
 
-This same pattern applies to all 4 phase pages since they all have the same structure.
+Filter `completedBatches` to exclude batches whose `from_extra_state` indicates they skipped the current phase entirely. The phase hierarchy is: manufacturing → finishing → packaging → boxing. An item retrieved from a later phase's extra state never went through earlier phases in this order.
+
+| Phase | Exclude `from_extra_state` values |
+|-------|----------------------------------|
+| Manufacturing | `extra_finishing`, `extra_packaging`, `extra_boxing` |
+| Finishing | `extra_packaging`, `extra_boxing` |
+| Packaging | `extra_boxing` |
+| Boxing | (none — already correct) |
+
+Items with `from_extra_state` matching the current phase (e.g., `extra_manufacturing` in Manufacturing) are already handled by the existing `processedBatchesForRate` subtraction using `extra_batch_history`.
 
 ### Changes
 
-**All 4 phase pages** (`OrderManufacturing.tsx`, `OrderFinishing.tsx`, `OrderPackaging.tsx`, `OrderBoxing.tsx`):
-
-- When setting `completedBatches`, filter OUT batches where `from_extra_state` matches the current phase's extra state. These items bypassed the phase and belong only in the Retrieved section (sourced from history).
-- The Production Rate section then only shows items that were actually processed in this phase.
-- The Retrieved section continues using `extra_batch_history` as its immutable source of truth.
-
-For Manufacturing specifically (line ~184):
+**`src/pages/OrderManufacturing.tsx`** (~line 211):
+After fetching `allCompleted`, filter out batches that skipped manufacturing:
 ```typescript
 const allCompleted = (completedRes.data || []) as any[];
-// Filter out batches that skipped this phase (retrieved from extra_manufacturing)
-const processedCompleted = allCompleted.filter(
-  (b: any) => b.from_extra_state !== 'extra_manufacturing'
+const filteredCompleted = allCompleted.filter(
+  (b: any) => !['extra_finishing', 'extra_packaging', 'extra_boxing'].includes(b.from_extra_state)
 );
-setCompletedBatches(processedCompleted as unknown as Batch[]);
+setCompletedBatches(filteredCompleted as unknown as Batch[]);
 ```
 
-Same pattern for Finishing (`extra_finishing`), Packaging (`extra_packaging`), Boxing (`extra_boxing`).
+**`src/pages/OrderFinishing.tsx`** (~line 239):
+Same pattern, excluding batches that skipped finishing:
+```typescript
+const filteredCompleted = completedWithData.filter(
+  (b: any) => !['extra_packaging', 'extra_boxing'].includes(b.from_extra_state)
+);
+setCompletedBatches(filteredCompleted as Batch[]);
+```
+
+**`src/pages/OrderPackaging.tsx`**:
+Exclude batches that skipped packaging:
+```typescript
+const filteredCompleted = completedWithData.filter(
+  (b: any) => b.from_extra_state !== 'extra_boxing'
+);
+setCompletedBatches(filteredCompleted as Batch[]);
+```
+
+**`src/pages/OrderBoxing.tsx`**: No change needed — boxing is the last phase.
 
 ### Files to modify
-| File | Change |
-|------|--------|
-| `src/pages/OrderManufacturing.tsx` | Filter completedBatches to exclude `from_extra_state = 'extra_manufacturing'` |
-| `src/pages/OrderFinishing.tsx` | Filter completedBatches to exclude `from_extra_state = 'extra_finishing'` |
-| `src/pages/OrderPackaging.tsx` | Filter completedBatches to exclude `from_extra_state = 'extra_packaging'` |
-| `src/pages/OrderBoxing.tsx` | Filter completedBatches to exclude `from_extra_state = 'extra_boxing'` |
+- `src/pages/OrderManufacturing.tsx`
+- `src/pages/OrderFinishing.tsx`
+- `src/pages/OrderPackaging.tsx`
 
