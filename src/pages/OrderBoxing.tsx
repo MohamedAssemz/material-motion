@@ -17,6 +17,7 @@ import { ExtraItemsTab } from '@/components/ExtraItemsTab';
 import { BoxScanPopup } from '@/components/BoxScanPopup';
 import { MoveToExtraDialog } from '@/components/MoveToExtraDialog';
 import { ProductionRateSection } from '@/components/ProductionRateSection';
+import { RetrievedFromExtraSection } from '@/components/RetrievedFromExtraSection';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { format } from "date-fns";
@@ -36,6 +37,7 @@ interface Batch {
   product: { id: string; name: string; sku: string; needs_packing: boolean };
   box?: { id: string; box_code: string } | null;
   order_item?: { id: string; needs_boxing: boolean } | null;
+  from_extra_state?: string | null;
 }
 
 interface Order {
@@ -72,6 +74,7 @@ interface ShippedBatch {
   order_item_id: string | null;
   product: { id: string; name: string; sku: string };
   order_item?: { needs_boxing: boolean } | null;
+  from_extra_state?: string | null;
 }
 
 interface Shipment {
@@ -149,7 +152,7 @@ export default function OrderBoxing() {
         supabase
           .from("order_batches")
           .select(
-            "id, qr_code_data, current_state, quantity, product_id, order_item_id, box_id, manufacturing_machine_id, finishing_machine_id, packaging_machine_id, boxing_machine_id, product:products(id, name, sku, needs_packing)",
+            "id, qr_code_data, current_state, quantity, product_id, order_item_id, box_id, manufacturing_machine_id, finishing_machine_id, packaging_machine_id, boxing_machine_id, from_extra_state, product:products(id, name, sku, needs_packing)",
           )
           .eq("order_id", id)
           .eq("is_terminated", false)
@@ -278,6 +281,7 @@ export default function OrderBoxing() {
             qr_code_data,
             quantity,
             order_item_id,
+            from_extra_state,
             product:products(id, name, sku)
           `)
           .eq("shipment_id", shipment.id);
@@ -300,6 +304,7 @@ export default function OrderBoxing() {
             order_item_id: batch.order_item_id,
             product: batch.product as any,
             order_item: orderItem,
+            from_extra_state: (batch as any).from_extra_state || null,
           });
         }
 
@@ -1344,6 +1349,11 @@ export default function OrderBoxing() {
                                 Not Boxed
                               </Badge>
                             )}
+                            {group.batches.some(b => b.from_extra_state === 'extra_boxing') && (
+                              <Badge className="text-xs bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300 border-purple-300 dark:border-purple-700">
+                                From Extra
+                              </Badge>
+                            )}
                           </div>
                           <p className="text-sm text-muted-foreground">{group.product_sku}</p>
                         </div>
@@ -1378,10 +1388,10 @@ export default function OrderBoxing() {
         </TabsContent>
 
         <TabsContent value="shipments" className="space-y-4">
-          {/* Production Rate Section - for shipped batches */}
+          {/* Production Rate Section - for shipped batches that were processed in boxing */}
           <ProductionRateSection
             batches={[
-              ...batches.filter(b => b.current_state === 'shipped').map(b => ({
+              ...batches.filter(b => b.current_state === 'shipped' && b.from_extra_state !== 'extra_boxing').map(b => ({
                 id: b.id,
                 product_id: b.product_id,
                 product_name: b.product?.name || 'Unknown',
@@ -1406,6 +1416,19 @@ export default function OrderBoxing() {
             machineType="boxing"
             machineColumnName="boxing_machine_id"
             onAssigned={() => { fetchData(); fetchAddedToExtra(); }}
+          />
+
+          {/* Retrieved from Extra - shipped batches that skipped boxing */}
+          <RetrievedFromExtraSection
+            batches={batches.filter(b => b.current_state === 'shipped' && b.from_extra_state === 'extra_boxing').map(b => ({
+              id: b.id,
+              product_id: b.product_id,
+              product_name: b.product?.name || 'Unknown',
+              product_sku: b.product?.sku || 'N/A',
+              quantity: b.quantity,
+              from_extra_state: b.from_extra_state!,
+              order_item_id: b.order_item_id || null,
+            }))}
           />
 
           <Card>
@@ -1480,6 +1503,7 @@ export default function OrderBoxing() {
                           product_name: string;
                           total_quantity: number;
                           needs_boxing: boolean;
+                          has_from_extra: boolean;
                         }>();
                         
                         shipment.batches.forEach(batch => {
@@ -1487,6 +1511,7 @@ export default function OrderBoxing() {
                           const existing = groupedItems.get(orderItemId);
                           if (existing) {
                             existing.total_quantity += batch.quantity;
+                            if (batch.from_extra_state) existing.has_from_extra = true;
                           } else {
                             groupedItems.set(orderItemId, {
                               order_item_id: orderItemId,
@@ -1494,6 +1519,7 @@ export default function OrderBoxing() {
                               product_name: batch.product?.name || 'Unknown',
                               total_quantity: batch.quantity,
                               needs_boxing: batch.order_item?.needs_boxing ?? true,
+                              has_from_extra: !!batch.from_extra_state,
                             });
                           }
                         });
@@ -1505,6 +1531,11 @@ export default function OrderBoxing() {
                               <span className="text-muted-foreground">- {group.product_name}</span>
                               {!group.needs_boxing && (
                                 <Badge variant="secondary" className="text-xs">No Boxing</Badge>
+                              )}
+                              {group.has_from_extra && (
+                                <Badge className="text-xs bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300 border-purple-300 dark:border-purple-700">
+                                  From Extra
+                                </Badge>
                               )}
                             </div>
                             <Badge variant="outline">{group.total_quantity}</Badge>

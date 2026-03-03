@@ -17,6 +17,7 @@ import { BoxScanPopup } from "@/components/BoxScanPopup";
 import { MoveToExtraDialog } from "@/components/MoveToExtraDialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ProductionRateSection } from "@/components/ProductionRateSection";
+import { RetrievedFromExtraSection } from "@/components/RetrievedFromExtraSection";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { normalizeBoxCode } from "@/lib/boxUtils";
 
@@ -77,6 +78,7 @@ export default function OrderFinishing() {
   const [order, setOrder] = useState<Order | null>(null);
   const [batches, setBatches] = useState<Batch[]>([]);
   const [completedBatches, setCompletedBatches] = useState<Batch[]>([]);
+  const [retrievedFromExtraBatches, setRetrievedFromExtraBatches] = useState<Batch[]>([]);
   const [addedToExtraItems, setAddedToExtraItems] = useState<
     Array<{ product_id: string; product_name: string; product_sku: string; quantity: number }>
   >([]);
@@ -203,9 +205,10 @@ export default function OrderFinishing() {
 
       setOrder(orderRes.data as Order);
       setBatches(batchesWithData as Batch[]);
-      // Filter out batches from extra inventory that skipped finishing
+      // Split completed batches: production rate vs retrieved from extra
       const skippedStates = ['extra_finishing', 'extra_packaging', 'extra_boxing'];
       setCompletedBatches((completedWithData as any[]).filter((b: any) => !b.from_extra_state || !skippedStates.includes(b.from_extra_state)) as Batch[]);
+      setRetrievedFromExtraBatches((completedWithData as any[]).filter((b: any) => b.from_extra_state && skippedStates.includes(b.from_extra_state)) as Batch[]);
     } catch (error: any) {
       toast.error(error.message);
     } finally {
@@ -988,7 +991,19 @@ export default function OrderFinishing() {
             onAssigned={() => { fetchData(); fetchAddedToExtra(); }}
           />
 
-          {completedGroups.length === 0 && completedBatches.length === 0 && (
+          <RetrievedFromExtraSection
+            batches={retrievedFromExtraBatches.map(b => ({
+              id: b.id,
+              product_id: b.product_id,
+              product_name: b.product?.name || 'Unknown',
+              product_sku: b.product?.sku || 'N/A',
+              quantity: b.quantity,
+              from_extra_state: (b as any).from_extra_state,
+              order_item_id: b.order_item_id || null,
+            }))}
+          />
+
+          {completedGroups.length === 0 && completedBatches.length === 0 && retrievedFromExtraBatches.length === 0 && (
             <Card>
               <CardContent className="p-8 text-center text-muted-foreground">No completed items yet</CardContent>
             </Card>

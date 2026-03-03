@@ -17,6 +17,7 @@ import { BoxScanPopup } from "@/components/BoxScanPopup";
 import { MoveToExtraDialog } from "@/components/MoveToExtraDialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ProductionRateSection } from "@/components/ProductionRateSection";
+import { RetrievedFromExtraSection } from "@/components/RetrievedFromExtraSection";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { normalizeBoxCode } from "@/lib/boxUtils";
 
@@ -74,6 +75,7 @@ export default function OrderPackaging() {
   const [order, setOrder] = useState<Order | null>(null);
   const [batches, setBatches] = useState<Batch[]>([]);
   const [completedBatches, setCompletedBatches] = useState<Batch[]>([]);
+  const [retrievedFromExtraBatches, setRetrievedFromExtraBatches] = useState<Batch[]>([]);
   const [addedToExtraItems, setAddedToExtraItems] = useState<
     Array<{ product_id: string; product_name: string; product_sku: string; quantity: number }>
   >([]);
@@ -183,12 +185,11 @@ export default function OrderPackaging() {
       // Filter completed batches to only include items that actually went through packaging
       // Items with needs_packing = false skip packaging entirely (go from Finishing -> Boxing)
       // and should NOT appear in the Packaging completed list
-      // Filter: exclude items that skip packaging (needs_packing=false) AND items from extra that skipped packaging
+      // Filter: exclude items that skip packaging (needs_packing=false)
       const skippedExtraStates = ['extra_packaging', 'extra_boxing'];
-      const completedWithData =
+      const allCompletedWithData =
         completedRes.data
           ?.filter((batch: any) => batch.product?.needs_packing !== false)
-          .filter((batch: any) => !batch.from_extra_state || !skippedExtraStates.includes(batch.from_extra_state))
           .map((batch: any) => ({
             ...batch,
             box: batch.box_id ? boxMap.get(batch.box_id) : null,
@@ -197,7 +198,9 @@ export default function OrderPackaging() {
 
       setOrder(orderRes.data as Order);
       setBatches(batchesWithData as Batch[]);
-      setCompletedBatches(completedWithData as Batch[]);
+      // Split: production rate vs retrieved from extra
+      setCompletedBatches(allCompletedWithData.filter((b: any) => !b.from_extra_state || !skippedExtraStates.includes(b.from_extra_state)) as Batch[]);
+      setRetrievedFromExtraBatches(allCompletedWithData.filter((b: any) => b.from_extra_state && skippedExtraStates.includes(b.from_extra_state)) as Batch[]);
     } catch (error: any) {
       toast.error(error.message);
     } finally {
@@ -1007,7 +1010,19 @@ export default function OrderPackaging() {
             onAssigned={() => { fetchData(); fetchAddedToExtra(); }}
           />
 
-          {completedGroups.length === 0 && completedBatches.length === 0 && (
+          <RetrievedFromExtraSection
+            batches={retrievedFromExtraBatches.map(b => ({
+              id: b.id,
+              product_id: b.product_id,
+              product_name: b.product?.name || 'Unknown',
+              product_sku: b.product?.sku || 'N/A',
+              quantity: b.quantity,
+              from_extra_state: (b as any).from_extra_state,
+              order_item_id: b.order_item_id || null,
+            }))}
+          />
+
+          {completedGroups.length === 0 && completedBatches.length === 0 && retrievedFromExtraBatches.length === 0 && (
             <Card>
               <CardContent className="p-8 text-center text-muted-foreground">No completed items yet</CardContent>
             </Card>
