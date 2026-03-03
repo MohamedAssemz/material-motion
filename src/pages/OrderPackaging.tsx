@@ -186,7 +186,7 @@ export default function OrderPackaging() {
       // Items with needs_packing = false skip packaging entirely (go from Finishing -> Boxing)
       // and should NOT appear in the Packaging completed list
       // Filter: exclude items that skip packaging (needs_packing=false)
-      const skippedExtraStates = ['extra_packaging', 'extra_boxing'];
+      const skippedExtraStates = ['extra_packaging'];
       const allCompletedWithData =
         completedRes.data
           ?.filter((batch: any) => batch.product?.needs_packing !== false)

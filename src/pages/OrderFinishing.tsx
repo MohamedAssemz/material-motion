@@ -206,7 +206,7 @@ export default function OrderFinishing() {
       setOrder(orderRes.data as Order);
       setBatches(batchesWithData as Batch[]);
       // Split completed batches: production rate vs retrieved from extra
-      const skippedStates = ['extra_finishing', 'extra_packaging', 'extra_boxing'];
+      const skippedStates = ['extra_finishing'];
       setCompletedBatches((completedWithData as any[]).filter((b: any) => !b.from_extra_state || !skippedStates.includes(b.from_extra_state)) as Batch[]);
       setRetrievedFromExtraBatches((completedWithData as any[]).filter((b: any) => b.from_extra_state && skippedStates.includes(b.from_extra_state)) as Batch[]);
     } catch (error: any) {
