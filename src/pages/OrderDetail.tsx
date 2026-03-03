@@ -116,8 +116,9 @@ interface Order {
 interface PhaseStats {
   waiting: number;
   inProgress: number;
-  completed: number;
+  processed: number;
   retrieved: number;
+  completed: number;
   addedToExtra: number;
   extraToRetrieve: number;
 }
@@ -580,12 +581,12 @@ export default function OrderDetail() {
       getAllStates().indexOf(b.current_state as UnitState) > stateIndex
     );
     
-    // Completed = processed in this phase (no from_extra_state, or from an earlier phase's extra state)
-    const completed = pastStateBatches
+    // Processed = items that went through this phase normally (no from_extra_state, or from an earlier phase)
+    const processed = pastStateBatches
       .filter((b) => {
         const fromExtra = (b as any).from_extra_state;
         if (!fromExtra) return true;
-        return fromExtra !== phaseExtraState; // from earlier phase = processed here
+        return fromExtra !== phaseExtraState;
       })
       .reduce((sum, b) => sum + b.quantity, 0);
     
@@ -594,9 +595,12 @@ export default function OrderDetail() {
       .filter((b) => (b as any).from_extra_state === phaseExtraState)
       .reduce((sum, b) => sum + b.quantity, 0);
     
+    // Completed = total moved to next phase (processed + retrieved)
+    const completed = processed + retrieved;
+    
     const addedToExtra = addedToExtraCounts[phaseName] || 0;
     const extraToRetrieve = reservedExtraCounts[phaseName] || 0;
-    return { waiting, inProgress, completed, retrieved, addedToExtra, extraToRetrieve };
+    return { waiting, inProgress, processed, retrieved, completed, addedToExtra, extraToRetrieve };
   };
 
   const manufacturingStats = getPhaseStats("in_manufacturing", "pending_rm", "manufacturing");
@@ -903,8 +907,8 @@ export default function OrderDetail() {
                         <span className="font-medium text-primary">{manufacturingStats.inProgress}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">Completed</span>
-                        <span className="font-medium text-green-600">{manufacturingStats.completed}</span>
+                        <span className="text-muted-foreground">Processed</span>
+                        <span className="font-medium text-green-600">{manufacturingStats.processed}</span>
                       </div>
                       {manufacturingStats.retrieved > 0 && (
                         <div className="flex justify-between">
@@ -924,6 +928,10 @@ export default function OrderDetail() {
                           <span className="font-medium text-amber-600">{manufacturingStats.extraToRetrieve}</span>
                         </div>
                       )}
+                      <div className="flex justify-between border-t pt-1 mt-1">
+                        <span className="font-medium text-muted-foreground">Completed</span>
+                        <span className="font-bold">{manufacturingStats.completed}</span>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -948,8 +956,8 @@ export default function OrderDetail() {
                         <span className="font-medium text-primary">{finishingStats.inProgress}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">Completed</span>
-                        <span className="font-medium text-green-600">{finishingStats.completed}</span>
+                        <span className="text-muted-foreground">Processed</span>
+                        <span className="font-medium text-green-600">{finishingStats.processed}</span>
                       </div>
                       {finishingStats.retrieved > 0 && (
                         <div className="flex justify-between">
@@ -969,6 +977,10 @@ export default function OrderDetail() {
                           <span className="font-medium text-amber-600">{finishingStats.extraToRetrieve}</span>
                         </div>
                       )}
+                      <div className="flex justify-between border-t pt-1 mt-1">
+                        <span className="font-medium text-muted-foreground">Completed</span>
+                        <span className="font-bold">{finishingStats.completed}</span>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -993,8 +1005,8 @@ export default function OrderDetail() {
                         <span className="font-medium text-primary">{packagingStats.inProgress}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">Completed</span>
-                        <span className="font-medium text-green-600">{packagingStats.completed}</span>
+                        <span className="text-muted-foreground">Processed</span>
+                        <span className="font-medium text-green-600">{packagingStats.processed}</span>
                       </div>
                       {packagingStats.retrieved > 0 && (
                         <div className="flex justify-between">
@@ -1014,6 +1026,10 @@ export default function OrderDetail() {
                           <span className="font-medium text-amber-600">{packagingStats.extraToRetrieve}</span>
                         </div>
                       )}
+                      <div className="flex justify-between border-t pt-1 mt-1">
+                        <span className="font-medium text-muted-foreground">Completed</span>
+                        <span className="font-bold">{packagingStats.completed}</span>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -1038,8 +1054,8 @@ export default function OrderDetail() {
                         <span className="font-medium text-primary">{boxingStats.inProgress}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">Completed</span>
-                        <span className="font-medium text-green-600">{boxingStats.completed}</span>
+                        <span className="text-muted-foreground">Processed</span>
+                        <span className="font-medium text-green-600">{boxingStats.processed}</span>
                       </div>
                       {boxingStats.retrieved > 0 && (
                         <div className="flex justify-between">
@@ -1059,6 +1075,10 @@ export default function OrderDetail() {
                           <span className="font-medium text-amber-600">{boxingStats.extraToRetrieve}</span>
                         </div>
                       )}
+                      <div className="flex justify-between border-t pt-1 mt-1">
+                        <span className="font-medium text-muted-foreground">Completed</span>
+                        <span className="font-bold">{boxingStats.completed}</span>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>

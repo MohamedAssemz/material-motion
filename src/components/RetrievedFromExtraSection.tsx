@@ -9,20 +9,12 @@ interface RetrievedBatch {
   product_name: string;
   product_sku: string;
   quantity: number;
-  from_extra_state: string;
   order_item_id?: string | null;
 }
 
 interface RetrievedFromExtraSectionProps {
   batches: RetrievedBatch[];
 }
-
-const EXTRA_STATE_LABELS: Record<string, string> = {
-  extra_manufacturing: 'From Extra Mfg',
-  extra_finishing: 'From Extra Finish',
-  extra_packaging: 'From Extra Pkg',
-  extra_boxing: 'From Extra Box',
-};
 
 export function RetrievedFromExtraSection({ batches }: RetrievedFromExtraSectionProps) {
   const groups = useMemo(() => {
@@ -31,7 +23,6 @@ export function RetrievedFromExtraSection({ batches }: RetrievedFromExtraSection
       product_name: string;
       product_sku: string;
       totalQty: number;
-      from_extra_state: string;
     }>();
 
     batches.forEach(b => {
@@ -45,7 +36,6 @@ export function RetrievedFromExtraSection({ batches }: RetrievedFromExtraSection
           product_name: b.product_name,
           product_sku: b.product_sku,
           totalQty: b.quantity,
-          from_extra_state: b.from_extra_state,
         });
       }
     });
@@ -75,12 +65,7 @@ export function RetrievedFromExtraSection({ batches }: RetrievedFromExtraSection
                   <Badge variant="secondary">{group.product_sku}</Badge>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <Badge variant="outline">{group.totalQty}</Badge>
-                <Badge className="bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300 border-purple-300 dark:border-purple-700">
-                  {EXTRA_STATE_LABELS[group.from_extra_state] || group.from_extra_state}
-                </Badge>
-              </div>
+              <Badge variant="outline">{group.totalQty}</Badge>
             </div>
           </CardContent>
         </Card>
