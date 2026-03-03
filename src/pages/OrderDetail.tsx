@@ -117,6 +117,7 @@ interface PhaseStats {
   waiting: number;
   inProgress: number;
   completed: number;
+  retrieved: number;
   addedToExtra: number;
   extraToRetrieve: number;
 }
@@ -566,28 +567,36 @@ export default function OrderDetail() {
     const inProgress = relevantBatches.filter((b) => b.current_state === inState).reduce((sum, b) => sum + b.quantity, 0);
     const stateIndex = getAllStates().indexOf(inState as UnitState);
     
-    // Define which from_extra_state values to exclude per phase
-    const extraExcludeMap: Record<string, string[] | 'all'> = {
-      manufacturing: 'all', // exclude any batch from extra inventory
-      finishing: ['extra_finishing', 'extra_packaging', 'extra_boxing'],
-      packaging: ['extra_packaging', 'extra_boxing'],
-      boxing: ['extra_boxing'],
+    // Define which from_extra_state matches the current phase (items that skipped THIS phase)
+    const phaseExtraStateMap: Record<string, string> = {
+      manufacturing: 'extra_manufacturing',
+      finishing: 'extra_finishing',
+      packaging: 'extra_packaging',
+      boxing: 'extra_boxing',
     };
-    const excludeRule = extraExcludeMap[phaseName];
+    const phaseExtraState = phaseExtraStateMap[phaseName];
     
-    const completed = relevantBatches
+    const pastStateBatches = relevantBatches.filter((b) => 
+      getAllStates().indexOf(b.current_state as UnitState) > stateIndex
+    );
+    
+    // Completed = processed in this phase (no from_extra_state, or from an earlier phase's extra state)
+    const completed = pastStateBatches
       .filter((b) => {
-        if (getAllStates().indexOf(b.current_state as UnitState) <= stateIndex) return false;
-        // Filter out batches from extra inventory that skipped this phase
         const fromExtra = (b as any).from_extra_state;
         if (!fromExtra) return true;
-        if (excludeRule === 'all') return false;
-        return !excludeRule?.includes(fromExtra);
+        return fromExtra !== phaseExtraState; // from earlier phase = processed here
       })
       .reduce((sum, b) => sum + b.quantity, 0);
+    
+    // Retrieved = skipped this phase (from_extra_state matches current phase)
+    const retrieved = pastStateBatches
+      .filter((b) => (b as any).from_extra_state === phaseExtraState)
+      .reduce((sum, b) => sum + b.quantity, 0);
+    
     const addedToExtra = addedToExtraCounts[phaseName] || 0;
     const extraToRetrieve = reservedExtraCounts[phaseName] || 0;
-    return { waiting, inProgress, completed, addedToExtra, extraToRetrieve };
+    return { waiting, inProgress, completed, retrieved, addedToExtra, extraToRetrieve };
   };
 
   const manufacturingStats = getPhaseStats("in_manufacturing", "pending_rm", "manufacturing");
@@ -897,6 +906,12 @@ export default function OrderDetail() {
                         <span className="text-muted-foreground">Completed</span>
                         <span className="font-medium text-green-600">{manufacturingStats.completed}</span>
                       </div>
+                      {manufacturingStats.retrieved > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Retrieved</span>
+                          <span className="font-medium text-purple-600">{manufacturingStats.retrieved}</span>
+                        </div>
+                      )}
                       {manufacturingStats.addedToExtra > 0 && (
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Added to Extra</span>
@@ -936,6 +951,12 @@ export default function OrderDetail() {
                         <span className="text-muted-foreground">Completed</span>
                         <span className="font-medium text-green-600">{finishingStats.completed}</span>
                       </div>
+                      {finishingStats.retrieved > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Retrieved</span>
+                          <span className="font-medium text-purple-600">{finishingStats.retrieved}</span>
+                        </div>
+                      )}
                       {finishingStats.addedToExtra > 0 && (
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Added to Extra</span>
@@ -975,6 +996,12 @@ export default function OrderDetail() {
                         <span className="text-muted-foreground">Completed</span>
                         <span className="font-medium text-green-600">{packagingStats.completed}</span>
                       </div>
+                      {packagingStats.retrieved > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Retrieved</span>
+                          <span className="font-medium text-purple-600">{packagingStats.retrieved}</span>
+                        </div>
+                      )}
                       {packagingStats.addedToExtra > 0 && (
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Added to Extra</span>
@@ -1014,6 +1041,12 @@ export default function OrderDetail() {
                         <span className="text-muted-foreground">Completed</span>
                         <span className="font-medium text-green-600">{boxingStats.completed}</span>
                       </div>
+                      {boxingStats.retrieved > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Retrieved</span>
+                          <span className="font-medium text-purple-600">{boxingStats.retrieved}</span>
+                        </div>
+                      )}
                       {boxingStats.addedToExtra > 0 && (
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Added to Extra</span>
