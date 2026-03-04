@@ -1005,7 +1005,7 @@ export default function OrderManufacturing() {
         </TabsContent>
 
         <TabsContent value="extra" className="space-y-6">
-          <ExtraItemsTab orderId={id!} phase="manufacturing" onRefresh={() => fetchData()} />
+          <ExtraItemsTab orderId={id!} phase="manufacturing" onRefresh={() => fetchData()} canManage={canManage} />
 
           {/* Added to Extra Inventory from this Order */}
           {addedToExtraItems.length > 0 && (
@@ -1063,6 +1063,7 @@ export default function OrderManufacturing() {
             machineType="manufacturing"
             machineColumnName="manufacturing_machine_id"
             onAssigned={() => { fetchData(); fetchAddedToExtra(); }}
+            canManage={canManage}
           />
 
           <RetrievedFromExtraSection

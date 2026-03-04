@@ -1017,7 +1017,7 @@ export default function OrderPackaging() {
         </TabsContent>
 
         <TabsContent value="extra" className="space-y-6">
-          <ExtraItemsTab orderId={id!} phase="packaging" onRefresh={() => fetchData()} />
+          <ExtraItemsTab orderId={id!} phase="packaging" onRefresh={() => fetchData()} canManage={canManage} />
 
           {/* Added to Extra Inventory from this Order */}
           {addedToExtraItems.length > 0 && (
@@ -1075,6 +1075,7 @@ export default function OrderPackaging() {
             machineType="packaging"
             machineColumnName="packaging_machine_id"
             onAssigned={() => { fetchData(); fetchAddedToExtra(); }}
+            canManage={canManage}
           />
 
           <RetrievedFromExtraSection

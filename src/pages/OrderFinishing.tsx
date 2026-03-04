@@ -997,7 +997,7 @@ export default function OrderFinishing() {
         </TabsContent>
 
         <TabsContent value="extra" className="space-y-6">
-          <ExtraItemsTab orderId={id!} phase="finishing" onRefresh={() => fetchData()} />
+          <ExtraItemsTab orderId={id!} phase="finishing" onRefresh={() => fetchData()} canManage={canManage} />
 
           {/* Added to Extra Inventory from this Order */}
           {addedToExtraItems.length > 0 && (
@@ -1055,6 +1055,7 @@ export default function OrderFinishing() {
             machineType="finishing"
             machineColumnName="finishing_machine_id"
             onAssigned={() => { fetchData(); fetchAddedToExtra(); }}
+            canManage={canManage}
           />
 
           <RetrievedFromExtraSection
