@@ -1130,7 +1130,7 @@ export default function OrderDetail() {
       </Card>
 
       {/* Extra Inventory - Only show for pending orders */}
-      {isPendingOrder && (
+      {isPendingOrder && canUpdate && (
         <Card>
           <CardHeader>
             <CardTitle>Extra Inventory</CardTitle>
