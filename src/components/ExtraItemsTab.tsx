@@ -67,6 +67,7 @@ interface ExtraItemsTabProps {
   orderId: string;
   phase: 'manufacturing' | 'finishing' | 'packaging' | 'boxing';
   onRefresh?: () => void;
+  canManage?: boolean;
 }
 
 // Map phase to the current_state for extra items assigned to this order
@@ -99,7 +100,7 @@ const PHASE_LABELS: Record<string, string> = {
   boxing: 'Extra Boxing',
 };
 
-export function ExtraItemsTab({ orderId, phase, onRefresh }: ExtraItemsTabProps) {
+export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true }: ExtraItemsTabProps) {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [extraBatches, setExtraBatches] = useState<ExtraBatch[]>([]);
@@ -713,7 +714,7 @@ export function ExtraItemsTab({ orderId, phase, onRefresh }: ExtraItemsTabProps)
               <Printer className="h-4 w-4 mr-2" />
               Print Guide
             </Button>
-            {phase !== 'boxing' && (
+            {canManage && phase !== 'boxing' && (
               <Button 
                 variant="secondary"
                 onClick={() => setMoveDirectlyConfirmOpen(true)} 
@@ -723,19 +724,21 @@ export function ExtraItemsTab({ orderId, phase, onRefresh }: ExtraItemsTabProps)
                 Move Directly
               </Button>
             )}
-            <Button onClick={handleOpenBoxDialog} disabled={totalSelected === 0 || submitting}>
-              {phase === 'boxing' ? (
-                <>
-                  {submitting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ArrowRight className="h-4 w-4 mr-2" />}
-                  Move to Ready
-                </>
-              ) : (
-                <>
-                  <Box className="h-4 w-4 mr-2" />
-                  Assign to Box
-                </>
-              )}
-            </Button>
+            {canManage && (
+              <Button onClick={handleOpenBoxDialog} disabled={totalSelected === 0 || submitting}>
+                {phase === 'boxing' ? (
+                  <>
+                    {submitting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ArrowRight className="h-4 w-4 mr-2" />}
+                    Move to Ready
+                  </>
+                ) : (
+                  <>
+                    <Box className="h-4 w-4 mr-2" />
+                    Assign to Box
+                  </>
+                )}
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -771,7 +774,7 @@ export function ExtraItemsTab({ orderId, phase, onRefresh }: ExtraItemsTabProps)
                       <p className="text-lg font-semibold">{group.quantity}</p>
                       <p className="text-xs text-muted-foreground">available</p>
                     </div>
-                    <div className="flex items-center gap-2">
+                    {canManage && <div className="flex items-center gap-2">
                       <Label className="text-xs">Select:</Label>
                       <Input
                         type="number"
@@ -794,7 +797,7 @@ export function ExtraItemsTab({ orderId, phase, onRefresh }: ExtraItemsTabProps)
                         className="w-20 h-8"
                         placeholder="0"
                       />
-                    </div>
+                    </div>}
                   </div>
                 </div>
               </CardContent>

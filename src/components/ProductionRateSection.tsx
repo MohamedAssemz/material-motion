@@ -61,6 +61,7 @@ interface ProductionRateSectionProps {
   machineType: 'manufacturing' | 'finishing' | 'packaging' | 'boxing';
   machineColumnName: 'manufacturing_machine_id' | 'finishing_machine_id' | 'packaging_machine_id' | 'boxing_machine_id';
   onAssigned: () => void;
+  canManage?: boolean;
 }
 
 export function ProductionRateSection({
@@ -68,6 +69,7 @@ export function ProductionRateSection({
   machineType,
   machineColumnName,
   onAssigned,
+  canManage = true,
 }: ProductionRateSectionProps) {
   const [machines, setMachines] = useState<Machine[]>([]);
   const [selectedMachines, setSelectedMachines] = useState<Map<string, string>>(new Map());
@@ -322,7 +324,7 @@ export function ProductionRateSection({
                     </p>
                   </div>
 
-                  {group.unassignedQty > 0 && (
+                  {group.unassignedQty > 0 && canManage && (
                     <div className="flex items-center gap-2 flex-wrap">
                       <Input
                         type="number"
@@ -360,6 +362,12 @@ export function ProductionRateSection({
                         )}
                       </Button>
                     </div>
+                  )}
+
+                  {group.unassignedQty > 0 && !canManage && (
+                    <Badge variant="outline" className="text-attention">
+                      {group.unassignedQty} unassigned
+                    </Badge>
                   )}
 
                   {group.unassignedQty === 0 && (

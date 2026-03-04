@@ -111,10 +111,6 @@ export default function ExtraInventory() {
   }, [searchQuery, stateFilter, statusFilter]);
 
   useEffect(() => {
-    if (!canManage) {
-      navigate('/');
-      return;
-    }
     fetchData();
 
     const channel = supabase
@@ -127,7 +123,7 @@ export default function ExtraInventory() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [canManage, navigate]);
+  }, []);
 
   const fetchData = async () => {
     try {

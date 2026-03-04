@@ -1351,7 +1351,8 @@ export default function OrderBoxing() {
           <ExtraItemsTab 
             orderId={id!} 
             phase="boxing" 
-            onRefresh={() => fetchData()} 
+            onRefresh={() => fetchData()}
+            canManage={canManage}
           />
 
           {/* Added to Extra Inventory from this Order */}
@@ -1487,6 +1488,7 @@ export default function OrderBoxing() {
             machineType="boxing"
             machineColumnName="boxing_machine_id"
             onAssigned={() => { fetchData(); fetchAddedToExtra(); }}
+            canManage={canManage}
           />
 
           {/* Retrieved from Extra - from history (immutable source of truth) */}

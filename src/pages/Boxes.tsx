@@ -234,7 +234,6 @@ export default function Boxes() {
   }, [orderBoxes, extraBoxes, toast, openBoxDetails]);
 
   useEffect(() => {
-    if (!canManage) { navigate('/'); return; }
     fetchBoxes();
     const channel = supabase.channel('boxes-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'boxes' }, () => { fetchBoxes(); })
@@ -243,7 +242,7 @@ export default function Boxes() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'extra_batches' }, () => { fetchBoxes(); })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [canManage, navigate]);
+  }, []);
 
   const fetchBoxes = async () => {
     try {
