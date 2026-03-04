@@ -515,25 +515,27 @@ export default function Boxes() {
                 <Printer className="mr-2 h-4 w-4" />
                 Print Labels
               </Button>
-              <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button><Plus className="mr-2 h-4 w-4" />Create Order Boxes</Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader><DialogTitle>Create Order Boxes</DialogTitle></DialogHeader>
-                  <form onSubmit={handleCreateOrderBoxes} className="space-y-4">
-                    <div>
-                      <Label htmlFor="count">Number of boxes to create</Label>
-                      <Input id="count" type="number" min="1" max="100" value={newBoxCount} onChange={(e) => setNewBoxCount(parseInt(e.target.value) || 1)} required />
-                      <p className="text-xs text-muted-foreground mt-1">Box codes will be auto-generated (e.g., BOX-0001)</p>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button type="submit" className="flex-1">Create</Button>
-                      <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-                    </div>
-                  </form>
-                </DialogContent>
-              </Dialog>
+              {canManage && (
+                <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button><Plus className="mr-2 h-4 w-4" />Create Order Boxes</Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader><DialogTitle>Create Order Boxes</DialogTitle></DialogHeader>
+                    <form onSubmit={handleCreateOrderBoxes} className="space-y-4">
+                      <div>
+                        <Label htmlFor="count">Number of boxes to create</Label>
+                        <Input id="count" type="number" min="1" max="100" value={newBoxCount} onChange={(e) => setNewBoxCount(parseInt(e.target.value) || 1)} required />
+                        <p className="text-xs text-muted-foreground mt-1">Box codes will be auto-generated (e.g., BOX-0001)</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button type="submit" className="flex-1">Create</Button>
+                        <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
+                      </div>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+              )}
             </div>
 
             {/* Filters */}
@@ -611,7 +613,7 @@ export default function Boxes() {
                           <TableCell>{box.total_quantity > 0 ? <span className="text-sm">{box.total_quantity}</span> : <span className="text-muted-foreground">0</span>}</TableCell>
                           <TableCell>{format(new Date(box.created_at), 'PP')}</TableCell>
                           <TableCell className="text-right">
-                            <Switch checked={box.is_active} onCheckedChange={() => {}} onClick={(e) => handleToggleOrderBoxActive(box, e)} disabled={box.batch_count > 0} />
+                            <Switch checked={box.is_active} onCheckedChange={() => {}} onClick={(e) => handleToggleOrderBoxActive(box, e)} disabled={box.batch_count > 0 || !canManage} />
                           </TableCell>
                         </TableRow>
                       ))}
@@ -631,25 +633,27 @@ export default function Boxes() {
                 <Printer className="mr-2 h-4 w-4" />
                 Print Labels
               </Button>
-              <Dialog open={extraDialogOpen} onOpenChange={setExtraDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button><Plus className="mr-2 h-4 w-4" />Create Extra Boxes</Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader><DialogTitle>Create Extra Boxes</DialogTitle></DialogHeader>
-                  <form onSubmit={handleCreateExtraBoxes} className="space-y-4">
-                    <div>
-                      <Label htmlFor="extra-count">Number of boxes to create</Label>
-                      <Input id="extra-count" type="number" min="1" max="100" value={newExtraBoxCount} onChange={(e) => setNewExtraBoxCount(parseInt(e.target.value) || 1)} required />
-                      <p className="text-xs text-muted-foreground mt-1">Box codes will be auto-generated (e.g., EBOX-0001)</p>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button type="submit" className="flex-1">Create</Button>
-                      <Button type="button" variant="outline" onClick={() => setExtraDialogOpen(false)}>Cancel</Button>
-                    </div>
-                  </form>
-                </DialogContent>
-              </Dialog>
+              {canManage && (
+                <Dialog open={extraDialogOpen} onOpenChange={setExtraDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button><Plus className="mr-2 h-4 w-4" />Create Extra Boxes</Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader><DialogTitle>Create Extra Boxes</DialogTitle></DialogHeader>
+                    <form onSubmit={handleCreateExtraBoxes} className="space-y-4">
+                      <div>
+                        <Label htmlFor="extra-count">Number of boxes to create</Label>
+                        <Input id="extra-count" type="number" min="1" max="100" value={newExtraBoxCount} onChange={(e) => setNewExtraBoxCount(parseInt(e.target.value) || 1)} required />
+                        <p className="text-xs text-muted-foreground mt-1">Box codes will be auto-generated (e.g., EBOX-0001)</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button type="submit" className="flex-1">Create</Button>
+                        <Button type="button" variant="outline" onClick={() => setExtraDialogOpen(false)}>Cancel</Button>
+                      </div>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+              )}
             </div>
 
             {/* Filters */}
@@ -727,7 +731,7 @@ export default function Boxes() {
                           <TableCell>{box.total_quantity > 0 ? <span className="text-sm">{box.total_quantity}</span> : <span className="text-muted-foreground">0</span>}</TableCell>
                           <TableCell>{format(new Date(box.created_at), 'PP')}</TableCell>
                           <TableCell className="text-right">
-                            <Switch checked={box.is_active} onCheckedChange={() => {}} onClick={(e) => handleToggleExtraBoxActive(box, e)} disabled={box.batch_count > 0} />
+                            <Switch checked={box.is_active} onCheckedChange={() => {}} onClick={(e) => handleToggleExtraBoxActive(box, e)} disabled={box.batch_count > 0 || !canManage} />
                           </TableCell>
                         </TableRow>
                       ))}
