@@ -12,14 +12,10 @@ import type { Database } from '@/integrations/supabase/types';
 type AppRole = Database['public']['Enums']['app_role'];
 
 const AVAILABLE_ROLES: { value: AppRole; label: string }[] = [
-  { value: 'viewer', label: 'Viewer' },
-  { value: 'manufacture_lead', label: 'Manufacturing Lead' },
-  { value: 'manufacturer', label: 'Manufacturer' },
-  { value: 'packaging_manager', label: 'Packaging Lead' },
-  { value: 'packer', label: 'Packer' },
-  { value: 'boxing_manager', label: 'Boxing Lead' },
-  { value: 'boxer', label: 'Boxer' },
-  { value: 'qc', label: 'QC Engineer' },
+  { value: 'manufacturing_manager', label: 'Manufacturing Manager' },
+  { value: 'finishing_manager', label: 'Finishing Manager' },
+  { value: 'packaging_manager', label: 'Packaging Manager' },
+  { value: 'boxing_manager', label: 'Boxing Manager' },
   { value: 'admin', label: 'Admin' },
 ];
 
@@ -37,7 +33,7 @@ export function CreateUserDialog({ open, onOpenChange, onSuccess }: CreateUserDi
     email: '',
     password: '',
     fullName: '',
-    primaryRole: 'viewer' as AppRole,
+    primaryRole: 'manufacturing_manager' as AppRole,
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -77,7 +73,7 @@ export function CreateUserDialog({ open, onOpenChange, onSuccess }: CreateUserDi
         description: 'User created successfully',
       });
 
-      setFormData({ email: '', password: '', fullName: '', primaryRole: 'viewer' });
+      setFormData({ email: '', password: '', fullName: '', primaryRole: 'manufacturing_manager' });
       onSuccess();
       onOpenChange(false);
     } catch (error: any) {

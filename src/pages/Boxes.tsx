@@ -79,7 +79,7 @@ export default function Boxes() {
   // Scan lookup dialog state
   const [scanDialogOpen, setScanDialogOpen] = useState(false);
 
-  const canManage = hasRole('manufacture_lead') || hasRole('admin');
+  const canManage = hasRole('admin');
   const [orderPage, setOrderPage] = useState(1);
   const [extraPage, setExtraPage] = useState(1);
   const PAGE_SIZE = 25;

@@ -26,14 +26,10 @@ interface UserWithRoles {
 }
 
 const AVAILABLE_ROLES: { value: AppRole; label: string }[] = [
-  { value: 'viewer', label: 'Viewer' },
-  { value: 'manufacture_lead', label: 'Mfg Lead' },
-  { value: 'manufacturer', label: 'Manufacturer' },
-  { value: 'packaging_manager', label: 'Pkg Lead' },
-  { value: 'packer', label: 'Packer' },
-  { value: 'boxing_manager', label: 'Box Lead' },
-  { value: 'boxer', label: 'Boxer' },
-  { value: 'qc', label: 'QC' },
+  { value: 'manufacturing_manager', label: 'Mfg Manager' },
+  { value: 'finishing_manager', label: 'Finishing Manager' },
+  { value: 'packaging_manager', label: 'Pkg Manager' },
+  { value: 'boxing_manager', label: 'Box Manager' },
   { value: 'admin', label: 'Admin' },
 ];
 
@@ -72,7 +68,7 @@ export default function Admin() {
 
       const usersWithRoles = profiles?.map(profile => ({
         ...profile,
-        primary_role: (profile.primary_role || 'viewer') as AppRole,
+        primary_role: (profile.primary_role || 'manufacturing_manager') as AppRole,
         roles: userRoles?.filter(ur => ur.user_id === profile.id).map(ur => ur.role) || []
       })) || [];
 

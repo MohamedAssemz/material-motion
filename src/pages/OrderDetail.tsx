@@ -555,9 +555,8 @@ export default function OrderDetail() {
     printWindow.document.close();
   };
 
-  const canUpdate =
-    hasRole("manufacture_lead") || hasRole("manufacturer") || hasRole("packer") || hasRole("boxer") || hasRole("admin");
-  const canDelete = hasRole("manufacture_lead") || hasRole("admin");
+  const canUpdate = hasRole("admin");
+  const canDelete = hasRole("admin");
 
   if (loading) {
     return (

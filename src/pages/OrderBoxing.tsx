@@ -131,7 +131,7 @@ export default function OrderBoxing() {
   const [notesDialogOpen, setNotesDialogOpen] = useState(false);
 
 
-  const canManage = hasRole("boxing_manager") || hasRole("boxer") || hasRole("admin");
+  const canManage = hasRole("boxing_manager") || hasRole("admin");
 
   useEffect(() => {
     fetchData();

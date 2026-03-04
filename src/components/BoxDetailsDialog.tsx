@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Printer } from 'lucide-react';
+import { Loader2, Printer, RotateCcw } from 'lucide-react';
 import { format } from 'date-fns';
 import { generateBoxLabelHTML } from '@/components/BoxLabel';
 
@@ -26,7 +26,7 @@ interface BoxDetailsDialogProps {
   isActive: boolean;
   contentType: string;
   primaryState: string | null;
-  
+  onRefresh?: () => void;
 }
 
 interface OrderBatchDetail {
@@ -56,16 +56,29 @@ export function BoxDetailsDialog({
   isActive,
   contentType,
   primaryState,
+  onRefresh,
 }: BoxDetailsDialogProps) {
   const { hasRole } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [forceEmptying, setForceEmptying] = useState(false);
   const [orderBatches, setOrderBatches] = useState<OrderBatchDetail[]>([]);
   const [extraBatches, setExtraBatches] = useState<ExtraBatchDetail[]>([]);
 
   const isAdmin = hasRole('admin');
   const batchCount = boxType === 'order' ? orderBatches.length : extraBatches.length;
   const isEmpty = batchCount === 0;
+
+  const previousStateMap: Record<string, string> = {
+    ready_for_finishing: 'in_manufacturing',
+    in_finishing: 'in_manufacturing',
+    ready_for_packaging: 'in_finishing',
+    in_packaging: 'in_finishing',
+    ready_for_boxing: 'in_packaging',
+    in_boxing: 'in_packaging',
+    ready_for_shipment: 'in_boxing',
+    shipped: 'in_boxing',
+  };
 
   useEffect(() => {
     if (open && boxId) {
@@ -123,6 +136,94 @@ export function BoxDetailsDialog({
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleForceEmpty = async () => {
+    if (!boxId || !isAdmin) return;
+    setForceEmptying(true);
+    try {
+      if (boxType === 'order') {
+        for (const batch of orderBatches) {
+          const prevState = previousStateMap[batch.current_state];
+          if (prevState) {
+            // Check if this batch was from extra inventory
+            const { data: batchFull } = await supabase
+              .from('order_batches')
+              .select('from_extra_state, order_id, order_item_id, product_id, quantity')
+              .eq('id', batch.id)
+              .single();
+
+            if (batchFull?.from_extra_state) {
+              // Find original EBox from extra_batch_history CONSUMED event
+              const { data: historyEntry } = await supabase
+                .from('extra_batch_history')
+                .select('extra_batch_id')
+                .eq('consuming_order_id', batchFull.order_id)
+                .eq('consuming_order_item_id', batchFull.order_item_id)
+                .eq('product_id', batchFull.product_id)
+                .eq('event_type', 'CONSUMED')
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .single();
+
+              // Get original box from that extra batch (or any active ebox)
+              let targetBoxId: string | null = null;
+              if (historyEntry?.extra_batch_id) {
+                const { data: origExtra } = await supabase
+                  .from('extra_batches')
+                  .select('box_id')
+                  .eq('id', historyEntry.extra_batch_id)
+                  .single();
+                targetBoxId = origExtra?.box_id || null;
+              }
+              if (!targetBoxId) {
+                const { data: anyBox } = await supabase
+                  .from('extra_boxes')
+                  .select('id')
+                  .eq('is_active', true)
+                  .limit(1)
+                  .single();
+                targetBoxId = anyBox?.id || null;
+              }
+
+              if (targetBoxId) {
+                // Create reserved extra batch
+                const { data: codeData } = await supabase.rpc('generate_extra_batch_code');
+                await supabase.from('extra_batches').insert({
+                  qr_code_data: codeData || `EB-${Math.random().toString(36).slice(2, 10).toUpperCase()}`,
+                  product_id: batchFull.product_id,
+                  quantity: batchFull.quantity,
+                  current_state: batchFull.from_extra_state,
+                  inventory_state: 'RESERVED',
+                  box_id: targetBoxId,
+                  order_id: batchFull.order_id,
+                  order_item_id: batchFull.order_item_id,
+                });
+                // Delete the order batch
+                await supabase.from('order_batches').delete().eq('id', batch.id);
+              }
+            } else {
+              // Regular batch: revert state, clear box_id
+              await supabase
+                .from('order_batches')
+                .update({ current_state: prevState, box_id: null })
+                .eq('id', batch.id);
+            }
+          }
+        }
+      }
+      // Clear box items_list
+      const table = boxType === 'order' ? 'boxes' : 'extra_boxes';
+      await supabase.from(table).update({ items_list: [] }).eq('id', boxId);
+
+      toast({ title: 'Success', description: 'Box emptied successfully. Batches reverted.' });
+      fetchBatchDetails();
+      onRefresh?.();
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } finally {
+      setForceEmptying(false);
     }
   };
 
@@ -273,7 +374,18 @@ export function BoxDetailsDialog({
             </div>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            {isAdmin && !isEmpty && !loading && boxType === 'order' && (
+              <Button
+                variant="destructive"
+                onClick={handleForceEmpty}
+                disabled={forceEmptying}
+                className="sm:mr-auto"
+              >
+                {forceEmptying ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RotateCcw className="h-4 w-4 mr-2" />}
+                Force Empty
+              </Button>
+            )}
             <Button 
               variant="outline" 
               onClick={() => {
