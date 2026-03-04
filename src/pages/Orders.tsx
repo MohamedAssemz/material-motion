@@ -357,7 +357,7 @@ export default function Orders() {
                 </p>
               </div>
             </div>
-            {(hasRole('manufacture_lead') || hasRole('admin')) && (
+            {hasRole('admin') && (
               <Button asChild>
                 <Link to="/orders/create">
                   <Plus className="mr-2 h-4 w-4" />

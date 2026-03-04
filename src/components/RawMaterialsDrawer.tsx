@@ -50,7 +50,7 @@ export function RawMaterialsDrawer({
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
-  const canEdit = hasRole("manufacture_lead") || hasRole("admin");
+  const canEdit = hasRole("admin");
 
   useEffect(() => {
     if (open) {

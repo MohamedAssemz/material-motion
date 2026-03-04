@@ -1520,15 +1520,11 @@ export type Database = {
     }
     Enums: {
       app_role:
-        | "manufacture_lead"
-        | "manufacturer"
-        | "packaging_manager"
-        | "packer"
-        | "boxing_manager"
-        | "boxer"
-        | "qc"
         | "admin"
-        | "viewer"
+        | "manufacturing_manager"
+        | "finishing_manager"
+        | "packaging_manager"
+        | "boxing_manager"
       batch_type: "ORDER" | "EXTRA"
       inventory_state: "AVAILABLE" | "RESERVED" | "CONSUMED"
       unit_state:
@@ -1675,15 +1671,11 @@ export const Constants = {
   public: {
     Enums: {
       app_role: [
-        "manufacture_lead",
-        "manufacturer",
-        "packaging_manager",
-        "packer",
-        "boxing_manager",
-        "boxer",
-        "qc",
         "admin",
-        "viewer",
+        "manufacturing_manager",
+        "finishing_manager",
+        "packaging_manager",
+        "boxing_manager",
       ],
       batch_type: ["ORDER", "EXTRA"],
       inventory_state: ["AVAILABLE", "RESERVED", "CONSUMED"],

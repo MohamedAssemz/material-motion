@@ -59,15 +59,11 @@ export function AppLayout({ children }: AppLayoutProps) {
   const { user, userRoles, signOut } = useAuth();
 
   const roleDisplayNames: Record<string, string> = {
-    manufacture_lead: 'Manufacturing Lead',
-    manufacturer: 'Manufacturer',
-    packaging_manager: 'Packaging Manager',
-    packer: 'Packer',
-    boxing_manager: 'Boxing Manager',
-    boxer: 'Boxer',
-    qc: 'Quality Control',
     admin: 'Administrator',
-    viewer: 'Viewer',
+    manufacturing_manager: 'Manufacturing Manager',
+    finishing_manager: 'Finishing Manager',
+    packaging_manager: 'Packaging Manager',
+    boxing_manager: 'Boxing Manager',
   };
 
   const filteredNavItems = navItems.filter(item => {

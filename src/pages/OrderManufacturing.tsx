@@ -120,7 +120,7 @@ export default function OrderManufacturing() {
   const [selectedMachine, setSelectedMachine] = useState<string | null>(null);
   const [loadingMachines, setLoadingMachines] = useState(false);
 
-  const canManage = hasRole("manufacture_lead") || hasRole("manufacturer") || hasRole("admin");
+  const canManage = hasRole("manufacturing_manager") || hasRole("admin");
 
   // Compute processed batches for Production Rate by subtracting retrieved quantities
   const processedBatchesForRate = useMemo(() => {

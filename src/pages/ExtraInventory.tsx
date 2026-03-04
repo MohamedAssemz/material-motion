@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Plus, Package, Loader2, Box, Search } from 'lucide-react';
+import { ArrowLeft, Plus, Package, Loader2, Box, Search, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { TablePagination } from '@/components/TablePagination';
 import { ExtraBoxSelectionDialog } from '@/components/ExtraBoxSelectionDialog';
@@ -71,6 +71,7 @@ export default function ExtraInventory() {
   });
   const [selectedBoxCode, setSelectedBoxCode] = useState<string>('');
   const [submitting, setSubmitting] = useState(false);
+  const [deletingBatchId, setDeletingBatchId] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 25;
 
@@ -79,7 +80,7 @@ export default function ExtraInventory() {
   const [stateFilter, setStateFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
 
-  const canManage = hasRole('manufacture_lead') || hasRole('admin');
+  const canManage = hasRole('admin');
 
   // Filtered batches
   const filteredBatches = useMemo(() => {
@@ -362,6 +363,58 @@ export default function ExtraInventory() {
     }
   };
 
+  const handleDeleteBatch = async (batch: ExtraBatch) => {
+    if (!canManage) return;
+    setDeletingBatchId(batch.id);
+    try {
+      // If reserved, un-reserve first: reduce order_items.deducted_to_extra
+      if (batch.inventory_state === 'RESERVED') {
+        // Find the reservation info from the batch itself (order_item_id is on extra_batches)
+        const { data: batchData } = await supabase
+          .from('extra_batches')
+          .select('order_item_id, quantity')
+          .eq('id', batch.id)
+          .single();
+
+        if (batchData?.order_item_id) {
+          const { data: orderItem } = await supabase
+            .from('order_items')
+            .select('deducted_to_extra')
+            .eq('id', batchData.order_item_id)
+            .single();
+
+          if (orderItem) {
+            await supabase
+              .from('order_items')
+              .update({ deducted_to_extra: Math.max(0, orderItem.deducted_to_extra - batchData.quantity) })
+              .eq('id', batchData.order_item_id);
+          }
+
+          // Clear reservation fields first to pass validation
+          await supabase
+            .from('extra_batches')
+            .update({ inventory_state: 'AVAILABLE', order_id: null, order_item_id: null })
+            .eq('id', batch.id);
+        }
+      }
+
+      // Delete the batch
+      const { error } = await supabase
+        .from('extra_batches')
+        .delete()
+        .eq('id', batch.id);
+
+      if (error) throw error;
+
+      toast({ title: 'Deleted', description: 'Extra batch deleted successfully' });
+      fetchData();
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } finally {
+      setDeletingBatchId(null);
+    }
+  };
+
   const getInventoryStateColor = (state: string) => {
     switch (state) {
       case 'AVAILABLE': return 'text-green-600 border-green-600';
@@ -397,13 +450,14 @@ export default function ExtraInventory() {
             </div>
           </div>
 
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="mr-2 h-4 w-4" />
-                Add Extra Batch
-              </Button>
-            </DialogTrigger>
+          {canManage && (
+            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Extra Batch
+                </Button>
+              </DialogTrigger>
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Create Extra Inventory Batch</DialogTitle>
@@ -511,6 +565,7 @@ export default function ExtraInventory() {
               </form>
             </DialogContent>
           </Dialog>
+          )}
         </div>
       </header>
 
@@ -645,6 +700,7 @@ export default function ExtraInventory() {
                     <TableHead>Status</TableHead>
                     <TableHead>Box</TableHead>
                     <TableHead>Created</TableHead>
+                    {canManage && <TableHead className="w-[60px]"></TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -689,6 +745,23 @@ export default function ExtraInventory() {
                         )}
                       </TableCell>
                       <TableCell>{format(new Date(batch.created_at), 'PP')}</TableCell>
+                      {canManage && (
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-destructive hover:text-destructive"
+                            onClick={() => handleDeleteBatch(batch)}
+                            disabled={deletingBatchId === batch.id}
+                          >
+                            {deletingBatchId === batch.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </TableCell>
+                      )}
                     </TableRow>
                   ))}
                 </TableBody>

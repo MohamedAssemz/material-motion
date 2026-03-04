@@ -146,7 +146,7 @@ export default function Dashboard() {
     },
   ];
 
-  const canCreateOrders = hasRole('manufacture_lead') || hasRole('admin');
+  const canCreateOrders = hasRole('admin');
 
   return (
     <div className="p-6 space-y-6">

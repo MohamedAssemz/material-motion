@@ -44,15 +44,11 @@ export const stateColors: Record<UnitState, string> = {
 };
 
 export const roleDisplayNames = {
-  manufacture_lead: 'Manufacturing Lead',
-  manufacturer: 'Manufacturer',
-  packaging_manager: 'Packaging Manager',
-  packer: 'Packer',
-  boxing_manager: 'Boxing Manager',
-  boxer: 'Boxer',
-  qc: 'Quality Control',
   admin: 'Administrator',
-  viewer: 'Viewer',
+  manufacturing_manager: 'Manufacturing Manager',
+  finishing_manager: 'Finishing Manager',
+  packaging_manager: 'Packaging Manager',
+  boxing_manager: 'Boxing Manager',
 } as const;
 
 export type UserRole = keyof typeof roleDisplayNames;
@@ -61,23 +57,23 @@ export type UserRole = keyof typeof roleDisplayNames;
 export const stateTransitionPermissions: Record<UnitState, { nextStates: UnitState[]; roles: UserRole[] }> = {
   waiting_for_rm: {
     nextStates: ['in_manufacturing'],
-    roles: ['manufacturer', 'manufacture_lead', 'admin'],
+    roles: ['manufacturing_manager', 'admin'],
   },
   in_manufacturing: {
     nextStates: ['manufactured'],
-    roles: ['manufacturer', 'manufacture_lead', 'admin'],
+    roles: ['manufacturing_manager', 'admin'],
   },
   manufactured: {
     nextStates: ['waiting_for_pm', 'in_packaging'],
-    roles: ['packaging_manager', 'admin'],
+    roles: ['finishing_manager', 'admin'],
   },
   waiting_for_pm: {
     nextStates: ['in_packaging'],
-    roles: ['packaging_manager', 'packer', 'admin'],
+    roles: ['packaging_manager', 'admin'],
   },
   in_packaging: {
     nextStates: ['packaged'],
-    roles: ['packer', 'packaging_manager', 'admin'],
+    roles: ['packaging_manager', 'admin'],
   },
   packaged: {
     nextStates: ['waiting_for_bm', 'in_boxing'],
@@ -85,15 +81,15 @@ export const stateTransitionPermissions: Record<UnitState, { nextStates: UnitSta
   },
   waiting_for_bm: {
     nextStates: ['in_boxing'],
-    roles: ['boxing_manager', 'boxer', 'admin'],
+    roles: ['boxing_manager', 'admin'],
   },
   in_boxing: {
     nextStates: ['boxed'],
-    roles: ['boxer', 'boxing_manager', 'admin'],
+    roles: ['boxing_manager', 'admin'],
   },
   boxed: {
     nextStates: ['qced'],
-    roles: ['qc', 'admin'],
+    roles: ['admin'],
   },
   qced: {
     nextStates: ['finished'],

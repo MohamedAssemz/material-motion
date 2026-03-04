@@ -36,7 +36,7 @@ export default function Products() {
     needs_packing: true,
   });
 
-  const canManage = hasRole('admin') || hasRole('manufacture_lead');
+  const canManage = hasRole('admin');
 
   useEffect(() => {
     fetchProducts();

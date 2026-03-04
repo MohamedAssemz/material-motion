@@ -39,7 +39,7 @@ export default function Customers() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    if (!hasRole('manufacture_lead') && !hasRole('admin')) {
+    if (!hasRole('admin')) {
       navigate('/');
       return;
     }
