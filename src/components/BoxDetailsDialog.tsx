@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import {
@@ -13,6 +13,16 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Printer, RotateCcw } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { format } from 'date-fns';
 import { generateBoxLabelHTML } from '@/components/BoxLabel';
 
@@ -62,6 +72,7 @@ export function BoxDetailsDialog({
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [forceEmptying, setForceEmptying] = useState(false);
+  const [forceEmptyConfirmOpen, setForceEmptyConfirmOpen] = useState(false);
   const [orderBatches, setOrderBatches] = useState<OrderBatchDetail[]>([]);
   const [extraBatches, setExtraBatches] = useState<ExtraBatchDetail[]>([]);
 
@@ -378,7 +389,7 @@ export function BoxDetailsDialog({
             {isAdmin && !isEmpty && !loading && boxType === 'order' && (
               <Button
                 variant="destructive"
-                onClick={handleForceEmpty}
+                onClick={() => setForceEmptyConfirmOpen(true)}
                 disabled={forceEmptying}
                 className="sm:mr-auto"
               >
@@ -409,6 +420,27 @@ export function BoxDetailsDialog({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Force Empty Confirmation */}
+      <AlertDialog open={forceEmptyConfirmOpen} onOpenChange={setForceEmptyConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Force Empty Box</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to force empty box {boxCode}? All batches will be reverted to their previous state. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => { setForceEmptyConfirmOpen(false); handleForceEmpty(); }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Force Empty
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
