@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
@@ -72,6 +73,7 @@ export default function ExtraInventory() {
   const [selectedBoxCode, setSelectedBoxCode] = useState<string>('');
   const [submitting, setSubmitting] = useState(false);
   const [deletingBatchId, setDeletingBatchId] = useState<string | null>(null);
+  const [batchToDelete, setBatchToDelete] = useState<ExtraBatch | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 25;
 
@@ -747,7 +749,7 @@ export default function ExtraInventory() {
                             variant="ghost"
                             size="icon"
                             className="h-8 w-8 text-destructive hover:text-destructive"
-                            onClick={() => handleDeleteBatch(batch)}
+                            onClick={() => setBatchToDelete(batch)}
                             disabled={deletingBatchId === batch.id}
                           >
                             {deletingBatchId === batch.id ? (
@@ -780,6 +782,29 @@ export default function ExtraInventory() {
         onConfirm={handleAssignBox}
         title="Assign Extra Box"
       />
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!batchToDelete} onOpenChange={(open) => { if (!open) setBatchToDelete(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Extra Batch</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this extra batch ({batchToDelete?.product?.name} × {batchToDelete?.quantity})?
+              {batchToDelete?.inventory_state === 'RESERVED' && ' This batch is currently reserved for an order. Deleting it will release the reservation.'}
+              {' '}This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => { if (batchToDelete) { handleDeleteBatch(batchToDelete); setBatchToDelete(null); } }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
