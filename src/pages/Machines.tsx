@@ -9,7 +9,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
-import { ArrowLeft, Plus, Settings, Loader2 } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { ArrowLeft, Plus, Settings, Loader2, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Machine {
@@ -23,19 +24,17 @@ interface Machine {
 export default function Machines() {
   const navigate = useNavigate();
   const { hasRole } = useAuth();
+  const isAdmin = hasRole('admin');
   const [machines, setMachines] = useState<Machine[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [newMachine, setNewMachine] = useState<{ name: string; type: 'manufacturing' | 'packaging' }>({ name: '', type: 'manufacturing' });
   const [submitting, setSubmitting] = useState(false);
+  const [machineToDelete, setMachineToDelete] = useState<Machine | null>(null);
 
   useEffect(() => {
-    if (!hasRole('admin')) {
-      navigate('/');
-      return;
-    }
     fetchMachines();
-  }, [hasRole, navigate]);
+  }, []);
 
   const fetchMachines = async () => {
     try {
@@ -103,6 +102,26 @@ export default function Machines() {
     }
   };
 
+  const handleDeleteMachine = async () => {
+    if (!machineToDelete) return;
+    try {
+      const { error } = await supabase
+        .from('machines')
+        .delete()
+        .eq('id', machineToDelete.id);
+
+      if (error) throw error;
+
+      setMachines(prev => prev.filter(m => m.id !== machineToDelete.id));
+      toast.success('Machine deleted successfully');
+    } catch (error) {
+      console.error('Error deleting machine:', error);
+      toast.error('Failed to delete machine. It may be linked to production records.');
+    } finally {
+      setMachineToDelete(null);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -115,6 +134,48 @@ export default function Machines() {
   const finishingMachines = machines.filter(m => m.type === 'finishing');
   const packagingMachines = machines.filter(m => m.type === 'packaging');
   const boxingMachines = machines.filter(m => m.type === 'boxing');
+
+  const renderMachineList = (list: Machine[], emptyLabel: string) => (
+    list.length === 0 ? (
+      <p className="text-muted-foreground text-center py-4">{emptyLabel}</p>
+    ) : (
+      <div className="space-y-3">
+        {list.map(machine => (
+          <div key={machine.id} className="flex items-center justify-between p-3 border rounded-lg">
+            <div>
+              <p className="font-medium">{machine.name}</p>
+              <p className="text-sm text-muted-foreground">
+                {machine.is_active ? 'Active' : 'Inactive'}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              {isAdmin && (
+                <>
+                  <Switch
+                    checked={machine.is_active}
+                    onCheckedChange={() => toggleMachineStatus(machine)}
+                  />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-destructive hover:text-destructive"
+                    onClick={() => setMachineToDelete(machine)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </>
+              )}
+              {!isAdmin && (
+                <span className={`text-xs font-medium px-2 py-1 rounded ${machine.is_active ? 'bg-green-100 text-green-700' : 'bg-muted text-muted-foreground'}`}>
+                  {machine.is_active ? 'Active' : 'Inactive'}
+                </span>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    )
+  );
 
   return (
     <div className="min-h-screen bg-background">
@@ -130,173 +191,97 @@ export default function Machines() {
               <p className="text-sm text-muted-foreground">Manage production equipment</p>
             </div>
           </div>
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Machine
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Add New Machine</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Machine Name</Label>
-                  <Input
-                    id="name"
-                    value={newMachine.name}
-                    onChange={(e) => setNewMachine(prev => ({ ...prev, name: e.target.value }))}
-                    placeholder="e.g., Machine A"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Type</Label>
-                  <Select
-                    value={newMachine.type}
-                    onValueChange={(value) => setNewMachine(prev => ({ ...prev, type: value as 'manufacturing' | 'packaging' }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="manufacturing">Manufacturing</SelectItem>
-                      <SelectItem value="finishing">Finishing</SelectItem>
-                      <SelectItem value="packaging">Packaging</SelectItem>
-                      <SelectItem value="boxing">Boxing</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setDialogOpen(false)}>
-                  Cancel
+          {isAdmin && (
+            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Machine
                 </Button>
-                <Button onClick={handleAddMachine} disabled={submitting}>
-                  {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Add Machine'}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Add New Machine</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="name">Machine Name</Label>
+                    <Input
+                      id="name"
+                      value={newMachine.name}
+                      onChange={(e) => setNewMachine(prev => ({ ...prev, name: e.target.value }))}
+                      placeholder="e.g., Machine A"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Type</Label>
+                    <Select
+                      value={newMachine.type}
+                      onValueChange={(value) => setNewMachine(prev => ({ ...prev, type: value as 'manufacturing' | 'packaging' }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="manufacturing">Manufacturing</SelectItem>
+                        <SelectItem value="finishing">Finishing</SelectItem>
+                        <SelectItem value="packaging">Packaging</SelectItem>
+                        <SelectItem value="boxing">Boxing</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setDialogOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={handleAddMachine} disabled={submitting}>
+                    {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Add Machine'}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          )}
         </div>
       </header>
 
       <div className="container mx-auto p-6 space-y-6">
         <div className="grid gap-6 md:grid-cols-2">
           <Card>
-            <CardHeader>
-              <CardTitle>Manufacturing Machines</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {manufacturingMachines.length === 0 ? (
-                <p className="text-muted-foreground text-center py-4">No manufacturing machines</p>
-              ) : (
-                <div className="space-y-3">
-                  {manufacturingMachines.map(machine => (
-                    <div key={machine.id} className="flex items-center justify-between p-3 border rounded-lg">
-                      <div>
-                        <p className="font-medium">{machine.name}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {machine.is_active ? 'Active' : 'Inactive'}
-                        </p>
-                      </div>
-                      <Switch
-                        checked={machine.is_active}
-                        onCheckedChange={() => toggleMachineStatus(machine)}
-                      />
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
+            <CardHeader><CardTitle>Manufacturing Machines</CardTitle></CardHeader>
+            <CardContent>{renderMachineList(manufacturingMachines, 'No manufacturing machines')}</CardContent>
           </Card>
-
           <Card>
-            <CardHeader>
-              <CardTitle>Finishing Machines</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {finishingMachines.length === 0 ? (
-                <p className="text-muted-foreground text-center py-4">No finishing machines</p>
-              ) : (
-                <div className="space-y-3">
-                  {finishingMachines.map(machine => (
-                    <div key={machine.id} className="flex items-center justify-between p-3 border rounded-lg">
-                      <div>
-                        <p className="font-medium">{machine.name}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {machine.is_active ? 'Active' : 'Inactive'}
-                        </p>
-                      </div>
-                      <Switch
-                        checked={machine.is_active}
-                        onCheckedChange={() => toggleMachineStatus(machine)}
-                      />
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
+            <CardHeader><CardTitle>Finishing Machines</CardTitle></CardHeader>
+            <CardContent>{renderMachineList(finishingMachines, 'No finishing machines')}</CardContent>
           </Card>
-
           <Card>
-            <CardHeader>
-              <CardTitle>Packaging Machines</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {packagingMachines.length === 0 ? (
-                <p className="text-muted-foreground text-center py-4">No packaging machines</p>
-              ) : (
-                <div className="space-y-3">
-                  {packagingMachines.map(machine => (
-                    <div key={machine.id} className="flex items-center justify-between p-3 border rounded-lg">
-                      <div>
-                        <p className="font-medium">{machine.name}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {machine.is_active ? 'Active' : 'Inactive'}
-                        </p>
-                      </div>
-                      <Switch
-                        checked={machine.is_active}
-                        onCheckedChange={() => toggleMachineStatus(machine)}
-                      />
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
+            <CardHeader><CardTitle>Packaging Machines</CardTitle></CardHeader>
+            <CardContent>{renderMachineList(packagingMachines, 'No packaging machines')}</CardContent>
           </Card>
-
           <Card>
-            <CardHeader>
-              <CardTitle>Boxing Machines</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {boxingMachines.length === 0 ? (
-                <p className="text-muted-foreground text-center py-4">No boxing machines</p>
-              ) : (
-                <div className="space-y-3">
-                  {boxingMachines.map(machine => (
-                    <div key={machine.id} className="flex items-center justify-between p-3 border rounded-lg">
-                      <div>
-                        <p className="font-medium">{machine.name}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {machine.is_active ? 'Active' : 'Inactive'}
-                        </p>
-                      </div>
-                      <Switch
-                        checked={machine.is_active}
-                        onCheckedChange={() => toggleMachineStatus(machine)}
-                      />
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
+            <CardHeader><CardTitle>Boxing Machines</CardTitle></CardHeader>
+            <CardContent>{renderMachineList(boxingMachines, 'No boxing machines')}</CardContent>
           </Card>
         </div>
       </div>
+
+      <AlertDialog open={!!machineToDelete} onOpenChange={(open) => !open && setMachineToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Machine</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{machineToDelete?.name}"? This action cannot be undone. If this machine has production records linked to it, deletion may fail.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteMachine} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
