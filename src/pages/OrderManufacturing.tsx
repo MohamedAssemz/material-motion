@@ -62,6 +62,7 @@ interface Order {
   id: string;
   order_number: string;
   priority: string;
+  status: string;
   customer?: { name: string };
 }
 
@@ -121,6 +122,7 @@ export default function OrderManufacturing() {
   const [loadingMachines, setLoadingMachines] = useState(false);
 
   const canManage = hasRole("manufacturing_manager") || hasRole("admin");
+  const isCancelled = order?.status === 'cancelled';
 
   // Compute processed batches for Production Rate by subtracting retrieved quantities
   const processedBatchesForRate = useMemo(() => {
@@ -173,7 +175,7 @@ export default function OrderManufacturing() {
   const fetchData = async () => {
     try {
       const [orderRes, batchesRes, completedRes] = await Promise.all([
-        supabase.from("orders").select("id, order_number, priority, customer:customers(name)").eq("id", id).single(),
+        supabase.from("orders").select("id, order_number, priority, status, customer:customers(name)").eq("id", id).single(),
         supabase
           .from("order_batches")
           .select(
@@ -891,6 +893,15 @@ export default function OrderManufacturing() {
         </Card>
       </div>
 
+      {isCancelled && (
+        <Card className="border-destructive bg-destructive/10">
+          <CardContent className="p-4 flex items-center gap-2 text-destructive font-medium">
+            <Badge variant="destructive">Cancelled</Badge>
+            This order has been cancelled. Actions are frozen except machine assignment.
+          </CardContent>
+        </Card>
+      )}
+
       <Tabs defaultValue="active" className="space-y-4">
         <TabsList className="grid grid-cols-3 w-full max-w-xl">
           <TabsTrigger value="active">Active ({totalPendingRm + totalInManufacturing})</TabsTrigger>
@@ -900,7 +911,7 @@ export default function OrderManufacturing() {
 
         <TabsContent value="active" className="space-y-4">
           {/* Action Buttons */}
-          {canManage && (
+          {canManage && !isCancelled && (
             <Card>
               <CardContent className="p-4 flex flex-wrap items-center gap-3">
                 <div className="flex-1 text-sm text-muted-foreground">
@@ -976,7 +987,7 @@ export default function OrderManufacturing() {
                           <p className="text-xs text-muted-foreground">In Mfg</p>
                           <p className="text-lg font-semibold text-primary">{group.inManufacturing}</p>
                         </div>
-                        {canManage && (
+                        {canManage && !isCancelled && (
                           <div className="flex items-center gap-2">
                             <Label className="text-xs text-muted-foreground">Select</Label>
                             <Input
@@ -1005,7 +1016,7 @@ export default function OrderManufacturing() {
         </TabsContent>
 
         <TabsContent value="extra" className="space-y-6">
-          <ExtraItemsTab orderId={id!} phase="manufacturing" onRefresh={() => fetchData()} canManage={canManage} />
+          <ExtraItemsTab orderId={id!} phase="manufacturing" onRefresh={() => fetchData()} canManage={canManage && !isCancelled} />
 
           {/* Added to Extra Inventory from this Order */}
           {addedToExtraItems.length > 0 && (

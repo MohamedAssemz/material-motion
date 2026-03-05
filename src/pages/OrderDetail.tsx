@@ -725,6 +725,7 @@ export default function OrderDetail() {
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-3xl font-bold">{order.order_number}</h1>
+              {order.status === 'cancelled' && <Badge variant="destructive">Cancelled</Badge>}
               {order.priority === "high" && <Badge variant="destructive">High Priority</Badge>}
               <Badge variant={orderState === "Fulfilled" ? "default" : "secondary"}>{orderState}</Badge>
             </div>
