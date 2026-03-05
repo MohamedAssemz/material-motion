@@ -44,6 +44,7 @@ interface Order {
   id: string;
   order_number: string;
   priority: string;
+  status: string;
   notes: string | null;
   customer?: { name: string };
 }
@@ -132,6 +133,7 @@ export default function OrderBoxing() {
 
 
   const canManage = hasRole("boxing_manager") || hasRole("admin");
+  const isCancelled = order?.status === 'cancelled';
 
   useEffect(() => {
     fetchData();
@@ -153,7 +155,7 @@ export default function OrderBoxing() {
   const fetchData = async () => {
     try {
       const [orderRes, batchesRes] = await Promise.all([
-        supabase.from("orders").select("id, order_number, priority, notes, customer:customers(name)").eq("id", id).single(),
+        supabase.from("orders").select("id, order_number, priority, status, notes, customer:customers(name)").eq("id", id).single(),
         supabase
           .from("order_batches")
           .select(
@@ -1177,6 +1179,15 @@ export default function OrderBoxing() {
         </Card>
       </div>
 
+      {isCancelled && (
+        <Card className="border-destructive bg-destructive/10">
+          <CardContent className="p-4 flex items-center gap-2 text-destructive font-medium">
+            <Badge variant="destructive">Cancelled</Badge>
+            This order has been cancelled. Actions are frozen except machine assignment.
+          </CardContent>
+        </Card>
+      )}
+
       <Tabs defaultValue={defaultTab} className="space-y-4">
         <TabsList className="grid grid-cols-5 w-full max-w-3xl">
           <TabsTrigger value="receive">Receive ({readyBoxGroups.length})</TabsTrigger>
@@ -1187,7 +1198,7 @@ export default function OrderBoxing() {
         </TabsList>
 
         <TabsContent value="receive" className="space-y-4">
-          {canManage && readyBoxGroups.length > 0 && (
+          {canManage && !isCancelled && readyBoxGroups.length > 0 && (
             <Card>
               <CardContent className="p-4 flex items-center justify-between">
                 <Button variant="outline" size="sm" onClick={handleSelectAllBoxes}>
@@ -1242,7 +1253,7 @@ export default function OrderBoxing() {
                 <Card key={group.box_id} className={selectedBoxes.has(group.box_id) ? "border-primary" : ""}>
                   <CardContent className="p-4">
                     <div className="flex items-center gap-4">
-                      {canManage && (
+                      {canManage && !isCancelled && (
                         <Checkbox
                           checked={selectedBoxes.has(group.box_id)}
                           onCheckedChange={(checked) => {
@@ -1272,7 +1283,7 @@ export default function OrderBoxing() {
         </TabsContent>
 
         <TabsContent value="process" className="space-y-4">
-          {canManage && (
+          {canManage && !isCancelled && (
             <Card>
               <CardContent className="p-4 flex items-center justify-between flex-wrap gap-3">
                 <Badge variant="secondary" className="text-lg px-3 py-1">
@@ -1321,7 +1332,7 @@ export default function OrderBoxing() {
                         </div>
                         <div className="flex items-center gap-4">
                           <Badge variant="secondary">{group.quantity} available</Badge>
-                          {canManage && (
+                          {canManage && !isCancelled && (
                             <div className="flex items-center gap-2">
                               <Label className="text-xs text-muted-foreground">Select</Label>
                               <Input
@@ -1352,7 +1363,7 @@ export default function OrderBoxing() {
             orderId={id!} 
             phase="boxing" 
             onRefresh={() => fetchData()}
-            canManage={canManage}
+            canManage={canManage && !isCancelled}
           />
 
           {/* Added to Extra Inventory from this Order */}
@@ -1383,7 +1394,7 @@ export default function OrderBoxing() {
         </TabsContent>
 
         <TabsContent value="ready" className="space-y-4">
-          {canManage && readyForShipmentGroups.length > 0 && (
+          {canManage && !isCancelled && readyForShipmentGroups.length > 0 && (
             <Card>
               <CardContent className="p-4 flex items-center justify-between">
                 <Badge variant="secondary" className="text-lg px-3 py-1">
@@ -1433,7 +1444,7 @@ export default function OrderBoxing() {
                           <Badge variant="default" className="bg-green-600">
                             {group.quantity} ready
                           </Badge>
-                          {canManage && (
+                          {canManage && !isCancelled && (
                             <div className="flex items-center gap-2">
                               <Label className="text-xs text-muted-foreground">Select</Label>
                               <Input
