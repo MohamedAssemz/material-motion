@@ -1,47 +1,42 @@
 
 
-## Updated Plan: Restrict Extra Inventory Assignment to Admin Only
+## Plan: Order Cancellation Freeze Logic
 
-### What changed from the approved plan
-The `ExtraItemsTab` component (the "Extra" tab within each phase page) currently allows any user to retrieve reserved extra batches, assign them to boxes, and move them directly. The approved plan already gates these actions behind `canManage` per phase. However, the user clarifies:
+### Requirements
+1. When an order is cancelled, freeze all actions on phase pages **except** production rate (machine) assignment (which still respects role permissions)
+2. Unretrieved reserved extra batches should be released back to AVAILABLE on cancellation
 
-- **Assigning extra batches to an order** (via `ExtraInventoryDialog` on OrderDetail) = **admin only** (already in plan)
-- **Retrieving/consuming reserved extra batches** within a phase page (`ExtraItemsTab`) = **phase manager + admin only** (already in plan)
-- **Managers should NOT be able to assign (reserve) extra inventory to orders** — this is the `ExtraInventoryDialog` on `OrderDetail.tsx`, which is already gated as admin-only in the plan
+### Analysis
+- Requirement 2 is **already implemented** in `handleCancelOrder` in `OrderDetail.tsx` (lines 462-471) — it releases reserved extra batches back to AVAILABLE
+- Requirement 1 needs changes across 4 phase pages and their child components
 
-### Confirmation: No plan changes needed
+### Implementation
 
-The approved plan already covers all three requirements:
+**Core approach:** Each phase page already has a `canManage` boolean that gates actions. Add an `isCancelled` check derived from `order?.status === 'cancelled'` and use it to disable all actions except machine assignment.
 
-1. **`ExtraInventoryDialog`** (reserve extra for order): Already listed as admin-only in Phase 4 (`OrderDetail.tsx` → Extra Inventory reservation → admin only)
-2. **`ExtraItemsTab`** actions (retrieve, assign to box, move directly): Will receive a `canManage` prop, passed as `{phase}_manager || admin` from each phase page
-3. **`ProductionRateSection`** machine assignment: Will receive a `canManage` prop, same gating
+**Files to modify:**
 
-### Implementation (from pending plan items)
+1. **`OrderManufacturing.tsx`** — Add `const isCancelled = order?.status === 'cancelled'`. Pass `isCancelled` to disable:
+   - Box assignment dialog actions
+   - Terminate/redo actions
+   - MoveToExtraDialog
+   - ExtraItemsTab `canManage` → `canManage && !isCancelled`
+   - BoxReceiveDialog actions
+   - Keep `ProductionRateSection canManage={canManage}` unchanged (still allows machine assignment)
 
-**`src/components/ExtraItemsTab.tsx`:**
-- Add `canManage?: boolean` prop
-- Gate "Assign to Box", "Move Directly", "Move to Ready" buttons behind `canManage`
-- Gate quantity selection inputs behind `canManage`
+2. **`OrderFinishing.tsx`** — Same pattern: `isCancelled` disables accept boxes, assign to box, MoveToExtraDialog, ExtraItemsTab, but keeps ProductionRateSection canManage unchanged.
 
-**`src/components/ProductionRateSection.tsx`:**
-- Add `canManage?: boolean` prop  
-- Gate machine assignment Select, quantity Input, and Assign button behind `canManage`
+3. **`OrderPackaging.tsx`** — Same pattern.
 
-**Phase pages pass `canManage`:**
-- `OrderManufacturing.tsx`: `canManage={hasRole('manufacturing_manager') || hasRole('admin')}`
-- `OrderFinishing.tsx`: `canManage={hasRole('finishing_manager') || hasRole('admin')}`
-- `OrderPackaging.tsx`: `canManage={hasRole('packaging_manager') || hasRole('admin')}`
-- `OrderBoxing.tsx`: `canManage={hasRole('boxing_manager') || hasRole('admin')}`
+4. **`OrderBoxing.tsx`** — Same pattern. Additionally disable shipment creation.
 
-**`src/pages/OrderDetail.tsx`:**
-- The "Extra Inventory" button that opens `ExtraInventoryDialog` is already gated to admin-only (confirmed in approved plan)
+5. **`OrderDetail.tsx`** — Add a visible "Cancelled" banner/badge. The cancel button is already hidden when `status === 'cancelled'`. Start Order and Extra Inventory sections are already gated to pending orders, so no changes needed there.
 
-### Files to modify
-- `src/components/ExtraItemsTab.tsx`
-- `src/components/ProductionRateSection.tsx`
-- `src/pages/OrderManufacturing.tsx`
-- `src/pages/OrderFinishing.tsx`
-- `src/pages/OrderPackaging.tsx`
-- `src/pages/OrderBoxing.tsx`
+**Specific prop changes per phase page:**
+- `ExtraItemsTab canManage={canManage && !isCancelled}` — freezes extra retrieval
+- `ProductionRateSection canManage={canManage}` — unchanged, still allows machine assignment
+- All action buttons (accept, assign, terminate, redo, move to extra, create shipment) gated with `!isCancelled`
+- Box receive dialogs disabled when cancelled
+
+**No database changes needed** — the cancellation already releases reserved batches.
 
