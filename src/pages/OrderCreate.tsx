@@ -284,7 +284,7 @@ export default function OrderCreate() {
           order_id: order.id,
           order_item_id: orderItem.id,
           product_id: orderItem.product_id,
-          current_state: "pending_rm",
+          current_state: "in_manufacturing",
           quantity: orderItem.quantity,
           created_by: user?.id,
         });

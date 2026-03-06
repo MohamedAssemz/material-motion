@@ -1,19 +1,17 @@
-// Unit state machine with allowed transitions (matching new 10-state flow)
+// Unit state machine with allowed transitions (matching 9-state flow, pending_rm removed)
 export type UnitState = 
-  | 'pending_rm'           // 1. Pending RM
-  | 'in_manufacturing'     // 2. In Manufacturing
-  | 'ready_for_finishing'  // 3. Ready for Finishing
-  | 'in_finishing'         // 4. In Finishing
-  | 'ready_for_packaging'  // 5. Ready for Packaging
-  | 'in_packaging'         // 6. In Packaging
-  | 'ready_for_boxing'     // 7. Ready for Boxing
-  | 'in_boxing'            // 8. In Boxing
-  | 'ready_for_shipment'   // 9. Ready for Shipment
-  | 'shipped';             // 10. Shipped
+  | 'in_manufacturing'     // 1. In Manufacturing
+  | 'ready_for_finishing'  // 2. Ready for Finishing
+  | 'in_finishing'         // 3. In Finishing
+  | 'ready_for_packaging'  // 4. Ready for Packaging
+  | 'in_packaging'         // 5. In Packaging
+  | 'ready_for_boxing'     // 6. Ready for Boxing
+  | 'in_boxing'            // 7. In Boxing
+  | 'ready_for_shipment'   // 8. Ready for Shipment
+  | 'shipped';             // 9. Shipped
 
 // Human-readable labels for each state
 const stateLabels: Record<string, string> = {
-  'pending_rm': 'Pending RM',
   'in_manufacturing': 'In Manufacturing',
   'ready_for_finishing': 'Ready for Finishing',
   'in_finishing': 'In Finishing',
@@ -32,7 +30,6 @@ const stateLabels: Record<string, string> = {
 
 // Define the next state for each current state
 const stateTransitions: Record<UnitState, UnitState | null> = {
-  'pending_rm': 'in_manufacturing',
   'in_manufacturing': 'ready_for_finishing',
   'ready_for_finishing': 'in_finishing',
   'in_finishing': 'ready_for_packaging',
@@ -48,12 +45,9 @@ const stateTransitions: Record<UnitState, UnitState | null> = {
 const requiresLeadTime: UnitState[] = ['in_manufacturing', 'in_finishing', 'in_packaging', 'in_boxing'];
 
 // States where items are IN a box (the "In" states)
-// When transitioning FROM these states, items leave the box
 const inBoxStates: UnitState[] = ['in_manufacturing', 'in_finishing', 'in_packaging', 'in_boxing'];
 
-// States where items need to be assigned TO a box (the "Ready for" states after "In" states)
-// When transitioning TO these states, items need box assignment
-// Note: ready_for_shipment does NOT need box assignment (items go directly to kartona)
+// States where items need to be assigned TO a box
 const needsBoxAssignment: UnitState[] = ['ready_for_finishing', 'ready_for_packaging', 'ready_for_boxing'];
 
 // "In" states where scanning/selecting box is needed to receive items
@@ -75,22 +69,18 @@ export function canTransitionTo(currentState: UnitState, targetState: UnitState)
   return stateTransitions[currentState] === targetState;
 }
 
-// Check if transitioning to this state requires box assignment
 export function needsBoxOnTransition(targetState: UnitState): boolean {
   return needsBoxAssignment.includes(targetState);
 }
 
-// Check if current state means items are in a box (for receiving workflow)
 export function isInBoxState(state: UnitState): boolean {
   return inBoxStates.includes(state);
 }
 
-// Check if this is a "Ready for" state (items waiting to be received)
 export function isReadyForState(state: UnitState): boolean {
   return state.startsWith('ready_for_');
 }
 
-// Check if this is an "In" state (items being processed)
 export function isInState(state: UnitState): boolean {
   return state.startsWith('in_');
 }
@@ -98,7 +88,6 @@ export function isInState(state: UnitState): boolean {
 // Get state color for UI
 export function getStateColor(state: string): string {
   const colors: Record<string, string> = {
-    'pending_rm': 'bg-yellow-500',
     'in_manufacturing': 'bg-blue-500',
     'ready_for_finishing': 'bg-blue-300',
     'in_finishing': 'bg-purple-500',
@@ -120,7 +109,6 @@ export function getStateColor(state: string): string {
 // Get all states in order
 export function getAllStates(): UnitState[] {
   return [
-    'pending_rm',
     'in_manufacturing',
     'ready_for_finishing',
     'in_finishing',

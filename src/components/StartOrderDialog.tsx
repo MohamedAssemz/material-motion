@@ -24,7 +24,7 @@ interface OrderItem {
   };
 }
 
-interface PendingBatch {
+interface BatchSummary {
   product_id: string;
   product_name: string;
   product_sku: string;
@@ -54,26 +54,25 @@ export function StartOrderDialog({
   onOrderStarted,
 }: StartOrderDialogProps) {
   const [loading, setLoading] = useState(false);
-  const [pendingBatches, setPendingBatches] = useState<PendingBatch[]>([]);
+  const [manufacturingBatches, setManufacturingBatches] = useState<BatchSummary[]>([]);
   const [reservedExtraItems, setReservedExtraItems] = useState<ReservedExtraItem[]>([]);
   const [fetchingBatches, setFetchingBatches] = useState(false);
 
   useEffect(() => {
     if (open && orderId) {
-      fetchPendingBatches();
+      fetchBatches();
     }
   }, [open, orderId]);
 
-  const fetchPendingBatches = async () => {
+  const fetchBatches = async () => {
     setFetchingBatches(true);
     try {
-      // Fetch pending_rm batches and reserved extra batches in parallel
       const [batchesResult, extraResult] = await Promise.all([
         supabase
           .from('order_batches')
           .select(`id, product_id, quantity, product:products(id, name, sku)`)
           .eq('order_id', orderId)
-          .eq('current_state', 'pending_rm'),
+          .eq('current_state', 'in_manufacturing'),
         supabase
           .from('extra_batches')
           .select(`id, product_id, quantity, product:products(id, name, sku)`)
@@ -84,8 +83,8 @@ export function StartOrderDialog({
       if (batchesResult.error) throw batchesResult.error;
       if (extraResult.error) throw extraResult.error;
 
-      // Group pending batches by product
-      const grouped = (batchesResult.data || []).reduce((acc: Record<string, PendingBatch>, batch: any) => {
+      // Group manufacturing batches by product
+      const grouped = (batchesResult.data || []).reduce((acc: Record<string, BatchSummary>, batch: any) => {
         const productId = batch.product_id;
         if (!acc[productId]) {
           acc[productId] = {
@@ -98,7 +97,7 @@ export function StartOrderDialog({
         acc[productId].quantity += batch.quantity;
         return acc;
       }, {});
-      setPendingBatches(Object.values(grouped));
+      setManufacturingBatches(Object.values(grouped));
 
       // Group reserved extra items by product
       const extraGrouped = (extraResult.data || []).reduce((acc: Record<string, ReservedExtraItem>, batch: any) => {
@@ -116,8 +115,8 @@ export function StartOrderDialog({
       }, {});
       setReservedExtraItems(Object.values(extraGrouped));
     } catch (error: any) {
-      console.error('Error fetching pending batches:', error);
-      toast.error('Failed to load pending batches');
+      console.error('Error fetching batches:', error);
+      toast.error('Failed to load batches');
     } finally {
       setFetchingBatches(false);
     }
@@ -126,21 +125,7 @@ export function StartOrderDialog({
   const handleStartOrder = async () => {
     setLoading(true);
     try {
-      // Transition pending_rm batches to in_manufacturing (if any exist)
-      if (pendingBatches.length > 0) {
-        const { error: updateError } = await supabase
-          .from('order_batches')
-          .update({ 
-            current_state: 'in_manufacturing',
-            updated_at: new Date().toISOString(),
-          })
-          .eq('order_id', orderId)
-          .eq('current_state', 'pending_rm');
-
-        if (updateError) throw updateError;
-      }
-
-      // Update order status to in_progress
+      // Simply update order status to in_progress (batches already start as in_manufacturing)
       await supabase
         .from('orders')
         .update({ status: 'in_progress' })
@@ -157,10 +142,10 @@ export function StartOrderDialog({
     }
   };
 
-  const totalPendingQty = pendingBatches.reduce((sum, b) => sum + b.quantity, 0);
+  const totalMfgQty = manufacturingBatches.reduce((sum, b) => sum + b.quantity, 0);
   const totalExtraQty = reservedExtraItems.reduce((sum, b) => sum + b.quantity, 0);
-  const hasAnythingToStart = pendingBatches.length > 0 || reservedExtraItems.length > 0;
-  const isFullyFromExtra = pendingBatches.length === 0 && reservedExtraItems.length > 0;
+  const hasAnythingToStart = manufacturingBatches.length > 0 || reservedExtraItems.length > 0;
+  const isFullyFromExtra = manufacturingBatches.length === 0 && reservedExtraItems.length > 0;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -183,17 +168,17 @@ export function StartOrderDialog({
           ) : !hasAnythingToStart ? (
             <div className="bg-muted rounded-lg p-4">
               <p className="text-sm text-muted-foreground text-center py-2">
-                No pending items to manufacture
+                No items to manufacture
               </p>
             </div>
           ) : (
             <>
-              {/* Pending manufacturing batches */}
-              {pendingBatches.length > 0 && (
+              {/* Manufacturing batches */}
+              {manufacturingBatches.length > 0 && (
                 <div className="bg-muted rounded-lg p-4">
-                  <p className="text-sm font-medium mb-3">Items to Manufacture:</p>
+                  <p className="text-sm font-medium mb-3">Items in Manufacturing:</p>
                   <ul className="space-y-2">
-                    {pendingBatches.map(batch => (
+                    {manufacturingBatches.map(batch => (
                       <li key={batch.product_id} className="text-sm flex justify-between items-center">
                         <div>
                           <span className="font-medium">{batch.product_name}</span>
@@ -205,7 +190,7 @@ export function StartOrderDialog({
                   </ul>
                   <div className="mt-3 pt-3 border-t flex justify-between text-sm font-medium">
                     <span>Total</span>
-                    <span>{totalPendingQty} units</span>
+                    <span>{totalMfgQty} units</span>
                   </div>
                 </div>
               )}
@@ -251,7 +236,7 @@ export function StartOrderDialog({
           </Button>
           <Button onClick={handleStartOrder} disabled={loading || fetchingBatches || !hasAnythingToStart}>
             {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            Start Manufacturing
+            Start Order
           </Button>
         </DialogFooter>
       </DialogContent>
