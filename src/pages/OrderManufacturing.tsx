@@ -727,7 +727,7 @@ export default function OrderManufacturing() {
         if (!group) continue;
 
         let remainingQty = quantity;
-        const pendingBatches = group.batches.filter((b) => b.current_state === "pending_rm");
+        const batchesToRedo = group.batches;
 
         for (const batch of pendingBatches) {
           if (remainingQty <= 0) break;
