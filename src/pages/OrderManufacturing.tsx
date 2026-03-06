@@ -817,7 +817,6 @@ export default function OrderManufacturing() {
     );
   }
 
-  const totalPendingRm = productGroups.reduce((sum, g) => sum + g.pendingRm, 0);
   const totalInManufacturing = productGroups.reduce((sum, g) => sum + g.inManufacturing, 0);
 
   return (
