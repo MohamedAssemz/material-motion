@@ -851,13 +851,7 @@ export default function OrderManufacturing() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Pending RM</p>
-            <p className="text-2xl font-bold text-warning">{totalPendingRm}</p>
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">In Manufacturing</p>
@@ -873,7 +867,7 @@ export default function OrderManufacturing() {
         <Card>
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">Total Items</p>
-            <p className="text-2xl font-bold">{totalPendingRm + totalInManufacturing}</p>
+            <p className="text-2xl font-bold">{totalInManufacturing}</p>
           </CardContent>
         </Card>
         <Card>
