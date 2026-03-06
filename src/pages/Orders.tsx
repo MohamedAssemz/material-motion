@@ -154,7 +154,7 @@ export default function Orders() {
 
           const batchTotalCount = batches?.reduce((sum, b) => sum + b.quantity, 0) || 0;
           const shippedCount = batches?.filter(b => b.current_state === 'shipped').reduce((sum, b) => sum + b.quantity, 0) || 0;
-          const inProgressCount = batches?.filter(b => b.current_state !== 'pending_rm' && b.current_state !== 'shipped').reduce((sum, b) => sum + b.quantity, 0) || 0;
+          const inProgressCount = batches?.filter(b => b.current_state !== 'shipped').reduce((sum, b) => sum + b.quantity, 0) || 0;
 
           // Unit count comes from order_items, not batches
           const unitCount = orderUnitCounts.get(order.id) || 0;

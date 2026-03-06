@@ -344,7 +344,6 @@ export function StateGroupView({
 
 function getStateColor(state: string): string {
   const colors: Record<string, string> = {
-    'pending_rm': 'bg-yellow-500',
     'in_manufacturing': 'bg-blue-500',
     'ready_for_finishing': 'bg-blue-300',
     'in_finishing': 'bg-purple-500',
