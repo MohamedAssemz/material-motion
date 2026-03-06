@@ -182,7 +182,7 @@ export default function OrderManufacturing() {
           )
           .eq("order_id", id)
           .eq("is_terminated", false)
-          .in("current_state", ["pending_rm", "in_manufacturing"]),
+          .in("current_state", ["in_manufacturing"]),
         // Fetch completed items for this phase (moved to next phases)
         supabase
           .from("order_batches")
