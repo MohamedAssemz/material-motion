@@ -889,7 +889,7 @@ export default function OrderManufacturing() {
 
       <Tabs defaultValue="active" className="space-y-4">
         <TabsList className="grid grid-cols-3 w-full max-w-xl">
-          <TabsTrigger value="active">Active ({totalPendingRm + totalInManufacturing})</TabsTrigger>
+          <TabsTrigger value="active">Active ({totalInManufacturing})</TabsTrigger>
           <TabsTrigger value="extra">Extra</TabsTrigger>
           <TabsTrigger value="completed">Completed ({totalCompleted})</TabsTrigger>
         </TabsList>
