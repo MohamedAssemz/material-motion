@@ -415,7 +415,6 @@ export default function OrderManufacturing() {
         product_sku: batch.product?.sku || "N/A",
         needs_packing: batch.product?.needs_packing ?? true,
         needs_boxing: needsBoxing,
-        pendingRm: 0,
         inManufacturing: 0,
         batches: [],
         order_item_ids: [],
@@ -423,12 +422,7 @@ export default function OrderManufacturing() {
     }
     const group = groupMap.get(groupKey)!;
     group.batches.push(batch);
-    if (batch.current_state === "pending_rm") {
-      group.pendingRm += batch.quantity;
-    } else {
-      group.inManufacturing += batch.quantity;
-    }
-    // Track unique order_item_ids
+    group.inManufacturing += batch.quantity;
     if (batch.order_item_id && !group.order_item_ids.includes(batch.order_item_id)) {
       group.order_item_ids.push(batch.order_item_id);
     }
