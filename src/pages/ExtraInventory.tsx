@@ -527,13 +527,13 @@ export default function ExtraInventory() {
                       ) : (
                         <span className="text-muted-foreground flex items-center gap-2">
                           <Box className="h-4 w-4" />
-                          Select or create an EBox...
+                          Select an EBox...
                         </span>
                       )}
                     </Button>
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Extra batches must be assigned to an EBox
+                    Extra batches must be assigned to an EBox. Only compatible boxes are shown.
                   </p>
                 </div>
 
@@ -576,7 +576,7 @@ export default function ExtraInventory() {
           setCreateBoxDialogOpen(false);
         }}
         title="Select Extra Box for Batch"
-        allowCreate={true}
+        filterByState={formData.current_state}
       />
 
       <div className="container mx-auto p-6 space-y-6">

@@ -8,7 +8,6 @@ interface OrderTimelineProps {
 }
 
 const STAGES = [
-  { key: 'pending_rm', label: 'Pending RM', icon: Clock },
   { key: 'in_manufacturing', label: 'In Manufacturing', icon: Circle },
   { key: 'ready_for_finishing', label: 'Ready for Finishing', icon: CheckCircle },
   { key: 'in_finishing', label: 'In Finishing', icon: Circle },
@@ -27,18 +26,15 @@ const BOXING_STAGES = ['ready_for_boxing', 'in_boxing'];
 export function OrderTimeline({ batches, orderStatus }: OrderTimelineProps) {
   const totalItems = batches.reduce((sum, b) => sum + b.total_quantity, 0);
   
-  // Check if all batches are in pending_rm state (order not started)
-  const isPending = orderStatus === 'pending' || 
-    (batches.length > 0 && batches.every(b => b.state === 'pending_rm'));
+  // Check if order hasn't started
+  const isPending = orderStatus === 'pending';
 
-  // Get effective total for a stage - accounts for items that skip certain phases
+  // Get effective total for a stage
   const getEffectiveTotalForStage = (stageKey: string) => {
-    // Packaging stages: only count items where needs_packing is true (default true if undefined)
     if (PACKAGING_STAGES.includes(stageKey)) {
       return batches.filter(b => b.needs_packing !== false)
         .reduce((sum, b) => sum + b.total_quantity, 0);
     }
-    // Boxing stages: only count items where needs_boxing is true (default true if undefined)
     if (BOXING_STAGES.includes(stageKey)) {
       return batches.filter(b => b.needs_boxing !== false)
         .reduce((sum, b) => sum + b.total_quantity, 0);
@@ -46,7 +42,6 @@ export function OrderTimeline({ batches, orderStatus }: OrderTimelineProps) {
     return totalItems;
   };
 
-  // Get relevant batches for a stage (filters out items that skip this stage)
   const getRelevantBatchesForStage = (stageKey: string) => {
     if (PACKAGING_STAGES.includes(stageKey)) {
       return batches.filter(b => b.needs_packing !== false);
@@ -84,11 +79,10 @@ export function OrderTimeline({ batches, orderStatus }: OrderTimelineProps) {
       current: totalPassed,
       isLate,
       leadTimeDays,
-      isApplicable: effectiveTotal > 0, // Stage is not applicable if no items need it
+      isApplicable: effectiveTotal > 0,
     };
   };
 
-  // Show inactive state when order hasn't started
   if (isPending) {
     return (
       <Card>
@@ -130,15 +124,12 @@ export function OrderTimeline({ batches, orderStatus }: OrderTimelineProps) {
               const status = getStageStatus(stage.key);
               const Icon = stage.icon;
               
-              // Skip rendering stages that have 0 applicable items
-              // (e.g., packaging stages when all items have needs_packing=false)
               if (!status.isApplicable && (PACKAGING_STAGES.includes(stage.key) || BOXING_STAGES.includes(stage.key))) {
                 return (
                   <div key={stage.key} className="relative flex items-start gap-4 opacity-50">
                     <div className="relative z-10 flex items-center justify-center w-8 h-8 rounded-full border-2 bg-background border-border text-muted-foreground">
                       <Icon className="h-4 w-4" />
                     </div>
-                    
                     <div className="flex-1 min-w-0 pt-1">
                       <div className="flex items-center justify-between">
                         <p className="font-medium text-muted-foreground">{stage.label}</p>

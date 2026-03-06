@@ -18,7 +18,6 @@ import {
 } from 'lucide-react';
 
 interface StateStats {
-  pending_rm: number;
   in_manufacturing: number;
   ready_for_finishing: number;
   in_finishing: number;
@@ -43,7 +42,6 @@ interface QueueData {
 export default function Dashboard() {
   const { userRoles, hasRole } = useAuth();
   const [stats, setStats] = useState<StateStats>({
-    pending_rm: 0,
     in_manufacturing: 0,
     ready_for_finishing: 0,
     in_finishing: 0,
@@ -85,7 +83,6 @@ export default function Dashboard() {
       }, {} as Record<string, number>) || {};
 
       setStats({
-        pending_rm: batchesByState.pending_rm || 0,
         in_manufacturing: batchesByState.in_manufacturing || 0,
         ready_for_finishing: batchesByState.ready_for_finishing || 0,
         in_finishing: batchesByState.in_finishing || 0,
@@ -105,7 +102,7 @@ export default function Dashboard() {
   };
 
   const totalInProgress = stats.in_manufacturing + stats.in_finishing + stats.in_packaging + stats.in_boxing;
-  const totalWaiting = stats.pending_rm + stats.ready_for_finishing + stats.ready_for_packaging + stats.ready_for_boxing + stats.ready_for_shipment;
+  const totalWaiting = stats.ready_for_finishing + stats.ready_for_packaging + stats.ready_for_boxing + stats.ready_for_shipment;
 
   const queues: QueueData[] = [
     {
@@ -113,9 +110,9 @@ export default function Dashboard() {
       href: '/queues/manufacturing',
       icon: Factory,
       color: 'blue',
-      waiting: stats.pending_rm,
+      waiting: 0,
       inProgress: stats.in_manufacturing,
-      waitingLabel: 'Pending RM',
+      waitingLabel: 'Waiting',
     },
     {
       name: 'Finishing',
@@ -294,7 +291,7 @@ export default function Dashboard() {
         <CardContent>
           <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-5">
             {[
-              { state: 'pending_rm', label: 'Pending RM', count: stats.pending_rm, color: 'bg-yellow-500' },
+              { state: 'in_manufacturing', label: 'Manufacturing', count: stats.in_manufacturing, color: 'bg-blue-500' },
               { state: 'in_manufacturing', label: 'Manufacturing', count: stats.in_manufacturing, color: 'bg-blue-500' },
               { state: 'ready_for_finishing', label: 'Ready Finishing', count: stats.ready_for_finishing, color: 'bg-blue-300' },
               { state: 'in_finishing', label: 'Finishing', count: stats.in_finishing, color: 'bg-purple-500' },

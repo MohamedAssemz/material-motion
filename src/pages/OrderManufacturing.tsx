@@ -67,16 +67,15 @@ interface Order {
 }
 
 interface ProductGroup {
-  groupKey: string; // product_id + needs_boxing
+  groupKey: string;
   product_id: string;
   product_name: string;
   product_sku: string;
   needs_packing: boolean;
   needs_boxing: boolean;
-  pendingRm: number;
   inManufacturing: number;
   batches: Batch[];
-  order_item_ids: string[]; // Track all order_item_ids in this group
+  order_item_ids: string[];
 }
 
 export default function OrderManufacturing() {
@@ -183,7 +182,7 @@ export default function OrderManufacturing() {
           )
           .eq("order_id", id)
           .eq("is_terminated", false)
-          .in("current_state", ["pending_rm", "in_manufacturing"]),
+          .in("current_state", ["in_manufacturing"]),
         // Fetch completed items for this phase (moved to next phases)
         supabase
           .from("order_batches")
@@ -416,7 +415,6 @@ export default function OrderManufacturing() {
         product_sku: batch.product?.sku || "N/A",
         needs_packing: batch.product?.needs_packing ?? true,
         needs_boxing: needsBoxing,
-        pendingRm: 0,
         inManufacturing: 0,
         batches: [],
         order_item_ids: [],
@@ -424,12 +422,7 @@ export default function OrderManufacturing() {
     }
     const group = groupMap.get(groupKey)!;
     group.batches.push(batch);
-    if (batch.current_state === "pending_rm") {
-      group.pendingRm += batch.quantity;
-    } else {
-      group.inManufacturing += batch.quantity;
-    }
-    // Track unique order_item_ids
+    group.inManufacturing += batch.quantity;
     if (batch.order_item_id && !group.order_item_ids.includes(batch.order_item_id)) {
       group.order_item_ids.push(batch.order_item_id);
     }
@@ -454,7 +447,6 @@ export default function OrderManufacturing() {
         product_sku: batch.product?.sku || "N/A",
         needs_packing: batch.product?.needs_packing ?? true,
         needs_boxing: needsBoxing,
-        pendingRm: 0,
         inManufacturing: 0,
         batches: [],
         order_item_ids: [],
@@ -549,8 +541,8 @@ export default function OrderManufacturing() {
 
         let remainingQty = quantity;
 
-        // First use pending_rm batches, then in_manufacturing
-        const sortedBatches = [...group.batches].sort((a, b) => (a.current_state === "pending_rm" ? -1 : 1));
+        // Sort batches by quantity
+        const sortedBatches = [...group.batches].sort((a, b) => a.quantity - b.quantity);
 
         for (const batch of sortedBatches) {
           if (remainingQty <= 0) break;
@@ -659,9 +651,9 @@ export default function OrderManufacturing() {
         if (!group) continue;
 
         let remainingQty = quantity;
-        const pendingBatches = group.batches.filter((b) => b.current_state === "pending_rm");
+        const batchesToTerminate = group.batches;
 
-        for (const batch of pendingBatches) {
+        for (const batch of batchesToTerminate) {
           if (remainingQty <= 0) break;
 
           const useQty = Math.min(batch.quantity, remainingQty);
@@ -735,9 +727,9 @@ export default function OrderManufacturing() {
         if (!group) continue;
 
         let remainingQty = quantity;
-        const pendingBatches = group.batches.filter((b) => b.current_state === "pending_rm");
+        const batchesToRedo = group.batches;
 
-        for (const batch of pendingBatches) {
+        for (const batch of batchesToRedo) {
           if (remainingQty <= 0) break;
 
           const useQty = Math.min(batch.quantity, remainingQty);
@@ -763,7 +755,7 @@ export default function OrderManufacturing() {
               order_id: id,
               product_id: batch.product_id,
               order_item_id: batch.order_item_id,
-              current_state: "pending_rm",
+              current_state: "in_manufacturing",
               quantity: useQty,
               is_redo: true,
               is_flagged: true,
@@ -825,7 +817,6 @@ export default function OrderManufacturing() {
     );
   }
 
-  const totalPendingRm = productGroups.reduce((sum, g) => sum + g.pendingRm, 0);
   const totalInManufacturing = productGroups.reduce((sum, g) => sum + g.inManufacturing, 0);
 
   return (
@@ -860,13 +851,7 @@ export default function OrderManufacturing() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Pending RM</p>
-            <p className="text-2xl font-bold text-warning">{totalPendingRm}</p>
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">In Manufacturing</p>
@@ -882,7 +867,7 @@ export default function OrderManufacturing() {
         <Card>
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">Total Items</p>
-            <p className="text-2xl font-bold">{totalPendingRm + totalInManufacturing}</p>
+            <p className="text-2xl font-bold">{totalInManufacturing}</p>
           </CardContent>
         </Card>
         <Card>
@@ -904,7 +889,7 @@ export default function OrderManufacturing() {
 
       <Tabs defaultValue="active" className="space-y-4">
         <TabsList className="grid grid-cols-3 w-full max-w-xl">
-          <TabsTrigger value="active">Active ({totalPendingRm + totalInManufacturing})</TabsTrigger>
+          <TabsTrigger value="active">Active ({totalInManufacturing})</TabsTrigger>
           <TabsTrigger value="extra">Extra</TabsTrigger>
           <TabsTrigger value="completed">Completed ({totalCompleted})</TabsTrigger>
         </TabsList>
@@ -980,10 +965,6 @@ export default function OrderManufacturing() {
                       </div>
                       <div className="flex items-center gap-6">
                         <div className="text-center">
-                          <p className="text-xs text-muted-foreground">Pending RM</p>
-                          <p className="text-lg font-semibold text-warning">{group.pendingRm}</p>
-                        </div>
-                        <div className="text-center">
                           <p className="text-xs text-muted-foreground">In Mfg</p>
                           <p className="text-lg font-semibold text-primary">{group.inManufacturing}</p>
                         </div>
@@ -993,12 +974,12 @@ export default function OrderManufacturing() {
                             <Input
                               type="number"
                               min={0}
-                              max={group.pendingRm + group.inManufacturing}
+                              max={group.inManufacturing}
                               value={productSelections.get(group.groupKey) || 0}
                               onChange={(e) => {
                                 const val = Math.min(
                                   Math.max(0, parseInt(e.target.value) || 0),
-                                  group.pendingRm + group.inManufacturing,
+                                  group.inManufacturing,
                                 );
                                 setProductSelections((prev) => new Map(prev).set(group.groupKey, val));
                               }}

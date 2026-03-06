@@ -317,64 +317,7 @@ export function StateGroupView({
             </>
           )}
 
-          {/* Pending RM special case - show products like "In" states */}
-          {state === 'pending_rm' && products.length > 0 && (
-            <>
-              <div className="space-y-2">
-                {products.map((product) => (
-                  <div 
-                    key={product.product_id}
-                    className="flex items-center justify-between p-3 border rounded-lg bg-muted/30"
-                  >
-                    <div className="flex-1">
-                      <p className="font-medium">{product.product_name}</p>
-                      <p className="text-sm text-muted-foreground">SKU: {product.product_sku}</p>
-                      <p className="text-sm font-medium mt-1">Quantity: {product.quantity}</p>
-                    </div>
-                    {canUpdate && (
-                      <div className="flex items-center gap-2">
-                        <Input
-                          type="number"
-                          min="0"
-                          max={product.quantity}
-                          value={productSelections.get(product.product_id) || ''}
-                          onChange={(e) => handleProductQuantityChange(
-                            product.product_id, 
-                            parseInt(e.target.value) || 0,
-                            product.quantity
-                          )}
-                          placeholder="0"
-                          className="w-20 text-center"
-                        />
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => handleProductQuantityChange(
-                            product.product_id,
-                            product.quantity,
-                            product.quantity
-                          )}
-                        >
-                          All
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-              
-              {canUpdate && totalSelectedProducts > 0 && (
-                <div className="flex items-center justify-end pt-4 border-t">
-                  <span className="text-sm text-muted-foreground mr-4">
-                    {totalSelectedProducts} item{totalSelectedProducts !== 1 ? 's' : ''} selected
-                  </span>
-                  <Button onClick={handleConfirmProductSelection}>
-                    Start Manufacturing
-                  </Button>
-                </div>
-              )}
-            </>
-          )}
+
           
           {/* Shipped state - show products summary */}
           {state === 'shipped' && products.length > 0 && (
@@ -401,7 +344,6 @@ export function StateGroupView({
 
 function getStateColor(state: string): string {
   const colors: Record<string, string> = {
-    'pending_rm': 'bg-yellow-500',
     'in_manufacturing': 'bg-blue-500',
     'ready_for_finishing': 'bg-blue-300',
     'in_finishing': 'bg-purple-500',

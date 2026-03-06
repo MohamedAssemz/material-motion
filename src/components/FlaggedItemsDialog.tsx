@@ -97,12 +97,12 @@ export function FlaggedItemsDialog({
         const qty = quantities.get(batchId) || batch.quantity;
 
         if (action === 'redo') {
-          // Mark as redo - move back to pending_rm
+          // Mark as redo - move back to in_manufacturing
           if (qty === batch.quantity) {
             await supabase
               .from('order_batches')
               .update({
-                current_state: 'pending_rm',
+                current_state: 'in_manufacturing',
                 is_redo: true,
                 redo_reason: reason.trim(),
                 redo_by: user?.id,
@@ -121,7 +121,7 @@ export function FlaggedItemsDialog({
               qr_code_data: batchCode,
               order_id: orderId,
               product_id: batch.id,
-              current_state: 'pending_rm',
+              current_state: 'in_manufacturing',
               quantity: qty,
               is_redo: true,
               redo_reason: reason.trim(),

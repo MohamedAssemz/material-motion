@@ -353,7 +353,7 @@ export default function Boxes() {
   };
 
   const getOrderStateColor = (state: string) => {
-    const colors: Record<string, string> = { 'pending_rm': 'bg-yellow-500', 'in_manufacturing': 'bg-blue-500', 'ready_for_finishing': 'bg-blue-300', 'in_finishing': 'bg-purple-500', 'ready_for_packaging': 'bg-orange-500', 'in_packaging': 'bg-indigo-500', 'ready_for_boxing': 'bg-cyan-300', 'in_boxing': 'bg-cyan-500', 'ready_for_shipment': 'bg-teal-300', 'shipped': 'bg-green-500' };
+    const colors: Record<string, string> = { 'in_manufacturing': 'bg-blue-500', 'ready_for_finishing': 'bg-blue-300', 'in_finishing': 'bg-purple-500', 'ready_for_packaging': 'bg-orange-500', 'in_packaging': 'bg-indigo-500', 'ready_for_boxing': 'bg-cyan-300', 'in_boxing': 'bg-cyan-500', 'ready_for_shipment': 'bg-teal-300', 'shipped': 'bg-green-500' };
     return colors[state] || 'bg-gray-500';
   };
 

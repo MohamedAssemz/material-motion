@@ -12,7 +12,6 @@ interface ProductProgressProps {
 }
 
 const STATE_COLORS: Record<string, string> = {
-  'pending_rm': 'bg-yellow-500',
   'in_manufacturing': 'bg-blue-500',
   'ready_for_finishing': 'bg-blue-300',
   'in_finishing': 'bg-purple-500',
