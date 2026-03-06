@@ -67,16 +67,15 @@ interface Order {
 }
 
 interface ProductGroup {
-  groupKey: string; // product_id + needs_boxing
+  groupKey: string;
   product_id: string;
   product_name: string;
   product_sku: string;
   needs_packing: boolean;
   needs_boxing: boolean;
-  pendingRm: number;
   inManufacturing: number;
   batches: Batch[];
-  order_item_ids: string[]; // Track all order_item_ids in this group
+  order_item_ids: string[];
 }
 
 export default function OrderManufacturing() {
