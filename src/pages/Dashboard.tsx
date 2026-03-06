@@ -83,7 +83,6 @@ export default function Dashboard() {
       }, {} as Record<string, number>) || {};
 
       setStats({
-        pending_rm: batchesByState.pending_rm || 0,
         in_manufacturing: batchesByState.in_manufacturing || 0,
         ready_for_finishing: batchesByState.ready_for_finishing || 0,
         in_finishing: batchesByState.in_finishing || 0,
