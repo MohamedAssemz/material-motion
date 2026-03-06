@@ -18,7 +18,6 @@ import {
 } from 'lucide-react';
 
 interface StateStats {
-  pending_rm: number;
   in_manufacturing: number;
   ready_for_finishing: number;
   in_finishing: number;
