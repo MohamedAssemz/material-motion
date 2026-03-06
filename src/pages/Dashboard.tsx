@@ -42,7 +42,6 @@ interface QueueData {
 export default function Dashboard() {
   const { userRoles, hasRole } = useAuth();
   const [stats, setStats] = useState<StateStats>({
-    pending_rm: 0,
     in_manufacturing: 0,
     ready_for_finishing: 0,
     in_finishing: 0,
