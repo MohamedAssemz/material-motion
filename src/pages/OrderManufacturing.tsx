@@ -755,7 +755,7 @@ export default function OrderManufacturing() {
               order_id: id,
               product_id: batch.product_id,
               order_item_id: batch.order_item_id,
-              current_state: "pending_rm",
+              current_state: "in_manufacturing",
               quantity: useQty,
               is_redo: true,
               is_flagged: true,

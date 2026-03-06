@@ -576,7 +576,7 @@ export default function ExtraInventory() {
           setCreateBoxDialogOpen(false);
         }}
         title="Select Extra Box for Batch"
-        allowCreate={true}
+        filterByState={formData.current_state}
       />
 
       <div className="container mx-auto p-6 space-y-6">
