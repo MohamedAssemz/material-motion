@@ -110,9 +110,9 @@ export default function Dashboard() {
       href: '/queues/manufacturing',
       icon: Factory,
       color: 'blue',
-      waiting: stats.pending_rm,
+      waiting: 0,
       inProgress: stats.in_manufacturing,
-      waitingLabel: 'Pending RM',
+      waitingLabel: 'Waiting',
     },
     {
       name: 'Finishing',
