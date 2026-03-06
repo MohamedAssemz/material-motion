@@ -653,7 +653,7 @@ export default function OrderManufacturing() {
         let remainingQty = quantity;
         const batchesToTerminate = group.batches;
 
-        for (const batch of pendingBatches) {
+        for (const batch of batchesToTerminate) {
           if (remainingQty <= 0) break;
 
           const useQty = Math.min(batch.quantity, remainingQty);
