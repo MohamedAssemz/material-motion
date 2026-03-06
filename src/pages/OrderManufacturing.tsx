@@ -541,8 +541,8 @@ export default function OrderManufacturing() {
 
         let remainingQty = quantity;
 
-        // First use pending_rm batches, then in_manufacturing
-        const sortedBatches = [...group.batches].sort((a, b) => (a.current_state === "pending_rm" ? -1 : 1));
+        // Sort batches by quantity
+        const sortedBatches = [...group.batches].sort((a, b) => a.quantity - b.quantity);
 
         for (const batch of sortedBatches) {
           if (remainingQty <= 0) break;
