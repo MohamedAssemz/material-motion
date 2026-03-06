@@ -291,7 +291,7 @@ export default function Dashboard() {
         <CardContent>
           <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-5">
             {[
-              { state: 'pending_rm', label: 'Pending RM', count: stats.pending_rm, color: 'bg-yellow-500' },
+              { state: 'in_manufacturing', label: 'Manufacturing', count: stats.in_manufacturing, color: 'bg-blue-500' },
               { state: 'in_manufacturing', label: 'Manufacturing', count: stats.in_manufacturing, color: 'bg-blue-500' },
               { state: 'ready_for_finishing', label: 'Ready Finishing', count: stats.ready_for_finishing, color: 'bg-blue-300' },
               { state: 'in_finishing', label: 'Finishing', count: stats.in_finishing, color: 'bg-purple-500' },
