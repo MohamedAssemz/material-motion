@@ -447,7 +447,6 @@ export default function OrderManufacturing() {
         product_sku: batch.product?.sku || "N/A",
         needs_packing: batch.product?.needs_packing ?? true,
         needs_boxing: needsBoxing,
-        pendingRm: 0,
         inManufacturing: 0,
         batches: [],
         order_item_ids: [],
