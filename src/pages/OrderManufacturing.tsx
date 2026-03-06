@@ -965,10 +965,6 @@ export default function OrderManufacturing() {
                       </div>
                       <div className="flex items-center gap-6">
                         <div className="text-center">
-                          <p className="text-xs text-muted-foreground">Pending RM</p>
-                          <p className="text-lg font-semibold text-warning">{group.pendingRm}</p>
-                        </div>
-                        <div className="text-center">
                           <p className="text-xs text-muted-foreground">In Mfg</p>
                           <p className="text-lg font-semibold text-primary">{group.inManufacturing}</p>
                         </div>
@@ -978,12 +974,12 @@ export default function OrderManufacturing() {
                             <Input
                               type="number"
                               min={0}
-                              max={group.pendingRm + group.inManufacturing}
+                              max={group.inManufacturing}
                               value={productSelections.get(group.groupKey) || 0}
                               onChange={(e) => {
                                 const val = Math.min(
                                   Math.max(0, parseInt(e.target.value) || 0),
-                                  group.pendingRm + group.inManufacturing,
+                                  group.inManufacturing,
                                 );
                                 setProductSelections((prev) => new Map(prev).set(group.groupKey, val));
                               }}
