@@ -102,7 +102,7 @@ export default function Dashboard() {
   };
 
   const totalInProgress = stats.in_manufacturing + stats.in_finishing + stats.in_packaging + stats.in_boxing;
-  const totalWaiting = stats.pending_rm + stats.ready_for_finishing + stats.ready_for_packaging + stats.ready_for_boxing + stats.ready_for_shipment;
+  const totalWaiting = stats.ready_for_finishing + stats.ready_for_packaging + stats.ready_for_boxing + stats.ready_for_shipment;
 
   const queues: QueueData[] = [
     {
