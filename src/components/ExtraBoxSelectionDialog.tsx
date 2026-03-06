@@ -3,11 +3,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Box, Loader2, Plus, Search } from 'lucide-react';
+import { Box, Loader2, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import { useBoxScanner } from '@/hooks/useBoxScanner';
 import { normalizeBoxCode } from '@/lib/boxUtils';
@@ -24,6 +22,7 @@ interface ExtraBoxOption {
     quantity: number;
     batch_id: string;
   }>;
+  batchState?: string | null; // The current_state of batches in this box
 }
 
 interface ExtraBoxSelectionDialogProps {
@@ -31,7 +30,7 @@ interface ExtraBoxSelectionDialogProps {
   onOpenChange: (open: boolean) => void;
   onConfirm: (boxId: string, boxCode?: string) => void;
   title?: string;
-  allowCreate?: boolean;
+  filterByState?: string; // Only show boxes that are empty or contain batches with this state
 }
 
 export function ExtraBoxSelectionDialog({
@@ -39,12 +38,11 @@ export function ExtraBoxSelectionDialog({
   onOpenChange,
   onConfirm,
   title = 'Select Extra Box',
-  allowCreate = true,
+  filterByState,
 }: ExtraBoxSelectionDialogProps) {
   const [boxes, setBoxes] = useState<ExtraBoxOption[]>([]);
   const [selectedBoxId, setSelectedBoxId] = useState<string>('');
   const [loading, setLoading] = useState(true);
-  const [creating, setCreating] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
@@ -53,25 +51,21 @@ export function ExtraBoxSelectionDialog({
       setSelectedBoxId('');
       setSearchQuery('');
     }
-  }, [open]);
+  }, [open, filterByState]);
 
-  // Scanner handler - auto-select extra box when scanned
   const handleBoxScan = useCallback(async (code: string) => {
     const normalizedCode = normalizeBoxCode(code);
 
-    // Detect order box scans
     if (normalizedCode.startsWith('BOX-') && !normalizedCode.startsWith('EBOX-')) {
       toast.error('This is an order box. It cannot be used for extra inventory.');
       return;
     }
 
-    // Check if code matches an EBOX
     if (!normalizedCode.startsWith('EBOX-')) {
       toast.error(`"${code}" is not an extra box code`);
       return;
     }
 
-    // Find in loaded boxes
     const matchingBox = boxes.find(b => b.box_code.toUpperCase() === normalizedCode);
     if (matchingBox) {
       setSelectedBoxId(matchingBox.id);
@@ -79,7 +73,6 @@ export function ExtraBoxSelectionDialog({
       return;
     }
 
-    // Check if box exists
     const { data: box } = await supabase
       .from('extra_boxes')
       .select('id, box_code, is_active')
@@ -96,13 +89,11 @@ export function ExtraBoxSelectionDialog({
       return;
     }
 
-    // Box exists but wasn't in our list - refresh and select
     await fetchExtraBoxes();
     setSelectedBoxId(box.id);
     toast.success(`Selected ${code}`);
   }, [boxes]);
 
-  // Enable scanner when dialog is open
   useBoxScanner({
     onScan: handleBoxScan,
     enabled: open,
@@ -119,57 +110,44 @@ export function ExtraBoxSelectionDialog({
 
       if (boxesError) throw boxesError;
 
-      const formattedBoxes: ExtraBoxOption[] = allBoxes?.map((box) => ({
+      let formattedBoxes: ExtraBoxOption[] = (allBoxes || []).map((box) => ({
         id: box.id,
         box_code: box.box_code,
         is_active: box.is_active,
         content_type: box.content_type || 'EMPTY',
         items_list: (box.items_list as ExtraBoxOption['items_list']) || [],
-      })) || [];
+        batchState: null,
+      }));
+
+      // If filtering by state, fetch batch states per box
+      if (filterByState) {
+        const boxIds = formattedBoxes.map(b => b.id);
+        if (boxIds.length > 0) {
+          const { data: batchData } = await supabase
+            .from('extra_batches')
+            .select('box_id, current_state')
+            .in('box_id', boxIds);
+
+          // Map box_id -> state (all batches in a box share state)
+          const boxStateMap = new Map<string, string>();
+          batchData?.forEach(b => {
+            if (b.box_id && !boxStateMap.has(b.box_id)) {
+              boxStateMap.set(b.box_id, b.current_state);
+            }
+          });
+
+          // Attach state and filter: show EMPTY or matching state
+          formattedBoxes = formattedBoxes
+            .map(box => ({ ...box, batchState: boxStateMap.get(box.id) || null }))
+            .filter(box => !box.batchState || box.batchState === filterByState);
+        }
+      }
 
       setBoxes(formattedBoxes);
     } catch (error) {
       console.error('Error fetching extra boxes:', error);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleCreateNewBox = async () => {
-    setCreating(true);
-    try {
-      const { data: boxCode } = await supabase.rpc('generate_extra_box_code');
-      
-      const { data: newBox, error } = await supabase
-        .from('extra_boxes')
-        .insert({
-          box_code: boxCode || `EBOX-${Date.now()}`,
-          is_active: true,
-          content_type: 'EMPTY',
-          items_list: [],
-        })
-        .select('id, box_code, is_active, content_type, items_list')
-        .single();
-
-      if (error) throw error;
-
-      toast.success(`Created new box: ${newBox.box_code}`);
-      
-      // Add to list and auto-select
-      const formattedBox: ExtraBoxOption = {
-        id: newBox.id,
-        box_code: newBox.box_code,
-        is_active: newBox.is_active,
-        content_type: newBox.content_type || 'EMPTY',
-        items_list: [],
-      };
-      
-      setBoxes(prev => [formattedBox, ...prev]);
-      setSelectedBoxId(newBox.id);
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to create box');
-    } finally {
-      setCreating(false);
     }
   };
 
@@ -184,7 +162,6 @@ export function ExtraBoxSelectionDialog({
 
   const selectedBox = boxes.find(b => b.id === selectedBoxId);
   
-  // Filter boxes by search query
   const filteredBoxes = searchQuery.trim()
     ? boxes.filter(box => 
         box.box_code.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -211,53 +188,21 @@ export function ExtraBoxSelectionDialog({
           </div>
         ) : (
           <div className="space-y-4">
-            {/* Search and Create Row */}
-            <div className="flex gap-2">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search boxes..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9"
-                />
-              </div>
-              {allowCreate && (
-                <Button 
-                  variant="outline" 
-                  size="icon"
-                  onClick={handleCreateNewBox}
-                  disabled={creating}
-                  title="Create new EBox"
-                >
-                  {creating ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Plus className="h-4 w-4" />
-                  )}
-                </Button>
-              )}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search boxes..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+              />
             </div>
 
-            {/* Box List */}
             {filteredBoxes.length === 0 ? (
               <div className="text-center py-8">
                 <Box className="mx-auto h-12 w-12 text-muted-foreground opacity-50 mb-4" />
                 {boxes.length === 0 ? (
-                  <>
-                    <p className="text-muted-foreground">No extra boxes available</p>
-                    {allowCreate && (
-                      <Button 
-                        variant="link" 
-                        onClick={handleCreateNewBox}
-                        disabled={creating}
-                        className="mt-2"
-                      >
-                        <Plus className="h-4 w-4 mr-1" />
-                        Create your first EBox
-                      </Button>
-                    )}
-                  </>
+                  <p className="text-muted-foreground">No compatible extra boxes available. Create EBoxes from the Warehouse page.</p>
                 ) : (
                   <p className="text-muted-foreground">No boxes match your search</p>
                 )}
@@ -295,7 +240,6 @@ export function ExtraBoxSelectionDialog({
                           )}
                         </div>
                         
-                        {/* Show contents preview if box has items */}
                         {box.items_list.length > 0 && (
                           <div className="mt-2 pl-6 text-xs text-muted-foreground space-y-0.5">
                             {box.items_list.slice(0, 3).map((item, idx) => (
@@ -319,7 +263,7 @@ export function ExtraBoxSelectionDialog({
             )}
             
             <p className="text-xs text-muted-foreground">
-              {boxes.length} extra box(es) available • Multiple batches can share the same box
+              {boxes.length} compatible box(es) available
             </p>
           </div>
         )}
