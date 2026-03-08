@@ -269,7 +269,7 @@ export default function Orders() {
 
       return true;
     });
-  }, [orders, searchTerm, activeTab, dateRange, minQty, maxQty, eftRange, priorityFilter]);
+  }, [orders, orderItems, searchTerm, activeTab, dateRange, minQty, maxQty, eftRange, priorityFilter]);
 
   const filteredCount = filteredOrders.length;
   const paginatedOrders = useMemo(() => {
