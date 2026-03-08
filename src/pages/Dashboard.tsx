@@ -5,8 +5,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -18,7 +16,7 @@ import {
 import {
   Factory, Package, Box, TrendingUp, Plus, AlertTriangle, Sparkles,
   CheckCircle, Clock, AlertCircle, Flag, CalendarClock,
-  ArrowRight, Truck, Archive,
+  ArrowRight, Truck, Archive, FileText,
 } from 'lucide-react';
 import { startOfDay, subDays, format } from 'date-fns';
 
@@ -26,23 +24,14 @@ import { startOfDay, subDays, format } from 'date-fns';
 interface DashboardData {
   profile: { full_name: string | null } | null;
   ordersByStatus: Record<string, number>;
-  recentOrders: Array<{
-    id: string;
-    order_number: string;
-    status: string;
-    priority: string | null;
-    customer: { name: string } | null;
-    created_at: string | null;
-  }>;
   batchesByState: Record<string, number>;
-  lateBatchCount: number;
+  lateOrderCount: number;
+  newOrdersToday: number;
   flaggedBatchCount: number;
-  lateBatches: Array<{ id: string; order_id: string; product_id: string; eta: string; quantity: number; order: { order_number: string } | null }>;
-  flaggedBatches: Array<{ id: string; order_id: string; flagged_reason: string | null; quantity: number; order: { order_number: string } | null }>;
+  lateBatches: Array<{ id: string; order_id: string; product_id: string; eta: string; quantity: number; order: { order_number: string; status: string } | null }>;
+  flaggedBatches: Array<{ id: string; order_id: string; flagged_reason: string | null; quantity: number; order: { order_number: string; status: string } | null }>;
   approachingEtaOrders: Array<{ id: string; order_number: string; estimated_fulfillment_time: string }>;
   todayThroughput: Record<string, number>;
-  orderItemCounts: Record<string, number>;
-  orderShippedCounts: Record<string, number>;
   extraInventoryCount: number;
 }
 
@@ -132,15 +121,6 @@ function getTimeRangeStart(range: TimeRange): Date {
   }
 }
 
-function statusBadgeVariant(status: string) {
-  switch (status) {
-    case 'completed': return 'default' as const;
-    case 'cancelled': return 'destructive' as const;
-    case 'in_progress': return 'secondary' as const;
-    default: return 'outline' as const;
-  }
-}
-
 /* ─── component ─── */
 export default function Dashboard() {
   const { user, hasRole, primaryRole } = useAuth();
@@ -153,31 +133,30 @@ export default function Dashboard() {
     try {
       const now = new Date().toISOString();
       const rangeStart = getTimeRangeStart(timeRange).toISOString();
+      const todayStart = startOfDay(new Date()).toISOString();
       const twoDaysFromNow = new Date(Date.now() + 2 * 86400000).toISOString();
 
       const [
         profileRes,
         ordersRes,
-        recentOrdersRes,
+        newOrdersTodayRes,
         batchesRes,
         lateBatchesRes,
         flaggedBatchesRes,
         approachingRes,
         throughputRes,
-        orderItemsRes,
-        shippedBatchesRes,
         extraRes,
       ] = await Promise.all([
         user ? supabase.from('profiles').select('full_name').eq('id', user.id).single() : Promise.resolve({ data: null }),
         supabase.from('orders').select('status').gte('created_at', rangeStart),
-        supabase.from('orders').select('id, order_number, status, priority, created_at, customer:customers(name)').gte('created_at', rangeStart).order('created_at', { ascending: false }).limit(8),
+        // New orders today — independent of time filter
+        supabase.from('orders').select('id').gte('created_at', todayStart),
         supabase.from('order_batches').select('current_state, quantity').eq('is_terminated', false).gte('created_at', rangeStart),
-        supabase.from('order_batches').select('id, order_id, product_id, eta, quantity, order:orders(order_number)').eq('is_terminated', false).not('current_state', 'in', '(shipped,ready_for_shipment)').not('eta', 'is', null).lt('eta', now).limit(10),
-        supabase.from('order_batches').select('id, order_id, flagged_reason, quantity, order:orders(order_number)').eq('is_flagged', true).eq('is_terminated', false).limit(10),
+        // Late batches — exclude cancelled orders via client filter
+        supabase.from('order_batches').select('id, order_id, product_id, eta, quantity, order:orders(order_number, status)').eq('is_terminated', false).not('current_state', 'in', '(shipped,ready_for_shipment)').not('eta', 'is', null).lt('eta', now).limit(50),
+        supabase.from('order_batches').select('id, order_id, flagged_reason, quantity, order:orders(order_number, status)').eq('is_flagged', true).eq('is_terminated', false).limit(50),
         supabase.from('orders').select('id, order_number, estimated_fulfillment_time').not('estimated_fulfillment_time', 'is', null).gt('estimated_fulfillment_time', now).lt('estimated_fulfillment_time', twoDaysFromNow).neq('status', 'completed').neq('status', 'cancelled').limit(5),
         supabase.from('machine_production').select('state_transition').gte('created_at', rangeStart),
-        supabase.from('order_items').select('order_id, quantity'),
-        supabase.from('order_batches').select('order_id, quantity').eq('current_state', 'shipped').eq('is_terminated', false),
         supabase.from('extra_batches').select('quantity').eq('inventory_state', 'AVAILABLE'),
       ]);
 
@@ -190,27 +169,26 @@ export default function Dashboard() {
       const todayThroughput: Record<string, number> = {};
       (throughputRes.data || []).forEach(t => { todayThroughput[t.state_transition] = (todayThroughput[t.state_transition] || 0) + 1; });
 
-      const orderItemCounts: Record<string, number> = {};
-      (orderItemsRes.data || []).forEach(i => { orderItemCounts[i.order_id] = (orderItemCounts[i.order_id] || 0) + i.quantity; });
-
-      const orderShippedCounts: Record<string, number> = {};
-      (shippedBatchesRes.data || []).forEach(b => { orderShippedCounts[b.order_id] = (orderShippedCounts[b.order_id] || 0) + b.quantity; });
-
       const extraInventoryCount = (extraRes.data || []).reduce((s, b) => s + b.quantity, 0);
+
+      // Filter out cancelled orders from alerts
+      const activeLate = ((lateBatchesRes.data || []) as any[]).filter(b => b.order?.status !== 'cancelled');
+      const activeFlagged = ((flaggedBatchesRes.data || []) as any[]).filter(b => b.order?.status !== 'cancelled');
+
+      // Late orders = distinct order_ids from late batches (excluding cancelled)
+      const lateOrderIds = new Set(activeLate.map(b => b.order_id));
 
       setData({
         profile: profileRes.data as any,
         ordersByStatus,
-        recentOrders: (recentOrdersRes.data || []) as any,
         batchesByState,
-        lateBatchCount: (lateBatchesRes.data || []).reduce((s, b) => s + b.quantity, 0),
-        flaggedBatchCount: (flaggedBatchesRes.data || []).reduce((s, b) => s + b.quantity, 0),
-        lateBatches: (lateBatchesRes.data || []) as any,
-        flaggedBatches: (flaggedBatchesRes.data || []) as any,
+        lateOrderCount: lateOrderIds.size,
+        newOrdersToday: (newOrdersTodayRes.data || []).length,
+        flaggedBatchCount: activeFlagged.reduce((s: number, b: any) => s + b.quantity, 0),
+        lateBatches: activeLate.slice(0, 10),
+        flaggedBatches: activeFlagged.slice(0, 10),
         approachingEtaOrders: (approachingRes.data || []) as any,
         todayThroughput,
-        orderItemCounts,
-        orderShippedCounts,
         extraInventoryCount,
       });
     } catch (e) {
@@ -231,20 +209,11 @@ export default function Dashboard() {
   }, [fetchAll]);
 
   /* ─── derived metrics ─── */
-  const totalOrders = useMemo(() => data ? Object.values(data.ordersByStatus).reduce((a, b) => a + b, 0) : 0, [data]);
-  const totalInProgress = useMemo(() => {
-    if (!data) return 0;
-    return (data.batchesByState.in_manufacturing || 0) + (data.batchesByState.in_finishing || 0) +
-      (data.batchesByState.in_packaging || 0) + (data.batchesByState.in_boxing || 0);
-  }, [data]);
-  const totalWaiting = useMemo(() => {
-    if (!data) return 0;
-    return (data.batchesByState.ready_for_finishing || 0) + (data.batchesByState.ready_for_packaging || 0) +
-      (data.batchesByState.ready_for_boxing || 0) + (data.batchesByState.ready_for_shipment || 0);
-  }, [data]);
+  const activeOrders = useMemo(() => data ? (data.ordersByStatus.pending || 0) + (data.ordersByStatus.in_progress || 0) : 0, [data]);
   const shippedTotal = useMemo(() => data?.batchesByState.shipped || 0, [data]);
   const allBatchTotal = useMemo(() => data ? Object.values(data.batchesByState).reduce((a, b) => a + b, 0) : 0, [data]);
   const fulfillmentRate = useMemo(() => allBatchTotal > 0 ? Math.round((shippedTotal / allBatchTotal) * 100) : 0, [shippedTotal, allBatchTotal]);
+  const totalOrders = useMemo(() => data ? Object.values(data.ordersByStatus).reduce((a, b) => a + b, 0) : 0, [data]);
 
   const pipelineData = useMemo(() => {
     if (!data) return [];
@@ -282,8 +251,8 @@ export default function Dashboard() {
     return (
       <div className="p-6 space-y-6">
         <Skeleton className="h-16 w-full" />
-        <div className="grid gap-4 md:grid-cols-6">
-          {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-28" />)}
+        <div className="grid gap-4 md:grid-cols-5">
+          {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-28" />)}
         </div>
         <div className="grid gap-4 md:grid-cols-2">
           <Skeleton className="h-72" />
@@ -335,11 +304,16 @@ export default function Dashboard() {
       </div>
 
       {/* ═══════ KPI CARDS ═══════ */}
-      <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
-        <KpiCard icon={TrendingUp} label="Active Orders" value={totalOrders} sub={TIME_RANGE_LABELS[timeRange]} color="text-primary" />
-        <KpiCard icon={AlertCircle} label="In Progress" value={totalInProgress} sub="Being processed" color="text-primary" />
-        <KpiCard icon={Clock} label="Waiting" value={totalWaiting} sub="Awaiting next phase" color="text-warning" />
-        <KpiCard icon={AlertTriangle} label="Late Batches" value={data.lateBatchCount} sub="Past ETA" color="text-destructive" highlight={data.lateBatchCount > 0} />
+      <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
+        <div onClick={() => navigate('/orders')} className="cursor-pointer">
+          <KpiCard icon={TrendingUp} label="Active Orders" value={activeOrders} sub={TIME_RANGE_LABELS[timeRange]} color="text-primary" />
+        </div>
+        <div onClick={() => navigate('/orders')} className="cursor-pointer">
+          <KpiCard icon={FileText} label="New Orders" value={data.newOrdersToday} sub="Today" color="text-primary" />
+        </div>
+        <div onClick={() => navigate('/orders')} className="cursor-pointer">
+          <KpiCard icon={AlertTriangle} label="Late Orders" value={data.lateOrderCount} sub="With late batches" color="text-destructive" highlight={data.lateOrderCount > 0} />
+        </div>
         <KpiCard icon={CheckCircle} label="Fulfillment" value={`${fulfillmentRate}%`} sub={`${shippedTotal} shipped`} color="text-success" />
         <div onClick={() => navigate('/extra-inventory')} className="cursor-pointer">
           <KpiCard icon={Archive} label="Extra Inventory" value={data.extraInventoryCount} sub="Available items" color="text-primary" />
@@ -554,61 +528,6 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
-
-      {/* ═══════ RECENT ORDERS TABLE ═══════ */}
-      <Card>
-        <CardHeader className="pb-2">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-base">Recent Orders</CardTitle>
-            <Button variant="ghost" size="sm" asChild>
-              <Link to="/orders" className="text-xs">View All <ArrowRight className="ml-1 h-3 w-3" /></Link>
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="px-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="pl-6">Order</TableHead>
-                <TableHead>Customer</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Items</TableHead>
-                <TableHead className="pr-6">Progress</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {data.recentOrders.map(order => {
-                const items = data.orderItemCounts[order.id] || 0;
-                const shipped = data.orderShippedCounts[order.id] || 0;
-                const pct = items > 0 ? Math.round((shipped / items) * 100) : 0;
-                return (
-                  <TableRow key={order.id} className="cursor-pointer" onClick={() => navigate(`/orders/${order.id}`)}>
-                    <TableCell className="pl-6 font-medium">{order.order_number}</TableCell>
-                    <TableCell className="text-muted-foreground">{order.customer?.name || '—'}</TableCell>
-                    <TableCell>
-                      <Badge variant={statusBadgeVariant(order.status)} className="capitalize text-xs">
-                        {order.status.replace('_', ' ')}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{items}</TableCell>
-                    <TableCell className="pr-6">
-                      <div className="flex items-center gap-2">
-                        <Progress value={pct} className="h-2 flex-1 max-w-24" />
-                        <span className="text-xs text-muted-foreground w-8 text-right">{pct}%</span>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-              {data.recentOrders.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={5} className="text-center text-muted-foreground py-8">No orders in this period</TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
     </div>
   );
 }
