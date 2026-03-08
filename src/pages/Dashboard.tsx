@@ -544,8 +544,8 @@ function KpiCard({ icon: Icon, label, value, sub, color, highlight }: {
   icon: React.ElementType; label: string; value: string | number; sub: string; color: string; highlight?: boolean;
 }) {
   return (
-    <Card className={highlight ? 'border-destructive/40 bg-destructive/5' : ''}>
-      <CardContent className="pt-4 pb-3 px-4">
+    <Card className={`h-full ${highlight ? 'border-destructive/40 bg-destructive/5' : ''}`}>
+      <CardContent className="pt-5 pb-4 px-5">
         <div className="flex items-center justify-between mb-2">
           <span className="text-xs font-medium text-muted-foreground">{label}</span>
           <Icon className={`h-4 w-4 ${color}`} />
