@@ -16,7 +16,7 @@ import {
 import {
   Factory, Package, Box, TrendingUp, Plus, AlertTriangle, Sparkles,
   CheckCircle, Clock, AlertCircle, Flag, CalendarClock,
-  ArrowRight, Truck, Archive, FileText,
+  ArrowRight, Truck, Archive, FileText, Trophy, Activity, Wrench,
 } from 'lucide-react';
 import { startOfDay, subDays, format } from 'date-fns';
 
