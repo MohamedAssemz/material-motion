@@ -63,7 +63,8 @@ export default function ExtraInventory() {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [boxDialogOpen, setBoxDialogOpen] = useState(false);
-  const [createBoxDialogOpen, setCreateBoxDialogOpen] = useState(false);
+  const [eboxOptions, setEboxOptions] = useState<SearchableSelectOption[]>([]);
+  const [eboxLoading, setEboxLoading] = useState(false);
   const [selectedBatchForBox, setSelectedBatchForBox] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     product_id: '',
