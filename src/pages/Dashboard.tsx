@@ -301,30 +301,27 @@ export default function Dashboard() {
               {primaryRole.replace('_', ' ')}
             </Badge>
           )}
-          {canCreateOrders && (
-            <Button asChild size="sm">
-              <Link to="/orders/create"><Plus className="mr-1 h-4 w-4" />New Order</Link>
-            </Button>
-          )}
         </div>
       </div>
 
       {/* ═══════ KPI CARDS ═══════ */}
-      <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
-        <div onClick={() => navigate('/orders')} className="cursor-pointer">
+      <div className="grid gap-4 grid-cols-2 md:grid-cols-3">
+        <div onClick={() => navigate('/orders')} className="cursor-pointer h-full">
           <KpiCard icon={TrendingUp} label="Active Orders" value={activeOrders} sub={TIME_RANGE_LABELS[timeRange]} color="text-primary" />
         </div>
-        <div onClick={() => navigate('/orders')} className="cursor-pointer">
+        <div onClick={() => navigate('/orders')} className="cursor-pointer h-full">
           <KpiCard icon={FileText} label="New Orders" value={data.newOrdersToday} sub="Today" color="text-primary" />
         </div>
-        <div onClick={() => navigate('/orders')} className="cursor-pointer">
+        <div onClick={() => navigate('/orders')} className="cursor-pointer h-full">
           <KpiCard icon={CheckCircle} label="Completed" value={data.completedOrders} sub={`${data.shipmentsCount} shipments`} color="text-success" />
         </div>
-        <div onClick={() => navigate('/orders')} className="cursor-pointer">
+        <div onClick={() => navigate('/orders')} className="cursor-pointer h-full">
           <KpiCard icon={AlertTriangle} label="Late Orders" value={data.lateOrderCount} sub="With late batches" color="text-destructive" highlight={data.lateOrderCount > 0} />
         </div>
-        <KpiCard icon={TrendingUp} label="Fulfillment" value={`${fulfillmentRate}%`} sub={`${shippedTotal} shipped`} color="text-success" />
-        <div onClick={() => navigate('/extra-inventory')} className="cursor-pointer">
+        <div className="h-full">
+          <KpiCard icon={TrendingUp} label="Fulfillment" value={`${fulfillmentRate}%`} sub={`${shippedTotal} shipped`} color="text-success" />
+        </div>
+        <div onClick={() => navigate('/extra-inventory')} className="cursor-pointer h-full">
           <KpiCard icon={Archive} label="Extra Inventory" value={data.extraInventoryCount} sub="Available items" color="text-primary" />
         </div>
       </div>
@@ -547,8 +544,8 @@ function KpiCard({ icon: Icon, label, value, sub, color, highlight }: {
   icon: React.ElementType; label: string; value: string | number; sub: string; color: string; highlight?: boolean;
 }) {
   return (
-    <Card className={highlight ? 'border-destructive/40 bg-destructive/5' : ''}>
-      <CardContent className="pt-4 pb-3 px-4">
+    <Card className={`h-full ${highlight ? 'border-destructive/40 bg-destructive/5' : ''}`}>
+      <CardContent className="pt-5 pb-4 px-5">
         <div className="flex items-center justify-between mb-2">
           <span className="text-xs font-medium text-muted-foreground">{label}</span>
           <Icon className={`h-4 w-4 ${color}`} />
