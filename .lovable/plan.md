@@ -1,39 +1,42 @@
 
 
-## Bug Analysis
+## Plan: Order Cancellation Freeze Logic
 
-The `handleForceEmpty` function in `BoxDetailsDialog.tsx` (lines 153-239) has two issues:
+### Requirements
+1. When an order is cancelled, freeze all actions on phase pages **except** production rate (machine) assignment (which still respects role permissions)
+2. Unretrieved reserved extra batches should be released back to AVAILABLE on cancellation
 
-### Bug 1: Extra-origin batches are incorrectly returned to extra inventory
-When a batch has `from_extra_state` set (meaning it was retrieved from extra inventory), the current code recreates it as a reserved extra batch and deletes the order batch. This is wrong. Once an item has been retrieved from extra inventory and moved into the order pipeline, force-emptying a box should simply revert it to the previous production state like any other order batch -- not send it back to extra inventory.
+### Analysis
+- Requirement 2 is **already implemented** in `handleCancelOrder` in `OrderDetail.tsx` (lines 462-471) — it releases reserved extra batches back to AVAILABLE
+- Requirement 1 needs changes across 4 phase pages and their child components
 
-The `from_extra_state` flag is only a provenance marker for traceability. It should not affect force-empty behavior.
+### Implementation
 
-### Bug 2: State reversion is correct in the map but only applied to non-extra batches
-The `previousStateMap` correctly maps states (e.g., `ready_for_finishing` -> `in_manufacturing`), but this logic is inside the `else` branch and only runs for batches without `from_extra_state`.
+**Core approach:** Each phase page already has a `canManage` boolean that gates actions. Add an `isCancelled` check derived from `order?.status === 'cancelled'` and use it to disable all actions except machine assignment.
 
-## Plan
+**Files to modify:**
 
-**File: `src/components/BoxDetailsDialog.tsx`**
+1. **`OrderManufacturing.tsx`** — Add `const isCancelled = order?.status === 'cancelled'`. Pass `isCancelled` to disable:
+   - Box assignment dialog actions
+   - Terminate/redo actions
+   - MoveToExtraDialog
+   - ExtraItemsTab `canManage` → `canManage && !isCancelled`
+   - BoxReceiveDialog actions
+   - Keep `ProductionRateSection canManage={canManage}` unchanged (still allows machine assignment)
 
-Simplify the `handleForceEmpty` function for order boxes. Remove the entire `from_extra_state` check branch (lines 162-216). All order batches, regardless of provenance, should be treated the same way:
+2. **`OrderFinishing.tsx`** — Same pattern: `isCancelled` disables accept boxes, assign to box, MoveToExtraDialog, ExtraItemsTab, but keeps ProductionRateSection canManage unchanged.
 
-1. Look up `previousStateMap[batch.current_state]` to get the previous state
-2. Update the batch: set `current_state` to the previous state and clear `box_id` to `null`
+3. **`OrderPackaging.tsx`** — Same pattern.
 
-The revised loop body (lines 158-225) becomes:
+4. **`OrderBoxing.tsx`** — Same pattern. Additionally disable shipment creation.
 
-```typescript
-for (const batch of orderBatches) {
-  const prevState = previousStateMap[batch.current_state];
-  if (prevState) {
-    await supabase
-      .from('order_batches')
-      .update({ current_state: prevState, box_id: null })
-      .eq('id', batch.id);
-  }
-}
-```
+5. **`OrderDetail.tsx`** — Add a visible "Cancelled" banner/badge. The cancel button is already hidden when `status === 'cancelled'`. Start Order and Extra Inventory sections are already gated to pending orders, so no changes needed there.
 
-This removes the per-batch extra fetch, the history lookup, the extra batch recreation, and the extra box fallback search. All batches revert to their previous production state uniformly, preserving the `from_extra_state` provenance marker for traceability without altering the reversion behavior.
+**Specific prop changes per phase page:**
+- `ExtraItemsTab canManage={canManage && !isCancelled}` — freezes extra retrieval
+- `ProductionRateSection canManage={canManage}` — unchanged, still allows machine assignment
+- All action buttons (accept, assign, terminate, redo, move to extra, create shipment) gated with `!isCancelled`
+- Box receive dialogs disabled when cancelled
+
+**No database changes needed** — the cancellation already releases reserved batches.
 

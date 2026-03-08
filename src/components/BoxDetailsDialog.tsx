@@ -158,69 +158,10 @@ export function BoxDetailsDialog({
         for (const batch of orderBatches) {
           const prevState = previousStateMap[batch.current_state];
           if (prevState) {
-            // Check if this batch was from extra inventory
-            const { data: batchFull } = await supabase
+            await supabase
               .from('order_batches')
-              .select('from_extra_state, order_id, order_item_id, product_id, quantity')
-              .eq('id', batch.id)
-              .single();
-
-            if (batchFull?.from_extra_state) {
-              // Find original EBox from extra_batch_history CONSUMED event
-              const { data: historyEntry } = await supabase
-                .from('extra_batch_history')
-                .select('extra_batch_id')
-                .eq('consuming_order_id', batchFull.order_id)
-                .eq('consuming_order_item_id', batchFull.order_item_id)
-                .eq('product_id', batchFull.product_id)
-                .eq('event_type', 'CONSUMED')
-                .order('created_at', { ascending: false })
-                .limit(1)
-                .single();
-
-              // Get original box from that extra batch (or any active ebox)
-              let targetBoxId: string | null = null;
-              if (historyEntry?.extra_batch_id) {
-                const { data: origExtra } = await supabase
-                  .from('extra_batches')
-                  .select('box_id')
-                  .eq('id', historyEntry.extra_batch_id)
-                  .single();
-                targetBoxId = origExtra?.box_id || null;
-              }
-              if (!targetBoxId) {
-                const { data: anyBox } = await supabase
-                  .from('extra_boxes')
-                  .select('id')
-                  .eq('is_active', true)
-                  .limit(1)
-                  .single();
-                targetBoxId = anyBox?.id || null;
-              }
-
-              if (targetBoxId) {
-                // Create reserved extra batch
-                const { data: codeData } = await supabase.rpc('generate_extra_batch_code');
-                await supabase.from('extra_batches').insert({
-                  qr_code_data: codeData || `EB-${Math.random().toString(36).slice(2, 10).toUpperCase()}`,
-                  product_id: batchFull.product_id,
-                  quantity: batchFull.quantity,
-                  current_state: batchFull.from_extra_state,
-                  inventory_state: 'RESERVED',
-                  box_id: targetBoxId,
-                  order_id: batchFull.order_id,
-                  order_item_id: batchFull.order_item_id,
-                });
-                // Delete the order batch
-                await supabase.from('order_batches').delete().eq('id', batch.id);
-              }
-            } else {
-              // Regular batch: revert state, clear box_id
-              await supabase
-                .from('order_batches')
-                .update({ current_state: prevState, box_id: null })
-                .eq('id', batch.id);
-            }
+              .update({ current_state: prevState, box_id: null })
+              .eq('id', batch.id);
           }
         }
       }
