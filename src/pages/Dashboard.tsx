@@ -194,6 +194,8 @@ export default function Dashboard() {
         approachingEtaOrders: (approachingRes.data || []) as any,
         todayThroughput,
         extraInventoryCount,
+        completedOrders: ordersByStatus.completed || 0,
+        shipmentsCount: (shipmentsRes.data || []).length,
       });
     } catch (e) {
       console.error('Dashboard fetch error:', e);
