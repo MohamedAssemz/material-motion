@@ -16,6 +16,7 @@ import { ArrowLeft, Plus, Package, Loader2, Box, Search, Trash2 } from 'lucide-r
 import { format } from 'date-fns';
 import { TablePagination } from '@/components/TablePagination';
 import { ExtraBoxSelectionDialog } from '@/components/ExtraBoxSelectionDialog';
+import { SearchableSelect, SearchableSelectOption } from '@/components/ui/searchable-select';
 
 interface Product {
   id: string;

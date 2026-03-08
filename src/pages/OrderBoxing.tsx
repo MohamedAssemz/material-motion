@@ -1608,11 +1608,6 @@ export default function OrderBoxing() {
                               {!group.needs_boxing && (
                                 <Badge variant="secondary" className="text-xs">No Boxing</Badge>
                               )}
-                              {group.has_from_extra && (
-                                <Badge className="text-xs bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300 border-purple-300 dark:border-purple-700">
-                                  From Extra
-                                </Badge>
-                              )}
                             </div>
                             <Badge variant="outline">{group.total_quantity}</Badge>
                           </div>
