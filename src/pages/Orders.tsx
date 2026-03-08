@@ -195,9 +195,19 @@ export default function Orders() {
 
   const filteredOrders = useMemo(() => {
     return orders.filter((order) => {
-      // Search filter
-      if (searchTerm && !order.order_number.toLowerCase().includes(searchTerm.toLowerCase())) {
-        return false;
+      // Search filter — matches order number, customer name, or item names
+      if (searchTerm) {
+        const term = searchTerm.toLowerCase();
+        const matchesOrder = order.order_number.toLowerCase().includes(term);
+        const matchesCustomer = order.customer?.name?.toLowerCase().includes(term);
+        const items = orderItems.get(order.id) || [];
+        const matchesItem = items.some(item => 
+          item.product?.name?.toLowerCase().includes(term) || 
+          item.product?.sku?.toLowerCase().includes(term)
+        );
+        if (!matchesOrder && !matchesCustomer && !matchesItem) {
+          return false;
+        }
       }
 
       // Tab filter
@@ -259,7 +269,7 @@ export default function Orders() {
 
       return true;
     });
-  }, [orders, searchTerm, activeTab, dateRange, minQty, maxQty, eftRange, priorityFilter]);
+  }, [orders, orderItems, searchTerm, activeTab, dateRange, minQty, maxQty, eftRange, priorityFilter]);
 
   const filteredCount = filteredOrders.length;
   const paginatedOrders = useMemo(() => {
