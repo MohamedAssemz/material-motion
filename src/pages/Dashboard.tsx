@@ -301,11 +301,6 @@ export default function Dashboard() {
               {primaryRole.replace('_', ' ')}
             </Badge>
           )}
-          {canCreateOrders && (
-            <Button asChild size="sm">
-              <Link to="/orders/create"><Plus className="mr-1 h-4 w-4" />New Order</Link>
-            </Button>
-          )}
         </div>
       </div>
 
