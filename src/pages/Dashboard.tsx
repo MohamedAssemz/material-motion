@@ -35,6 +35,9 @@ interface DashboardData {
   extraInventoryCount: number;
   completedOrders: number;
   shipmentsCount: number;
+  topProducts: Array<{ name: string; quantity: number }>;
+  avgFinishedPerDay: number;
+  topMachines: Array<{ name: string; count: number }>;
 }
 
 type TimeRange = 'today' | 'week' | 'month';
