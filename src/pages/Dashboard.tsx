@@ -1,5 +1,5 @@
-import { useEffect, useState, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useState, useMemo, useCallback } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,15 +9,18 @@ import { Progress } from '@/components/ui/progress';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
+import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend,
 } from 'recharts';
 import {
   Factory, Package, Box, TrendingUp, Plus, AlertTriangle, Sparkles,
-  CheckCircle, Clock, AlertCircle, ShieldAlert, Flag, CalendarClock,
-  ArrowRight, Truck,
+  CheckCircle, Clock, AlertCircle, Flag, CalendarClock,
+  ArrowRight, Truck, Archive,
 } from 'lucide-react';
-import { startOfDay, isBefore, addDays, format } from 'date-fns';
+import { startOfDay, subDays, format } from 'date-fns';
 
 /* ─── types ─── */
 interface DashboardData {
@@ -40,7 +43,10 @@ interface DashboardData {
   todayThroughput: Record<string, number>;
   orderItemCounts: Record<string, number>;
   orderShippedCounts: Record<string, number>;
+  extraInventoryCount: number;
 }
+
+type TimeRange = 'today' | 'week' | 'month';
 
 /* ─── constants ─── */
 const PHASE_COLORS: Record<string, string> = {
@@ -74,6 +80,13 @@ const ORDER_STATUS_COLORS: Record<string, string> = {
   cancelled: 'hsl(0, 72%, 51%)',
 };
 
+const ORDER_STATUS_LABELS: Record<string, string> = {
+  pending: 'Not Started',
+  in_progress: 'In Progress',
+  completed: 'Completed',
+  cancelled: 'Cancelled',
+};
+
 const TRANSITION_LABELS: Record<string, string> = {
   'start_manufacturing': 'Manufacturing',
   'finish_manufacturing': 'Manufactured',
@@ -96,6 +109,12 @@ const TRANSITION_COLORS = [
   'hsl(170, 55%, 45%)',
 ];
 
+const TIME_RANGE_LABELS: Record<TimeRange, string> = {
+  today: 'Today',
+  week: 'This Week',
+  month: 'Last 30 Days',
+};
+
 /* ─── helpers ─── */
 function getGreeting() {
   const h = new Date().getHours();
@@ -104,35 +123,37 @@ function getGreeting() {
   return 'Good evening';
 }
 
+function getTimeRangeStart(range: TimeRange): Date {
+  const now = new Date();
+  switch (range) {
+    case 'today': return startOfDay(now);
+    case 'week': return startOfDay(subDays(now, 7));
+    case 'month': return startOfDay(subDays(now, 30));
+  }
+}
+
 function statusBadgeVariant(status: string) {
   switch (status) {
-    case 'completed': return 'default';
-    case 'cancelled': return 'destructive';
-    case 'in_progress': return 'secondary';
-    default: return 'outline';
+    case 'completed': return 'default' as const;
+    case 'cancelled': return 'destructive' as const;
+    case 'in_progress': return 'secondary' as const;
+    default: return 'outline' as const;
   }
 }
 
 /* ─── component ─── */
 export default function Dashboard() {
   const { user, hasRole, primaryRole } = useAuth();
+  const navigate = useNavigate();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [timeRange, setTimeRange] = useState<TimeRange>('today');
 
-  useEffect(() => {
-    fetchAll();
-    const channel = supabase
-      .channel('dashboard-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_batches' }, fetchAll)
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, []);
-
-  const fetchAll = async () => {
+  const fetchAll = useCallback(async () => {
     try {
       const now = new Date().toISOString();
-      const todayStart = startOfDay(new Date()).toISOString();
-      const twoDaysFromNow = addDays(new Date(), 2).toISOString();
+      const rangeStart = getTimeRangeStart(timeRange).toISOString();
+      const twoDaysFromNow = new Date(Date.now() + 2 * 86400000).toISOString();
 
       const [
         profileRes,
@@ -145,38 +166,37 @@ export default function Dashboard() {
         throughputRes,
         orderItemsRes,
         shippedBatchesRes,
+        extraRes,
       ] = await Promise.all([
         user ? supabase.from('profiles').select('full_name').eq('id', user.id).single() : Promise.resolve({ data: null }),
-        supabase.from('orders').select('status'),
-        supabase.from('orders').select('id, order_number, status, priority, created_at, customer:customers(name)').order('created_at', { ascending: false }).limit(8),
-        supabase.from('order_batches').select('current_state, quantity').eq('is_terminated', false),
+        supabase.from('orders').select('status').gte('created_at', rangeStart),
+        supabase.from('orders').select('id, order_number, status, priority, created_at, customer:customers(name)').gte('created_at', rangeStart).order('created_at', { ascending: false }).limit(8),
+        supabase.from('order_batches').select('current_state, quantity').eq('is_terminated', false).gte('created_at', rangeStart),
         supabase.from('order_batches').select('id, order_id, product_id, eta, quantity, order:orders(order_number)').eq('is_terminated', false).not('current_state', 'in', '(shipped,ready_for_shipment)').not('eta', 'is', null).lt('eta', now).limit(10),
         supabase.from('order_batches').select('id, order_id, flagged_reason, quantity, order:orders(order_number)').eq('is_flagged', true).eq('is_terminated', false).limit(10),
         supabase.from('orders').select('id, order_number, estimated_fulfillment_time').not('estimated_fulfillment_time', 'is', null).gt('estimated_fulfillment_time', now).lt('estimated_fulfillment_time', twoDaysFromNow).neq('status', 'completed').neq('status', 'cancelled').limit(5),
-        supabase.from('machine_production').select('state_transition').gte('created_at', todayStart),
+        supabase.from('machine_production').select('state_transition').gte('created_at', rangeStart),
         supabase.from('order_items').select('order_id, quantity'),
         supabase.from('order_batches').select('order_id, quantity').eq('current_state', 'shipped').eq('is_terminated', false),
+        supabase.from('extra_batches').select('quantity').eq('inventory_state', 'AVAILABLE'),
       ]);
 
-      // order status counts
       const ordersByStatus: Record<string, number> = {};
       (ordersRes.data || []).forEach(o => { ordersByStatus[o.status] = (ordersByStatus[o.status] || 0) + 1; });
 
-      // batches by state
       const batchesByState: Record<string, number> = {};
       (batchesRes.data || []).forEach(b => { batchesByState[b.current_state] = (batchesByState[b.current_state] || 0) + b.quantity; });
 
-      // today throughput
       const todayThroughput: Record<string, number> = {};
       (throughputRes.data || []).forEach(t => { todayThroughput[t.state_transition] = (todayThroughput[t.state_transition] || 0) + 1; });
 
-      // order item counts
       const orderItemCounts: Record<string, number> = {};
       (orderItemsRes.data || []).forEach(i => { orderItemCounts[i.order_id] = (orderItemCounts[i.order_id] || 0) + i.quantity; });
 
-      // shipped counts per order
       const orderShippedCounts: Record<string, number> = {};
       (shippedBatchesRes.data || []).forEach(b => { orderShippedCounts[b.order_id] = (orderShippedCounts[b.order_id] || 0) + b.quantity; });
+
+      const extraInventoryCount = (extraRes.data || []).reduce((s, b) => s + b.quantity, 0);
 
       setData({
         profile: profileRes.data as any,
@@ -191,13 +211,24 @@ export default function Dashboard() {
         todayThroughput,
         orderItemCounts,
         orderShippedCounts,
+        extraInventoryCount,
       });
     } catch (e) {
       console.error('Dashboard fetch error:', e);
     } finally {
       setLoading(false);
     }
-  };
+  }, [user, timeRange]);
+
+  useEffect(() => {
+    setLoading(true);
+    fetchAll();
+    const channel = supabase
+      .channel('dashboard-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_batches' }, fetchAll)
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [fetchAll]);
 
   /* ─── derived metrics ─── */
   const totalOrders = useMemo(() => data ? Object.values(data.ordersByStatus).reduce((a, b) => a + b, 0) : 0, [data]);
@@ -215,7 +246,6 @@ export default function Dashboard() {
   const allBatchTotal = useMemo(() => data ? Object.values(data.batchesByState).reduce((a, b) => a + b, 0) : 0, [data]);
   const fulfillmentRate = useMemo(() => allBatchTotal > 0 ? Math.round((shippedTotal / allBatchTotal) * 100) : 0, [shippedTotal, allBatchTotal]);
 
-  // Pipeline chart data
   const pipelineData = useMemo(() => {
     if (!data) return [];
     return Object.entries(PHASE_LABELS).map(([key, label]) => ({
@@ -225,17 +255,16 @@ export default function Dashboard() {
     }));
   }, [data]);
 
-  // Order status donut
   const donutData = useMemo(() => {
     if (!data) return [];
-    return Object.entries(data.ordersByStatus).map(([status, count]) => ({
-      name: status.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase()),
-      value: count,
+    const allStatuses = ['pending', 'in_progress', 'completed', 'cancelled'];
+    return allStatuses.map(status => ({
+      name: ORDER_STATUS_LABELS[status] || status,
+      value: data.ordersByStatus[status] || 0,
       fill: ORDER_STATUS_COLORS[status] || 'hsl(216, 12%, 60%)',
     }));
   }, [data]);
 
-  // Throughput chart
   const throughputData = useMemo(() => {
     if (!data) return [];
     return Object.entries(data.todayThroughput)
@@ -247,13 +276,14 @@ export default function Dashboard() {
   }, [data]);
 
   const canCreateOrders = hasRole('admin');
+  const readyForShipment = data?.batchesByState.ready_for_shipment || 0;
 
   if (loading) {
     return (
       <div className="p-6 space-y-6">
         <Skeleton className="h-16 w-full" />
-        <div className="grid gap-4 md:grid-cols-5">
-          {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-28" />)}
+        <div className="grid gap-4 md:grid-cols-6">
+          {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-28" />)}
         </div>
         <div className="grid gap-4 md:grid-cols-2">
           <Skeleton className="h-72" />
@@ -281,6 +311,16 @@ export default function Dashboard() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Select value={timeRange} onValueChange={(v) => setTimeRange(v as TimeRange)}>
+            <SelectTrigger className="w-[150px] h-9 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="today">Today</SelectItem>
+              <SelectItem value="week">This Week</SelectItem>
+              <SelectItem value="month">Last 30 Days</SelectItem>
+            </SelectContent>
+          </Select>
           {primaryRole && (
             <Badge variant="outline" className="capitalize text-xs">
               {primaryRole.replace('_', ' ')}
@@ -295,13 +335,36 @@ export default function Dashboard() {
       </div>
 
       {/* ═══════ KPI CARDS ═══════ */}
-      <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
-        <KpiCard icon={TrendingUp} label="Active Orders" value={totalOrders} sub="All orders" color="text-primary" />
+      <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
+        <KpiCard icon={TrendingUp} label="Active Orders" value={totalOrders} sub={TIME_RANGE_LABELS[timeRange]} color="text-primary" />
         <KpiCard icon={AlertCircle} label="In Progress" value={totalInProgress} sub="Being processed" color="text-primary" />
         <KpiCard icon={Clock} label="Waiting" value={totalWaiting} sub="Awaiting next phase" color="text-warning" />
         <KpiCard icon={AlertTriangle} label="Late Batches" value={data.lateBatchCount} sub="Past ETA" color="text-destructive" highlight={data.lateBatchCount > 0} />
         <KpiCard icon={CheckCircle} label="Fulfillment" value={`${fulfillmentRate}%`} sub={`${shippedTotal} shipped`} color="text-success" />
+        <div onClick={() => navigate('/extra-inventory')} className="cursor-pointer">
+          <KpiCard icon={Archive} label="Extra Inventory" value={data.extraInventoryCount} sub="Available items" color="text-primary" />
+        </div>
       </div>
+
+      {/* ═══════ SHIPMENT READY BANNER ═══════ */}
+      {readyForShipment > 0 && (
+        <Card className="border-success/30 bg-success/5">
+          <CardContent className="flex items-center justify-between py-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-success/10">
+                <Truck className="h-5 w-5 text-success" />
+              </div>
+              <div>
+                <p className="font-semibold text-sm">{readyForShipment} items ready for shipment</p>
+                <p className="text-xs text-muted-foreground">Ready to be added to a Kartona</p>
+              </div>
+            </div>
+            <Button variant="outline" size="sm" asChild>
+              <Link to="/queues/boxing">View <ArrowRight className="ml-1 h-3 w-3" /></Link>
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       {/* ═══════ CHARTS ROW ═══════ */}
       <div className="grid gap-4 lg:grid-cols-5">
@@ -338,11 +401,11 @@ export default function Dashboard() {
         {/* Order Status Donut */}
         <Card className="lg:col-span-2">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">Order Status</CardTitle>
+            <CardTitle className="text-base">Order Status Breakdown</CardTitle>
             <CardDescription>Distribution by status</CardDescription>
           </CardHeader>
           <CardContent className="h-72 flex items-center justify-center">
-            {donutData.length > 0 ? (
+            {donutData.some(d => d.value > 0) ? (
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
@@ -373,7 +436,6 @@ export default function Dashboard() {
                     iconSize={8}
                     wrapperStyle={{ fontSize: 11 }}
                   />
-                  {/* center label */}
                   <text x="50%" y="48%" textAnchor="middle" dominantBaseline="middle" className="fill-foreground text-2xl font-bold">
                     {totalOrders}
                   </text>
@@ -410,11 +472,10 @@ export default function Dashboard() {
 
       {/* ═══════ THROUGHPUT + ALERTS ═══════ */}
       <div className="grid gap-4 lg:grid-cols-5">
-        {/* Today's Throughput */}
         <Card className="lg:col-span-3">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">Today's Throughput</CardTitle>
-            <CardDescription>Items processed per phase today</CardDescription>
+            <CardTitle className="text-base">{timeRange === 'today' ? "Today's" : TIME_RANGE_LABELS[timeRange]} Throughput</CardTitle>
+            <CardDescription>Items processed per phase</CardDescription>
           </CardHeader>
           <CardContent className="h-64">
             {throughputData.length > 0 ? (
@@ -440,13 +501,12 @@ export default function Dashboard() {
               </ResponsiveContainer>
             ) : (
               <div className="flex items-center justify-center h-full">
-                <p className="text-sm text-muted-foreground">No production recorded today</p>
+                <p className="text-sm text-muted-foreground">No production recorded</p>
               </div>
             )}
           </CardContent>
         </Card>
 
-        {/* Alerts & Attention */}
         <Card className="lg:col-span-2">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
@@ -522,7 +582,7 @@ export default function Dashboard() {
                 const shipped = data.orderShippedCounts[order.id] || 0;
                 const pct = items > 0 ? Math.round((shipped / items) * 100) : 0;
                 return (
-                  <TableRow key={order.id} className="cursor-pointer" onClick={() => window.location.href = `/orders/${order.id}`}>
+                  <TableRow key={order.id} className="cursor-pointer" onClick={() => navigate(`/orders/${order.id}`)}>
                     <TableCell className="pl-6 font-medium">{order.order_number}</TableCell>
                     <TableCell className="text-muted-foreground">{order.customer?.name || '—'}</TableCell>
                     <TableCell>
@@ -542,33 +602,13 @@ export default function Dashboard() {
               })}
               {data.recentOrders.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-muted-foreground py-8">No orders yet</TableCell>
+                  <TableCell colSpan={5} className="text-center text-muted-foreground py-8">No orders in this period</TableCell>
                 </TableRow>
               )}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
-
-      {/* ═══════ SHIPMENT READY BANNER ═══════ */}
-      {(data.batchesByState.ready_for_shipment || 0) > 0 && (
-        <Card className="border-success/30 bg-success/5">
-          <CardContent className="flex items-center justify-between py-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-success/10">
-                <Truck className="h-5 w-5 text-success" />
-              </div>
-              <div>
-                <p className="font-semibold text-sm">{data.batchesByState.ready_for_shipment} items ready for shipment</p>
-                <p className="text-xs text-muted-foreground">Ready to be added to a Kartona</p>
-              </div>
-            </div>
-            <Button variant="outline" size="sm" asChild>
-              <Link to="/queues/boxing">View <ArrowRight className="ml-1 h-3 w-3" /></Link>
-            </Button>
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 }
