@@ -33,6 +33,8 @@ interface DashboardData {
   approachingEtaOrders: Array<{ id: string; order_number: string; estimated_fulfillment_time: string }>;
   todayThroughput: Record<string, number>;
   extraInventoryCount: number;
+  completedOrders: number;
+  shipmentsCount: number;
 }
 
 type TimeRange = 'today' | 'week' | 'month';
@@ -146,6 +148,7 @@ export default function Dashboard() {
         approachingRes,
         throughputRes,
         extraRes,
+        shipmentsRes,
       ] = await Promise.all([
         user ? supabase.from('profiles').select('full_name').eq('id', user.id).single() : Promise.resolve({ data: null }),
         supabase.from('orders').select('status').gte('created_at', rangeStart),
@@ -158,6 +161,7 @@ export default function Dashboard() {
         supabase.from('orders').select('id, order_number, estimated_fulfillment_time').not('estimated_fulfillment_time', 'is', null).gt('estimated_fulfillment_time', now).lt('estimated_fulfillment_time', twoDaysFromNow).neq('status', 'completed').neq('status', 'cancelled').limit(5),
         supabase.from('machine_production').select('state_transition').gte('created_at', rangeStart),
         supabase.from('extra_batches').select('quantity').eq('inventory_state', 'AVAILABLE'),
+        supabase.from('shipments').select('id').gte('created_at', rangeStart),
       ]);
 
       const ordersByStatus: Record<string, number> = {};
@@ -190,6 +194,8 @@ export default function Dashboard() {
         approachingEtaOrders: (approachingRes.data || []) as any,
         todayThroughput,
         extraInventoryCount,
+        completedOrders: ordersByStatus.completed || 0,
+        shipmentsCount: (shipmentsRes.data || []).length,
       });
     } catch (e) {
       console.error('Dashboard fetch error:', e);
@@ -304,7 +310,7 @@ export default function Dashboard() {
       </div>
 
       {/* ═══════ KPI CARDS ═══════ */}
-      <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
+      <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
         <div onClick={() => navigate('/orders')} className="cursor-pointer">
           <KpiCard icon={TrendingUp} label="Active Orders" value={activeOrders} sub={TIME_RANGE_LABELS[timeRange]} color="text-primary" />
         </div>
@@ -312,9 +318,12 @@ export default function Dashboard() {
           <KpiCard icon={FileText} label="New Orders" value={data.newOrdersToday} sub="Today" color="text-primary" />
         </div>
         <div onClick={() => navigate('/orders')} className="cursor-pointer">
+          <KpiCard icon={CheckCircle} label="Completed" value={data.completedOrders} sub={`${data.shipmentsCount} shipments`} color="text-success" />
+        </div>
+        <div onClick={() => navigate('/orders')} className="cursor-pointer">
           <KpiCard icon={AlertTriangle} label="Late Orders" value={data.lateOrderCount} sub="With late batches" color="text-destructive" highlight={data.lateOrderCount > 0} />
         </div>
-        <KpiCard icon={CheckCircle} label="Fulfillment" value={`${fulfillmentRate}%`} sub={`${shippedTotal} shipped`} color="text-success" />
+        <KpiCard icon={TrendingUp} label="Fulfillment" value={`${fulfillmentRate}%`} sub={`${shippedTotal} shipped`} color="text-success" />
         <div onClick={() => navigate('/extra-inventory')} className="cursor-pointer">
           <KpiCard icon={Archive} label="Extra Inventory" value={data.extraInventoryCount} sub="Available items" color="text-primary" />
         </div>
