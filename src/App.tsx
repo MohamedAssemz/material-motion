@@ -67,7 +67,7 @@ const App = () => (
             <Route path="/extra-inventory" element={<ProtectedPage><ExtraInventory /></ProtectedPage>} />
             <Route path="/boxes" element={<ProtectedPage><Boxes /></ProtectedPage>} />
             <Route path="/machines" element={<ProtectedRoute requiredRole="admin"><AppLayout><Machines /></AppLayout></ProtectedRoute>} />
-            <Route path="/customers" element={<ProtectedPage><Customers /></ProtectedPage>} />
+            <Route path="/customers" element={<ProtectedRoute requiredRole="admin"><AppLayout><Customers /></AppLayout></ProtectedRoute>} />
             <Route path="/batch/:code" element={<ProtectedRoute><BatchLookup /></ProtectedRoute>} />
             <Route path="/batch" element={<ProtectedRoute><BatchLookup /></ProtectedRoute>} />
             <Route path="/box/:code" element={<ProtectedRoute><BoxLookup /></ProtectedRoute>} />

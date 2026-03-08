@@ -85,13 +85,8 @@ export default function OrderCreate() {
   const [packagingRows, setPackagingRows] = useState<Array<{ item_index: number; quantity: number; length_cm: string; width_cm: string; height_cm: string; weight_kg: string }>>([]);
 
   useEffect(() => {
-    if (!hasRole("admin")) {
-      navigate("/");
-      return;
-    }
-
     fetchData();
-  }, [hasRole, navigate]);
+  }, []);
 
   const fetchData = async () => {
     try {

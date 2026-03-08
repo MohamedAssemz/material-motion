@@ -39,12 +39,8 @@ export default function Customers() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    if (!hasRole('admin')) {
-      navigate('/');
-      return;
-    }
     fetchCustomers();
-  }, [hasRole, navigate]);
+  }, []);
 
   const fetchCustomers = async () => {
     try {

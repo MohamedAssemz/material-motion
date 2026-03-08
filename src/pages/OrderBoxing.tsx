@@ -1579,7 +1579,6 @@ export default function OrderBoxing() {
                           product_name: string;
                           total_quantity: number;
                           needs_boxing: boolean;
-                          has_from_extra: boolean;
                         }>();
                         
                         shipment.batches.forEach(batch => {
@@ -1587,7 +1586,6 @@ export default function OrderBoxing() {
                           const existing = groupedItems.get(orderItemId);
                           if (existing) {
                             existing.total_quantity += batch.quantity;
-                            if (batch.from_extra_state) existing.has_from_extra = true;
                           } else {
                             groupedItems.set(orderItemId, {
                               order_item_id: orderItemId,
@@ -1595,7 +1593,6 @@ export default function OrderBoxing() {
                               product_name: batch.product?.name || 'Unknown',
                               total_quantity: batch.quantity,
                               needs_boxing: batch.order_item?.needs_boxing ?? true,
-                              has_from_extra: !!batch.from_extra_state,
                             });
                           }
                         });

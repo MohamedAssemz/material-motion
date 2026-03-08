@@ -8,7 +8,7 @@ interface ProtectedRouteProps {
 }
 
 export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) {
-  const { user, userRoles, loading } = useAuth();
+  const { user, loading, hasRole } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -16,10 +16,10 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
       navigate('/auth');
     }
     
-    if (!loading && user && requiredRole && !userRoles.includes(requiredRole) && !userRoles.includes('admin')) {
+    if (!loading && user && requiredRole && !hasRole(requiredRole)) {
       navigate('/');
     }
-  }, [user, userRoles, loading, requiredRole, navigate]);
+  }, [user, loading, requiredRole, navigate, hasRole]);
 
   if (loading) {
     return (
@@ -36,7 +36,7 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
     return null;
   }
 
-  if (requiredRole && !userRoles.includes(requiredRole) && !userRoles.includes('admin')) {
+  if (requiredRole && !hasRole(requiredRole)) {
     return null;
   }
 
