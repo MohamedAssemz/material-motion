@@ -86,6 +86,56 @@ export default function ExtraInventory() {
 
   const canManage = hasRole('admin');
 
+  // Fetch compatible EBox options when state changes
+  const fetchEboxOptions = async (state: string) => {
+    setEboxLoading(true);
+    try {
+      const { data: allBoxes } = await supabase
+        .from('extra_boxes')
+        .select('id, box_code, items_list')
+        .eq('is_active', true)
+        .order('box_code');
+
+      if (!allBoxes) { setEboxOptions([]); return; }
+
+      const boxIds = allBoxes.map(b => b.id);
+      const { data: batchData } = await supabase
+        .from('extra_batches')
+        .select('box_id, current_state')
+        .in('box_id', boxIds);
+
+      const boxStateMap = new Map<string, string>();
+      batchData?.forEach(b => {
+        if (b.box_id && !boxStateMap.has(b.box_id)) boxStateMap.set(b.box_id, b.current_state);
+      });
+
+      const compatible = allBoxes.filter(box => {
+        const boxState = boxStateMap.get(box.id);
+        return !boxState || boxState === state;
+      });
+
+      setEboxOptions(compatible.map(box => {
+        const items = (box.items_list as Array<{ product_sku: string; quantity: number }>) || [];
+        const totalQty = items.reduce((s, i) => s + i.quantity, 0);
+        const desc = items.length > 0
+          ? `${totalQty} units in ${items.length} batch(es)`
+          : 'Empty';
+        return { value: box.id, label: box.box_code, description: desc };
+      }));
+    } catch (e) {
+      console.error('Error fetching ebox options:', e);
+      setEboxOptions([]);
+    } finally {
+      setEboxLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (dialogOpen) {
+      fetchEboxOptions(formData.current_state);
+    }
+  }, [dialogOpen, formData.current_state]);
+
   // Filtered batches
   const filteredBatches = useMemo(() => {
     let result = batches;
