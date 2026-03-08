@@ -276,7 +276,7 @@ export default function Dashboard() {
             {getGreeting()}, {data.profile?.full_name || 'there'}
           </h1>
           <p className="text-sm text-muted-foreground">
-            Here's your factory overview for {format(new Date(), 'EEEE, MMMM d')}
+            Here's your factory overview — {TIME_RANGE_LABELS[timeRange]}
           </p>
         </div>
         <div className="flex items-center gap-2">
