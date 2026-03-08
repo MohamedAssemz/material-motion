@@ -16,7 +16,7 @@ import {
 import {
   Factory, Package, Box, TrendingUp, Plus, AlertTriangle, Sparkles,
   CheckCircle, Clock, AlertCircle, Flag, CalendarClock,
-  ArrowRight, Truck, Archive, FileText,
+  ArrowRight, Truck, Archive, FileText, Trophy, Activity, Wrench,
 } from 'lucide-react';
 import { startOfDay, subDays, format } from 'date-fns';
 
@@ -35,6 +35,9 @@ interface DashboardData {
   extraInventoryCount: number;
   completedOrders: number;
   shipmentsCount: number;
+  topProducts: Array<{ name: string; quantity: number }>;
+  avgFinishedPerDay: number;
+  topMachines: Array<{ name: string; count: number }>;
 }
 
 type TimeRange = 'today' | 'week' | 'month';
@@ -149,19 +152,25 @@ export default function Dashboard() {
         throughputRes,
         extraRes,
         shipmentsRes,
+        shippedBatchesRes,
+        machineProductionRes,
+        machinesRes,
       ] = await Promise.all([
         user ? supabase.from('profiles').select('full_name').eq('id', user.id).single() : Promise.resolve({ data: null }),
         supabase.from('orders').select('status').gte('created_at', rangeStart),
-        // New orders today — independent of time filter
         supabase.from('orders').select('id').gte('created_at', todayStart),
         supabase.from('order_batches').select('current_state, quantity, order:orders!inner(status)').eq('is_terminated', false).neq('order.status', 'cancelled').gte('created_at', rangeStart),
-        // Late batches — exclude cancelled orders via client filter
         supabase.from('order_batches').select('id, order_id, product_id, eta, quantity, order:orders(order_number, status)').eq('is_terminated', false).not('current_state', 'in', '(shipped,ready_for_shipment)').not('eta', 'is', null).lt('eta', now).limit(50),
         supabase.from('order_batches').select('id, order_id, flagged_reason, quantity, order:orders(order_number, status)').eq('is_flagged', true).eq('is_terminated', false).limit(50),
         supabase.from('orders').select('id, order_number, estimated_fulfillment_time').not('estimated_fulfillment_time', 'is', null).gt('estimated_fulfillment_time', now).lt('estimated_fulfillment_time', twoDaysFromNow).neq('status', 'completed').neq('status', 'cancelled').limit(5),
         supabase.from('machine_production').select('state_transition').gte('created_at', rangeStart),
         supabase.from('extra_batches').select('quantity').eq('inventory_state', 'AVAILABLE'),
         supabase.from('shipments').select('id').gte('created_at', rangeStart),
+        // Top products: shipped/ready_for_shipment batches in time range (excluding cancelled)
+        supabase.from('order_batches').select('product_id, quantity, order:orders!inner(status)').in('current_state', ['shipped', 'ready_for_shipment']).eq('is_terminated', false).neq('order.status', 'cancelled').gte('created_at', rangeStart),
+        // Machine production with machine_id for top machines
+        supabase.from('machine_production').select('machine_id').gte('created_at', rangeStart),
+        supabase.from('machines').select('id, name'),
       ]);
 
       const ordersByStatus: Record<string, number> = {};
@@ -178,9 +187,41 @@ export default function Dashboard() {
       // Filter out cancelled orders from alerts
       const activeLate = ((lateBatchesRes.data || []) as any[]).filter(b => b.order?.status !== 'cancelled');
       const activeFlagged = ((flaggedBatchesRes.data || []) as any[]).filter(b => b.order?.status !== 'cancelled');
-
-      // Late orders = distinct order_ids from late batches (excluding cancelled)
       const lateOrderIds = new Set(activeLate.map(b => b.order_id));
+
+      // Top 3 products by finished quantity
+      const productQtyMap: Record<string, number> = {};
+      (shippedBatchesRes.data || []).forEach((b: any) => {
+        productQtyMap[b.product_id] = (productQtyMap[b.product_id] || 0) + b.quantity;
+      });
+
+      // We need product names — fetch them if we have product ids
+      const topProductIds = Object.entries(productQtyMap)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 3);
+      let topProducts: Array<{ name: string; quantity: number }> = [];
+      if (topProductIds.length > 0) {
+        const prodRes = await supabase.from('products').select('id, name').in('id', topProductIds.map(p => p[0]));
+        const prodMap = new Map((prodRes.data || []).map(p => [p.id, p.name]));
+        topProducts = topProductIds.map(([id, qty]) => ({ name: prodMap.get(id) || 'Unknown', quantity: qty }));
+      }
+
+      // Avg finished items per day
+      const rangeStartDate = getTimeRangeStart(timeRange);
+      const daysDiff = Math.max(1, Math.ceil((Date.now() - rangeStartDate.getTime()) / 86400000));
+      const totalFinished = Object.values(productQtyMap).reduce((s, v) => s + v, 0);
+      const avgFinishedPerDay = Math.round((totalFinished / daysDiff) * 10) / 10;
+
+      // Top machines
+      const machineCountMap: Record<string, number> = {};
+      (machineProductionRes.data || []).forEach((m: any) => {
+        machineCountMap[m.machine_id] = (machineCountMap[m.machine_id] || 0) + 1;
+      });
+      const machineNameMap = new Map((machinesRes.data || []).map((m: any) => [m.id, m.name]));
+      const topMachines = Object.entries(machineCountMap)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 3)
+        .map(([id, count]) => ({ name: machineNameMap.get(id) || 'Unknown', count }));
 
       setData({
         profile: profileRes.data as any,
@@ -196,6 +237,9 @@ export default function Dashboard() {
         extraInventoryCount,
         completedOrders: ordersByStatus.completed || 0,
         shipmentsCount: (shipmentsRes.data || []).length,
+        topProducts,
+        avgFinishedPerDay,
+        topMachines,
       });
     } catch (e) {
       console.error('Dashboard fetch error:', e);
@@ -531,6 +575,76 @@ export default function Dashboard() {
                 </div>
               </Link>
             ))}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* ═══════ INSIGHTS ROW ═══════ */}
+      <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
+        {/* Top 3 Products */}
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center gap-2">
+              <Trophy className="h-4 w-4 text-primary" />
+              <CardTitle className="text-base">Top Products</CardTitle>
+            </div>
+            <CardDescription>Most completed in {TIME_RANGE_LABELS[timeRange].toLowerCase()}</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {data.topProducts.length > 0 ? data.topProducts.map((p, i) => (
+              <div key={i} className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className={`flex items-center justify-center h-6 w-6 rounded-full text-xs font-bold ${
+                    i === 0 ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground'
+                  }`}>{i + 1}</span>
+                  <span className="text-sm font-medium truncate">{p.name}</span>
+                </div>
+                <Badge variant="secondary" className="text-xs shrink-0">{p.quantity} units</Badge>
+              </div>
+            )) : (
+              <p className="text-sm text-muted-foreground text-center py-4">No completed items yet</p>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Average Finished Per Day */}
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center gap-2">
+              <Activity className="h-4 w-4 text-primary" />
+              <CardTitle className="text-base">Avg. Finished / Day</CardTitle>
+            </div>
+            <CardDescription>Daily average in {TIME_RANGE_LABELS[timeRange].toLowerCase()}</CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col items-center justify-center py-6">
+            <p className="text-4xl font-bold text-primary">{data.avgFinishedPerDay}</p>
+            <p className="text-sm text-muted-foreground mt-1">items per day</p>
+          </CardContent>
+        </Card>
+
+        {/* Most Used Machinery */}
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center gap-2">
+              <Wrench className="h-4 w-4 text-primary" />
+              <CardTitle className="text-base">Most Used Machines</CardTitle>
+            </div>
+            <CardDescription>By production records in {TIME_RANGE_LABELS[timeRange].toLowerCase()}</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {data.topMachines.length > 0 ? data.topMachines.map((m, i) => (
+              <div key={i} className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className={`flex items-center justify-center h-6 w-6 rounded-full text-xs font-bold ${
+                    i === 0 ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground'
+                  }`}>{i + 1}</span>
+                  <span className="text-sm font-medium truncate">{m.name}</span>
+                </div>
+                <Badge variant="secondary" className="text-xs shrink-0">{m.count} ops</Badge>
+              </div>
+            )) : (
+              <p className="text-sm text-muted-foreground text-center py-4">No machine activity yet</p>
+            )}
           </CardContent>
         </Card>
       </div>
