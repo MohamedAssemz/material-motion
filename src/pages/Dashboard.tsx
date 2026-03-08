@@ -305,21 +305,23 @@ export default function Dashboard() {
       </div>
 
       {/* ═══════ KPI CARDS ═══════ */}
-      <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
-        <div onClick={() => navigate('/orders')} className="cursor-pointer">
+      <div className="grid gap-4 grid-cols-2 md:grid-cols-3">
+        <div onClick={() => navigate('/orders')} className="cursor-pointer h-full">
           <KpiCard icon={TrendingUp} label="Active Orders" value={activeOrders} sub={TIME_RANGE_LABELS[timeRange]} color="text-primary" />
         </div>
-        <div onClick={() => navigate('/orders')} className="cursor-pointer">
+        <div onClick={() => navigate('/orders')} className="cursor-pointer h-full">
           <KpiCard icon={FileText} label="New Orders" value={data.newOrdersToday} sub="Today" color="text-primary" />
         </div>
-        <div onClick={() => navigate('/orders')} className="cursor-pointer">
+        <div onClick={() => navigate('/orders')} className="cursor-pointer h-full">
           <KpiCard icon={CheckCircle} label="Completed" value={data.completedOrders} sub={`${data.shipmentsCount} shipments`} color="text-success" />
         </div>
-        <div onClick={() => navigate('/orders')} className="cursor-pointer">
+        <div onClick={() => navigate('/orders')} className="cursor-pointer h-full">
           <KpiCard icon={AlertTriangle} label="Late Orders" value={data.lateOrderCount} sub="With late batches" color="text-destructive" highlight={data.lateOrderCount > 0} />
         </div>
-        <KpiCard icon={TrendingUp} label="Fulfillment" value={`${fulfillmentRate}%`} sub={`${shippedTotal} shipped`} color="text-success" />
-        <div onClick={() => navigate('/extra-inventory')} className="cursor-pointer">
+        <div className="h-full">
+          <KpiCard icon={TrendingUp} label="Fulfillment" value={`${fulfillmentRate}%`} sub={`${shippedTotal} shipped`} color="text-success" />
+        </div>
+        <div onClick={() => navigate('/extra-inventory')} className="cursor-pointer h-full">
           <KpiCard icon={Archive} label="Extra Inventory" value={data.extraInventoryCount} sub="Available items" color="text-primary" />
         </div>
       </div>
