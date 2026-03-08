@@ -161,6 +161,7 @@ export default function Dashboard() {
         supabase.from('orders').select('id, order_number, estimated_fulfillment_time').not('estimated_fulfillment_time', 'is', null).gt('estimated_fulfillment_time', now).lt('estimated_fulfillment_time', twoDaysFromNow).neq('status', 'completed').neq('status', 'cancelled').limit(5),
         supabase.from('machine_production').select('state_transition').gte('created_at', rangeStart),
         supabase.from('extra_batches').select('quantity').eq('inventory_state', 'AVAILABLE'),
+        supabase.from('shipments').select('id').gte('created_at', rangeStart),
       ]);
 
       const ordersByStatus: Record<string, number> = {};
