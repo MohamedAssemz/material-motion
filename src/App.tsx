@@ -56,7 +56,7 @@ const App = () => (
             <Route path="/orders/:id/finishing" element={<ProtectedPage><OrderFinishing /></ProtectedPage>} />
             <Route path="/orders/:id/packaging" element={<ProtectedPage><OrderPackaging /></ProtectedPage>} />
             <Route path="/orders/:id/boxing" element={<ProtectedPage><OrderBoxing /></ProtectedPage>} />
-            <Route path="/orders/create" element={<ProtectedPage><OrderCreate /></ProtectedPage>} />
+            <Route path="/orders/create" element={<ProtectedRoute requiredRole="admin"><AppLayout><OrderCreate /></AppLayout></ProtectedRoute>} />
             <Route path="/products" element={<ProtectedPage><Products /></ProtectedPage>} />
             <Route path="/catalog" element={<ProtectedPage><Catalog /></ProtectedPage>} />
             <Route path="/users" element={<ProtectedRoute requiredRole="admin"><AppLayout><Admin /></AppLayout></ProtectedRoute>} />
