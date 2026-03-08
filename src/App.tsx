@@ -56,7 +56,7 @@ const App = () => (
             <Route path="/orders/:id/finishing" element={<ProtectedPage><OrderFinishing /></ProtectedPage>} />
             <Route path="/orders/:id/packaging" element={<ProtectedPage><OrderPackaging /></ProtectedPage>} />
             <Route path="/orders/:id/boxing" element={<ProtectedPage><OrderBoxing /></ProtectedPage>} />
-            <Route path="/orders/create" element={<ProtectedPage><OrderCreate /></ProtectedPage>} />
+            <Route path="/orders/create" element={<ProtectedRoute requiredRole="admin"><AppLayout><OrderCreate /></AppLayout></ProtectedRoute>} />
             <Route path="/products" element={<ProtectedPage><Products /></ProtectedPage>} />
             <Route path="/catalog" element={<ProtectedPage><Catalog /></ProtectedPage>} />
             <Route path="/users" element={<ProtectedRoute requiredRole="admin"><AppLayout><Admin /></AppLayout></ProtectedRoute>} />
@@ -67,11 +67,11 @@ const App = () => (
             <Route path="/extra-inventory" element={<ProtectedPage><ExtraInventory /></ProtectedPage>} />
             <Route path="/boxes" element={<ProtectedPage><Boxes /></ProtectedPage>} />
             <Route path="/machines" element={<ProtectedRoute requiredRole="admin"><AppLayout><Machines /></AppLayout></ProtectedRoute>} />
-            <Route path="/customers" element={<ProtectedPage><Customers /></ProtectedPage>} />
-            <Route path="/batch/:code" element={<BatchLookup />} />
-            <Route path="/batch" element={<BatchLookup />} />
-            <Route path="/box/:code" element={<BoxLookup />} />
-            <Route path="/box" element={<BoxLookup />} />
+            <Route path="/customers" element={<ProtectedRoute requiredRole="admin"><AppLayout><Customers /></AppLayout></ProtectedRoute>} />
+            <Route path="/batch/:code" element={<ProtectedRoute><BatchLookup /></ProtectedRoute>} />
+            <Route path="/batch" element={<ProtectedRoute><BatchLookup /></ProtectedRoute>} />
+            <Route path="/box/:code" element={<ProtectedRoute><BoxLookup /></ProtectedRoute>} />
+            <Route path="/box" element={<ProtectedRoute><BoxLookup /></ProtectedRoute>} />
             <Route path="/analytics" element={<ProtectedPage><Analytics /></ProtectedPage>} />
             <Route path="/reports" element={<ProtectedPage><Reports /></ProtectedPage>} />
             <Route path="*" element={<NotFound />} />
