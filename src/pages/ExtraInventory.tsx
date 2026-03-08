@@ -569,6 +569,17 @@ export default function ExtraInventory() {
         </div>
       </header>
 
+      <ExtraBoxSelectionDialog
+        open={createBoxDialogOpen}
+        onOpenChange={setCreateBoxDialogOpen}
+        onConfirm={(boxId, boxCode) => {
+          setFormData({ ...formData, box_id: boxId });
+          setSelectedBoxCode(boxCode || '');
+          setCreateBoxDialogOpen(false);
+        }}
+        title="Select Extra Box for Batch"
+        filterByState={formData.current_state}
+      />
 
       <div className="container mx-auto p-6 space-y-6">
         {/* Stats */}
