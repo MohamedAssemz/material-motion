@@ -187,9 +187,41 @@ export default function Dashboard() {
       // Filter out cancelled orders from alerts
       const activeLate = ((lateBatchesRes.data || []) as any[]).filter(b => b.order?.status !== 'cancelled');
       const activeFlagged = ((flaggedBatchesRes.data || []) as any[]).filter(b => b.order?.status !== 'cancelled');
-
-      // Late orders = distinct order_ids from late batches (excluding cancelled)
       const lateOrderIds = new Set(activeLate.map(b => b.order_id));
+
+      // Top 3 products by finished quantity
+      const productQtyMap: Record<string, number> = {};
+      (shippedBatchesRes.data || []).forEach((b: any) => {
+        productQtyMap[b.product_id] = (productQtyMap[b.product_id] || 0) + b.quantity;
+      });
+
+      // We need product names — fetch them if we have product ids
+      const topProductIds = Object.entries(productQtyMap)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 3);
+      let topProducts: Array<{ name: string; quantity: number }> = [];
+      if (topProductIds.length > 0) {
+        const prodRes = await supabase.from('products').select('id, name').in('id', topProductIds.map(p => p[0]));
+        const prodMap = new Map((prodRes.data || []).map(p => [p.id, p.name]));
+        topProducts = topProductIds.map(([id, qty]) => ({ name: prodMap.get(id) || 'Unknown', quantity: qty }));
+      }
+
+      // Avg finished items per day
+      const rangeStartDate = getTimeRangeStart(timeRange);
+      const daysDiff = Math.max(1, Math.ceil((Date.now() - rangeStartDate.getTime()) / 86400000));
+      const totalFinished = Object.values(productQtyMap).reduce((s, v) => s + v, 0);
+      const avgFinishedPerDay = Math.round((totalFinished / daysDiff) * 10) / 10;
+
+      // Top machines
+      const machineCountMap: Record<string, number> = {};
+      (machineProductionRes.data || []).forEach((m: any) => {
+        machineCountMap[m.machine_id] = (machineCountMap[m.machine_id] || 0) + 1;
+      });
+      const machineNameMap = new Map((machinesRes.data || []).map((m: any) => [m.id, m.name]));
+      const topMachines = Object.entries(machineCountMap)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 3)
+        .map(([id, count]) => ({ name: machineNameMap.get(id) || 'Unknown', count }));
 
       setData({
         profile: profileRes.data as any,
@@ -205,6 +237,9 @@ export default function Dashboard() {
         extraInventoryCount,
         completedOrders: ordersByStatus.completed || 0,
         shipmentsCount: (shipmentsRes.data || []).length,
+        topProducts,
+        avgFinishedPerDay,
+        topMachines,
       });
     } catch (e) {
       console.error('Dashboard fetch error:', e);
