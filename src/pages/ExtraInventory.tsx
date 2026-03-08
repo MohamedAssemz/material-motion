@@ -16,6 +16,7 @@ import { ArrowLeft, Plus, Package, Loader2, Box, Search, Trash2 } from 'lucide-r
 import { format } from 'date-fns';
 import { TablePagination } from '@/components/TablePagination';
 import { ExtraBoxSelectionDialog } from '@/components/ExtraBoxSelectionDialog';
+import { SearchableSelect, SearchableSelectOption } from '@/components/ui/searchable-select';
 
 interface Product {
   id: string;
@@ -62,7 +63,8 @@ export default function ExtraInventory() {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [boxDialogOpen, setBoxDialogOpen] = useState(false);
-  const [createBoxDialogOpen, setCreateBoxDialogOpen] = useState(false);
+  const [eboxOptions, setEboxOptions] = useState<SearchableSelectOption[]>([]);
+  const [eboxLoading, setEboxLoading] = useState(false);
   const [selectedBatchForBox, setSelectedBatchForBox] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     product_id: '',
@@ -83,6 +85,56 @@ export default function ExtraInventory() {
   const [statusFilter, setStatusFilter] = useState('all');
 
   const canManage = hasRole('admin');
+
+  // Fetch compatible EBox options when state changes
+  const fetchEboxOptions = async (state: string) => {
+    setEboxLoading(true);
+    try {
+      const { data: allBoxes } = await supabase
+        .from('extra_boxes')
+        .select('id, box_code, items_list')
+        .eq('is_active', true)
+        .order('box_code');
+
+      if (!allBoxes) { setEboxOptions([]); return; }
+
+      const boxIds = allBoxes.map(b => b.id);
+      const { data: batchData } = await supabase
+        .from('extra_batches')
+        .select('box_id, current_state')
+        .in('box_id', boxIds);
+
+      const boxStateMap = new Map<string, string>();
+      batchData?.forEach(b => {
+        if (b.box_id && !boxStateMap.has(b.box_id)) boxStateMap.set(b.box_id, b.current_state);
+      });
+
+      const compatible = allBoxes.filter(box => {
+        const boxState = boxStateMap.get(box.id);
+        return !boxState || boxState === state;
+      });
+
+      setEboxOptions(compatible.map(box => {
+        const items = (box.items_list as Array<{ product_sku: string; quantity: number }>) || [];
+        const totalQty = items.reduce((s, i) => s + i.quantity, 0);
+        const desc = items.length > 0
+          ? `${totalQty} units in ${items.length} batch(es)`
+          : 'Empty';
+        return { value: box.id, label: box.box_code, description: desc };
+      }));
+    } catch (e) {
+      console.error('Error fetching ebox options:', e);
+      setEboxOptions([]);
+    } finally {
+      setEboxLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (dialogOpen) {
+      fetchEboxOptions(formData.current_state);
+    }
+  }, [dialogOpen, formData.current_state]);
 
   // Filtered batches
   const filteredBatches = useMemo(() => {
@@ -512,28 +564,22 @@ export default function ExtraInventory() {
                 
                 <div>
                   <Label>Extra Box (EBox) *</Label>
-                  <div className="flex gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="flex-1 justify-start"
-                      onClick={() => setCreateBoxDialogOpen(true)}
-                    >
-                      {formData.box_id && selectedBoxCode ? (
-                        <span className="flex items-center gap-2">
-                          <Box className="h-4 w-4 text-primary" />
-                          <span className="font-mono">{selectedBoxCode}</span>
-                        </span>
-                      ) : (
-                        <span className="text-muted-foreground flex items-center gap-2">
-                          <Box className="h-4 w-4" />
-                          Select an EBox...
-                        </span>
-                      )}
-                    </Button>
-                  </div>
+                  <SearchableSelect
+                    options={eboxOptions}
+                    value={formData.box_id || null}
+                    onValueChange={(val) => {
+                      const opt = eboxOptions.find(o => o.value === val);
+                      setFormData({ ...formData, box_id: val || '' });
+                      setSelectedBoxCode(opt?.label || '');
+                    }}
+                    placeholder="Select an EBox..."
+                    searchPlaceholder="Search EBoxes..."
+                    emptyText="No compatible EBoxes available"
+                    loading={eboxLoading}
+                    allowClear
+                  />
                   <p className="text-xs text-muted-foreground mt-1">
-                    Extra batches must be assigned to an EBox. Only compatible boxes are shown.
+                    Only boxes matching the selected state are shown.
                   </p>
                 </div>
 
@@ -567,17 +613,6 @@ export default function ExtraInventory() {
         </div>
       </header>
 
-      <ExtraBoxSelectionDialog
-        open={createBoxDialogOpen}
-        onOpenChange={setCreateBoxDialogOpen}
-        onConfirm={(boxId, boxCode) => {
-          setFormData({ ...formData, box_id: boxId });
-          setSelectedBoxCode(boxCode || '');
-          setCreateBoxDialogOpen(false);
-        }}
-        title="Select Extra Box for Batch"
-        filterByState={formData.current_state}
-      />
 
       <div className="container mx-auto p-6 space-y-6">
         {/* Stats */}
