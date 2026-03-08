@@ -33,6 +33,8 @@ interface DashboardData {
   approachingEtaOrders: Array<{ id: string; order_number: string; estimated_fulfillment_time: string }>;
   todayThroughput: Record<string, number>;
   extraInventoryCount: number;
+  completedOrders: number;
+  shipmentsCount: number;
 }
 
 type TimeRange = 'today' | 'week' | 'month';
