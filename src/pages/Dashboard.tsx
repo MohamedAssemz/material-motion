@@ -475,6 +475,76 @@ export default function Dashboard() {
         </Card>
       </div>
 
+      {/* ═══════ INSIGHTS ROW ═══════ */}
+      <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
+        {/* Top 3 Products */}
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center gap-2">
+              <Trophy className="h-4 w-4 text-primary" />
+              <CardTitle className="text-base">Top Products</CardTitle>
+            </div>
+            <CardDescription>Most completed in {TIME_RANGE_LABELS[timeRange].toLowerCase()}</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {data.topProducts.length > 0 ? data.topProducts.map((p, i) => (
+              <div key={i} className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className={`flex items-center justify-center h-6 w-6 rounded-full text-xs font-bold ${
+                    i === 0 ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground'
+                  }`}>{i + 1}</span>
+                  <span className="text-sm font-medium truncate">{p.name}</span>
+                </div>
+                <Badge variant="secondary" className="text-xs shrink-0">{p.quantity} units</Badge>
+              </div>
+            )) : (
+              <p className="text-sm text-muted-foreground text-center py-4">No completed items yet</p>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Average Finished Per Day */}
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center gap-2">
+              <Activity className="h-4 w-4 text-primary" />
+              <CardTitle className="text-base">Avg. Finished / Day</CardTitle>
+            </div>
+            <CardDescription>Daily average in {TIME_RANGE_LABELS[timeRange].toLowerCase()}</CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col items-center justify-center py-6">
+            <p className="text-4xl font-bold text-primary">{data.avgFinishedPerDay}</p>
+            <p className="text-sm text-muted-foreground mt-1">items per day</p>
+          </CardContent>
+        </Card>
+
+        {/* Most Used Machinery */}
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center gap-2">
+              <Wrench className="h-4 w-4 text-primary" />
+              <CardTitle className="text-base">Most Used Machines</CardTitle>
+            </div>
+            <CardDescription>By production records in {TIME_RANGE_LABELS[timeRange].toLowerCase()}</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {data.topMachines.length > 0 ? data.topMachines.map((m, i) => (
+              <div key={i} className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className={`flex items-center justify-center h-6 w-6 rounded-full text-xs font-bold ${
+                    i === 0 ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground'
+                  }`}>{i + 1}</span>
+                  <span className="text-sm font-medium truncate">{m.name}</span>
+                </div>
+                <Badge variant="secondary" className="text-xs shrink-0">{m.count} ops</Badge>
+              </div>
+            )) : (
+              <p className="text-sm text-muted-foreground text-center py-4">No machine activity yet</p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
       {/* ═══════ QUEUE CARDS ═══════ */}
       <div>
         <h2 className="text-base font-semibold mb-3">Production Queues</h2>
@@ -575,76 +645,6 @@ export default function Dashboard() {
                 </div>
               </Link>
             ))}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* ═══════ INSIGHTS ROW ═══════ */}
-      <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
-        {/* Top 3 Products */}
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center gap-2">
-              <Trophy className="h-4 w-4 text-primary" />
-              <CardTitle className="text-base">Top Products</CardTitle>
-            </div>
-            <CardDescription>Most completed in {TIME_RANGE_LABELS[timeRange].toLowerCase()}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {data.topProducts.length > 0 ? data.topProducts.map((p, i) => (
-              <div key={i} className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className={`flex items-center justify-center h-6 w-6 rounded-full text-xs font-bold ${
-                    i === 0 ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground'
-                  }`}>{i + 1}</span>
-                  <span className="text-sm font-medium truncate">{p.name}</span>
-                </div>
-                <Badge variant="secondary" className="text-xs shrink-0">{p.quantity} units</Badge>
-              </div>
-            )) : (
-              <p className="text-sm text-muted-foreground text-center py-4">No completed items yet</p>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Average Finished Per Day */}
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center gap-2">
-              <Activity className="h-4 w-4 text-primary" />
-              <CardTitle className="text-base">Avg. Finished / Day</CardTitle>
-            </div>
-            <CardDescription>Daily average in {TIME_RANGE_LABELS[timeRange].toLowerCase()}</CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col items-center justify-center py-6">
-            <p className="text-4xl font-bold text-primary">{data.avgFinishedPerDay}</p>
-            <p className="text-sm text-muted-foreground mt-1">items per day</p>
-          </CardContent>
-        </Card>
-
-        {/* Most Used Machinery */}
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center gap-2">
-              <Wrench className="h-4 w-4 text-primary" />
-              <CardTitle className="text-base">Most Used Machines</CardTitle>
-            </div>
-            <CardDescription>By production records in {TIME_RANGE_LABELS[timeRange].toLowerCase()}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {data.topMachines.length > 0 ? data.topMachines.map((m, i) => (
-              <div key={i} className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className={`flex items-center justify-center h-6 w-6 rounded-full text-xs font-bold ${
-                    i === 0 ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground'
-                  }`}>{i + 1}</span>
-                  <span className="text-sm font-medium truncate">{m.name}</span>
-                </div>
-                <Badge variant="secondary" className="text-xs shrink-0">{m.count} ops</Badge>
-              </div>
-            )) : (
-              <p className="text-sm text-muted-foreground text-center py-4">No machine activity yet</p>
-            )}
           </CardContent>
         </Card>
       </div>
