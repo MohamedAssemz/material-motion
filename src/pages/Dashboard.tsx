@@ -154,7 +154,7 @@ export default function Dashboard() {
         supabase.from('orders').select('status').gte('created_at', rangeStart),
         // New orders today — independent of time filter
         supabase.from('orders').select('id').gte('created_at', todayStart),
-        supabase.from('order_batches').select('current_state, quantity').eq('is_terminated', false).gte('created_at', rangeStart),
+        supabase.from('order_batches').select('current_state, quantity, order:orders!inner(status)').eq('is_terminated', false).neq('order.status', 'cancelled').gte('created_at', rangeStart),
         // Late batches — exclude cancelled orders via client filter
         supabase.from('order_batches').select('id, order_id, product_id, eta, quantity, order:orders(order_number, status)').eq('is_terminated', false).not('current_state', 'in', '(shipped,ready_for_shipment)').not('eta', 'is', null).lt('eta', now).limit(50),
         supabase.from('order_batches').select('id, order_id, flagged_reason, quantity, order:orders(order_number, status)').eq('is_flagged', true).eq('is_terminated', false).limit(50),
