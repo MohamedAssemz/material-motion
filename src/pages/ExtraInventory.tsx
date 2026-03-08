@@ -514,20 +514,26 @@ export default function ExtraInventory() {
                 
                 <div>
                   <Label>Extra Box (EBox) *</Label>
-                  <SearchableSelect
-                    options={eboxOptions}
-                    value={formData.box_id || null}
-                    onValueChange={(val) => {
-                      const opt = eboxOptions.find(o => o.value === val);
-                      setFormData({ ...formData, box_id: val || '' });
-                      setSelectedBoxCode(opt?.label || '');
-                    }}
-                    placeholder="Select an EBox..."
-                    searchPlaceholder="Search EBoxes..."
-                    emptyText="No compatible EBoxes available"
-                    loading={eboxLoading}
-                    allowClear
-                  />
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="flex-1 justify-start"
+                      onClick={() => setCreateBoxDialogOpen(true)}
+                    >
+                      {formData.box_id && selectedBoxCode ? (
+                        <span className="flex items-center gap-2">
+                          <Box className="h-4 w-4 text-primary" />
+                          <span className="font-mono">{selectedBoxCode}</span>
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground flex items-center gap-2">
+                          <Box className="h-4 w-4" />
+                          Select an EBox...
+                        </span>
+                      )}
+                    </Button>
+                  </div>
                   <p className="text-xs text-muted-foreground mt-1">
                     Only boxes matching the selected state are shown.
                   </p>
