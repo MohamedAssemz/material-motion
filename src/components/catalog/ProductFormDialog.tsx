@@ -296,20 +296,16 @@ export function ProductFormDialog({
         );
       }
 
-      // Update potential customers - use product_id column
-      // First delete existing entries for this product
+      // Update customers (delete all, then insert new)
       await supabase
-        .from('product_potential_customers')
+        .from('product_customers')
         .delete()
         .eq('product_id', productId);
 
       if (formData.customer_ids.length > 0) {
-        // Note: The table still has parent_product_id as required
-        // Using product_id as placeholder for parent_product_id
-        await supabase.from('product_potential_customers').insert(
+        await supabase.from('product_customers').insert(
           formData.customer_ids.map(customerId => ({
             product_id: productId,
-            parent_product_id: productId,
             customer_id: customerId,
           }))
         );

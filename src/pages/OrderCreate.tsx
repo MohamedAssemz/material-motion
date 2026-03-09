@@ -512,11 +512,9 @@ export default function OrderCreate() {
                             {/* Suggested products for selected customer */}
                             {selectedCustomerId &&
                               (() => {
-                                const suggestedParentIds = customerProductMapping.get(selectedCustomerId);
-                                const suggestedProducts = suggestedParentIds
-                                  ? products.filter(
-                                      (p) => p.parent_product_id && suggestedParentIds.has(p.parent_product_id),
-                                    )
+                                const suggestedIds = customerProductMapping.get(selectedCustomerId);
+                                const suggestedProducts = suggestedIds
+                                  ? products.filter((p) => suggestedIds.has(p.id))
                                   : [];
 
                                 if (suggestedProducts.length > 0) {

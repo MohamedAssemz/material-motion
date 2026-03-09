@@ -61,8 +61,7 @@ export default function QueuePackaging() {
       // Fetch all order_batches
       const { data: orderBatchesData, error: batchError } = await supabase
         .from('order_batches')
-        .select('order_id, current_state, quantity')
-        .eq('is_terminated', false);
+        .select('order_id, current_state, quantity');
 
       if (batchError) throw batchError;
 

@@ -54,8 +54,8 @@ export default function Reports() {
       setOrders(ordersRes.data || []);
       setProducts(productsRes.data || []);
       setOrderItems(orderItemsRes.data || []);
-      setUnitHistory(unitHistoryRes.data || []);
-      setUnits(unitsRes.data || []);
+      setUnitHistory([]);
+      setUnits([]);
       setBoxes(boxesRes.data || []);
       setShipments(shipmentsRes.data || []);
       setExtraHistory(extraHistoryRes.data || []);
