@@ -200,8 +200,7 @@ export function BoxReceiveDialog({
         `)
         .eq('order_id', orderId)
         .eq('current_state', filterState)
-        .not('box_id', 'is', null)
-        .eq('is_terminated', false);
+        .not('box_id', 'is', null);
 
       if (error) throw error;
 
