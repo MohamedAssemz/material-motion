@@ -483,11 +483,10 @@ export default function ExtraInventory() {
                 </div>
                 <div>
                   <Label>Quantity *</Label>
-                  <Input
-                    type="number"
-                    min="1"
+                  <NumericInput
+                    min={1}
                     value={formData.quantity}
-                    onChange={(e) => setFormData({ ...formData, quantity: parseInt(e.target.value) || 1 })}
+                    onValueChange={(val) => setFormData({ ...formData, quantity: val ?? 1 })}
                     required
                   />
                 </div>

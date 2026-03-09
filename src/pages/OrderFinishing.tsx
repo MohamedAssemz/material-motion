@@ -957,14 +957,12 @@ export default function OrderFinishing() {
                         {canManage && !isCancelled && (
                           <div className="flex items-center gap-2">
                             <Label className="text-xs text-muted-foreground">Select</Label>
-                            <Input
-                              type="number"
+                            <NumericInput
                               min={0}
                               max={group.quantity}
-                              value={productSelections.get(group.groupKey) || 0}
-                              onChange={(e) => {
-                                const val = Math.min(Math.max(0, parseInt(e.target.value) || 0), group.quantity);
-                                setProductSelections((prev) => new Map(prev).set(group.groupKey, val));
+                              value={productSelections.get(group.groupKey) || undefined}
+                              onValueChange={(val) => {
+                                setProductSelections((prev) => new Map(prev).set(group.groupKey, val ?? 0));
                               }}
                               className="w-20 h-8"
                             />

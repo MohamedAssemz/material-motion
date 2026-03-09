@@ -84,13 +84,12 @@ export function LeadTimeDialog({ open, onOpenChange, onConfirm, unitCount, nextS
         <div className="space-y-4">
           <div>
             <Label htmlFor="leadTime">Lead Time (days) *</Label>
-            <Input
+            <NumericInput
               id="leadTime"
-              type="number"
-              min="1"
-              max="365"
+              min={1}
+              max={365}
               value={leadTimeDays}
-              onChange={(e) => handleLeadTimeChange(parseInt(e.target.value) || 1)}
+              onValueChange={(val) => handleLeadTimeChange(val ?? 1)}
               className="mt-1"
             />
           </div>

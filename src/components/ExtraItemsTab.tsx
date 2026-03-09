@@ -776,18 +776,15 @@ export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true }: E
                     </div>
                     {canManage && <div className="flex items-center gap-2">
                       <Label className="text-xs">Select:</Label>
-                      <Input
-                        type="number"
-                        min="0"
+                      <NumericInput
+                        min={0}
                         max={group.quantity}
-                        value={productSelections.get(group.product_id) || ''}
-                        onChange={e => {
-                          const val = parseInt(e.target.value) || 0;
-                          const clamped = Math.max(0, Math.min(val, group.quantity));
+                        value={productSelections.get(group.product_id) || undefined}
+                        onValueChange={val => {
                           setProductSelections(prev => {
                             const newMap = new Map(prev);
-                            if (clamped > 0) {
-                              newMap.set(group.product_id, clamped);
+                            if (val && val > 0) {
+                              newMap.set(group.product_id, val);
                             } else {
                               newMap.delete(group.product_id);
                             }

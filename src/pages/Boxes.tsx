@@ -643,7 +643,7 @@ export default function Boxes() {
                     <form onSubmit={handleCreateExtraBoxes} className="space-y-4">
                       <div>
                         <Label htmlFor="extra-count">Number of boxes to create</Label>
-                        <Input id="extra-count" type="number" min="1" max="100" value={newExtraBoxCount} onChange={(e) => setNewExtraBoxCount(parseInt(e.target.value) || 1)} required />
+                        <NumericInput id="extra-count" min={1} max={100} value={newExtraBoxCount} onValueChange={(val) => setNewExtraBoxCount(val ?? 1)} required />
                         <p className="text-xs text-muted-foreground mt-1">Box codes will be auto-generated (e.g., EBOX-0001)</p>
                       </div>
                       <div className="flex gap-2">

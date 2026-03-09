@@ -217,14 +217,13 @@ export function StateGroupView({
                     </div>
                     {canUpdate && (
                       <div className="flex items-center gap-2">
-                        <Input
-                          type="number"
-                          min="0"
+                        <NumericInput
+                          min={0}
                           max={product.quantity}
-                          value={productSelections.get(product.product_id) || ''}
-                          onChange={(e) => handleProductQuantityChange(
+                          value={productSelections.get(product.product_id) || undefined}
+                          onValueChange={(val) => handleProductQuantityChange(
                             product.product_id, 
-                            parseInt(e.target.value) || 0,
+                            val ?? 0,
                             product.quantity
                           )}
                           placeholder="0"

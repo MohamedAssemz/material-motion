@@ -692,15 +692,13 @@ export default function OrderCreate() {
                                 })}
                               </SelectContent>
                             </Select>
-                            <Input
-                              type="number"
+                            <NumericInput
                               min={1}
                               max={maxQty > 0 ? maxQty : 1}
                               value={row.quantity}
-                              onChange={(e) => {
+                              onValueChange={(val) => {
                                 const newRows = [...packagingRows];
-                                const val = parseInt(e.target.value) || 1;
-                                newRows[index] = { ...newRows[index], quantity: Math.min(val, maxQty > 0 ? maxQty : 1) };
+                                newRows[index] = { ...newRows[index], quantity: val ?? 1 };
                                 setPackagingRows(newRows);
                               }}
                               className="w-20"

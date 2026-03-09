@@ -92,13 +92,12 @@ const getStatusColor = (status: string) => {
               <Label htmlFor={`qty-${batch.id}`} className="text-xs">
                 Select Qty
               </Label>
-              <Input
+              <NumericInput
                 id={`qty-${batch.id}`}
-                type="number"
-                min="0"
+                min={0}
                 max={batch.total_quantity}
-                value={selectedQuantity || ''}
-                onChange={(e) => handleQuantityChange(e.target.value)}
+                value={selectedQuantity || undefined}
+                onValueChange={(val) => onQuantityChange(val ?? 0)}
                 placeholder="0"
                 className="mt-1 h-8"
               />
