@@ -1080,8 +1080,6 @@ export default function OrderDetail() {
         }))}
         onRefresh={fetchOrder}
       />
-      <BoxAssignmentDialog open={boxAssignDialogOpen} onOpenChange={setBoxAssignDialogOpen} orderId={id!} onAssigned={fetchOrder} />
-      <LeadTimeDialog open={leadTimeDialogOpen} onOpenChange={setLeadTimeDialogOpen} />
       <ExtraInventoryDialog 
         open={extraInventoryOpen} 
         onOpenChange={setExtraInventoryOpen} 
@@ -1103,7 +1101,6 @@ export default function OrderDetail() {
         open={startOrderOpen} 
         onOpenChange={setStartOrderOpen}
         orderId={id!}
-        orderNumber={order?.order_number || ''}
         orderItems={orderItems}
         onOrderStarted={() => {
           fetchOrder();
