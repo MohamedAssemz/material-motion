@@ -596,8 +596,7 @@ export default function OrderBoxing() {
               .eq("order_id", id)
               .eq("product_id", batch.product_id)
               .eq("order_item_id", batch.order_item_id)
-              .eq("current_state", "ready_for_shipment")
-              .eq("is_terminated", false);
+              .eq("current_state", "ready_for_shipment");
             
             if (batch.from_extra_state) {
               existingBatchQuery = existingBatchQuery.eq("from_extra_state", batch.from_extra_state);
@@ -615,12 +614,12 @@ export default function OrderBoxing() {
                 .eq("id", existingBatch.id);
               if (updateError) throw updateError;
               
-              // Mark current batch as terminated (soft delete)
-              const { error: terminateError } = await supabase
+              // Delete current batch as it's been consolidated
+              const { error: deleteError } = await supabase
                 .from("order_batches")
-                .update({ is_terminated: true, terminated_reason: "Consolidated" })
+                .delete()
                 .eq("id", batch.id);
-              if (terminateError) throw terminateError;
+              if (deleteError) throw deleteError;
             } else {
               // No existing batch to consolidate, just update state
               const { error: updateError } = await supabase
@@ -764,8 +763,7 @@ export default function OrderBoxing() {
               .eq("product_id", batch.product_id)
               .eq("order_item_id", batch.order_item_id)
               .eq("current_state", "shipped")
-              .eq("shipment_id", shipment.id)
-              .eq("is_terminated", false);
+              .eq("shipment_id", shipment.id);
             
             if (batch.from_extra_state) {
               existingShipBatchQuery = existingShipBatchQuery.eq("from_extra_state", batch.from_extra_state);
