@@ -569,11 +569,10 @@ export default function OrderCreate() {
                   </div>
                   <div className="w-32">
                     <Label>Quantity *</Label>
-                    <Input
-                      type="number"
-                      min="1"
+                    <NumericInput
+                      min={1}
                       value={item.quantity}
-                      onChange={(e) => updateItem(index, "quantity", parseInt(e.target.value) || 1)}
+                      onValueChange={(val) => updateItem(index, "quantity", val ?? 1)}
                     />
                   </div>
                   <div className="flex items-center gap-2 pb-1">
