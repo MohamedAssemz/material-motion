@@ -97,8 +97,7 @@ export function BoxScanDialog({
         const { data: occupiedBatches } = await supabase
           .from('order_batches')
           .select('box_id')
-          .not('box_id', 'is', null)
-          .eq('is_terminated', false);
+          .not('box_id', 'is', null);
 
         const occupiedBoxIds = new Set(occupiedBatches?.map(b => b.box_id) || []);
         const emptyBoxes = allBoxes?.filter(box => !occupiedBoxIds.has(box.id)) || [];
