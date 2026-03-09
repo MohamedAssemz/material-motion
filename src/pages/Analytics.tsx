@@ -263,16 +263,6 @@ export default function Analytics() {
             <p className="text-xs text-muted-foreground">Past their ETA</p>
           </CardContent>
         </Card>
-      </div>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Avg Lead Time</CardTitle>
-            <Timer className="h-4 w-4 text-primary" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-primary">{globalCounters.avgLeadTime} days</div>
-            <p className="text-xs text-muted-foreground">Average per stage</p>
-          </CardContent>
-        </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
