@@ -413,7 +413,7 @@ export default function Catalog() {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search products by name, SKU, or description..."
+                placeholder={t('catalog.search_placeholder')}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
@@ -422,7 +422,7 @@ export default function Catalog() {
             {hasActiveFilters && (
               <Button variant="ghost" onClick={clearFilters} size="sm">
                 <X className="mr-1 h-4 w-4" />
-                Clear filters
+                {t('catalog.clear_filters')}
               </Button>
             )}
           </div>
