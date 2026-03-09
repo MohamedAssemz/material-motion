@@ -560,7 +560,7 @@ export default function Orders() {
                       <TableBody>
                         {paginatedOrders.length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={tab === 'pending' ? 7 : 6} className="text-center text-muted-foreground">
+                            <TableCell colSpan={tab === 'pending' ? 6 : 5} className="text-center text-muted-foreground">
                               No orders found
                             </TableCell>
                           </TableRow>
