@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
-import { NotificationBell } from '@/components/NotificationBell';
+
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -187,7 +187,7 @@ export function AppLayout({ children }: AppLayoutProps) {
           </div>
 
           <div className="flex items-center gap-4">
-            <NotificationBell />
+            
             <div className="hidden sm:block text-right">
               <p className="text-sm font-medium truncate max-w-[200px]">{user?.email}</p>
               <div className="flex gap-1 justify-end mt-0.5">

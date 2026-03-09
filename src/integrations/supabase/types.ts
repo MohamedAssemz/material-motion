@@ -366,50 +366,6 @@ export type Database = {
         }
         Relationships: []
       }
-      notifications: {
-        Row: {
-          created_at: string | null
-          id: string
-          is_read: boolean | null
-          message: string
-          order_id: string | null
-          target_role: Database["public"]["Enums"]["app_role"] | null
-          target_user: string | null
-          type: string
-          unit_ids: string[] | null
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          is_read?: boolean | null
-          message: string
-          order_id?: string | null
-          target_role?: Database["public"]["Enums"]["app_role"] | null
-          target_user?: string | null
-          type: string
-          unit_ids?: string[] | null
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          is_read?: boolean | null
-          message?: string
-          order_id?: string | null
-          target_role?: Database["public"]["Enums"]["app_role"] | null
-          target_user?: string | null
-          type?: string
-          unit_ids?: string[] | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "notifications_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       order_batches: {
         Row: {
           box_id: string | null
