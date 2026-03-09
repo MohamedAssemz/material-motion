@@ -3,12 +3,13 @@ import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { BarChart3, FileDown, ClipboardList, Factory, Warehouse, Tag, ArrowLeft } from 'lucide-react';
+import { BarChart3, FileDown, ClipboardList, Factory, Warehouse, Tag, ArrowLeft, Wrench } from 'lucide-react';
 import { ExportsTab } from '@/components/reports/ExportsTab';
 import { OrderPerformanceTab } from '@/components/reports/OrderPerformanceTab';
 import { ProductionFlowTab } from '@/components/reports/ProductionFlowTab';
 import { InventoryBoxesTab } from '@/components/reports/InventoryBoxesTab';
 import { CatalogInsightsTab } from '@/components/reports/CatalogInsightsTab';
+import { MachineProductionTab } from '@/components/reports/MachineProductionTab';
 
 export default function Reports() {
   const [loading, setLoading] = useState(true);
