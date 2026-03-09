@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -98,6 +99,7 @@ export default function OrderBoxing() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { hasRole, user } = useAuth();
+  const { t } = useLanguage();
   const [order, setOrder] = useState<Order | null>(null);
   const [batches, setBatches] = useState<Batch[]>([]);
   const [shipments, setShipments] = useState<Shipment[]>([]);
@@ -1105,9 +1107,9 @@ export default function OrderBoxing() {
       <div className="p-6">
         <Button variant="ghost" onClick={() => navigate("/orders")}>
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Back
+          {t('common.back')}
         </Button>
-        <p className="text-center text-muted-foreground mt-8">Order not found</p>
+        <p className="text-center text-muted-foreground mt-8">{t('phase.order_not_found')}</p>
       </div>
     );
   }
@@ -1125,12 +1127,12 @@ export default function OrderBoxing() {
               <Box className="h-6 w-6 text-cyan-600 dark:text-cyan-400" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold">Boxing</h1>
+              <h1 className="text-2xl font-bold">{t('boxing.title')}</h1>
               <p className="text-muted-foreground">
                 {order.order_number} {order.customer?.name && `· ${order.customer.name}`}
                 {order.priority === "high" && (
                   <Badge variant="destructive" className="ml-2">
-                    High Priority
+                    {t('phase.high_priority')}
                   </Badge>
                 )}
               </p>
@@ -1139,11 +1141,11 @@ export default function OrderBoxing() {
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => navigate(`/orders/${id}`)}>
-            View Order Details
+            {t('phase.view_order_details')}
           </Button>
           <Button variant="outline" onClick={() => setNotesDialogOpen(true)}>
             <Package className="mr-2 h-4 w-4" />
-            Packaging Reference
+            {t('phase.packaging_reference')}
           </Button>
         </div>
       </div>
@@ -1152,31 +1154,31 @@ export default function OrderBoxing() {
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <Card>
           <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Ready for Boxing</p>
+            <p className="text-sm text-muted-foreground">{t('boxing.ready_for_boxing')}</p>
             <p className="text-2xl font-bold text-warning">{totalReadyForBoxing}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">In Boxing</p>
+            <p className="text-sm text-muted-foreground">{t('boxing.in_boxing_phase')}</p>
             <p className="text-2xl font-bold text-primary">{totalInBoxing}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Ready for Shipment</p>
+            <p className="text-sm text-muted-foreground">{t('boxing.ready_for_shipment')}</p>
             <p className="text-2xl font-bold text-green-600">{totalReadyForShipment}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Total Kartonas</p>
+            <p className="text-sm text-muted-foreground">{t('boxing.total_kartonas')}</p>
             <p className="text-2xl font-bold text-purple-600">{shipments.length}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Total Shipped</p>
+            <p className="text-sm text-muted-foreground">{t('boxing.total_shipped')}</p>
             <p className="text-2xl font-bold text-green-600">{totalShipped}</p>
           </CardContent>
         </Card>
@@ -1185,19 +1187,19 @@ export default function OrderBoxing() {
       {isCancelled && (
         <Card className="border-destructive bg-destructive/10">
           <CardContent className="p-4 flex items-center gap-2 text-destructive font-medium">
-            <Badge variant="destructive">Cancelled</Badge>
-            This order has been cancelled. Actions are frozen except machine assignment.
+            <Badge variant="destructive">{t('status.cancelled')}</Badge>
+            {t('phase.cancelled_order_msg')}
           </CardContent>
         </Card>
       )}
 
       <Tabs defaultValue={defaultTab} className="space-y-4">
         <TabsList className="grid grid-cols-5 w-full max-w-3xl">
-          <TabsTrigger value="receive">Receive ({readyBoxGroups.length})</TabsTrigger>
-          <TabsTrigger value="process">Process ({totalInBoxing})</TabsTrigger>
-          <TabsTrigger value="extra">Extra</TabsTrigger>
-          <TabsTrigger value="ready">Ready ({totalReadyForShipment})</TabsTrigger>
-          <TabsTrigger value="shipments">Shipments ({shipments.length})</TabsTrigger>
+          <TabsTrigger value="receive">{t('phase.receive')} ({readyBoxGroups.length})</TabsTrigger>
+          <TabsTrigger value="process">{t('phase.process')} ({totalInBoxing})</TabsTrigger>
+          <TabsTrigger value="extra">{t('phase.extra')}</TabsTrigger>
+          <TabsTrigger value="ready">{t('phase.ready')} ({totalReadyForShipment})</TabsTrigger>
+          <TabsTrigger value="shipments">{t('phase.shipments')} ({shipments.length})</TabsTrigger>
         </TabsList>
 
         <TabsContent value="receive" className="space-y-4">

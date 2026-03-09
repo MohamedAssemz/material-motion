@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -78,6 +79,7 @@ export default function OrderFinishing() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { hasRole, user } = useAuth();
+  const { t } = useLanguage();
   const [order, setOrder] = useState<Order | null>(null);
   const [batches, setBatches] = useState<Batch[]>([]);
   const [completedBatches, setCompletedBatches] = useState<Batch[]>([]);
@@ -738,9 +740,9 @@ export default function OrderFinishing() {
       <div className="p-6">
         <Button variant="ghost" onClick={() => navigate("/orders")}>
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Back
+          {t('common.back')}
         </Button>
-        <p className="text-center text-muted-foreground mt-8">Order not found</p>
+        <p className="text-center text-muted-foreground mt-8">{t('phase.order_not_found')}</p>
       </div>
     );
   }
@@ -758,12 +760,12 @@ export default function OrderFinishing() {
               <Sparkles className="h-6 w-6 text-purple-600 dark:text-purple-400" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold">Finishing</h1>
+              <h1 className="text-2xl font-bold">{t('finishing.title')}</h1>
               <p className="text-muted-foreground">
                 {order.order_number} {order.customer?.name && `· ${order.customer.name}`}
                 {order.priority === "high" && (
                   <Badge variant="destructive" className="ml-2">
-                    High Priority
+                    {t('phase.high_priority')}
                   </Badge>
                 )}
               </p>
@@ -771,7 +773,7 @@ export default function OrderFinishing() {
           </div>
         </div>
         <Button variant="outline" onClick={() => navigate(`/orders/${id}`)}>
-          View Order Details
+          {t('phase.view_order_details')}
         </Button>
       </div>
 
@@ -779,31 +781,31 @@ export default function OrderFinishing() {
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <Card>
           <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Ready for Finishing</p>
+            <p className="text-sm text-muted-foreground">{t('finishing.ready_for_finishing')}</p>
             <p className="text-2xl font-bold text-warning">{totalReadyForFinishing}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">In Finishing</p>
+            <p className="text-sm text-muted-foreground">{t('finishing.in_finishing')}</p>
             <p className="text-2xl font-bold text-primary">{totalInFinishing}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Boxes Waiting</p>
+            <p className="text-sm text-muted-foreground">{t('phase.boxes_waiting')}</p>
             <p className="text-2xl font-bold">{readyBoxGroups.length}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Products in Finishing</p>
+            <p className="text-sm text-muted-foreground">{t('finishing.products_in_finishing')}</p>
             <p className="text-2xl font-bold">{inFinishingGroups.length}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Completed</p>
+            <p className="text-sm text-muted-foreground">{t('phase.completed')}</p>
             <p className="text-2xl font-bold text-green-600">{totalCompleted}</p>
           </CardContent>
         </Card>
@@ -812,18 +814,18 @@ export default function OrderFinishing() {
       {isCancelled && (
         <Card className="border-destructive bg-destructive/10">
           <CardContent className="p-4 flex items-center gap-2 text-destructive font-medium">
-            <Badge variant="destructive">Cancelled</Badge>
-            This order has been cancelled. Actions are frozen except machine assignment.
+            <Badge variant="destructive">{t('status.cancelled')}</Badge>
+            {t('phase.cancelled_order_msg')}
           </CardContent>
         </Card>
       )}
 
       <Tabs defaultValue="receive" className="space-y-4">
         <TabsList className="grid grid-cols-4 w-full max-w-2xl">
-          <TabsTrigger value="receive">Receive ({readyBoxGroups.length})</TabsTrigger>
-          <TabsTrigger value="process">Process ({totalInFinishing})</TabsTrigger>
-          <TabsTrigger value="extra">Extra</TabsTrigger>
-          <TabsTrigger value="completed">Completed ({totalCompleted})</TabsTrigger>
+          <TabsTrigger value="receive">{t('phase.receive')} ({readyBoxGroups.length})</TabsTrigger>
+          <TabsTrigger value="process">{t('phase.process')} ({totalInFinishing})</TabsTrigger>
+          <TabsTrigger value="extra">{t('phase.extra')}</TabsTrigger>
+          <TabsTrigger value="completed">{t('phase.completed')} ({totalCompleted})</TabsTrigger>
         </TabsList>
 
         <TabsContent value="receive" className="space-y-4">

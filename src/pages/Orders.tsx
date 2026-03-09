@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -60,6 +61,7 @@ interface DateRange {
 
 export default function Orders() {
   const { hasRole } = useAuth();
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const [orders, setOrders] = useState<Order[]>([]);
   const [orderItems, setOrderItems] = useState<Map<string, OrderItem[]>>(new Map());
@@ -97,7 +99,6 @@ export default function Orders() {
 
   const fetchOrders = async () => {
     try {
-      // Fetch orders with customer
       const { data: ordersData, error } = await supabase
         .from('orders')
         .select('*, customer:customers(name)')
@@ -105,13 +106,11 @@ export default function Orders() {
 
       if (error) throw error;
 
-      // Fetch order items to calculate total units per order and extra inventory counts
       const { data: itemsData } = await supabase
         .from('order_items')
         .select('id, order_id, quantity, deducted_to_extra, product:products(name, sku)')
         .in('order_id', ordersData?.map(o => o.id) || []);
 
-      // Build items map and calculate total units per order + extra counts
       const itemsMap = new Map<string, OrderItem[]>();
       const orderUnitCounts = new Map<string, number>();
       const extraCountsByOrder = new Map<string, number>();
@@ -120,13 +119,11 @@ export default function Orders() {
         existing.push(item);
         itemsMap.set(item.order_id, existing);
         
-        // Sum quantities for unit count
         orderUnitCounts.set(
           item.order_id, 
           (orderUnitCounts.get(item.order_id) || 0) + item.quantity
         );
         
-        // Sum deducted_to_extra for extra inventory indicator
         extraCountsByOrder.set(
           item.order_id,
           (extraCountsByOrder.get(item.order_id) || 0) + (item.deducted_to_extra || 0)
@@ -134,7 +131,6 @@ export default function Orders() {
       });
       setOrderItems(itemsMap);
 
-      // Get creator profiles
       const creatorIds = ordersData?.map(o => o.created_by).filter(Boolean) || [];
       const { data: profilesData } = await supabase
         .from('profiles')
@@ -143,7 +139,6 @@ export default function Orders() {
 
       const profilesMap = new Map(profilesData?.map(p => [p.id, p]) || []);
 
-      // Get batch counts for each order to calculate status
       const ordersWithStatus = [];
       
       for (const order of ordersData || []) {
@@ -157,14 +152,8 @@ export default function Orders() {
           const shippedCount = batches?.filter(b => b.current_state === 'shipped').reduce((sum, b) => sum + b.quantity, 0) || 0;
           const inProgressCount = batches?.filter(b => b.current_state !== 'shipped').reduce((sum, b) => sum + b.quantity, 0) || 0;
 
-          // Unit count comes from order_items, not batches
           const unitCount = orderUnitCounts.get(order.id) || 0;
 
-          // Compute status based on actual fulfillment:
-          // - If all items are shipped, order is completed
-          // - If order.status is 'completed', order is completed
-          // - If order.status is 'in_progress' and not fully shipped, order is in_progress
-          // - Otherwise, order is pending
           let computed_status: OrderStatus = 'pending';
           if (order.status === 'cancelled') {
             computed_status = 'cancelled';
@@ -195,7 +184,6 @@ export default function Orders() {
 
   const filteredOrders = useMemo(() => {
     return orders.filter((order) => {
-      // Search filter — matches order number, customer name, or item names
       if (searchTerm) {
         const term = searchTerm.toLowerCase();
         const matchesOrder = order.order_number.toLowerCase().includes(term);
@@ -210,7 +198,6 @@ export default function Orders() {
         }
       }
 
-      // Tab filter
       if (activeTab === 'pending') {
         if (order.computed_status !== 'pending' && order.computed_status !== 'in_progress') {
           return false;
@@ -225,7 +212,6 @@ export default function Orders() {
         }
       }
 
-      // Date range filter
       if (dateRange.from || dateRange.to) {
         const orderDate = parseISO(order.created_at);
         if (dateRange.from && dateRange.to) {
@@ -239,7 +225,6 @@ export default function Orders() {
         }
       }
 
-      // Quantity filter
       if (minQty && order.unit_count !== undefined && order.unit_count < parseInt(minQty)) {
         return false;
       }
@@ -247,7 +232,6 @@ export default function Orders() {
         return false;
       }
 
-      // EFT filter
       if (eftRange.from || eftRange.to) {
         if (!order.estimated_fulfillment_time) return false;
         const eftDate = parseISO(order.estimated_fulfillment_time);
@@ -262,7 +246,6 @@ export default function Orders() {
         }
       }
 
-      // Priority filter
       if (priorityFilter !== 'all' && order.priority !== priorityFilter) {
         return false;
       }
@@ -277,7 +260,6 @@ export default function Orders() {
     return filteredOrders.slice(start, start + PAGE_SIZE);
   }, [filteredOrders, currentPage]);
 
-  // Reset page on filter/tab change
   useEffect(() => { setCurrentPage(1); }, [searchTerm, activeTab, dateRange, minQty, maxQty, eftRange, priorityFilter]);
 
   const clearFilters = () => {
@@ -291,7 +273,6 @@ export default function Orders() {
   const hasActiveFilters = dateRange.from || dateRange.to || minQty || maxQty || eftRange.from || eftRange.to || priorityFilter !== 'all';
 
   const exportOrders = () => {
-    // Build CSV content
     const headers = ['Order Number', 'Customer', 'Priority', 'Status', 'Total Items', 'Shipped', 'Added to Extra', 'Created At', 'EFT', 'Notes', 'Item SKU', 'Item Name', 'Item Quantity'];
     const rows: string[][] = [];
 
@@ -361,9 +342,9 @@ export default function Orders() {
                 </Link>
               </Button>
               <div>
-                <h1 className="text-2xl font-bold">Orders</h1>
+                <h1 className="text-2xl font-bold">{t('orders.title')}</h1>
                 <p className="text-sm text-muted-foreground">
-                  View and manage production orders
+                  {t('orders.view_manage')}
                 </p>
               </div>
             </div>
@@ -371,7 +352,7 @@ export default function Orders() {
               <Button asChild>
                 <Link to="/orders/create">
                   <Plus className="mr-2 h-4 w-4" />
-                  Create Order
+                  {t('orders.create')}
                 </Link>
               </Button>
             )}
@@ -384,15 +365,15 @@ export default function Orders() {
           <div className="flex items-center justify-between">
             <TabsList>
               <TabsTrigger value="pending" className="gap-2">
-                Pending
+                {t('status.pending')}
                 <Badge variant="secondary" className="ml-1">{tabCounts.pending}</Badge>
               </TabsTrigger>
               <TabsTrigger value="completed" className="gap-2">
-                Completed
+                {t('status.completed')}
                 <Badge variant="secondary" className="ml-1">{tabCounts.completed}</Badge>
               </TabsTrigger>
               <TabsTrigger value="cancelled" className="gap-2">
-                Cancelled
+                {t('status.cancelled')}
                 <Badge variant="secondary" className="ml-1">{tabCounts.cancelled}</Badge>
               </TabsTrigger>
             </TabsList>
@@ -401,7 +382,7 @@ export default function Orders() {
               <div className="relative w-64">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search orders..."
+                  placeholder={t('orders.search_orders')}
                   className="pl-8"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
@@ -417,7 +398,7 @@ export default function Orders() {
               </Button>
               <Button variant="outline" onClick={exportOrders}>
                 <Download className="h-4 w-4 mr-2" />
-                Export
+                {t('common.export')}
               </Button>
             </div>
           </div>
@@ -427,18 +408,18 @@ export default function Orders() {
             <Card>
               <CardContent className="p-4">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-medium">Filters</h3>
+                  <h3 className="font-medium">{t('orders.filters')}</h3>
                   {hasActiveFilters && (
                     <Button variant="ghost" size="sm" onClick={clearFilters}>
                       <X className="h-4 w-4 mr-1" />
-                      Clear All
+                      {t('orders.clear_all')}
                     </Button>
                   )}
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                   {/* Created Date Range */}
                   <div className="space-y-2">
-                    <Label>Created Date</Label>
+                    <Label>{t('orders.created_date')}</Label>
                     <Popover>
                       <PopoverTrigger asChild>
                         <Button variant="outline" className="w-full justify-start text-left font-normal">
@@ -450,7 +431,7 @@ export default function Orders() {
                               format(dateRange.from, 'MMM d, yyyy')
                             )
                           ) : (
-                            "Pick dates"
+                            t('orders.pick_dates')
                           )}
                         </Button>
                       </PopoverTrigger>
@@ -466,18 +447,18 @@ export default function Orders() {
 
                   {/* Quantity Range */}
                   <div className="space-y-2">
-                    <Label>Items Quantity</Label>
+                    <Label>{t('orders.items_quantity')}</Label>
                     <div className="flex gap-2">
                       <Input
                         type="number"
-                        placeholder="Min"
+                        placeholder={t('orders.min')}
                         value={minQty}
                         onChange={(e) => setMinQty(e.target.value)}
                         className="w-full"
                       />
                       <Input
                         type="number"
-                        placeholder="Max"
+                        placeholder={t('orders.max')}
                         value={maxQty}
                         onChange={(e) => setMaxQty(e.target.value)}
                         className="w-full"
@@ -487,7 +468,7 @@ export default function Orders() {
 
                   {/* EFT Range */}
                   <div className="space-y-2">
-                    <Label>EFT Date</Label>
+                    <Label>{t('orders.eft_date')}</Label>
                     <Popover>
                       <PopoverTrigger asChild>
                         <Button variant="outline" className="w-full justify-start text-left font-normal">
@@ -499,7 +480,7 @@ export default function Orders() {
                               format(eftRange.from, 'MMM d, yyyy')
                             )
                           ) : (
-                            "Pick dates"
+                            t('orders.pick_dates')
                           )}
                         </Button>
                       </PopoverTrigger>
@@ -515,15 +496,15 @@ export default function Orders() {
 
                   {/* Priority */}
                   <div className="space-y-2">
-                    <Label>Priority</Label>
+                    <Label>{t('common.priority')}</Label>
                     <Select value={priorityFilter} onValueChange={setPriorityFilter}>
                       <SelectTrigger>
-                        <SelectValue placeholder="All priorities" />
+                        <SelectValue placeholder={t('orders.all_priorities')} />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">All Priorities</SelectItem>
-                        <SelectItem value="high">High</SelectItem>
-                        <SelectItem value="normal">Normal</SelectItem>
+                        <SelectItem value="all">{t('orders.all_priorities')}</SelectItem>
+                        <SelectItem value="high">{t('priority.high')}</SelectItem>
+                        <SelectItem value="normal">{t('priority.medium')}</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -537,7 +518,7 @@ export default function Orders() {
             <TabsContent key={tab} value={tab}>
               <Card>
                 <CardHeader>
-                  <CardTitle className="capitalize">{tab} Orders</CardTitle>
+                  <CardTitle className="capitalize">{t(`status.${tab === 'pending' ? 'pending' : tab}`)} {t('orders.title')}</CardTitle>
                 </CardHeader>
                 <CardContent>
                   {loading ? (
@@ -549,19 +530,19 @@ export default function Orders() {
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Order Number</TableHead>
-                          <TableHead>Customer</TableHead>
-                          {tab === 'pending' && <TableHead>Status</TableHead>}
-                          <TableHead>Units</TableHead>
-                          <TableHead>EFT</TableHead>
-                          <TableHead>Created</TableHead>
+                          <TableHead>{t('orders.order_number')}</TableHead>
+                          <TableHead>{t('common.customer')}</TableHead>
+                          {tab === 'pending' && <TableHead>{t('common.status')}</TableHead>}
+                          <TableHead>{t('common.units')}</TableHead>
+                          <TableHead>{t('orders.eft')}</TableHead>
+                          <TableHead>{t('table.created')}</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {paginatedOrders.length === 0 ? (
                           <TableRow>
                             <TableCell colSpan={tab === 'pending' ? 6 : 5} className="text-center text-muted-foreground">
-                              No orders found
+                              {t('orders.no_orders')}
                             </TableCell>
                           </TableRow>
                         ) : (
@@ -589,7 +570,7 @@ export default function Orders() {
                                           <Package className="h-4 w-4 text-orange-500" />
                                         </TooltipTrigger>
                                         <TooltipContent>
-                                          <p>{order.extra_count} items moved to extra inventory</p>
+                                          <p>{order.extra_count} {t('orders.items_to_extra')}</p>
                                         </TooltipContent>
                                       </Tooltip>
                                     </TooltipProvider>
@@ -600,7 +581,7 @@ export default function Orders() {
                               {tab === 'pending' && (
                                 <TableCell>
                                   <Badge variant={order.computed_status === 'in_progress' ? 'default' : 'outline'}>
-                                    {order.computed_status === 'in_progress' ? 'In Progress' : 'Pending'}
+                                    {order.computed_status === 'in_progress' ? t('status.in_progress') : t('status.pending')}
                                   </Badge>
                                 </TableCell>
                               )}
