@@ -151,7 +151,9 @@ export default function Dashboard() {
       extraRes,
       shipmentsRes,
       shippedBatchesRes,
-      machinesRes] =
+      machinesRes,
+      throughputRes,
+      stalledOrdersRes] =
       await Promise.all([
       user ? supabase.from('profiles').select('full_name').eq('id', user.id).single() : Promise.resolve({ data: null }),
       supabase.from('orders').select('status').gte('created_at', rangeStart),
