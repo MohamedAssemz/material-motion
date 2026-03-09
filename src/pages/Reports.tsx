@@ -117,7 +117,7 @@ export default function Reports() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4 h-11">
+        <TabsList className="grid w-full grid-cols-5 h-11">
           <TabsTrigger value="order-performance" className="flex items-center gap-2 text-xs sm:text-sm">
             <ClipboardList className="h-4 w-4 hidden sm:block" />
             Order Performance
@@ -125,6 +125,10 @@ export default function Reports() {
           <TabsTrigger value="production-flow" className="flex items-center gap-2 text-xs sm:text-sm">
             <Factory className="h-4 w-4 hidden sm:block" />
             Production Flow
+          </TabsTrigger>
+          <TabsTrigger value="machine-production" className="flex items-center gap-2 text-xs sm:text-sm">
+            <Wrench className="h-4 w-4 hidden sm:block" />
+            Machine Rate
           </TabsTrigger>
           <TabsTrigger value="inventory-boxes" className="flex items-center gap-2 text-xs sm:text-sm">
             <Warehouse className="h-4 w-4 hidden sm:block" />
@@ -142,6 +146,10 @@ export default function Reports() {
 
         <TabsContent value="production-flow">
           <ProductionFlowTab unitHistory={unitHistory} units={units} products={products} />
+        </TabsContent>
+
+        <TabsContent value="machine-production">
+          <MachineProductionTab />
         </TabsContent>
 
         <TabsContent value="inventory-boxes">
