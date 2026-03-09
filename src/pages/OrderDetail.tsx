@@ -639,7 +639,7 @@ export default function OrderDetail() {
     return { waiting, inProgress, processed, retrieved, completed, addedToExtra, extraToRetrieve };
   };
 
-  const manufacturingStats = getPhaseStats("in_manufacturing", "in_manufacturing", "manufacturing");
+  const manufacturingStats = getPhaseStats("in_manufacturing", undefined, "manufacturing");
   const finishingStats = getPhaseStats("in_finishing", "ready_for_finishing", "finishing");
   // Packaging: only count items where product.needs_packing is true (items that skip packaging shouldn't count)
   const packagingStats = getPhaseStats("in_packaging", "ready_for_packaging", "packaging", (b) => b.product?.needs_packing !== false);
