@@ -121,7 +121,6 @@ export function BoxLookupScanDialog({ open, onOpenChange }: BoxLookupScanDialogP
             .from('order_batches')
             .select('box_id, box:boxes(id, box_code, is_active, created_at, content_type)')
             .eq('qr_code_data', batchCode)
-            .eq('is_terminated', false)
             .maybeSingle();
 
           if (orderBatch) {
