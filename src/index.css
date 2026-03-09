@@ -135,28 +135,95 @@ All colors MUST be HSL.
   }
 }
 
-/* RTL support */
+/* ============================================================
+   RTL SUPPORT
+   All RTL overrides live here. Use CSS logical properties
+   (start/end, inline/block) in new components to avoid needing
+   overrides here at all.
+   ============================================================ */
+
 [dir="rtl"] {
   font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
 }
 
-[dir="rtl"] .space-x-1 > :not([hidden]) ~ :not([hidden]) {
-  --tw-space-x-reverse: 1;
+/* ── Spacing: reverse horizontal space utilities ── */
+[dir="rtl"] .space-x-1 > :not([hidden]) ~ :not([hidden]) { --tw-space-x-reverse: 1; }
+[dir="rtl"] .space-x-2 > :not([hidden]) ~ :not([hidden]) { --tw-space-x-reverse: 1; }
+[dir="rtl"] .space-x-3 > :not([hidden]) ~ :not([hidden]) { --tw-space-x-reverse: 1; }
+[dir="rtl"] .space-x-4 > :not([hidden]) ~ :not([hidden]) { --tw-space-x-reverse: 1; }
+[dir="rtl"] .space-x-6 > :not([hidden]) ~ :not([hidden]) { --tw-space-x-reverse: 1; }
+[dir="rtl"] .space-x-8 > :not([hidden]) ~ :not([hidden]) { --tw-space-x-reverse: 1; }
+
+/* ── Text alignment ── */
+[dir="rtl"] .text-left  { text-align: right; }
+[dir="rtl"] .text-right { text-align: left;  }
+
+/* ── RTL flex helpers for specific opt-in elements ── */
+/* Use class "rtl-flip" on flex rows that should visually reverse in RTL  */
+[dir="rtl"] .rtl-flip { flex-direction: row-reverse; }
+
+/* ── Margin logical-property helpers ── */
+[dir="rtl"] .ml-auto { margin-left: unset; margin-right: auto; }
+[dir="rtl"] .mr-auto { margin-right: unset; margin-left: auto; }
+
+[dir="rtl"] .ml-1  { margin-left: unset;  margin-right: 0.25rem; }
+[dir="rtl"] .ml-2  { margin-left: unset;  margin-right: 0.5rem;  }
+[dir="rtl"] .ml-3  { margin-left: unset;  margin-right: 0.75rem; }
+[dir="rtl"] .ml-4  { margin-left: unset;  margin-right: 1rem;    }
+[dir="rtl"] .ml-6  { margin-left: unset;  margin-right: 1.5rem;  }
+[dir="rtl"] .ml-8  { margin-left: unset;  margin-right: 2rem;    }
+[dir="rtl"] .ml-10 { margin-left: unset;  margin-right: 2.5rem;  }
+[dir="rtl"] .ml-12 { margin-left: unset;  margin-right: 3rem;    }
+
+[dir="rtl"] .mr-1  { margin-right: unset; margin-left: 0.25rem; }
+[dir="rtl"] .mr-2  { margin-right: unset; margin-left: 0.5rem;  }
+[dir="rtl"] .mr-3  { margin-right: unset; margin-left: 0.75rem; }
+[dir="rtl"] .mr-4  { margin-right: unset; margin-left: 1rem;    }
+[dir="rtl"] .mr-6  { margin-right: unset; margin-left: 1.5rem;  }
+[dir="rtl"] .mr-8  { margin-right: unset; margin-left: 2rem;    }
+
+/* ── Padding logical-property helpers ── */
+[dir="rtl"] .pl-1  { padding-left: unset;  padding-right: 0.25rem; }
+[dir="rtl"] .pl-2  { padding-left: unset;  padding-right: 0.5rem;  }
+[dir="rtl"] .pl-3  { padding-left: unset;  padding-right: 0.75rem; }
+[dir="rtl"] .pl-4  { padding-left: unset;  padding-right: 1rem;    }
+[dir="rtl"] .pl-6  { padding-left: unset;  padding-right: 1.5rem;  }
+[dir="rtl"] .pl-8  { padding-left: unset;  padding-right: 2rem;    }
+[dir="rtl"] .pl-10 { padding-left: unset;  padding-right: 2.5rem;  }
+
+[dir="rtl"] .pr-1  { padding-right: unset; padding-left: 0.25rem; }
+[dir="rtl"] .pr-2  { padding-right: unset; padding-left: 0.5rem;  }
+[dir="rtl"] .pr-3  { padding-right: unset; padding-left: 0.75rem; }
+[dir="rtl"] .pr-4  { padding-right: unset; padding-left: 1rem;    }
+[dir="rtl"] .pr-6  { padding-right: unset; padding-left: 1.5rem;  }
+[dir="rtl"] .pr-8  { padding-right: unset; padding-left: 2rem;    }
+[dir="rtl"] .pr-10 { padding-right: unset; padding-left: 2.5rem;  }
+
+/* ── Absolute / fixed positioning ── */
+[dir="rtl"] .left-0   { left: unset;  right: 0;    }
+[dir="rtl"] .left-4   { left: unset;  right: 1rem; }
+[dir="rtl"] .left-6   { left: unset;  right: 1.5rem; }
+[dir="rtl"] .right-0  { right: unset; left: 0;     }
+[dir="rtl"] .right-4  { right: unset; left: 1rem;  }
+[dir="rtl"] .right-6  { right: unset; left: 1.5rem; }
+
+/* ── Border radius: flip rounded corners ── */
+[dir="rtl"] .rounded-l-lg { border-radius: 0; border-top-right-radius: var(--radius); border-bottom-right-radius: var(--radius); }
+[dir="rtl"] .rounded-r-lg { border-radius: 0; border-top-left-radius:  var(--radius); border-bottom-left-radius:  var(--radius); }
+
+/* ── Border side ── */
+[dir="rtl"] .border-l { border-left: none;  border-right-width: 1px; }
+[dir="rtl"] .border-r { border-right: none; border-left-width: 1px;  }
+
+/* ── Sidebar: slide from opposite side in RTL ── */
+[dir="rtl"] .sidebar-wrapper {
+  left: unset;
+  right: 0;
 }
 
-[dir="rtl"] .space-x-2 > :not([hidden]) ~ :not([hidden]) {
-  --tw-space-x-reverse: 1;
-}
-
-[dir="rtl"] .space-x-3 > :not([hidden]) ~ :not([hidden]) {
-  --tw-space-x-reverse: 1;
-}
-
-[dir="rtl"] .space-x-4 > :not([hidden]) ~ :not([hidden]) {
-  --tw-space-x-reverse: 1;
-}
-
-/* Print styles for Kartona label */
+/* ============================================================
+   Print styles for Kartona label
+   ============================================================ */
 @media print {
   body * {
     visibility: hidden;
