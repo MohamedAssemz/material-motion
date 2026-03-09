@@ -578,15 +578,15 @@ export default function OrderDetail() {
     );
   }
 
-  const activeBatches = order.batches.filter((b) => !b.is_terminated);
+  const activeBatches = order.batches;
   // Total items = planned order quantity from order_items (not affected by extra inventory reservation)
   const totalItems = orderItems.reduce((sum, item) => sum + item.quantity, 0);
   const shippedItems = activeBatches
     .filter((b) => b.current_state === "shipped")
     .reduce((sum, b) => sum + b.quantity, 0);
-  const flaggedCount = activeBatches.filter((b) => b.is_flagged).reduce((sum, b) => sum + b.quantity, 0);
-  const redoCount = activeBatches.filter((b) => b.is_redo).reduce((sum, b) => sum + b.quantity, 0);
-  
+  const flaggedCount = 0;
+  const redoCount = 0;
+
   // Check if order is pending based on order status, not batch states
   // This ensures the UI remains consistent even when all order batches are deleted/replaced by extra inventory
   // Order can be "pending" or "waiting_for_rm" before being started
