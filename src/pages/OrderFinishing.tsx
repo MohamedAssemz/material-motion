@@ -79,6 +79,7 @@ export default function OrderFinishing() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { hasRole, user } = useAuth();
+  const { t } = useLanguage();
   const [order, setOrder] = useState<Order | null>(null);
   const [batches, setBatches] = useState<Batch[]>([]);
   const [completedBatches, setCompletedBatches] = useState<Batch[]>([]);
