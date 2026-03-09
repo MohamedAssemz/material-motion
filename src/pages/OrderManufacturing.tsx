@@ -764,7 +764,7 @@ export default function OrderManufacturing() {
                           )}
                         </div>
                         <p className="text-sm text-muted-foreground">
-                          {group.product_sku} · {group.needs_packing ? "Needs Packing" : "No Packing"}
+                          {group.product_sku} · {group.needs_packing ? t('phase.needs_packing') : t('phase.no_packing')}
                         </p>
                       </div>
                       <div className="flex items-center gap-6">
