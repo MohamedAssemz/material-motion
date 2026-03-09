@@ -166,7 +166,7 @@ export default function Dashboard() {
         supabase.from('order_batches').select('product_id, quantity, order:orders!inner(status)').in('current_state', ['shipped', 'ready_for_shipment']).neq('order.status', 'cancelled').gte('created_at', rangeStart),
         // Machine production with machine_id for top machines
         supabase.from('machine_production').select('machine_id').gte('created_at', rangeStart),
-        supabase.from('machines').select('id, name'),
+        supabase.from('machines').select('id, name, type'),
       ]);
 
       const ordersByStatus: Record<string, number> = {};
