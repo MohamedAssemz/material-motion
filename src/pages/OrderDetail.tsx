@@ -1259,19 +1259,6 @@ export default function OrderDetail() {
 
       {/* Dialogs */}
       <RawMaterialsDrawer open={rawMaterialsOpen} onOpenChange={setRawMaterialsOpen} orderId={id!} orderNumber={order?.order_number || ""} />
-        orderId={id!}
-        batches={(order?.batches || []).filter(b => b.is_flagged || b.is_redo).map(b => ({
-          id: b.id,
-          batch_code: b.qr_code_data,
-          product_name: b.product.name,
-          product_sku: b.product.sku,
-          quantity: b.quantity,
-          current_state: b.current_state,
-          is_flagged: b.is_flagged || false,
-          is_redo: b.is_redo || false,
-        }))}
-        onRefresh={() => fetchOrder()}
-      />
       <ShipmentDialog 
         open={shipmentDialogOpen} 
         onOpenChange={setShipmentDialogOpen} 
