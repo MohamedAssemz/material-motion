@@ -18,7 +18,7 @@ import {
   CheckCircle, Clock, AlertCircle, Flag, CalendarClock,
   ArrowRight, Truck, Archive, FileText, Trophy, Activity, Wrench } from
 'lucide-react';
-import { startOfDay, subDays, format } from 'date-fns';
+import { startOfDay, subDays, format, formatDistanceToNow, differenceInDays } from 'date-fns';
 
 /* ─── types ─── */
 interface DashboardData {
