@@ -31,6 +31,7 @@ interface DashboardData {
   lateBatches: Array<{id: string;order_id: string;product_id: string;eta: string;quantity: number;order: {order_number: string;status: string;} | null;}>;
   flaggedBatches: Array<{id: string;order_id: string;flagged_reason: string | null;quantity: number;order: {order_number: string;status: string;} | null;}>;
   approachingEtaOrders: Array<{id: string;order_number: string;estimated_fulfillment_time: string;}>;
+  stalledOrders: Array<{id: string;order_number: string;updated_at: string;}>;
   todayThroughput: Record<string, number>;
   extraInventoryCount: number;
   completedOrders: number;
