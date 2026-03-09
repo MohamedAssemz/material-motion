@@ -697,8 +697,8 @@ export default function OrderManufacturing() {
       {isCancelled && (
         <Card className="border-destructive bg-destructive/10">
           <CardContent className="p-4 flex items-center gap-2 text-destructive font-medium">
-            <Badge variant="destructive">Cancelled</Badge>
-            This order has been cancelled. Actions are frozen except machine assignment.
+            <Badge variant="destructive">{t('status.cancelled')}</Badge>
+            {t('phase.cancelled_order_msg')}
           </CardContent>
         </Card>
       )}
