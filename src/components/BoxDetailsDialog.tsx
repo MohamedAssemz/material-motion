@@ -288,7 +288,7 @@ export function BoxDetailsDialog({
 
           <div className="space-y-4">
             {/* Box Info */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
               <div>
                 <p className="text-muted-foreground">Created</p>
                 <p className="font-medium">{format(new Date(createdAt), 'PPP')}</p>
@@ -296,10 +296,6 @@ export function BoxDetailsDialog({
               <div>
                 <p className="text-muted-foreground">Active</p>
                 <p className="font-medium">{isActive ? 'Yes' : 'No'}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground">Content Type</p>
-                <p className="font-medium">{contentType}</p>
               </div>
               {boxType === 'order' && orderNumbers.length > 0 && (
                 <div>
