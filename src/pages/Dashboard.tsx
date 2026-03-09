@@ -182,7 +182,6 @@ export default function Dashboard() {
 
       // Filter out cancelled orders from alerts
       const activeLate = ((lateBatchesRes.data || []) as any[]).filter(b => b.order?.status !== 'cancelled');
-      const activeFlagged = ((flaggedBatchesRes.data || []) as any[]).filter(b => b.order?.status !== 'cancelled');
       const lateOrderIds = new Set(activeLate.map(b => b.order_id));
 
       // Top 3 products by finished quantity

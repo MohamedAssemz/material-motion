@@ -234,7 +234,7 @@ export default function OrderDetail() {
       // Fetch batches separately
       const { data: batchesData, error: batchesError } = await supabase
         .from("order_batches")
-        .select("id, qr_code_data, current_state, quantity, product_id, order_item_id, eta, lead_time_days, box_id, is_terminated, is_redo, is_flagged, from_extra_state, product:products(id, name, sku, needs_packing)")
+        .select("id, qr_code_data, current_state, quantity, product_id, order_item_id, eta, lead_time_days, box_id, from_extra_state, product:products(id, name, sku, needs_packing)")
         .eq("order_id", id);
 
       if (batchesError) throw batchesError;

@@ -178,19 +178,17 @@ export default function OrderManufacturing() {
         supabase
           .from("order_batches")
           .select(
-            "id, qr_code_data, current_state, quantity, product_id, order_item_id, eta, lead_time_days, box_id, is_flagged, is_redo, manufacturing_machine_id, from_extra_state, product:products(id, name, sku, needs_packing), order_item:order_items(needs_boxing)",
+            "id, qr_code_data, current_state, quantity, product_id, order_item_id, eta, lead_time_days, box_id, manufacturing_machine_id, from_extra_state, product:products(id, name, sku, needs_packing), order_item:order_items(needs_boxing)",
           )
           .eq("order_id", id)
-          .eq("is_terminated", false)
           .in("current_state", ["in_manufacturing"]),
         // Fetch completed items for this phase (moved to next phases)
         supabase
           .from("order_batches")
           .select(
-            "id, qr_code_data, current_state, quantity, product_id, order_item_id, eta, lead_time_days, box_id, is_flagged, is_redo, manufacturing_machine_id, from_extra_state, product:products(id, name, sku, needs_packing), order_item:order_items(needs_boxing)",
+            "id, qr_code_data, current_state, quantity, product_id, order_item_id, eta, lead_time_days, box_id, manufacturing_machine_id, from_extra_state, product:products(id, name, sku, needs_packing), order_item:order_items(needs_boxing)",
           )
           .eq("order_id", id)
-          .eq("is_terminated", false)
           .in("current_state", [
             "ready_for_finishing",
             "in_finishing",
