@@ -525,7 +525,7 @@ export default function Boxes() {
                     <form onSubmit={handleCreateOrderBoxes} className="space-y-4">
                       <div>
                         <Label htmlFor="count">Number of boxes to create</Label>
-                        <Input id="count" type="number" min="1" max="100" value={newBoxCount} onChange={(e) => setNewBoxCount(parseInt(e.target.value) || 1)} required />
+                        <NumericInput id="count" min={1} max={100} value={newBoxCount} onValueChange={(val) => setNewBoxCount(val ?? 1)} required />
                         <p className="text-xs text-muted-foreground mt-1">Box codes will be auto-generated (e.g., BOX-0001)</p>
                       </div>
                       <div className="flex gap-2">
