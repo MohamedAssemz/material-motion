@@ -774,7 +774,7 @@ export default function OrderManufacturing() {
                         </div>
                         {canManage && !isCancelled && (
                           <div className="flex items-center gap-2">
-                            <Label className="text-xs text-muted-foreground">Select</Label>
+                            <Label className="text-xs text-muted-foreground">{t('phase.select_label')}</Label>
                             <NumericInput
                               min={0}
                               max={group.inManufacturing}
