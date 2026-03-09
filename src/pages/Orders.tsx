@@ -144,13 +144,14 @@ export default function Orders() {
       const profilesMap = new Map(profilesData?.map(p => [p.id, p]) || []);
 
       // Get batch counts for each order to calculate status
-      const ordersWithStatus = await Promise.all(
-        (ordersData || []).map(async (order: any) => {
-          const { data: batches } = await supabase
-            .from('order_batches')
-            .select('current_state, quantity')
-            .eq('order_id', order.id)
-            .eq('is_terminated', false) as { data: Array<{ current_state: string; quantity: number }> | null };
+      const ordersWithStatus = [];
+      
+      for (const order of ordersData || []) {
+        const { data: batches } = await supabase
+          .from('order_batches')
+          .select('current_state, quantity')
+          .eq('order_id', order.id)
+          .eq('is_terminated', false);
 
           const batchTotalCount = batches?.reduce((sum, b) => sum + b.quantity, 0) || 0;
           const shippedCount = batches?.filter(b => b.current_state === 'shipped').reduce((sum, b) => sum + b.quantity, 0) || 0;
