@@ -7,35 +7,37 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select';
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from
+'@/components/ui/select';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, Legend,
-} from 'recharts';
+  PieChart, Pie, Cell, Legend } from
+'recharts';
 import {
   Factory, Package, Box, TrendingUp, Plus, AlertTriangle, Sparkles,
   CheckCircle, Clock, AlertCircle, Flag, CalendarClock,
-  ArrowRight, Truck, Archive, FileText, Trophy, Activity, Wrench,
-} from 'lucide-react';
+  ArrowRight, Truck, Archive, FileText, Trophy, Activity, Wrench } from
+'lucide-react';
 import { startOfDay, subDays, format } from 'date-fns';
 
 /* ─── types ─── */
 interface DashboardData {
-  profile: { full_name: string | null } | null;
+  profile: {full_name: string | null;} | null;
   ordersByStatus: Record<string, number>;
   batchesByState: Record<string, number>;
   lateOrderCount: number;
   newOrdersToday: number;
-  lateBatches: Array<{ id: string; order_id: string; product_id: string; eta: string; quantity: number; order: { order_number: string; status: string } | null }>;
-  approachingEtaOrders: Array<{ id: string; order_number: string; estimated_fulfillment_time: string }>;
+  flaggedBatchCount: number;
+  lateBatches: Array<{id: string;order_id: string;product_id: string;eta: string;quantity: number;order: {order_number: string;status: string;} | null;}>;
+  flaggedBatches: Array<{id: string;order_id: string;flagged_reason: string | null;quantity: number;order: {order_number: string;status: string;} | null;}>;
+  approachingEtaOrders: Array<{id: string;order_number: string;estimated_fulfillment_time: string;}>;
   todayThroughput: Record<string, number>;
   extraInventoryCount: number;
   completedOrders: number;
   shipmentsCount: number;
-  topProducts: Array<{ name: string; quantity: number }>;
+  topProducts: Array<{name: string;quantity: number;}>;
   avgFinishedPerDay: number;
-  topMachines: Array<{ name: string; count: number; type: string }>;
+  topMachines: Array<{name: string;count: number;}>;
 }
 
 type TimeRange = 'today' | 'week' | 'month';
@@ -50,7 +52,7 @@ const PHASE_COLORS: Record<string, string> = {
   ready_for_boxing: 'hsl(190, 60%, 55%)',
   in_boxing: 'hsl(190, 80%, 40%)',
   ready_for_shipment: 'hsl(170, 55%, 45%)',
-  shipped: 'hsl(142, 76%, 36%)',
+  shipped: 'hsl(142, 76%, 36%)'
 };
 
 const PHASE_LABELS: Record<string, string> = {
@@ -62,21 +64,21 @@ const PHASE_LABELS: Record<string, string> = {
   ready_for_boxing: 'Ready Boxing',
   in_boxing: 'Boxing',
   ready_for_shipment: 'Ready Shipment',
-  shipped: 'Shipped',
+  shipped: 'Shipped'
 };
 
 const ORDER_STATUS_COLORS: Record<string, string> = {
   pending: 'hsl(38, 92%, 50%)',
   in_progress: 'hsl(214, 95%, 36%)',
   completed: 'hsl(142, 76%, 36%)',
-  cancelled: 'hsl(0, 72%, 51%)',
+  cancelled: 'hsl(0, 72%, 51%)'
 };
 
 const ORDER_STATUS_LABELS: Record<string, string> = {
   pending: 'Not Started',
   in_progress: 'In Progress',
   completed: 'Completed',
-  cancelled: 'Cancelled',
+  cancelled: 'Cancelled'
 };
 
 const TRANSITION_LABELS: Record<string, string> = {
@@ -87,24 +89,24 @@ const TRANSITION_LABELS: Record<string, string> = {
   'start_packaging': 'Packaging',
   'finish_packaging': 'Packaged',
   'start_boxing': 'Boxing',
-  'finish_boxing': 'Boxed',
+  'finish_boxing': 'Boxed'
 };
 
 const TRANSITION_COLORS = [
-  'hsl(214, 95%, 36%)',
-  'hsl(270, 60%, 50%)',
-  'hsl(240, 50%, 55%)',
-  'hsl(190, 80%, 40%)',
-  'hsl(142, 76%, 36%)',
-  'hsl(38, 92%, 50%)',
-  'hsl(0, 72%, 51%)',
-  'hsl(170, 55%, 45%)',
-];
+'hsl(214, 95%, 36%)',
+'hsl(270, 60%, 50%)',
+'hsl(240, 50%, 55%)',
+'hsl(190, 80%, 40%)',
+'hsl(142, 76%, 36%)',
+'hsl(38, 92%, 50%)',
+'hsl(0, 72%, 51%)',
+'hsl(170, 55%, 45%)'];
+
 
 const TIME_RANGE_LABELS: Record<TimeRange, string> = {
   today: 'Today',
   week: 'This Week',
-  month: 'Last 30 Days',
+  month: 'Last 30 Days'
 };
 
 /* ─── helpers ─── */
@@ -118,9 +120,9 @@ function getGreeting() {
 function getTimeRangeStart(range: TimeRange): Date {
   const now = new Date();
   switch (range) {
-    case 'today': return startOfDay(now);
-    case 'week': return startOfDay(subDays(now, 7));
-    case 'month': return startOfDay(subDays(now, 30));
+    case 'today':return startOfDay(now);
+    case 'week':return startOfDay(subDays(now, 7));
+    case 'month':return startOfDay(subDays(now, 30));
   }
 }
 
@@ -140,47 +142,52 @@ export default function Dashboard() {
       const twoDaysFromNow = new Date(Date.now() + 2 * 86400000).toISOString();
 
       const [
-        profileRes,
-        ordersRes,
-        newOrdersTodayRes,
-        batchesRes,
-        lateBatchesRes,
-        approachingRes,
-        extraRes,
-        shipmentsRes,
-        shippedBatchesRes,
-        machineBatchesRes,
-        machinesRes,
-        throughputBatchesRes,
-      ] = await Promise.all([
-        user ? supabase.from('profiles').select('full_name').eq('id', user.id).single() : Promise.resolve({ data: null }),
-        supabase.from('orders').select('status').gte('created_at', rangeStart),
-        supabase.from('orders').select('id').gte('created_at', todayStart),
-        supabase.from('order_batches').select('current_state, quantity, order:orders!inner(status)').neq('order.status', 'cancelled').gte('created_at', rangeStart),
-        supabase.from('order_batches').select('id, order_id, product_id, eta, quantity, order:orders(order_number, status)').not('current_state', 'in', '(shipped,ready_for_shipment)').not('eta', 'is', null).lt('eta', now).limit(50),
-        supabase.from('orders').select('id, order_number, estimated_fulfillment_time').not('estimated_fulfillment_time', 'is', null).gt('estimated_fulfillment_time', now).lt('estimated_fulfillment_time', twoDaysFromNow).neq('status', 'completed').neq('status', 'cancelled').limit(5),
-        supabase.from('extra_batches').select('quantity').eq('inventory_state', 'AVAILABLE'),
-        supabase.from('shipments').select('id').gte('created_at', rangeStart),
-        // Top products: shipped/ready_for_shipment batches in time range (excluding cancelled)
-        supabase.from('order_batches').select('product_id, quantity, order:orders!inner(status)').in('current_state', ['shipped', 'ready_for_shipment']).neq('order.status', 'cancelled').gte('created_at', rangeStart),
-        // Machine assignments from order_batches
-        supabase.from('order_batches').select('manufacturing_machine_id, finishing_machine_id, packaging_machine_id, boxing_machine_id, quantity').gte('updated_at', rangeStart),
-        supabase.from('machines').select('id, name, type'),
-        // Throughput: batch states in time range for deriving transitions
-        supabase.from('order_batches').select('current_state, quantity').gte('updated_at', rangeStart),
-      ]);
+      profileRes,
+      ordersRes,
+      newOrdersTodayRes,
+      batchesRes,
+      lateBatchesRes,
+      flaggedBatchesRes,
+      approachingRes,
+      throughputRes,
+      extraRes,
+      shipmentsRes,
+      shippedBatchesRes,
+      machineProductionRes,
+      machinesRes] =
+      await Promise.all([
+      user ? supabase.from('profiles').select('full_name').eq('id', user.id).single() : Promise.resolve({ data: null }),
+      supabase.from('orders').select('status').gte('created_at', rangeStart),
+      supabase.from('orders').select('id').gte('created_at', todayStart),
+      supabase.from('order_batches').select('current_state, quantity, order:orders!inner(status)').eq('is_terminated', false).neq('order.status', 'cancelled').gte('created_at', rangeStart),
+      supabase.from('order_batches').select('id, order_id, product_id, eta, quantity, order:orders(order_number, status)').eq('is_terminated', false).not('current_state', 'in', '(shipped,ready_for_shipment)').not('eta', 'is', null).lt('eta', now).limit(50),
+      supabase.from('order_batches').select('id, order_id, flagged_reason, quantity, order:orders(order_number, status)').eq('is_flagged', true).eq('is_terminated', false).limit(50),
+      supabase.from('orders').select('id, order_number, estimated_fulfillment_time').not('estimated_fulfillment_time', 'is', null).gt('estimated_fulfillment_time', now).lt('estimated_fulfillment_time', twoDaysFromNow).neq('status', 'completed').neq('status', 'cancelled').limit(5),
+      supabase.from('machine_production').select('state_transition').gte('created_at', rangeStart),
+      supabase.from('extra_batches').select('quantity').eq('inventory_state', 'AVAILABLE'),
+      supabase.from('shipments').select('id').gte('created_at', rangeStart),
+      // Top products: shipped/ready_for_shipment batches in time range (excluding cancelled)
+      supabase.from('order_batches').select('product_id, quantity, order:orders!inner(status)').in('current_state', ['shipped', 'ready_for_shipment']).eq('is_terminated', false).neq('order.status', 'cancelled').gte('created_at', rangeStart),
+      // Machine production with machine_id for top machines
+      supabase.from('machine_production').select('machine_id').gte('created_at', rangeStart),
+      supabase.from('machines').select('id, name')]
+      );
 
       const ordersByStatus: Record<string, number> = {};
-      (ordersRes.data || []).forEach(o => { ordersByStatus[o.status] = (ordersByStatus[o.status] || 0) + 1; });
+      (ordersRes.data || []).forEach((o) => {ordersByStatus[o.status] = (ordersByStatus[o.status] || 0) + 1;});
 
       const batchesByState: Record<string, number> = {};
-      (batchesRes.data || []).forEach(b => { batchesByState[b.current_state] = (batchesByState[b.current_state] || 0) + b.quantity; });
+      (batchesRes.data || []).forEach((b) => {batchesByState[b.current_state] = (batchesByState[b.current_state] || 0) + b.quantity;});
+
+      const todayThroughput: Record<string, number> = {};
+      (throughputRes.data || []).forEach((t) => {todayThroughput[t.state_transition] = (todayThroughput[t.state_transition] || 0) + 1;});
 
       const extraInventoryCount = (extraRes.data || []).reduce((s, b) => s + b.quantity, 0);
 
       // Filter out cancelled orders from alerts
-      const activeLate = ((lateBatchesRes.data || []) as any[]).filter(b => b.order?.status !== 'cancelled');
-      const lateOrderIds = new Set(activeLate.map(b => b.order_id));
+      const activeLate = ((lateBatchesRes.data || []) as any[]).filter((b) => b.order?.status !== 'cancelled');
+      const activeFlagged = ((flaggedBatchesRes.data || []) as any[]).filter((b) => b.order?.status !== 'cancelled');
+      const lateOrderIds = new Set(activeLate.map((b) => b.order_id));
 
       // Top 3 products by finished quantity
       const productQtyMap: Record<string, number> = {};
@@ -189,13 +196,13 @@ export default function Dashboard() {
       });
 
       // We need product names — fetch them if we have product ids
-      const topProductIds = Object.entries(productQtyMap)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 3);
-      let topProducts: Array<{ name: string; quantity: number }> = [];
+      const topProductIds = Object.entries(productQtyMap).
+      sort((a, b) => b[1] - a[1]).
+      slice(0, 3);
+      let topProducts: Array<{name: string;quantity: number;}> = [];
       if (topProductIds.length > 0) {
-        const prodRes = await supabase.from('products').select('id, name').in('id', topProductIds.map(p => p[0]));
-        const prodMap = new Map((prodRes.data || []).map(p => [p.id, p.name]));
+        const prodRes = await supabase.from('products').select('id, name').in('id', topProductIds.map((p) => p[0]));
+        const prodMap = new Map((prodRes.data || []).map((p) => [p.id, p.name]));
         topProducts = topProductIds.map(([id, qty]) => ({ name: prodMap.get(id) || 'Unknown', quantity: qty }));
       }
 
@@ -203,27 +210,18 @@ export default function Dashboard() {
       const rangeStartDate = getTimeRangeStart(timeRange);
       const daysDiff = Math.max(1, Math.ceil((Date.now() - rangeStartDate.getTime()) / 86400000));
       const totalFinished = Object.values(productQtyMap).reduce((s, v) => s + v, 0);
-      const avgFinishedPerDay = Math.round((totalFinished / daysDiff) * 10) / 10;
+      const avgFinishedPerDay = Math.round(totalFinished / daysDiff * 10) / 10;
 
-      // Top machines - aggregate from batch machine columns
+      // Top machines
       const machineCountMap: Record<string, number> = {};
-      const PHASE_COLS = ['manufacturing_machine_id', 'finishing_machine_id', 'packaging_machine_id', 'boxing_machine_id'] as const;
-      (machineBatchesRes.data || []).forEach((b: any) => {
-        for (const col of PHASE_COLS) {
-          const machineId = b[col];
-          if (machineId) {
-            machineCountMap[machineId] = (machineCountMap[machineId] || 0) + (b.quantity || 1);
-          }
-        }
+      (machineProductionRes.data || []).forEach((m: any) => {
+        machineCountMap[m.machine_id] = (machineCountMap[m.machine_id] || 0) + 1;
       });
-      const machineDataMap = new Map((machinesRes.data || []).map((m: any) => [m.id, { name: m.name, type: m.type }]));
-      const topMachines = Object.entries(machineCountMap)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 3)
-        .map(([id, count]) => {
-          const machineData = machineDataMap.get(id);
-          return { name: machineData?.name || 'Unknown', count, type: machineData?.type || '' };
-        });
+      const machineNameMap = new Map((machinesRes.data || []).map((m: any) => [m.id, m.name]));
+      const topMachines = Object.entries(machineCountMap).
+      sort((a, b) => b[1] - a[1]).
+      slice(0, 3).
+      map(([id, count]) => ({ name: machineNameMap.get(id) || 'Unknown', count }));
 
       setData({
         profile: profileRes.data as any,
@@ -231,37 +229,18 @@ export default function Dashboard() {
         batchesByState,
         lateOrderCount: lateOrderIds.size,
         newOrdersToday: (newOrdersTodayRes.data || []).length,
+        flaggedBatchCount: activeFlagged.reduce((s: number, b: any) => s + b.quantity, 0),
         lateBatches: activeLate.slice(0, 10),
+        flaggedBatches: activeFlagged.slice(0, 10),
         approachingEtaOrders: (approachingRes.data || []) as any,
-        todayThroughput: {}, // No longer tracking state transitions
+        todayThroughput,
         extraInventoryCount,
         completedOrders: ordersByStatus.completed || 0,
         shipmentsCount: (shipmentsRes.data || []).length,
         topProducts,
         avgFinishedPerDay,
-        topMachines,
+        topMachines
       });
-
-      // Derive throughput from batch states — map each state to a transition label
-      const STATE_TO_TRANSITION: Record<string, string> = {
-        in_manufacturing: 'start_manufacturing',
-        ready_for_finishing: 'finish_manufacturing',
-        in_finishing: 'start_finishing',
-        ready_for_packaging: 'finish_finishing',
-        in_packaging: 'start_packaging',
-        ready_for_boxing: 'finish_packaging',
-        in_boxing: 'start_boxing',
-        ready_for_shipment: 'finish_boxing',
-      };
-      const throughputMap: Record<string, number> = {};
-      (throughputBatchesRes.data || []).forEach((b: any) => {
-        const transition = STATE_TO_TRANSITION[b.current_state];
-        if (transition) {
-          throughputMap[transition] = (throughputMap[transition] || 0) + (b.quantity || 1);
-        }
-      });
-
-      setData(prev => prev ? { ...prev, todayThroughput: throughputMap } : prev);
     } catch (e) {
       console.error('Dashboard fetch error:', e);
     } finally {
@@ -272,18 +251,18 @@ export default function Dashboard() {
   useEffect(() => {
     setLoading(true);
     fetchAll();
-    const channel = supabase
-      .channel('dashboard-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_batches' }, fetchAll)
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    const channel = supabase.
+    channel('dashboard-realtime').
+    on('postgres_changes', { event: '*', schema: 'public', table: 'order_batches' }, fetchAll).
+    subscribe();
+    return () => {supabase.removeChannel(channel);};
   }, [fetchAll]);
 
   /* ─── derived metrics ─── */
   const activeOrders = useMemo(() => data ? (data.ordersByStatus.pending || 0) + (data.ordersByStatus.in_progress || 0) : 0, [data]);
   const shippedTotal = useMemo(() => data?.batchesByState.shipped || 0, [data]);
   const allBatchTotal = useMemo(() => data ? Object.values(data.batchesByState).reduce((a, b) => a + b, 0) : 0, [data]);
-  const fulfillmentRate = useMemo(() => allBatchTotal > 0 ? Math.round((shippedTotal / allBatchTotal) * 100) : 0, [shippedTotal, allBatchTotal]);
+  const fulfillmentRate = useMemo(() => allBatchTotal > 0 ? Math.round(shippedTotal / allBatchTotal * 100) : 0, [shippedTotal, allBatchTotal]);
   const totalOrders = useMemo(() => data ? Object.values(data.ordersByStatus).reduce((a, b) => a + b, 0) : 0, [data]);
 
   const pipelineData = useMemo(() => {
@@ -291,28 +270,28 @@ export default function Dashboard() {
     return Object.entries(PHASE_LABELS).map(([key, label]) => ({
       name: label,
       value: data.batchesByState[key] || 0,
-      fill: PHASE_COLORS[key],
+      fill: PHASE_COLORS[key]
     }));
   }, [data]);
 
   const donutData = useMemo(() => {
     if (!data) return [];
     const allStatuses = ['pending', 'in_progress', 'completed', 'cancelled'];
-    return allStatuses.map(status => ({
+    return allStatuses.map((status) => ({
       name: ORDER_STATUS_LABELS[status] || status,
       value: data.ordersByStatus[status] || 0,
-      fill: ORDER_STATUS_COLORS[status] || 'hsl(216, 12%, 60%)',
+      fill: ORDER_STATUS_COLORS[status] || 'hsl(216, 12%, 60%)'
     }));
   }, [data]);
 
   const throughputData = useMemo(() => {
     if (!data) return [];
-    return Object.entries(data.todayThroughput)
-      .filter(([key]) => TRANSITION_LABELS[key])
-      .map(([key, count]) => ({
-        name: TRANSITION_LABELS[key] || key,
-        value: count,
-      }));
+    return Object.entries(data.todayThroughput).
+    filter(([key]) => TRANSITION_LABELS[key]).
+    map(([key, count]) => ({
+      name: TRANSITION_LABELS[key] || key,
+      value: count
+    }));
   }, [data]);
 
   const canCreateOrders = hasRole('admin');
@@ -329,13 +308,13 @@ export default function Dashboard() {
           <Skeleton className="h-72" />
           <Skeleton className="h-72" />
         </div>
-      </div>
-    );
+      </div>);
+
   }
 
   if (!data) return null;
 
-  const alertCount = data.lateBatches.length + data.approachingEtaOrders.length;
+  const alertCount = data.lateBatches.length + data.flaggedBatches.length + data.approachingEtaOrders.length;
 
   return (
     <div className="p-4 md:p-6 space-y-6">
@@ -361,11 +340,11 @@ export default function Dashboard() {
               <SelectItem value="month">Last 30 Days</SelectItem>
             </SelectContent>
           </Select>
-          {primaryRole && (
-            <Badge variant="outline" className="capitalize text-xs">
+          {primaryRole &&
+          <Badge variant="outline" className="capitalize text-xs">
               {primaryRole.replace('_', ' ')}
             </Badge>
-          )}
+          }
         </div>
       </div>
 
@@ -383,17 +362,17 @@ export default function Dashboard() {
         <div onClick={() => navigate('/orders')} className="cursor-pointer h-full">
           <KpiCard icon={AlertTriangle} label="Late Orders" value={data.lateOrderCount} sub="With late batches" color="text-destructive" highlight={data.lateOrderCount > 0} />
         </div>
-        <div className="h-full">
-          <KpiCard icon={TrendingUp} label="Fulfillment" value={`${fulfillmentRate}%`} sub={`${shippedTotal} shipped`} color="text-success" />
-        </div>
+        
+
+        
         <div onClick={() => navigate('/extra-inventory')} className="cursor-pointer h-full">
           <KpiCard icon={Archive} label="Extra Inventory" value={data.extraInventoryCount} sub="Available items" color="text-primary" />
         </div>
       </div>
 
       {/* ═══════ SHIPMENT READY BANNER ═══════ */}
-      {readyForShipment > 0 && (
-        <Card className="border-success/30 bg-success/5">
+      {readyForShipment > 0 &&
+      <Card className="border-success/30 bg-success/5">
           <CardContent className="flex items-center justify-between py-4">
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-success/10">
@@ -409,7 +388,7 @@ export default function Dashboard() {
             </Button>
           </CardContent>
         </Card>
-      )}
+      }
 
       {/* ═══════ CHARTS ROW ═══════ */}
       <div className="grid gap-4 lg:grid-cols-5">
@@ -430,13 +409,13 @@ export default function Dashboard() {
                     background: 'hsl(var(--card))',
                     border: '1px solid hsl(var(--border))',
                     borderRadius: 'var(--radius)',
-                    fontSize: 12,
-                  }}
-                />
+                    fontSize: 12
+                  }} />
+                
                 <Bar dataKey="value" radius={[0, 4, 4, 0]} maxBarSize={24}>
-                  {pipelineData.map((entry, i) => (
-                    <Cell key={i} fill={entry.fill} />
-                  ))}
+                  {pipelineData.map((entry, i) =>
+                  <Cell key={i} fill={entry.fill} />
+                  )}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
@@ -450,37 +429,37 @@ export default function Dashboard() {
             <CardDescription>Distribution by status</CardDescription>
           </CardHeader>
           <CardContent className="h-72 flex items-center justify-center">
-            {donutData.some(d => d.value > 0) ? (
-              <ResponsiveContainer width="100%" height="100%">
+            {donutData.some((d) => d.value > 0) ?
+            <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                    data={donutData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={55}
-                    outerRadius={85}
-                    paddingAngle={3}
-                    dataKey="value"
-                    stroke="none"
-                  >
-                    {donutData.map((entry, i) => (
-                      <Cell key={i} fill={entry.fill} />
-                    ))}
+                  data={donutData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={55}
+                  outerRadius={85}
+                  paddingAngle={3}
+                  dataKey="value"
+                  stroke="none">
+                  
+                    {donutData.map((entry, i) =>
+                  <Cell key={i} fill={entry.fill} />
+                  )}
                   </Pie>
                   <Tooltip
-                    contentStyle={{
-                      background: 'hsl(var(--card))',
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: 'var(--radius)',
-                      fontSize: 12,
-                    }}
-                  />
+                  contentStyle={{
+                    background: 'hsl(var(--card))',
+                    border: '1px solid hsl(var(--border))',
+                    borderRadius: 'var(--radius)',
+                    fontSize: 12
+                  }} />
+                
                   <Legend
-                    verticalAlign="bottom"
-                    iconType="circle"
-                    iconSize={8}
-                    wrapperStyle={{ fontSize: 11 }}
-                  />
+                  verticalAlign="bottom"
+                  iconType="circle"
+                  iconSize={8}
+                  wrapperStyle={{ fontSize: 11 }} />
+                
                   <text x="50%" y="48%" textAnchor="middle" dominantBaseline="middle" className="fill-foreground text-2xl font-bold">
                     {totalOrders}
                   </text>
@@ -488,10 +467,10 @@ export default function Dashboard() {
                     orders
                   </text>
                 </PieChart>
-              </ResponsiveContainer>
-            ) : (
-              <p className="text-sm text-muted-foreground">No orders yet</p>
-            )}
+              </ResponsiveContainer> :
+
+            <p className="text-sm text-muted-foreground">No orders yet</p>
+            }
           </CardContent>
         </Card>
       </div>
@@ -508,19 +487,19 @@ export default function Dashboard() {
             <CardDescription>Most completed in {TIME_RANGE_LABELS[timeRange].toLowerCase()}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            {data.topProducts.length > 0 ? data.topProducts.map((p, i) => (
-              <div key={i} className="flex items-center justify-between gap-2">
+            {data.topProducts.length > 0 ? data.topProducts.map((p, i) =>
+            <div key={i} className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2 min-w-0">
                   <span className={`flex items-center justify-center h-6 w-6 rounded-full text-xs font-bold ${
-                    i === 0 ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground'
-                  }`}>{i + 1}</span>
+                i === 0 ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground'}`
+                }>{i + 1}</span>
                   <span className="text-sm font-medium truncate">{p.name}</span>
                 </div>
                 <Badge variant="secondary" className="text-xs shrink-0">{p.quantity} units</Badge>
               </div>
-            )) : (
-              <p className="text-sm text-muted-foreground text-center py-4">No completed items yet</p>
-            )}
+            ) :
+            <p className="text-sm text-muted-foreground text-center py-4">No completed items yet</p>
+            }
           </CardContent>
         </Card>
 
@@ -549,39 +528,19 @@ export default function Dashboard() {
             <CardDescription>By production records in {TIME_RANGE_LABELS[timeRange].toLowerCase()}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            {data.topMachines.length > 0 ? (
-              <>
-                {data.topMachines.map((m, i) => {
-                  const typeColors: Record<string, string> = {
-                    manufacturing: 'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300',
-                    finishing: 'bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300',
-                    packaging: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300',
-                    boxing: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-950 dark:text-cyan-300',
-                  };
-                  return (
-                    <div key={i} className="flex items-center justify-between gap-2 py-1">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className={`flex items-center justify-center h-6 w-6 rounded-full text-xs font-bold shrink-0 ${
-                          i === 0 ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground'
-                        }`}>{i + 1}</span>
-                        <span className="text-sm font-medium truncate">{m.name}</span>
-                        {m.type && (
-                          <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full capitalize shrink-0 ${typeColors[m.type] || 'bg-muted text-muted-foreground'}`}>
-                            {m.type}
-                          </span>
-                        )}
-                      </div>
-                      <Badge variant="secondary" className="text-xs shrink-0">{m.count}</Badge>
-                    </div>
-                  );
-                })}
-                <Link to="/reports?tab=machine-production" className="flex items-center justify-center gap-1 pt-2 text-xs text-primary hover:underline">
-                  See detailed analytics <ArrowRight className="h-3 w-3" />
-                </Link>
-              </>
-            ) : (
-              <p className="text-sm text-muted-foreground text-center py-4">No machine activity yet</p>
-            )}
+            {data.topMachines.length > 0 ? data.topMachines.map((m, i) =>
+            <div key={i} className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className={`flex items-center justify-center h-6 w-6 rounded-full text-xs font-bold ${
+                i === 0 ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground'}`
+                }>{i + 1}</span>
+                  <span className="text-sm font-medium truncate">{m.name}</span>
+                </div>
+                <Badge variant="secondary" className="text-xs shrink-0">{m.count} ops</Badge>
+              </div>
+            ) :
+            <p className="text-sm text-muted-foreground text-center py-4">No machine activity yet</p>
+            }
           </CardContent>
         </Card>
       </div>
@@ -591,17 +550,17 @@ export default function Dashboard() {
         <h2 className="text-base font-semibold mb-3">Production Queues</h2>
         <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
           <QueueCard name="Manufacturing" href="/queues/manufacturing" icon={Factory}
-            waiting={0} inProgress={data.batchesByState.in_manufacturing || 0}
-            waitingLabel="Waiting" bgClass="bg-blue-50 dark:bg-blue-950/30" iconClass="text-blue-600 dark:text-blue-400" />
+          waiting={0} inProgress={data.batchesByState.in_manufacturing || 0}
+          waitingLabel="Waiting" bgClass="bg-blue-50 dark:bg-blue-950/30" iconClass="text-blue-600 dark:text-blue-400" />
           <QueueCard name="Finishing" href="/queues/finishing" icon={Sparkles}
-            waiting={data.batchesByState.ready_for_finishing || 0} inProgress={data.batchesByState.in_finishing || 0}
-            waitingLabel="Ready" bgClass="bg-purple-50 dark:bg-purple-950/30" iconClass="text-purple-600 dark:text-purple-400" />
+          waiting={data.batchesByState.ready_for_finishing || 0} inProgress={data.batchesByState.in_finishing || 0}
+          waitingLabel="Ready" bgClass="bg-purple-50 dark:bg-purple-950/30" iconClass="text-purple-600 dark:text-purple-400" />
           <QueueCard name="Packaging" href="/queues/packaging" icon={Package}
-            waiting={data.batchesByState.ready_for_packaging || 0} inProgress={data.batchesByState.in_packaging || 0}
-            waitingLabel="Ready" bgClass="bg-indigo-50 dark:bg-indigo-950/30" iconClass="text-indigo-600 dark:text-indigo-400" />
+          waiting={data.batchesByState.ready_for_packaging || 0} inProgress={data.batchesByState.in_packaging || 0}
+          waitingLabel="Ready" bgClass="bg-indigo-50 dark:bg-indigo-950/30" iconClass="text-indigo-600 dark:text-indigo-400" />
           <QueueCard name="Boxing" href="/queues/boxing" icon={Box}
-            waiting={data.batchesByState.ready_for_boxing || 0} inProgress={data.batchesByState.in_boxing || 0}
-            waitingLabel="Ready" bgClass="bg-cyan-50 dark:bg-cyan-950/30" iconClass="text-cyan-600 dark:text-cyan-400" />
+          waiting={data.batchesByState.ready_for_boxing || 0} inProgress={data.batchesByState.in_boxing || 0}
+          waitingLabel="Ready" bgClass="bg-cyan-50 dark:bg-cyan-950/30" iconClass="text-cyan-600 dark:text-cyan-400" />
         </div>
       </div>
 
@@ -613,32 +572,32 @@ export default function Dashboard() {
             <CardDescription>Items processed per phase</CardDescription>
           </CardHeader>
           <CardContent className="h-64">
-            {throughputData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
+            {throughputData.length > 0 ?
+            <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={throughputData} margin={{ left: 0, right: 10 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                   <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} />
                   <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} />
                   <Tooltip
-                    contentStyle={{
-                      background: 'hsl(var(--card))',
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: 'var(--radius)',
-                      fontSize: 12,
-                    }}
-                  />
+                  contentStyle={{
+                    background: 'hsl(var(--card))',
+                    border: '1px solid hsl(var(--border))',
+                    borderRadius: 'var(--radius)',
+                    fontSize: 12
+                  }} />
+                
                   <Bar dataKey="value" radius={[4, 4, 0, 0]} maxBarSize={40}>
-                    {throughputData.map((_, i) => (
-                      <Cell key={i} fill={TRANSITION_COLORS[i % TRANSITION_COLORS.length]} />
-                    ))}
+                    {throughputData.map((_, i) =>
+                  <Cell key={i} fill={TRANSITION_COLORS[i % TRANSITION_COLORS.length]} />
+                  )}
                   </Bar>
                 </BarChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="flex items-center justify-center h-full">
+              </ResponsiveContainer> :
+
+            <div className="flex items-center justify-center h-full">
                 <p className="text-sm text-muted-foreground">No production recorded</p>
               </div>
-            )}
+            }
           </CardContent>
         </Card>
 
@@ -646,49 +605,58 @@ export default function Dashboard() {
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <CardTitle className="text-base">Alerts & Attention</CardTitle>
-              {alertCount > 0 && (
-                <Badge variant="destructive" className="text-xs">{alertCount}</Badge>
-              )}
+              {alertCount > 0 &&
+              <Badge variant="destructive" className="text-xs">{alertCount}</Badge>
+              }
             </div>
             <CardDescription>Items needing your attention</CardDescription>
           </CardHeader>
           <CardContent className="max-h-56 overflow-y-auto space-y-2">
-            {alertCount === 0 && (
-              <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+            {alertCount === 0 &&
+            <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
                 <CheckCircle className="h-8 w-8 mb-2 text-success" />
                 <p className="text-sm">All clear! No alerts.</p>
               </div>
-            )}
-            {data.lateBatches.map(b => (
-              <Link key={`late-${b.id}`} to={`/orders/${b.order_id}`} className="flex items-start gap-2 p-2 rounded-md hover:bg-muted/50 transition-colors">
+            }
+            {data.lateBatches.map((b) =>
+            <Link key={`late-${b.id}`} to={`/orders/${b.order_id}`} className="flex items-start gap-2 p-2 rounded-md hover:bg-muted/50 transition-colors">
                 <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
                 <div className="min-w-0">
                   <p className="text-sm font-medium truncate">Late: {b.order?.order_number || 'Unknown'}</p>
                   <p className="text-xs text-muted-foreground">{b.quantity} items past ETA</p>
                 </div>
               </Link>
-            ))}
-            {data.approachingEtaOrders.map(o => (
-              <Link key={`eta-${o.id}`} to={`/orders/${o.id}`} className="flex items-start gap-2 p-2 rounded-md hover:bg-muted/50 transition-colors">
+            )}
+            {data.flaggedBatches.map((b) =>
+            <Link key={`flag-${b.id}`} to={`/orders/${b.order_id}`} className="flex items-start gap-2 p-2 rounded-md hover:bg-muted/50 transition-colors">
+                <Flag className="h-4 w-4 text-warning mt-0.5 shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-sm font-medium truncate">Flagged: {b.order?.order_number || 'Unknown'}</p>
+                  <p className="text-xs text-muted-foreground">{b.flagged_reason || `${b.quantity} items`}</p>
+                </div>
+              </Link>
+            )}
+            {data.approachingEtaOrders.map((o) =>
+            <Link key={`eta-${o.id}`} to={`/orders/${o.id}`} className="flex items-start gap-2 p-2 rounded-md hover:bg-muted/50 transition-colors">
                 <CalendarClock className="h-4 w-4 text-primary mt-0.5 shrink-0" />
                 <div className="min-w-0">
                   <p className="text-sm font-medium truncate">{o.order_number} due soon</p>
                   <p className="text-xs text-muted-foreground">ETA: {format(new Date(o.estimated_fulfillment_time), 'MMM d')}</p>
                 </div>
               </Link>
-            ))}
+            )}
           </CardContent>
         </Card>
       </div>
-    </div>
-  );
+    </div>);
+
 }
 
 /* ─── sub-components ─── */
 
-function KpiCard({ icon: Icon, label, value, sub, color, highlight }: {
-  icon: React.ElementType; label: string; value: string | number; sub: string; color: string; highlight?: boolean;
-}) {
+function KpiCard({ icon: Icon, label, value, sub, color, highlight
+
+}: {icon: React.ElementType;label: string;value: string | number;sub: string;color: string;highlight?: boolean;}) {
   return (
     <Card className={`h-full ${highlight ? 'border-destructive/40 bg-destructive/5' : ''}`}>
       <CardContent className="pt-5 pb-4 px-5">
@@ -699,14 +667,14 @@ function KpiCard({ icon: Icon, label, value, sub, color, highlight }: {
         <p className="text-2xl font-bold">{value}</p>
         <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>
       </CardContent>
-    </Card>
-  );
+    </Card>);
+
 }
 
-function QueueCard({ name, href, icon: Icon, waiting, inProgress, waitingLabel, bgClass, iconClass }: {
-  name: string; href: string; icon: React.ElementType; waiting: number; inProgress: number;
-  waitingLabel: string; bgClass: string; iconClass: string;
-}) {
+function QueueCard({ name, href, icon: Icon, waiting, inProgress, waitingLabel, bgClass, iconClass
+
+
+}: {name: string;href: string;icon: React.ElementType;waiting: number;inProgress: number;waitingLabel: string;bgClass: string;iconClass: string;}) {
   const total = waiting + inProgress;
   return (
     <Link to={href}>
@@ -731,6 +699,6 @@ function QueueCard({ name, href, icon: Icon, waiting, inProgress, waitingLabel, 
           </div>
         </CardContent>
       </Card>
-    </Link>
-  );
+    </Link>);
+
 }
