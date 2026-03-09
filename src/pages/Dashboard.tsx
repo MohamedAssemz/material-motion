@@ -242,10 +242,23 @@ export default function Dashboard() {
         topMachines,
       });
 
-      // Aggregate throughput from machine_production
+      // Derive throughput from batch states — map each state to a transition label
+      const STATE_TO_TRANSITION: Record<string, string> = {
+        in_manufacturing: 'start_manufacturing',
+        ready_for_finishing: 'finish_manufacturing',
+        in_finishing: 'start_finishing',
+        ready_for_packaging: 'finish_finishing',
+        in_packaging: 'start_packaging',
+        ready_for_boxing: 'finish_packaging',
+        in_boxing: 'start_boxing',
+        ready_for_shipment: 'finish_boxing',
+      };
       const throughputMap: Record<string, number> = {};
-      (machineProductionRes.data || []).forEach((r: any) => {
-        throughputMap[r.state_transition] = (throughputMap[r.state_transition] || 0) + 1;
+      (throughputBatchesRes.data || []).forEach((b: any) => {
+        const transition = STATE_TO_TRANSITION[b.current_state];
+        if (transition) {
+          throughputMap[transition] = (throughputMap[transition] || 0) + (b.quantity || 1);
+        }
       });
 
       setData(prev => prev ? { ...prev, todayThroughput: throughputMap } : prev);
