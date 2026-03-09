@@ -769,7 +769,7 @@ export default function OrderManufacturing() {
                       </div>
                       <div className="flex items-center gap-6">
                         <div className="text-center">
-                          <p className="text-xs text-muted-foreground">In Mfg</p>
+                          <p className="text-xs text-muted-foreground">{t('phase.in_mfg')}</p>
                           <p className="text-lg font-semibold text-primary">{group.inManufacturing}</p>
                         </div>
                         {canManage && !isCancelled && (
