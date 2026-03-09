@@ -352,15 +352,15 @@ export default function Catalog() {
             <Package className="h-6 w-6 text-primary" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold">Product Catalog</h1>
-            <p className="text-muted-foreground text-sm">{products.length} products</p>
+            <h1 className="text-2xl font-bold">{t('catalog.title')}</h1>
+            <p className="text-muted-foreground text-sm">{products.length} {t('catalog.products_count')}</p>
           </div>
         </div>
         
         <div className="flex items-center gap-2 flex-wrap">
           <Button variant="outline" size="sm" onClick={() => navigate('/reports?tab=catalog-insights')}>
             <BarChart3 className="mr-2 h-4 w-4" />
-            Catalog Insights
+            {t('catalog.catalog_insights')}
           </Button>
           {canManage && (
             <>
@@ -368,29 +368,29 @@ export default function Catalog() {
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="sm">
                     <Settings2 className="mr-2 h-4 w-4" />
-                    Manage
+                    {t('catalog.manage')}
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48">
                   <DropdownMenuItem onClick={() => setCategoryListOpen(true)}>
                     <Tag className="mr-2 h-4 w-4" />
-                    Categories
+                    {t('catalog.categories')}
                     <Badge variant="secondary" className="ml-auto">{categories.length}</Badge>
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => setBrandListOpen(true)}>
                     <Palette className="mr-2 h-4 w-4" />
-                    Brands
+                    {t('catalog.brands')}
                     <Badge variant="secondary" className="ml-auto">{brands.length}</Badge>
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => navigate('/customers')}>
                     <Users className="mr-2 h-4 w-4" />
-                    Customers
+                    {t('catalog.customers')}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
               <Button variant="outline" size="sm" onClick={() => setBulkUploadOpen(true)}>
                 <Upload className="mr-2 h-4 w-4" />
-                Bulk Upload
+                {t('catalog.bulk_upload')}
               </Button>
               <Button onClick={() => { 
                 setEditingProduct(null); 
@@ -399,7 +399,7 @@ export default function Catalog() {
                 setProductFormOpen(true); 
               }}>
                 <Plus className="mr-2 h-4 w-4" />
-                Add Product
+                {t('catalog.add_product')}
               </Button>
             </>
           )}
