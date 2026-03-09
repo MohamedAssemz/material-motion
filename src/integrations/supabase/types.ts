@@ -342,51 +342,6 @@ export type Database = {
         }
         Relationships: []
       }
-      machine_production: {
-        Row: {
-          batch_id: string | null
-          created_at: string
-          id: string
-          machine_id: string
-          recorded_by: string | null
-          state_transition: string
-          unit_id: string | null
-        }
-        Insert: {
-          batch_id?: string | null
-          created_at?: string
-          id?: string
-          machine_id: string
-          recorded_by?: string | null
-          state_transition: string
-          unit_id?: string | null
-        }
-        Update: {
-          batch_id?: string | null
-          created_at?: string
-          id?: string
-          machine_id?: string
-          recorded_by?: string | null
-          state_transition?: string
-          unit_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "machine_production_batch_id_fkey"
-            columns: ["batch_id"]
-            isOneToOne: false
-            referencedRelation: "order_batches"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "machine_production_machine_id_fkey"
-            columns: ["machine_id"]
-            isOneToOne: false
-            referencedRelation: "machines"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       machines: {
         Row: {
           created_at: string

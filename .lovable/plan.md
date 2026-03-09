@@ -1,37 +1,42 @@
 
 
-## Drop `machine_production` Table and Derive Throughput from `order_batches`
+## Plan: Order Cancellation Freeze Logic
 
-### Context
+### Requirements
+1. When an order is cancelled, freeze all actions on phase pages **except** production rate (machine) assignment (which still respects role permissions)
+2. Unretrieved reserved extra batches should be released back to AVAILABLE on cancellation
 
-The `machine_production` table is empty and has no INSERT logic anywhere. Both consumers (Dashboard throughput chart, Analytics machine stats) query it and get nothing. The `MachineProductionTab` in Reports already derives machine stats from `order_batches` machine columns — we follow the same pattern.
+### Analysis
+- Requirement 2 is **already implemented** in `handleCancelOrder` in `OrderDetail.tsx` (lines 462-471) — it releases reserved extra batches back to AVAILABLE
+- Requirement 1 needs changes across 4 phase pages and their child components
 
-### Changes
+### Implementation
 
-#### 1. Database Migration
-```sql
-DROP TABLE IF EXISTS public.machine_production;
-```
+**Core approach:** Each phase page already has a `canManage` boolean that gates actions. Add an `isCancelled` check derived from `order?.status === 'cancelled'` and use it to disable all actions except machine assignment.
 
-#### 2. `src/pages/Dashboard.tsx` — Throughput from `order_batches`
+**Files to modify:**
 
-Replace the `machine_production` query (line 170) with a query on `order_batches` that fetches `current_state, quantity, updated_at` within the time range. Then derive throughput by counting quantities per state (mapping states to the existing `TRANSITION_LABELS` keys):
+1. **`OrderManufacturing.tsx`** — Add `const isCancelled = order?.status === 'cancelled'`. Pass `isCancelled` to disable:
+   - Box assignment dialog actions
+   - Terminate/redo actions
+   - MoveToExtraDialog
+   - ExtraItemsTab `canManage` → `canManage && !isCancelled`
+   - BoxReceiveDialog actions
+   - Keep `ProductionRateSection canManage={canManage}` unchanged (still allows machine assignment)
 
-- `in_manufacturing` → `start_manufacturing`
-- `ready_for_finishing` / `in_finishing` → `finish_manufacturing` / `start_finishing`
-- etc.
+2. **`OrderFinishing.tsx`** — Same pattern: `isCancelled` disables accept boxes, assign to box, MoveToExtraDialog, ExtraItemsTab, but keeps ProductionRateSection canManage unchanged.
 
-Remove `machineProductionRes` from the destructuring. Build `throughputMap` from batch states instead.
+3. **`OrderPackaging.tsx`** — Same pattern.
 
-#### 3. `src/pages/Analytics.tsx` — Machine stats from `order_batches`
+4. **`OrderBoxing.tsx`** — Same pattern. Additionally disable shipment creation.
 
-Replace the `machine_production` query (line 149-151) with a query on `order_batches` selecting machine ID columns + `updated_at`. For each batch, check which machine columns are populated and count production per machine (same approach as the existing `MachineProductionTab.flattenBatches`).
+5. **`OrderDetail.tsx`** — Add a visible "Cancelled" banner/badge. The cancel button is already hidden when `status === 'cancelled'`. Start Order and Extra Inventory sections are already gated to pending orders, so no changes needed there.
 
-Remove the `machine_production` realtime subscription (line 91-93).
+**Specific prop changes per phase page:**
+- `ExtraItemsTab canManage={canManage && !isCancelled}` — freezes extra retrieval
+- `ProductionRateSection canManage={canManage}` — unchanged, still allows machine assignment
+- All action buttons (accept, assign, terminate, redo, move to extra, create shipment) gated with `!isCancelled`
+- Box receive dialogs disabled when cancelled
 
-### Result
-
-- Throughput chart on Dashboard will show actual production activity derived from batch state data.
-- Analytics machine stats will reflect real machine assignments from `order_batches`.
-- The empty, unused `machine_production` table is removed from the schema.
+**No database changes needed** — the cancellation already releases reserved batches.
 
