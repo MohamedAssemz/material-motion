@@ -562,7 +562,6 @@ export function ExtraInventoryDialog({
       .select('id, quantity, current_state, order_item_id')
       .eq('order_id', orderId)
       .eq('order_item_id', orderItemId)
-      .eq('is_terminated', false)
       .order('created_at', { ascending: true });
 
     if (fetchError) throw fetchError;

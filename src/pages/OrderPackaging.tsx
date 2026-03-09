@@ -171,7 +171,6 @@ export default function OrderPackaging() {
             "id, qr_code_data, current_state, quantity, product_id, order_item_id, box_id, manufacturing_machine_id, finishing_machine_id, packaging_machine_id, from_extra_state, product:products(id, name, sku, needs_packing)",
           )
           .eq("order_id", id)
-          .eq("is_terminated", false)
           .in("current_state", ["ready_for_packaging", "in_packaging"]),
         // Fetch completed items for this phase (moved to next phases)
         supabase
@@ -180,7 +179,6 @@ export default function OrderPackaging() {
             "id, qr_code_data, current_state, quantity, product_id, order_item_id, box_id, manufacturing_machine_id, finishing_machine_id, packaging_machine_id, from_extra_state, product:products(id, name, sku, needs_packing)",
           )
           .eq("order_id", id)
-          .eq("is_terminated", false)
           .in("current_state", ["ready_for_boxing", "in_boxing", "ready_for_shipment", "shipped"]),
       ]);
 
@@ -351,8 +349,7 @@ export default function OrderPackaging() {
       const { data: occupiedBatches } = await supabase
         .from("order_batches")
         .select("box_id")
-        .not("box_id", "is", null)
-        .eq("is_terminated", false);
+        .not("box_id", "is", null);
       const occupiedIds = new Set(occupiedBatches?.map((b) => b.box_id) || []);
       setAvailableBoxes(allBoxes?.filter((box) => !occupiedIds.has(box.id)) || []);
     } catch (error: any) {
@@ -398,7 +395,6 @@ export default function OrderPackaging() {
         .from("order_batches")
         .select("id")
         .eq("box_id", box.id)
-        .eq("is_terminated", false)
         .limit(1);
       if (existingBatches && existingBatches.length > 0) {
         toast.error(`Box ${box.box_code} is already occupied`);

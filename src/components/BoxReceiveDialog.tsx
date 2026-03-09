@@ -104,8 +104,7 @@ export function BoxReceiveDialog({
         product:products(id, name, sku)
       `)
       .eq('box_id', box.id)
-      .eq('order_id', orderId)
-      .eq('is_terminated', false);
+      .eq('order_id', orderId);
 
     if (!batches || batches.length === 0) {
       toast({
@@ -201,8 +200,7 @@ export function BoxReceiveDialog({
         `)
         .eq('order_id', orderId)
         .eq('current_state', filterState)
-        .not('box_id', 'is', null)
-        .eq('is_terminated', false);
+        .not('box_id', 'is', null);
 
       if (error) throw error;
 
@@ -301,8 +299,7 @@ export function BoxReceiveDialog({
           `)
           .eq('box_id', box.id)
           .eq('order_id', orderId)
-          .eq('current_state', filterState)
-          .eq('is_terminated', false);
+          .eq('current_state', filterState);
 
         if (!batches?.length) {
           toast({
@@ -340,7 +337,6 @@ export function BoxReceiveDialog({
           `)
           .eq('order_id', orderId)
           .eq('current_state', filterState)
-          .eq('is_terminated', false)
           .not('box_id', 'is', null);
 
         // Filter by product sku or name containing search term

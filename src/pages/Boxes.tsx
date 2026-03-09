@@ -212,7 +212,7 @@ export default function Boxes() {
     if (batchMatch) {
       const batchCode = batchMatch[1];
       if (batchCode.startsWith('B-')) {
-        const { data: orderBatch } = await supabase.from('order_batches').select('box_id, box:boxes(id, box_code, is_active, created_at, content_type)').eq('qr_code_data', batchCode).eq('is_terminated', false).maybeSingle();
+        const { data: orderBatch } = await supabase.from('order_batches').select('box_id, box:boxes(id, box_code, is_active, created_at, content_type)').eq('qr_code_data', batchCode).maybeSingle();
         if (orderBatch) {
           if (orderBatch.box_id && orderBatch.box) { const box = orderBatch.box as any; openBoxDetails('order', box.id, box.box_code, box.created_at, box.is_active, box.content_type || 'EMPTY', null); }
           else { toast({ title: 'Batch Not In Box', description: `Batch ${batchCode} is not currently assigned to a box`, variant: 'destructive' }); }
@@ -250,7 +250,7 @@ export default function Boxes() {
       if (orderBoxesError) throw orderBoxesError;
 
       const orderBoxIds = orderBoxesData?.map(b => b.id) || [];
-      const { data: orderBatchesData } = await supabase.from('order_batches').select('box_id, quantity, current_state').in('box_id', orderBoxIds).eq('is_terminated', false);
+      const { data: orderBatchesData } = await supabase.from('order_batches').select('box_id, quantity, current_state').in('box_id', orderBoxIds);
 
       const orderBatchStats = new Map<string, { count: number; total: number; state: string | null }>();
       orderBatchesData?.forEach(batch => {

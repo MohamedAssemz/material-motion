@@ -51,8 +51,6 @@ interface StateDistribution {
 }
 
 interface GlobalCounters {
-  totalTerminations: number;
-  totalRedos: number;
   avgLeadTime: number;
   lateBatches: number;
 }
@@ -77,8 +75,6 @@ export default function Analytics() {
   const [machineStats, setMachineStats] = useState<MachineStats[]>([]);
   const [stateDistribution, setStateDistribution] = useState<StateDistribution[]>([]);
   const [globalCounters, setGlobalCounters] = useState<GlobalCounters>({
-    totalTerminations: 0,
-    totalRedos: 0,
     avgLeadTime: 0,
     lateBatches: 0,
   });
@@ -114,8 +110,6 @@ export default function Analytics() {
           current_state,
           quantity,
           lead_time_days,
-          is_redo,
-          is_terminated,
           product:products(name),
           order:orders(order_number)
         `)
@@ -204,13 +198,6 @@ export default function Analytics() {
       setStateDistribution(distribution);
 
       // Fetch global counters
-      const { data: ordersData } = await supabase
-        .from('orders')
-        .select('termination_counter, redo_counter');
-
-      const totalTerminations = (ordersData || []).reduce((sum, o: any) => sum + (o.termination_counter || 0), 0);
-      const totalRedos = (ordersData || []).reduce((sum, o: any) => sum + (o.redo_counter || 0), 0);
-
       const { data: leadTimeData } = await supabase
         .from('order_batches')
         .select('lead_time_days')
@@ -221,8 +208,6 @@ export default function Analytics() {
         : 0;
 
       setGlobalCounters({
-        totalTerminations,
-        totalRedos,
         avgLeadTime: Math.round(avgLeadTime * 10) / 10,
         lateBatches: processedBatches.filter(b => b.is_late).length,
       });
@@ -256,29 +241,7 @@ export default function Analytics() {
       </div>
 
       {/* Global Counters */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Terminations</CardTitle>
-            <AlertTriangle className="h-4 w-4 text-destructive" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-destructive">{globalCounters.totalTerminations}</div>
-            <p className="text-xs text-muted-foreground">Items marked as lost</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Redos</CardTitle>
-            <TrendingUp className="h-4 w-4 text-warning" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-warning">{globalCounters.totalRedos}</div>
-            <p className="text-xs text-muted-foreground">Items sent for redo</p>
-          </CardContent>
-        </Card>
-
+      <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Avg Lead Time</CardTitle>
@@ -287,6 +250,17 @@ export default function Analytics() {
           <CardContent>
             <div className="text-2xl font-bold text-primary">{globalCounters.avgLeadTime} days</div>
             <p className="text-xs text-muted-foreground">Average per stage</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Late Batches</CardTitle>
+            <Clock className="h-4 w-4 text-destructive" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-destructive">{globalCounters.lateBatches}</div>
+            <p className="text-xs text-muted-foreground">Past their ETA</p>
           </CardContent>
         </Card>
 

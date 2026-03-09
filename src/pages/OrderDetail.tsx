@@ -76,9 +76,6 @@ interface Batch {
   eta: string | null;
   lead_time_days: number | null;
   box_id: string | null;
-  is_terminated?: boolean;
-  is_redo?: boolean;
-  is_flagged?: boolean;
   product: {
     id: string;
     name: string;
@@ -146,7 +143,7 @@ export default function OrderDetail() {
 
   // Dialog states
   const [rawMaterialsOpen, setRawMaterialsOpen] = useState(false);
-  const [flaggedItemsOpen, setFlaggedItemsOpen] = useState(false);
+  
   const [shipmentDialogOpen, setShipmentDialogOpen] = useState(false);
   const [boxAssignDialogOpen, setBoxAssignDialogOpen] = useState(false);
   const [leadTimeDialogOpen, setLeadTimeDialogOpen] = useState(false);
@@ -584,8 +581,6 @@ export default function OrderDetail() {
   const shippedItems = activeBatches
     .filter((b) => b.current_state === "shipped")
     .reduce((sum, b) => sum + b.quantity, 0);
-  const flaggedCount = 0;
-  const redoCount = 0;
 
   // Check if order is pending based on order status, not batch states
   // This ensures the UI remains consistent even when all order batches are deleted/replaced by extra inventory
@@ -853,11 +848,10 @@ export default function OrderDetail() {
         );
       })()}
 
-      {/* Notes & Alerts */}
-      {(order.notes || flaggedCount > 0 || redoCount > 0) && (
+      {/* Notes */}
+      {order.notes && (
         <div className="space-y-2">
            {(() => {
-              // Show notes without packaging reference block
               const notes = order.notes || '';
               const startTag = "---PACKAGING_REFERENCE---";
               const endTag = "---END_PACKAGING_REFERENCE---";
@@ -877,29 +871,6 @@ export default function OrderDetail() {
                 </Card>
               );
            })()}
-          {(flaggedCount > 0 || redoCount > 0) && (
-            <Card className="border-warning">
-              <CardContent className="p-4 flex items-center gap-4">
-                <AlertTriangle className="h-5 w-5 text-warning" />
-                <div className="flex-1">
-                  {flaggedCount > 0 && (
-                    <span className="text-sm">
-                      {flaggedCount} flagged item(s)
-                    </span>
-                  )}
-                  {flaggedCount > 0 && redoCount > 0 && <span className="mx-2">·</span>}
-                  {redoCount > 0 && (
-                    <span className="text-sm">
-                      {redoCount} redo item(s)
-                    </span>
-                  )}
-                </div>
-                <Button variant="outline" size="sm" onClick={() => setFlaggedItemsOpen(true)}>
-                  View Details
-                </Button>
-              </CardContent>
-            </Card>
-          )}
         </div>
       )}
 

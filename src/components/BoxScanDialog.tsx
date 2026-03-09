@@ -97,8 +97,7 @@ export function BoxScanDialog({
         const { data: occupiedBatches } = await supabase
           .from('order_batches')
           .select('box_id')
-          .not('box_id', 'is', null)
-          .eq('is_terminated', false);
+          .not('box_id', 'is', null);
 
         const occupiedBoxIds = new Set(occupiedBatches?.map(b => b.box_id) || []);
         const emptyBoxes = allBoxes?.filter(box => !occupiedBoxIds.has(box.id)) || [];
@@ -118,8 +117,7 @@ export function BoxScanDialog({
             product:products(name, sku)
           `)
           .eq('current_state', filterState || '')
-          .not('box_id', 'is', null)
-          .eq('is_terminated', false);
+          .not('box_id', 'is', null);
 
       if (!batches?.length) {
           setAllBoxes([]);
@@ -200,7 +198,6 @@ export function BoxScanDialog({
           .from('order_batches')
           .select('id')
           .eq('box_id', box.id)
-          .eq('is_terminated', false)
           .single();
 
         if (existingBatch) {
@@ -226,7 +223,6 @@ export function BoxScanDialog({
           `)
           .eq('box_id', box.id)
           .eq('current_state', filterState || '')
-          .eq('is_terminated', false)
           .single();
 
         if (!batch) {
