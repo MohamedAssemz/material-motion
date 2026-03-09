@@ -585,8 +585,8 @@ export default function Dashboard() {
                   }} />
                 
                   <Bar dataKey="value" radius={[4, 4, 0, 0]} maxBarSize={40}>
-                    {throughputData.map((_, i) =>
-                  <Cell key={i} fill={TRANSITION_COLORS[i % TRANSITION_COLORS.length]} />
+                    {throughputData.map((entry, i) =>
+                  <Cell key={i} fill={entry.fill} />
                   )}
                   </Bar>
                 </BarChart>
