@@ -106,15 +106,15 @@ export default function Reports() {
         <div>
           <div className="flex items-center gap-3 mb-1">
             <BarChart3 className="h-7 w-7 text-primary" />
-            <h1 className="text-2xl font-bold">Reports & Analytics</h1>
+            <h1 className="text-2xl font-bold">{t('reports.title')}</h1>
           </div>
           <p className="text-muted-foreground text-sm ml-10">
-            Operational insights across orders, production, and inventory
+            {t('reports.operational_insights')}
           </p>
         </div>
         <Button onClick={() => setShowExports(true)} className="bg-blue-600 hover:bg-blue-700 text-white">
           <FileDown className="mr-2 h-4 w-4" />
-          Exports
+          {t('reports.exports')}
         </Button>
       </div>
 
@@ -122,23 +122,23 @@ export default function Reports() {
         <TabsList className="grid w-full grid-cols-5 h-11">
           <TabsTrigger value="order-performance" className="flex items-center gap-2 text-xs sm:text-sm">
             <ClipboardList className="h-4 w-4 hidden sm:block" />
-            Order Performance
+            {t('reports.order_performance')}
           </TabsTrigger>
           <TabsTrigger value="production-flow" className="flex items-center gap-2 text-xs sm:text-sm">
             <Factory className="h-4 w-4 hidden sm:block" />
-            Production Flow
+            {t('reports.production_flow')}
           </TabsTrigger>
           <TabsTrigger value="machine-production" className="flex items-center gap-2 text-xs sm:text-sm">
             <Wrench className="h-4 w-4 hidden sm:block" />
-            Machine Rate
+            {t('reports.machine_rate')}
           </TabsTrigger>
           <TabsTrigger value="inventory-boxes" className="flex items-center gap-2 text-xs sm:text-sm">
             <Warehouse className="h-4 w-4 hidden sm:block" />
-            Inventory & Boxes
+            {t('reports.inventory_boxes')}
           </TabsTrigger>
           <TabsTrigger value="catalog-insights" className="flex items-center gap-2 text-xs sm:text-sm">
             <Tag className="h-4 w-4 hidden sm:block" />
-            Catalog Insights
+            {t('reports.catalog_insights')}
           </TabsTrigger>
         </TabsList>
 
