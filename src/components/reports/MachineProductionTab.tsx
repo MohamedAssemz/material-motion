@@ -62,7 +62,8 @@ function flattenBatches(batches: any[], dateField: string): FlatRecord[] {
   for (const b of batches) {
     for (const { col, type } of PHASE_COLUMNS) {
       const machineId = b[col];
-      if (machineId) {
+      // Skip machine assignments for batches that were retrieved from extra inventory at this phase
+      if (machineId && b.from_extra_state !== `extra_${type}`) {
         results.push({ machine_id: machineId, type, quantity: b.quantity || 1, date: b[dateField] });
       }
     }
