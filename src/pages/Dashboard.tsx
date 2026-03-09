@@ -611,7 +611,7 @@ export default function Dashboard() {
                 <p className="text-sm">All clear! No alerts.</p>
               </div>
             }
-            {data.lateBatches.map((b) =>
+            {(data.lateBatches || []).map((b) =>
             <Link key={`late-${b.id}`} to={`/orders/${b.order_id}`} className="flex items-start gap-2 p-2 rounded-md hover:bg-muted/50 transition-colors">
                 <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
                 <div className="min-w-0">
