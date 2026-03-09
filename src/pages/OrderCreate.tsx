@@ -37,7 +37,6 @@ interface Product {
   id: string;
   sku: string;
   name: string;
-  parent_product_id?: string | null;
 }
 
 interface Customer {
