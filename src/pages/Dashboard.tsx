@@ -162,7 +162,9 @@ export default function Dashboard() {
       supabase.from('extra_batches').select('quantity').eq('inventory_state', 'AVAILABLE'),
       supabase.from('shipments').select('id').gte('created_at', rangeStart),
       supabase.from('order_batches').select('product_id, quantity').in('current_state', ['shipped', 'ready_for_shipment']).gte('created_at', rangeStart),
-      supabase.from('machines').select('id, name')]
+      supabase.from('machines').select('id, name'),
+      supabase.from('order_batches').select('current_state, quantity').gte('updated_at', rangeStart),
+      supabase.from('orders').select('id, order_number, updated_at').eq('status', 'in_progress').lt('updated_at', new Date(Date.now() - 3 * 86400000).toISOString()).limit(10)]
       );
 
       const ordersByStatus: Record<string, number> = {};
