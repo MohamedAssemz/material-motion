@@ -104,8 +104,7 @@ export function BoxReceiveDialog({
         product:products(id, name, sku)
       `)
       .eq('box_id', box.id)
-      .eq('order_id', orderId)
-      .eq('is_terminated', false);
+      .eq('order_id', orderId);
 
     if (!batches || batches.length === 0) {
       toast({
