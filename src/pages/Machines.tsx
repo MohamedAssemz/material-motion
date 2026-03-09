@@ -2,16 +2,17 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { ArrowLeft, Plus, Settings, Loader2, Trash2 } from 'lucide-react';
+import { ArrowLeft, Plus, Loader2, Trash2, Pencil, Check, X, Hammer, Sparkles, Package, Box, Cog } from 'lucide-react';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 
 interface Machine {
   id: string;
@@ -21,6 +22,37 @@ interface Machine {
   created_at: string;
 }
 
+const TYPE_CONFIG: Record<string, { label: string; icon: React.ElementType; accent: string; bg: string; iconBg: string }> = {
+  manufacturing: {
+    label: 'Manufacturing',
+    icon: Hammer,
+    accent: 'text-blue-600',
+    bg: 'bg-blue-50 dark:bg-blue-950/30',
+    iconBg: 'bg-blue-100 dark:bg-blue-900/50',
+  },
+  finishing: {
+    label: 'Finishing',
+    icon: Sparkles,
+    accent: 'text-purple-600',
+    bg: 'bg-purple-50 dark:bg-purple-950/30',
+    iconBg: 'bg-purple-100 dark:bg-purple-900/50',
+  },
+  packaging: {
+    label: 'Packaging',
+    icon: Package,
+    accent: 'text-orange-600',
+    bg: 'bg-orange-50 dark:bg-orange-950/30',
+    iconBg: 'bg-orange-100 dark:bg-orange-900/50',
+  },
+  boxing: {
+    label: 'Boxing',
+    icon: Box,
+    accent: 'text-cyan-600',
+    bg: 'bg-cyan-50 dark:bg-cyan-950/30',
+    iconBg: 'bg-cyan-100 dark:bg-cyan-900/50',
+  },
+};
+
 export default function Machines() {
   const navigate = useNavigate();
   const { hasRole } = useAuth();
@@ -28,9 +60,11 @@ export default function Machines() {
   const [machines, setMachines] = useState<Machine[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [newMachine, setNewMachine] = useState<{ name: string; type: 'manufacturing' | 'packaging' }>({ name: '', type: 'manufacturing' });
+  const [newMachine, setNewMachine] = useState<{ name: string; type: 'manufacturing' | 'finishing' | 'packaging' | 'boxing' }>({ name: '', type: 'manufacturing' });
   const [submitting, setSubmitting] = useState(false);
   const [machineToDelete, setMachineToDelete] = useState<Machine | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState('');
 
   useEffect(() => {
     fetchMachines();
@@ -43,11 +77,9 @@ export default function Machines() {
         .select('*')
         .order('type', { ascending: true })
         .order('name', { ascending: true });
-
       if (error) throw error;
       setMachines(data as Machine[] || []);
-    } catch (error) {
-      console.error('Error fetching machines:', error);
+    } catch {
       toast.error('Failed to load machines');
     } finally {
       setLoading(false);
@@ -55,28 +87,16 @@ export default function Machines() {
   };
 
   const handleAddMachine = async () => {
-    if (!newMachine.name.trim()) {
-      toast.error('Machine name is required');
-      return;
-    }
-
+    if (!newMachine.name.trim()) { toast.error('Machine name is required'); return; }
     setSubmitting(true);
     try {
-      const { error } = await supabase
-        .from('machines')
-        .insert({
-          name: newMachine.name.trim(),
-          type: newMachine.type,
-        });
-
+      const { error } = await supabase.from('machines').insert({ name: newMachine.name.trim(), type: newMachine.type });
       if (error) throw error;
-
-      toast.success('Machine added successfully');
+      toast.success('Machine added');
       setDialogOpen(false);
       setNewMachine({ name: '', type: 'manufacturing' });
       fetchMachines();
-    } catch (error) {
-      console.error('Error adding machine:', error);
+    } catch {
       toast.error('Failed to add machine');
     } finally {
       setSubmitting(false);
@@ -85,19 +105,11 @@ export default function Machines() {
 
   const toggleMachineStatus = async (machine: Machine) => {
     try {
-      const { error } = await supabase
-        .from('machines')
-        .update({ is_active: !machine.is_active })
-        .eq('id', machine.id);
-
+      const { error } = await supabase.from('machines').update({ is_active: !machine.is_active }).eq('id', machine.id);
       if (error) throw error;
-
-      setMachines(prev =>
-        prev.map(m => m.id === machine.id ? { ...m, is_active: !m.is_active } : m)
-      );
+      setMachines(prev => prev.map(m => m.id === machine.id ? { ...m, is_active: !m.is_active } : m));
       toast.success(`Machine ${machine.is_active ? 'deactivated' : 'activated'}`);
-    } catch (error) {
-      console.error('Error updating machine:', error);
+    } catch {
       toast.error('Failed to update machine');
     }
   };
@@ -105,20 +117,38 @@ export default function Machines() {
   const handleDeleteMachine = async () => {
     if (!machineToDelete) return;
     try {
-      const { error } = await supabase
-        .from('machines')
-        .delete()
-        .eq('id', machineToDelete.id);
-
+      const { error } = await supabase.from('machines').delete().eq('id', machineToDelete.id);
       if (error) throw error;
-
       setMachines(prev => prev.filter(m => m.id !== machineToDelete.id));
-      toast.success('Machine deleted successfully');
-    } catch (error) {
-      console.error('Error deleting machine:', error);
+      toast.success('Machine deleted');
+    } catch {
       toast.error('Failed to delete machine. It may be linked to production records.');
     } finally {
       setMachineToDelete(null);
+    }
+  };
+
+  const startEdit = (machine: Machine) => {
+    setEditingId(machine.id);
+    setEditingName(machine.name);
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditingName('');
+  };
+
+  const saveEdit = async (machine: Machine) => {
+    if (!editingName.trim()) { toast.error('Name cannot be empty'); return; }
+    try {
+      const { error } = await supabase.from('machines').update({ name: editingName.trim() }).eq('id', machine.id);
+      if (error) throw error;
+      setMachines(prev => prev.map(m => m.id === machine.id ? { ...m, name: editingName.trim() } : m));
+      toast.success('Machine renamed');
+    } catch {
+      toast.error('Failed to rename machine');
+    } finally {
+      cancelEdit();
     }
   };
 
@@ -130,52 +160,10 @@ export default function Machines() {
     );
   }
 
-  const manufacturingMachines = machines.filter(m => m.type === 'manufacturing');
-  const finishingMachines = machines.filter(m => m.type === 'finishing');
-  const packagingMachines = machines.filter(m => m.type === 'packaging');
-  const boxingMachines = machines.filter(m => m.type === 'boxing');
-
-  const renderMachineList = (list: Machine[], emptyLabel: string) => (
-    list.length === 0 ? (
-      <p className="text-muted-foreground text-center py-4">{emptyLabel}</p>
-    ) : (
-      <div className="space-y-3">
-        {list.map(machine => (
-          <div key={machine.id} className="flex items-center justify-between p-3 border rounded-lg">
-            <div>
-              <p className="font-medium">{machine.name}</p>
-              <p className="text-sm text-muted-foreground">
-                {machine.is_active ? 'Active' : 'Inactive'}
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              {isAdmin && (
-                <>
-                  <Switch
-                    checked={machine.is_active}
-                    onCheckedChange={() => toggleMachineStatus(machine)}
-                  />
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="text-destructive hover:text-destructive"
-                    onClick={() => setMachineToDelete(machine)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </>
-              )}
-              {!isAdmin && (
-                <span className={`text-xs font-medium px-2 py-1 rounded ${machine.is_active ? 'bg-green-100 text-green-700' : 'bg-muted text-muted-foreground'}`}>
-                  {machine.is_active ? 'Active' : 'Inactive'}
-                </span>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
-    )
-  );
+  const grouped = (['manufacturing', 'finishing', 'packaging', 'boxing'] as const).map(type => ({
+    type,
+    machines: machines.filter(m => m.type === type),
+  }));
 
   return (
     <div className="min-h-screen bg-background">
@@ -185,7 +173,7 @@ export default function Machines() {
             <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
               <ArrowLeft className="h-5 w-5" />
             </Button>
-            <Settings className="h-6 w-6 text-primary" />
+            <Cog className="h-6 w-6 text-primary" />
             <div>
               <h1 className="text-xl font-bold">Machines</h1>
               <p className="text-sm text-muted-foreground">Manage production equipment</p>
@@ -211,30 +199,23 @@ export default function Machines() {
                       value={newMachine.name}
                       onChange={(e) => setNewMachine(prev => ({ ...prev, name: e.target.value }))}
                       placeholder="e.g., Machine A"
+                      onKeyDown={(e) => e.key === 'Enter' && handleAddMachine()}
                     />
                   </div>
                   <div className="space-y-2">
                     <Label>Type</Label>
-                    <Select
-                      value={newMachine.type}
-                      onValueChange={(value) => setNewMachine(prev => ({ ...prev, type: value as 'manufacturing' | 'packaging' }))}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
+                    <Select value={newMachine.type} onValueChange={(v) => setNewMachine(prev => ({ ...prev, type: v as typeof newMachine.type }))}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="manufacturing">Manufacturing</SelectItem>
-                        <SelectItem value="finishing">Finishing</SelectItem>
-                        <SelectItem value="packaging">Packaging</SelectItem>
-                        <SelectItem value="boxing">Boxing</SelectItem>
+                        {Object.entries(TYPE_CONFIG).map(([key, cfg]) => (
+                          <SelectItem key={key} value={key}>{cfg.label}</SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
                 </div>
                 <DialogFooter>
-                  <Button variant="outline" onClick={() => setDialogOpen(false)}>
-                    Cancel
-                  </Button>
+                  <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
                   <Button onClick={handleAddMachine} disabled={submitting}>
                     {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Add Machine'}
                   </Button>
@@ -245,24 +226,114 @@ export default function Machines() {
         </div>
       </header>
 
-      <div className="container mx-auto p-6 space-y-6">
-        <div className="grid gap-6 md:grid-cols-2">
-          <Card>
-            <CardHeader><CardTitle>Manufacturing Machines</CardTitle></CardHeader>
-            <CardContent>{renderMachineList(manufacturingMachines, 'No manufacturing machines')}</CardContent>
-          </Card>
-          <Card>
-            <CardHeader><CardTitle>Finishing Machines</CardTitle></CardHeader>
-            <CardContent>{renderMachineList(finishingMachines, 'No finishing machines')}</CardContent>
-          </Card>
-          <Card>
-            <CardHeader><CardTitle>Packaging Machines</CardTitle></CardHeader>
-            <CardContent>{renderMachineList(packagingMachines, 'No packaging machines')}</CardContent>
-          </Card>
-          <Card>
-            <CardHeader><CardTitle>Boxing Machines</CardTitle></CardHeader>
-            <CardContent>{renderMachineList(boxingMachines, 'No boxing machines')}</CardContent>
-          </Card>
+      <div className="container mx-auto p-6">
+        <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
+          {grouped.map(({ type, machines: list }) => {
+            const cfg = TYPE_CONFIG[type];
+            const Icon = cfg.icon;
+            const activeCount = list.filter(m => m.is_active).length;
+            return (
+              <div key={type} className={cn('rounded-2xl border border-border overflow-hidden', cfg.bg)}>
+                {/* Section header */}
+                <div className="px-5 pt-5 pb-4 flex items-center gap-3">
+                  <div className={cn('p-2 rounded-xl', cfg.iconBg)}>
+                    <Icon className={cn('h-5 w-5', cfg.accent)} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-foreground">{cfg.label}</p>
+                    <p className="text-xs text-muted-foreground">{activeCount}/{list.length} active</p>
+                  </div>
+                  <Badge variant="outline" className="text-xs shrink-0">
+                    {list.length}
+                  </Badge>
+                </div>
+
+                {/* Machine list */}
+                <div className="px-3 pb-4 space-y-2">
+                  {list.length === 0 ? (
+                    <div className="text-center py-6 text-muted-foreground text-sm">
+                      No machines yet
+                    </div>
+                  ) : (
+                    list.map(machine => (
+                      <div
+                        key={machine.id}
+                        className="bg-card rounded-xl border border-border px-4 py-3 flex items-center gap-3 group"
+                      >
+                        {/* Status dot */}
+                        <span className={cn(
+                          'h-2 w-2 rounded-full shrink-0 transition-colors',
+                          machine.is_active ? 'bg-green-500' : 'bg-muted-foreground/40'
+                        )} />
+
+                        {/* Name / inline edit */}
+                        <div className="flex-1 min-w-0">
+                          {editingId === machine.id ? (
+                            <Input
+                              autoFocus
+                              value={editingName}
+                              onChange={e => setEditingName(e.target.value)}
+                              onKeyDown={e => { if (e.key === 'Enter') saveEdit(machine); if (e.key === 'Escape') cancelEdit(); }}
+                              className="h-7 text-sm"
+                            />
+                          ) : (
+                            <p className={cn('text-sm font-medium truncate', !machine.is_active && 'text-muted-foreground')}>
+                              {machine.name}
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Actions */}
+                        {isAdmin && (
+                          <div className="flex items-center gap-1 shrink-0">
+                            {editingId === machine.id ? (
+                              <>
+                                <Button variant="ghost" size="icon" className="h-7 w-7 text-green-600 hover:text-green-700" onClick={() => saveEdit(machine)}>
+                                  <Check className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={cancelEdit}>
+                                  <X className="h-3.5 w-3.5" />
+                                </Button>
+                              </>
+                            ) : (
+                              <>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+                                  onClick={() => startEdit(machine)}
+                                >
+                                  <Pencil className="h-3.5 w-3.5" />
+                                </Button>
+                                <Switch
+                                  checked={machine.is_active}
+                                  onCheckedChange={() => toggleMachineStatus(machine)}
+                                  className="scale-75"
+                                />
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7 text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                                  onClick={() => setMachineToDelete(machine)}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </>
+                            )}
+                          </div>
+                        )}
+                        {!isAdmin && (
+                          <span className={cn('text-xs font-medium px-2 py-0.5 rounded-full', machine.is_active ? 'bg-green-100 text-green-700' : 'bg-muted text-muted-foreground')}>
+                            {machine.is_active ? 'Active' : 'Inactive'}
+                          </span>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 
@@ -271,7 +342,7 @@ export default function Machines() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Machine</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete "{machineToDelete?.name}"? This action cannot be undone. If this machine has production records linked to it, deletion may fail.
+              Are you sure you want to delete "{machineToDelete?.name}"? This cannot be undone. If this machine has production records linked to it, deletion may fail.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
