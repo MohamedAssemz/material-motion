@@ -1154,31 +1154,31 @@ export default function OrderBoxing() {
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <Card>
           <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Ready for Boxing</p>
+            <p className="text-sm text-muted-foreground">{t('boxing.ready_for_boxing')}</p>
             <p className="text-2xl font-bold text-warning">{totalReadyForBoxing}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">In Boxing</p>
+            <p className="text-sm text-muted-foreground">{t('boxing.in_boxing_phase')}</p>
             <p className="text-2xl font-bold text-primary">{totalInBoxing}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Ready for Shipment</p>
+            <p className="text-sm text-muted-foreground">{t('boxing.ready_for_shipment')}</p>
             <p className="text-2xl font-bold text-green-600">{totalReadyForShipment}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Total Kartonas</p>
+            <p className="text-sm text-muted-foreground">{t('boxing.total_kartonas')}</p>
             <p className="text-2xl font-bold text-purple-600">{shipments.length}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Total Shipped</p>
+            <p className="text-sm text-muted-foreground">{t('boxing.total_shipped')}</p>
             <p className="text-2xl font-bold text-green-600">{totalShipped}</p>
           </CardContent>
         </Card>
