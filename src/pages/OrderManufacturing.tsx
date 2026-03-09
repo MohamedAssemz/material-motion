@@ -638,79 +638,9 @@ export default function OrderManufacturing() {
   };
 
   const handleTerminate = async () => {
-    if (totalSelected === 0 || !terminateReason.trim()) return;
-    setSubmitting(true);
-
-    try {
-      for (const [groupKey, quantity] of productSelections.entries()) {
-        if (quantity <= 0) continue;
-
-        const group = productGroups.find((g) => g.groupKey === groupKey);
-        if (!group) continue;
-
-        let remainingQty = quantity;
-        const batchesToTerminate = group.batches;
-
-        for (const batch of batchesToTerminate) {
-          if (remainingQty <= 0) break;
-
-          const useQty = Math.min(batch.quantity, remainingQty);
-          remainingQty -= useQty;
-
-          if (useQty === batch.quantity) {
-            await supabase
-              .from("order_batches")
-              .update({
-                is_terminated: true,
-                terminated_by: user?.id,
-                terminated_reason: terminateReason.trim(),
-              })
-              .eq("id", batch.id);
-          } else {
-            // Create terminated batch
-            const { data: qrCode } = await supabase.rpc("generate_extra_batch_code");
-            await supabase.from("order_batches").insert({
-              qr_code_data: qrCode,
-              order_id: id,
-              product_id: batch.product_id,
-              order_item_id: batch.order_item_id,
-              current_state: batch.current_state,
-              quantity: useQty,
-              is_terminated: true,
-              terminated_by: user?.id,
-              terminated_reason: terminateReason.trim(),
-              created_by: user?.id,
-            });
-
-            await supabase
-              .from("order_batches")
-              .update({
-                quantity: batch.quantity - useQty,
-              })
-              .eq("id", batch.id);
-          }
-        }
-      }
-
-      // Update order termination counter
-      const { data: orderData } = await supabase.from("orders").select("termination_counter").eq("id", id).single();
-      await supabase
-        .from("orders")
-        .update({
-          termination_counter: (orderData?.termination_counter || 0) + totalSelected,
-        })
-        .eq("id", id);
-
-      toast.success(`Terminated ${totalSelected} items`);
-      setTerminateDialogOpen(false);
-      setTerminateReason("");
-      setProductSelections(new Map());
-      fetchData();
-    } catch (error: any) {
-      toast.error(error.message);
-    } finally {
-      setSubmitting(false);
-    }
+    toast.error("Terminate is not available in this version.");
+    setTerminateDialogOpen(false);
+    setTerminateReason("");
   };
 
   const handleMarkRedo = async () => {
