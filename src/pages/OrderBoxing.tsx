@@ -1330,14 +1330,12 @@ export default function OrderBoxing() {
                           {canManage && !isCancelled && (
                             <div className="flex items-center gap-2">
                               <Label className="text-xs text-muted-foreground">Select</Label>
-                              <Input
-                                type="number"
+                              <NumericInput
                                 min={0}
                                 max={group.quantity}
-                                value={productSelections.get(key) || 0}
-                                onChange={(e) => {
-                                  const val = Math.min(Math.max(0, parseInt(e.target.value) || 0), group.quantity);
-                                  setProductSelections((prev) => new Map(prev).set(key, val));
+                                value={productSelections.get(key) || undefined}
+                                onValueChange={(val) => {
+                                  setProductSelections((prev) => new Map(prev).set(key, val ?? 0));
                                 }}
                                 className="w-20 h-8"
                               />
