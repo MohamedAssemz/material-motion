@@ -89,10 +89,10 @@ export default function Reports() {
               <ArrowLeft className="h-6 w-6 text-muted-foreground" />
             </button>
             <FileDown className="h-7 w-7 text-primary" />
-            <h1 className="text-2xl font-bold">Exports</h1>
+            <h1 className="text-2xl font-bold">{t('reports.exports')}</h1>
           </div>
           <Button variant="outline" onClick={() => setShowExports(false)}>
-            ← Back to Reports
+            ← {t('common.back')}
           </Button>
         </div>
         <ExportsTab />
