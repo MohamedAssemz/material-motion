@@ -717,21 +717,21 @@ export default function OrderManufacturing() {
               <CardContent className="p-4 flex flex-wrap items-center gap-3">
                 <div className="flex-1 text-sm text-muted-foreground">
                   {totalSelected > 0
-                    ? `${totalSelected} selected${totalSelectedInManufacturing > 0 ? ` (${totalSelectedInManufacturing} in manufacturing)` : ""}`
-                    : "Select quantities below, then choose an action"}
+                    ? `${totalSelected} ${t('phase.selected')}${totalSelectedInManufacturing > 0 ? ` (${totalSelectedInManufacturing} ${t('phase.in_manufacturing').toLowerCase()})` : ""}`
+                    : t('phase.select_quantities')}
                 </div>
                 <Button onClick={handleOpenBoxDialog} disabled={totalSelected === 0}>
                   <Box className="h-4 w-4 mr-2" />
-                  Assign to Box
+                  {t('phase.assign_to_box')}
                 </Button>
                 <Button
                   variant="secondary"
                   onClick={() => setMoveToExtraDialogOpen(true)}
                   disabled={totalSelectedInManufacturing === 0}
-                  title="Move selected items from 'In Manufacturing' to Extra Inventory"
+                  title={t('phase.assign_to_extra')}
                 >
                   <Package className="h-4 w-4 mr-2" />
-                  Assign to Extra
+                  {t('phase.assign_to_extra')}
                 </Button>
               </CardContent>
             </Card>
