@@ -27,9 +27,7 @@ interface DashboardData {
   batchesByState: Record<string, number>;
   lateOrderCount: number;
   newOrdersToday: number;
-  flaggedBatchCount: number;
   lateBatches: Array<{ id: string; order_id: string; product_id: string; eta: string; quantity: number; order: { order_number: string; status: string } | null }>;
-  flaggedBatches: Array<{ id: string; order_id: string; flagged_reason: string | null; quantity: number; order: { order_number: string; status: string } | null }>;
   approachingEtaOrders: Array<{ id: string; order_number: string; estimated_fulfillment_time: string }>;
   todayThroughput: Record<string, number>;
   extraInventoryCount: number;
@@ -147,7 +145,6 @@ export default function Dashboard() {
         newOrdersTodayRes,
         batchesRes,
         lateBatchesRes,
-        flaggedBatchesRes,
         approachingRes,
         throughputRes,
         extraRes,
@@ -159,15 +156,14 @@ export default function Dashboard() {
         user ? supabase.from('profiles').select('full_name').eq('id', user.id).single() : Promise.resolve({ data: null }),
         supabase.from('orders').select('status').gte('created_at', rangeStart),
         supabase.from('orders').select('id').gte('created_at', todayStart),
-        supabase.from('order_batches').select('current_state, quantity, order:orders!inner(status)').eq('is_terminated', false).neq('order.status', 'cancelled').gte('created_at', rangeStart),
-        supabase.from('order_batches').select('id, order_id, product_id, eta, quantity, order:orders(order_number, status)').eq('is_terminated', false).not('current_state', 'in', '(shipped,ready_for_shipment)').not('eta', 'is', null).lt('eta', now).limit(50),
-        supabase.from('order_batches').select('id, order_id, flagged_reason, quantity, order:orders(order_number, status)').eq('is_flagged', true).eq('is_terminated', false).limit(50),
+        supabase.from('order_batches').select('current_state, quantity, order:orders!inner(status)').neq('order.status', 'cancelled').gte('created_at', rangeStart),
+        supabase.from('order_batches').select('id, order_id, product_id, eta, quantity, order:orders(order_number, status)').not('current_state', 'in', '(shipped,ready_for_shipment)').not('eta', 'is', null).lt('eta', now).limit(50),
         supabase.from('orders').select('id, order_number, estimated_fulfillment_time').not('estimated_fulfillment_time', 'is', null).gt('estimated_fulfillment_time', now).lt('estimated_fulfillment_time', twoDaysFromNow).neq('status', 'completed').neq('status', 'cancelled').limit(5),
         supabase.from('machine_production').select('state_transition').gte('created_at', rangeStart),
         supabase.from('extra_batches').select('quantity').eq('inventory_state', 'AVAILABLE'),
         supabase.from('shipments').select('id').gte('created_at', rangeStart),
         // Top products: shipped/ready_for_shipment batches in time range (excluding cancelled)
-        supabase.from('order_batches').select('product_id, quantity, order:orders!inner(status)').in('current_state', ['shipped', 'ready_for_shipment']).eq('is_terminated', false).neq('order.status', 'cancelled').gte('created_at', rangeStart),
+        supabase.from('order_batches').select('product_id, quantity, order:orders!inner(status)').in('current_state', ['shipped', 'ready_for_shipment']).neq('order.status', 'cancelled').gte('created_at', rangeStart),
         // Machine production with machine_id for top machines
         supabase.from('machine_production').select('machine_id').gte('created_at', rangeStart),
         supabase.from('machines').select('id, name'),
@@ -186,7 +182,6 @@ export default function Dashboard() {
 
       // Filter out cancelled orders from alerts
       const activeLate = ((lateBatchesRes.data || []) as any[]).filter(b => b.order?.status !== 'cancelled');
-      const activeFlagged = ((flaggedBatchesRes.data || []) as any[]).filter(b => b.order?.status !== 'cancelled');
       const lateOrderIds = new Set(activeLate.map(b => b.order_id));
 
       // Top 3 products by finished quantity
@@ -314,7 +309,7 @@ export default function Dashboard() {
 
   if (!data) return null;
 
-  const alertCount = data.lateBatches.length + data.flaggedBatches.length + data.approachingEtaOrders.length;
+  const alertCount = data.lateBatches.length + data.approachingEtaOrders.length;
 
   return (
     <div className="p-4 md:p-6 space-y-6">

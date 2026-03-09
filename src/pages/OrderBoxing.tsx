@@ -162,7 +162,6 @@ export default function OrderBoxing() {
             "id, qr_code_data, current_state, quantity, product_id, order_item_id, box_id, manufacturing_machine_id, finishing_machine_id, packaging_machine_id, boxing_machine_id, from_extra_state, product:products(id, name, sku, needs_packing)",
           )
           .eq("order_id", id)
-          .eq("is_terminated", false)
           .in("current_state", ["ready_for_boxing", "in_boxing", "ready_for_shipment", "shipped"]),
       ]);
 
@@ -643,9 +642,8 @@ export default function OrderBoxing() {
               .eq("order_id", id)
               .eq("product_id", batch.product_id)
               .eq("order_item_id", batch.order_item_id)
-              .eq("current_state", "ready_for_shipment")
-              .eq("is_terminated", false);
-            
+              .eq("current_state", "ready_for_shipment");
+
             if (batch.from_extra_state) {
               existingBatchQuery2 = existingBatchQuery2.eq("from_extra_state", batch.from_extra_state);
             } else {
@@ -818,9 +816,8 @@ export default function OrderBoxing() {
               .eq("product_id", batch.product_id)
               .eq("order_item_id", batch.order_item_id)
               .eq("current_state", "shipped")
-              .eq("shipment_id", shipment.id)
-              .eq("is_terminated", false);
-            
+              .eq("shipment_id", shipment.id);
+
             if (batch.from_extra_state) {
               existingShipBatchQuery2 = existingShipBatchQuery2.eq("from_extra_state", batch.from_extra_state);
             } else {

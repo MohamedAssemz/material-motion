@@ -39,8 +39,6 @@ export default function Reports() {
         ordersRes,
         productsRes,
         orderItemsRes,
-        unitHistoryRes,
-        unitsRes,
         boxesRes,
         shipmentsRes,
         extraHistoryRes,
@@ -48,8 +46,6 @@ export default function Reports() {
         supabase.from('orders').select('id, order_number, status, priority, created_at, updated_at, estimated_fulfillment_time, customer_id'),
         supabase.from('products').select('id, name'),
         supabase.from('order_items').select('order_id, product_id, quantity'),
-        supabase.from('unit_history').select('unit_id, prev_state, new_state, created_at'),
-        supabase.from('units').select('id, state, product_id'),
         supabase.from('boxes').select('id, box_code, created_at, items_list'),
         supabase.from('shipments').select('id, created_at, status'),
         supabase.from('extra_batch_history').select('event_type, quantity, created_at, from_state, product_id'),
@@ -58,8 +54,8 @@ export default function Reports() {
       setOrders(ordersRes.data || []);
       setProducts(productsRes.data || []);
       setOrderItems(orderItemsRes.data || []);
-      setUnitHistory(unitHistoryRes.data || []);
-      setUnits(unitsRes.data || []);
+      setUnitHistory([]);
+      setUnits([]);
       setBoxes(boxesRes.data || []);
       setShipments(shipmentsRes.data || []);
       setExtraHistory(extraHistoryRes.data || []);

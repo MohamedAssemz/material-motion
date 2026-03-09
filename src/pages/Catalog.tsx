@@ -118,7 +118,7 @@ export default function Catalog() {
           brand:brands(id, name),
           categories:product_categories(category:categories(id, name)),
           images:product_images(id, image_url, is_main, sort_order),
-          potential_customers:product_potential_customers(customer:customers(id, name, code))
+          product_customers:product_customers(customer:customers(id, name, code))
         `).order('created_at', { ascending: false }),
         supabase.from('categories').select('*').order('name'),
         supabase.from('brands').select('*').order('name'),
@@ -283,10 +283,10 @@ export default function Catalog() {
       // Delete related data first
       await Promise.all([
         supabase.from('product_categories').delete().eq('product_id', productToDelete.id),
-        supabase.from('product_potential_customers').delete().eq('product_id', productToDelete.id),
+        supabase.from('product_customers').delete().eq('product_id', productToDelete.id),
         supabase.from('product_images').delete().eq('product_id', productToDelete.id),
       ]);
-      
+
       // Delete the product
       const { error } = await supabase
         .from('products')
