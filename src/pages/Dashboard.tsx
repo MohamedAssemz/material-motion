@@ -620,7 +620,7 @@ export default function Dashboard() {
                 </div>
               </Link>
             )}
-            {data.flaggedBatches.map((b) =>
+            {(data.flaggedBatches || []).map((b) =>
             <Link key={`flag-${b.id}`} to={`/orders/${b.order_id}`} className="flex items-start gap-2 p-2 rounded-md hover:bg-muted/50 transition-colors">
                 <Flag className="h-4 w-4 text-warning mt-0.5 shrink-0" />
                 <div className="min-w-0">
