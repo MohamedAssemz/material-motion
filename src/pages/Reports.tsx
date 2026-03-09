@@ -3,12 +3,13 @@ import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { BarChart3, FileDown, ClipboardList, Factory, Warehouse, Tag, ArrowLeft } from 'lucide-react';
+import { BarChart3, FileDown, ClipboardList, Factory, Warehouse, Tag, ArrowLeft, Wrench } from 'lucide-react';
 import { ExportsTab } from '@/components/reports/ExportsTab';
 import { OrderPerformanceTab } from '@/components/reports/OrderPerformanceTab';
 import { ProductionFlowTab } from '@/components/reports/ProductionFlowTab';
 import { InventoryBoxesTab } from '@/components/reports/InventoryBoxesTab';
 import { CatalogInsightsTab } from '@/components/reports/CatalogInsightsTab';
+import { MachineProductionTab } from '@/components/reports/MachineProductionTab';
 
 export default function Reports() {
   const [loading, setLoading] = useState(true);
@@ -116,7 +117,7 @@ export default function Reports() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4 h-11">
+        <TabsList className="grid w-full grid-cols-5 h-11">
           <TabsTrigger value="order-performance" className="flex items-center gap-2 text-xs sm:text-sm">
             <ClipboardList className="h-4 w-4 hidden sm:block" />
             Order Performance
@@ -124,6 +125,10 @@ export default function Reports() {
           <TabsTrigger value="production-flow" className="flex items-center gap-2 text-xs sm:text-sm">
             <Factory className="h-4 w-4 hidden sm:block" />
             Production Flow
+          </TabsTrigger>
+          <TabsTrigger value="machine-production" className="flex items-center gap-2 text-xs sm:text-sm">
+            <Wrench className="h-4 w-4 hidden sm:block" />
+            Machine Rate
           </TabsTrigger>
           <TabsTrigger value="inventory-boxes" className="flex items-center gap-2 text-xs sm:text-sm">
             <Warehouse className="h-4 w-4 hidden sm:block" />
@@ -141,6 +146,10 @@ export default function Reports() {
 
         <TabsContent value="production-flow">
           <ProductionFlowTab unitHistory={unitHistory} units={units} products={products} />
+        </TabsContent>
+
+        <TabsContent value="machine-production">
+          <MachineProductionTab />
         </TabsContent>
 
         <TabsContent value="inventory-boxes">
