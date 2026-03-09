@@ -1195,11 +1195,11 @@ export default function OrderBoxing() {
 
       <Tabs defaultValue={defaultTab} className="space-y-4">
         <TabsList className="grid grid-cols-5 w-full max-w-3xl">
-          <TabsTrigger value="receive">Receive ({readyBoxGroups.length})</TabsTrigger>
-          <TabsTrigger value="process">Process ({totalInBoxing})</TabsTrigger>
-          <TabsTrigger value="extra">Extra</TabsTrigger>
-          <TabsTrigger value="ready">Ready ({totalReadyForShipment})</TabsTrigger>
-          <TabsTrigger value="shipments">Shipments ({shipments.length})</TabsTrigger>
+          <TabsTrigger value="receive">{t('phase.receive')} ({readyBoxGroups.length})</TabsTrigger>
+          <TabsTrigger value="process">{t('phase.process')} ({totalInBoxing})</TabsTrigger>
+          <TabsTrigger value="extra">{t('phase.extra')}</TabsTrigger>
+          <TabsTrigger value="ready">{t('phase.ready')} ({totalReadyForShipment})</TabsTrigger>
+          <TabsTrigger value="shipments">{t('phase.shipments')} ({shipments.length})</TabsTrigger>
         </TabsList>
 
         <TabsContent value="receive" className="space-y-4">
