@@ -1,42 +1,28 @@
 
+The error "column order_batches_is_terminated does not exist" occurs when opening box details because the BoxDetailsDialog component still contains a database query that filters by the `is_terminated` column, which was recently removed from the schema.
 
-## Plan: Order Cancellation Freeze Logic
+## Root Cause Analysis
+Looking at the network requests and the error message, the issue is in the `BoxDetailsDialog` component's `fetchBatchDetails` function. The code is trying to query the `order_batches` table with an `.eq('is_terminated', false)` filter, but this column no longer exists in the database schema.
 
-### Requirements
-1. When an order is cancelled, freeze all actions on phase pages **except** production rate (machine) assignment (which still respects role permissions)
-2. Unretrieved reserved extra batches should be released back to AVAILABLE on cancellation
+## Technical Investigation Required
+I need to:
+1. Read the BoxDetailsDialog component to identify the exact location of the problematic query
+2. Check if there are similar issues in related components that handle box details
+3. Verify the current database schema to confirm the column removal
 
-### Analysis
-- Requirement 2 is **already implemented** in `handleCancelOrder` in `OrderDetail.tsx` (lines 462-471) — it releases reserved extra batches back to AVAILABLE
-- Requirement 1 needs changes across 4 phase pages and their child components
+## Proposed Solution
+1. **Remove Deprecated Filter**: Update the `fetchBatchDetails` function in `BoxDetailsDialog` to remove the `.eq('is_terminated', false)` filter from the `order_batches` query
+2. **Update Extra Batches Query**: Also check and fix the similar query for `extra_batches` if it exists
+3. **Test Box Operations**: Verify that box viewing, batch display, and related operations work correctly after the fix
 
-### Implementation
+## Files to Modify
+- `src/components/BoxDetailsDialog.tsx` - Remove `is_terminated` filter from batch queries
+- Potentially other box-related components if similar issues exist
 
-**Core approach:** Each phase page already has a `canManage` boolean that gates actions. Add an `isCancelled` check derived from `order?.status === 'cancelled'` and use it to disable all actions except machine assignment.
+## Implementation Steps
+1. Read the BoxDetailsDialog component to locate the problematic queries
+2. Remove all references to the `is_terminated` column
+3. Ensure the queries still return the correct batch data for display
+4. Test that the box details dialog opens and displays batch information correctly
 
-**Files to modify:**
-
-1. **`OrderManufacturing.tsx`** — Add `const isCancelled = order?.status === 'cancelled'`. Pass `isCancelled` to disable:
-   - Box assignment dialog actions
-   - Terminate/redo actions
-   - MoveToExtraDialog
-   - ExtraItemsTab `canManage` → `canManage && !isCancelled`
-   - BoxReceiveDialog actions
-   - Keep `ProductionRateSection canManage={canManage}` unchanged (still allows machine assignment)
-
-2. **`OrderFinishing.tsx`** — Same pattern: `isCancelled` disables accept boxes, assign to box, MoveToExtraDialog, ExtraItemsTab, but keeps ProductionRateSection canManage unchanged.
-
-3. **`OrderPackaging.tsx`** — Same pattern.
-
-4. **`OrderBoxing.tsx`** — Same pattern. Additionally disable shipment creation.
-
-5. **`OrderDetail.tsx`** — Add a visible "Cancelled" banner/badge. The cancel button is already hidden when `status === 'cancelled'`. Start Order and Extra Inventory sections are already gated to pending orders, so no changes needed there.
-
-**Specific prop changes per phase page:**
-- `ExtraItemsTab canManage={canManage && !isCancelled}` — freezes extra retrieval
-- `ProductionRateSection canManage={canManage}` — unchanged, still allows machine assignment
-- All action buttons (accept, assign, terminate, redo, move to extra, create shipment) gated with `!isCancelled`
-- Box receive dialogs disabled when cancelled
-
-**No database changes needed** — the cancellation already releases reserved batches.
-
+This is a straightforward database query cleanup that should resolve the error immediately.
