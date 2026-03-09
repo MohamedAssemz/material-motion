@@ -29,8 +29,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { RawMaterialsDrawer } from "@/components/RawMaterialsDrawer";
 
 import { ShipmentDialog } from "@/components/ShipmentDialog";
-import { BoxAssignmentDialog } from "@/components/BoxAssignmentDialog";
-import { LeadTimeDialog } from "@/components/LeadTimeDialog";
 import { ExtraInventoryDialog } from "@/components/ExtraInventoryDialog";
 import { StartOrderDialog } from "@/components/StartOrderDialog";
 import { OrderCommentsDrawer } from "@/components/OrderCommentsDrawer";
@@ -147,8 +145,6 @@ export default function OrderDetail() {
   const [rawMaterialsOpen, setRawMaterialsOpen] = useState(false);
   
   const [shipmentDialogOpen, setShipmentDialogOpen] = useState(false);
-  const [boxAssignDialogOpen, setBoxAssignDialogOpen] = useState(false);
-  const [leadTimeDialogOpen, setLeadTimeDialogOpen] = useState(false);
   const [extraInventoryOpen, setExtraInventoryOpen] = useState(false);
   const [startOrderOpen, setStartOrderOpen] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
@@ -1080,8 +1076,6 @@ export default function OrderDetail() {
         }))}
         onRefresh={fetchOrder}
       />
-      <BoxAssignmentDialog open={boxAssignDialogOpen} onOpenChange={setBoxAssignDialogOpen} orderId={id!} onAssigned={fetchOrder} />
-      <LeadTimeDialog open={leadTimeDialogOpen} onOpenChange={setLeadTimeDialogOpen} />
       <ExtraInventoryDialog 
         open={extraInventoryOpen} 
         onOpenChange={setExtraInventoryOpen} 
@@ -1103,7 +1097,6 @@ export default function OrderDetail() {
         open={startOrderOpen} 
         onOpenChange={setStartOrderOpen}
         orderId={id!}
-        orderNumber={order?.order_number || ''}
         orderItems={orderItems}
         onOrderStarted={() => {
           fetchOrder();
