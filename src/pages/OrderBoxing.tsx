@@ -583,7 +583,14 @@ export default function OrderBoxing() {
         // to consolidate into instead of creating new batches
         const orderItemId = group.order_item_ids[0]; // Use first order_item_id for consolidation
         
-        for (const batch of group.batches) {
+        // Sort batches: prioritize those with machine assigned, then by quantity
+        const sortedBatches = [...group.batches].sort((a, b) => {
+          const aHasMachine = a.boxing_machine_id ? 0 : 1;
+          const bHasMachine = b.boxing_machine_id ? 0 : 1;
+          if (aHasMachine !== bHasMachine) return aHasMachine - bHasMachine;
+          return a.quantity - b.quantity;
+        });
+        for (const batch of sortedBatches) {
           if (remainingQty <= 0) break;
           const useQty = Math.min(batch.quantity, remainingQty);
           remainingQty -= useQty;
