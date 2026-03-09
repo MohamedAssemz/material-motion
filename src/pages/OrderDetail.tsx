@@ -1259,9 +1259,6 @@ export default function OrderDetail() {
 
       {/* Dialogs */}
       <RawMaterialsDrawer open={rawMaterialsOpen} onOpenChange={setRawMaterialsOpen} orderId={id!} orderNumber={order?.order_number || ""} />
-      <FlaggedItemsDialog 
-        open={flaggedItemsOpen} 
-        onOpenChange={setFlaggedItemsOpen} 
         orderId={id!}
         batches={(order?.batches || []).filter(b => b.is_flagged || b.is_redo).map(b => ({
           id: b.id,

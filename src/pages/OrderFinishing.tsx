@@ -405,7 +405,6 @@ export default function OrderFinishing() {
         .from("order_batches")
         .select("id")
         .eq("box_id", box.id)
-        .eq("is_terminated", false)
         .limit(1);
 
       if (existingBatches && existingBatches.length > 0) {
