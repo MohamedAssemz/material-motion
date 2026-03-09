@@ -146,7 +146,6 @@ export default function Dashboard() {
         batchesRes,
         lateBatchesRes,
         approachingRes,
-        throughputRes,
         extraRes,
         shipmentsRes,
         shippedBatchesRes,
@@ -173,9 +172,6 @@ export default function Dashboard() {
 
       const batchesByState: Record<string, number> = {};
       (batchesRes.data || []).forEach(b => { batchesByState[b.current_state] = (batchesByState[b.current_state] || 0) + b.quantity; });
-
-      const todayThroughput: Record<string, number> = {};
-      (throughputRes.data || []).forEach(t => { todayThroughput[t.state_transition] = (todayThroughput[t.state_transition] || 0) + 1; });
 
       const extraInventoryCount = (extraRes.data || []).reduce((s, b) => s + b.quantity, 0);
 
@@ -206,10 +202,16 @@ export default function Dashboard() {
       const totalFinished = Object.values(productQtyMap).reduce((s, v) => s + v, 0);
       const avgFinishedPerDay = Math.round((totalFinished / daysDiff) * 10) / 10;
 
-      // Top machines
+      // Top machines - aggregate from batch machine columns
       const machineCountMap: Record<string, number> = {};
-      (machineProductionRes.data || []).forEach((m: any) => {
-        machineCountMap[m.machine_id] = (machineCountMap[m.machine_id] || 0) + 1;
+      const PHASE_COLS = ['manufacturing_machine_id', 'finishing_machine_id', 'packaging_machine_id', 'boxing_machine_id'] as const;
+      (machineBatchesRes.data || []).forEach((b: any) => {
+        for (const col of PHASE_COLS) {
+          const machineId = b[col];
+          if (machineId) {
+            machineCountMap[machineId] = (machineCountMap[machineId] || 0) + (b.quantity || 1);
+          }
+        }
       });
       const machineDataMap = new Map((machinesRes.data || []).map((m: any) => [m.id, { name: m.name, type: m.type }]));
       const topMachines = Object.entries(machineCountMap)
