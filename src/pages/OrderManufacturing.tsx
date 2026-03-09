@@ -98,6 +98,7 @@ export default function OrderManufacturing() {
 
   // Dialog states
   const [boxDialogOpen, setBoxDialogOpen] = useState(false);
+  const [moveToExtraDialogOpen, setMoveToExtraDialogOpen] = useState(false);
 
   // Box selection
   const [boxSearchCode, setBoxSearchCode] = useState("");
