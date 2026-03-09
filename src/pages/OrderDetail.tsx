@@ -143,7 +143,7 @@ export default function OrderDetail() {
 
   // Dialog states
   const [rawMaterialsOpen, setRawMaterialsOpen] = useState(false);
-  const [flaggedItemsOpen, setFlaggedItemsOpen] = useState(false);
+  
   const [shipmentDialogOpen, setShipmentDialogOpen] = useState(false);
   const [boxAssignDialogOpen, setBoxAssignDialogOpen] = useState(false);
   const [leadTimeDialogOpen, setLeadTimeDialogOpen] = useState(false);
