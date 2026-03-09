@@ -99,6 +99,7 @@ export default function OrderBoxing() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { hasRole, user } = useAuth();
+  const { t } = useLanguage();
   const [order, setOrder] = useState<Order | null>(null);
   const [batches, setBatches] = useState<Batch[]>([]);
   const [shipments, setShipments] = useState<Shipment[]>([]);
