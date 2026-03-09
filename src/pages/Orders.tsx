@@ -145,7 +145,7 @@ export default function Orders() {
 
       // Get batch counts for each order to calculate status
       const ordersWithStatus = await Promise.all(
-        (ordersData || []).map(async (order) => {
+        (ordersData || []).map(async (order: any) => {
           const { data: batches } = await supabase
             .from('order_batches')
             .select('current_state, quantity')
