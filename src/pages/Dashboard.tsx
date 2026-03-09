@@ -609,39 +609,70 @@ export default function Dashboard() {
             </div>
             <CardDescription>Items needing your attention</CardDescription>
           </CardHeader>
-          <CardContent className="max-h-56 overflow-y-auto space-y-2">
+          <CardContent className="max-h-64 overflow-y-auto space-y-1">
             {alertCount === 0 &&
             <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
-                <CheckCircle className="h-8 w-8 mb-2 text-success" />
-                <p className="text-sm">All clear! No alerts.</p>
+                <CheckCircle className="h-10 w-10 mb-3 text-success" />
+                <p className="text-sm font-medium">All clear!</p>
+                <p className="text-xs text-muted-foreground mt-1">No late batches, upcoming deadlines, or stalled orders.</p>
               </div>
             }
-            {(data.lateBatches || []).map((b) =>
-            <Link key={`late-${b.id}`} to={`/orders/${b.order_id}`} className="flex items-start gap-2 p-2 rounded-md hover:bg-muted/50 transition-colors">
-                <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
-                <div className="min-w-0">
-                  <p className="text-sm font-medium truncate">Late: {b.order?.order_number || 'Unknown'}</p>
-                  <p className="text-xs text-muted-foreground">{b.quantity} items past ETA</p>
-                </div>
-              </Link>
+
+            {/* Late Batches */}
+            {(data.lateBatches?.length || 0) > 0 && (
+              <div className="space-y-1">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-destructive px-2 pt-1">Late</p>
+                {(data.lateBatches || []).map((b) => {
+                  const daysOverdue = differenceInDays(new Date(), new Date(b.eta));
+                  return (
+                    <Link key={`late-${b.id}`} to={`/orders/${b.order_id}`} className="flex items-start gap-2 p-2 rounded-md hover:bg-muted/50 transition-colors border-l-2 border-destructive">
+                      <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium truncate">{b.order?.order_number || 'Unknown'}</p>
+                        <p className="text-xs text-muted-foreground">{b.quantity} items · {daysOverdue > 0 ? `${daysOverdue}d overdue` : 'overdue'}</p>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
             )}
-            {(data.flaggedBatches || []).map((b) =>
-            <Link key={`flag-${b.id}`} to={`/orders/${b.order_id}`} className="flex items-start gap-2 p-2 rounded-md hover:bg-muted/50 transition-colors">
-                <Flag className="h-4 w-4 text-warning mt-0.5 shrink-0" />
-                <div className="min-w-0">
-                  <p className="text-sm font-medium truncate">Flagged: {b.order?.order_number || 'Unknown'}</p>
-                  <p className="text-xs text-muted-foreground">{b.flagged_reason || `${b.quantity} items`}</p>
-                </div>
-              </Link>
+
+            {/* Stalled Orders */}
+            {(data.stalledOrders?.length || 0) > 0 && (
+              <div className="space-y-1">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-warning px-2 pt-2">Stalled</p>
+                {(data.stalledOrders || []).map((o) => {
+                  const stalledDays = differenceInDays(new Date(), new Date(o.updated_at));
+                  return (
+                    <Link key={`stall-${o.id}`} to={`/orders/${o.id}`} className="flex items-start gap-2 p-2 rounded-md hover:bg-muted/50 transition-colors border-l-2 border-warning">
+                      <Clock className="h-4 w-4 text-warning mt-0.5 shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium truncate">{o.order_number}</p>
+                        <p className="text-xs text-muted-foreground">No updates for {stalledDays}d</p>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
             )}
-            {(data.approachingEtaOrders || []).map((o) =>
-            <Link key={`eta-${o.id}`} to={`/orders/${o.id}`} className="flex items-start gap-2 p-2 rounded-md hover:bg-muted/50 transition-colors">
-                <CalendarClock className="h-4 w-4 text-primary mt-0.5 shrink-0" />
-                <div className="min-w-0">
-                  <p className="text-sm font-medium truncate">{o.order_number} due soon</p>
-                  <p className="text-xs text-muted-foreground">ETA: {format(new Date(o.estimated_fulfillment_time), 'MMM d')}</p>
-                </div>
-              </Link>
+
+            {/* Approaching ETA */}
+            {(data.approachingEtaOrders?.length || 0) > 0 && (
+              <div className="space-y-1">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-primary px-2 pt-2">Approaching Deadline</p>
+                {(data.approachingEtaOrders || []).map((o) => {
+                  const timeLeft = formatDistanceToNow(new Date(o.estimated_fulfillment_time), { addSuffix: true });
+                  return (
+                    <Link key={`eta-${o.id}`} to={`/orders/${o.id}`} className="flex items-start gap-2 p-2 rounded-md hover:bg-muted/50 transition-colors border-l-2 border-primary">
+                      <CalendarClock className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium truncate">{o.order_number}</p>
+                        <p className="text-xs text-muted-foreground">Due {timeLeft}</p>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
             )}
           </CardContent>
         </Card>
