@@ -176,6 +176,9 @@ export default function Dashboard() {
       (batchesRes.data || []).forEach((b: any) => {batchesByState[b.current_state] = (batchesByState[b.current_state] || 0) + b.quantity;});
 
       const todayThroughput: Record<string, number> = {};
+      (throughputRes.data || []).forEach((b: any) => {
+        todayThroughput[b.current_state] = (todayThroughput[b.current_state] || 0) + b.quantity;
+      });
 
       const extraInventoryCount = (extraRes.data || []).reduce((s, b) => s + b.quantity, 0);
 
