@@ -88,9 +88,6 @@ export default function Analytics() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'order_batches' }, () => {
         fetchAnalytics();
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'machine_production' }, () => {
-        fetchAnalytics();
-      })
       .subscribe();
 
     return () => {
