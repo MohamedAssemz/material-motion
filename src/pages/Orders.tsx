@@ -150,7 +150,7 @@ export default function Orders() {
             .from('order_batches')
             .select('current_state, quantity')
             .eq('order_id', order.id)
-            .eq('is_terminated', false);
+            .eq('is_terminated', false) as { data: Array<{ current_state: string; quantity: number }> | null };
 
           const batchTotalCount = batches?.reduce((sum, b) => sum + b.quantity, 0) || 0;
           const shippedCount = batches?.filter(b => b.current_state === 'shipped').reduce((sum, b) => sum + b.quantity, 0) || 0;
