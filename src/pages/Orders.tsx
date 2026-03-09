@@ -174,16 +174,15 @@ export default function Orders() {
             computed_status = 'in_progress';
           }
 
-          return {
-            ...order,
-            profiles: order.created_by ? profilesMap.get(order.created_by) : null,
-            unit_count: unitCount,
-            shipped_count: shippedCount,
-            computed_status,
-            extra_count: extraCountsByOrder.get(order.id) || 0,
-          };
-        })
-      );
+        ordersWithStatus.push({
+          ...order,
+          profiles: order.created_by ? profilesMap.get(order.created_by) : null,
+          unit_count: unitCount,
+          shipped_count: shippedCount,
+          computed_status,
+          extra_count: extraCountsByOrder.get(order.id) || 0,
+        });
+      }
 
       setOrders(ordersWithStatus);
 
