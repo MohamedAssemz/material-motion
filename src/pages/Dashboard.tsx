@@ -629,7 +629,7 @@ export default function Dashboard() {
                 </div>
               </Link>
             )}
-            {data.approachingEtaOrders.map((o) =>
+            {(data.approachingEtaOrders || []).map((o) =>
             <Link key={`eta-${o.id}`} to={`/orders/${o.id}`} className="flex items-start gap-2 p-2 rounded-md hover:bg-muted/50 transition-colors">
                 <CalendarClock className="h-4 w-4 text-primary mt-0.5 shrink-0" />
                 <div className="min-w-0">
