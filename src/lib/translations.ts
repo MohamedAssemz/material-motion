@@ -265,7 +265,6 @@ export const translations: Record<string, TranslationEntry> = {
   "boxing.title":             { en: "Boxing",               ar: "التعليب" },
   "boxing.queue":             { en: "Boxing Queue",         ar: "طابور التعليب" },
   "boxing.in_progress":       { en: "In Boxing",            ar: "قيد التعليب" },
-  "boxing.ready_for_shipment": { en: "Ready for Shipment",  ar: "جاهز للشحن" },
   "boxing.create_kartona":    { en: "Create Kartona",       ar: "إنشاء كرتونة" },
 
   // ══════════════════════════════════════════
