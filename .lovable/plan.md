@@ -1,42 +1,36 @@
 
 
-## Plan: Order Cancellation Freeze Logic
+## Plan: Simplify Machine Analytics — Query `order_batches` Directly
 
-### Requirements
-1. When an order is cancelled, freeze all actions on phase pages **except** production rate (machine) assignment (which still respects role permissions)
-2. Unretrieved reserved extra batches should be released back to AVAILABLE on cancellation
+### Problem
+The `machine_production` table is empty and nothing populates it. The current MachineProductionTab and Dashboard "Most Used Machines" card both query this empty table.
 
-### Analysis
-- Requirement 2 is **already implemented** in `handleCancelOrder` in `OrderDetail.tsx` (lines 462-471) — it releases reserved extra batches back to AVAILABLE
-- Requirement 1 needs changes across 4 phase pages and their child components
+### Simplified approach
+Instead of creating triggers, backfill migrations, and finish-event inserts across 4 phase pages, **derive all analytics directly from `order_batches` and `extra_batches`**. These tables already have `manufacturing_machine_id`, `finishing_machine_id`, `packaging_machine_id`, and `boxing_machine_id` columns populated by `ProductionRateSection`. No database changes needed at all.
 
-### Implementation
+### Changes
 
-**Core approach:** Each phase page already has a `canManage` boolean that gates actions. Add an `isCancelled` check derived from `order?.status === 'cancelled'` and use it to disable all actions except machine assignment.
+**1. `src/components/reports/MachineProductionTab.tsx`** — Rewrite data fetching:
+- Replace `machine_production` query with `order_batches` query selecting `manufacturing_machine_id, finishing_machine_id, packaging_machine_id, boxing_machine_id, quantity, updated_at`
+- Also query `extra_batches` with the same machine columns
+- Flatten into a unified list: for each batch, emit one record per non-null machine column (e.g. if `manufacturing_machine_id` is set, emit `{ machine_id, type: 'manufacturing', quantity, date }`)
+- Remove the `state_transition` / `getPhaseFromTransition` logic — phase is now derived directly from which column the machine ID came from
+- Remove the "Phase Breakdown (start vs finish)" chart (Section C) since we no longer track start/finish events — replace with a simpler "Units per Phase" chart showing total quantity assigned per phase
+- Keep everything else (filters, ops-per-machine bar chart, daily trend, leaderboard) but count by `quantity` (units assigned) instead of number of records
 
-**Files to modify:**
+**2. `src/pages/Dashboard.tsx`** — Rewrite "Top Machines" data:
+- Remove the two `machine_production` queries (lines 162 and 168)
+- Replace with a single `order_batches` query: `select('manufacturing_machine_id, finishing_machine_id, packaging_machine_id, boxing_machine_id, quantity')`
+- Aggregate: for each non-null machine column, sum `quantity` per machine ID
+- Build `topMachines` from this aggregation — same shape `{ name, count, type }`
+- Keep the existing card UI unchanged
 
-1. **`OrderManufacturing.tsx`** — Add `const isCancelled = order?.status === 'cancelled'`. Pass `isCancelled` to disable:
-   - Box assignment dialog actions
-   - Terminate/redo actions
-   - MoveToExtraDialog
-   - ExtraItemsTab `canManage` → `canManage && !isCancelled`
-   - BoxReceiveDialog actions
-   - Keep `ProductionRateSection canManage={canManage}` unchanged (still allows machine assignment)
+### What gets removed
+- All references to `machine_production` table in frontend code
+- The `getPhaseFromTransition` helper
+- The "Phase Breakdown (start vs finish)" chart — replaced with "Units per Phase" (simpler, just sums quantities by phase)
+- The trend logic comparing halves of period stays (it's useful), but operates on the flattened batch data instead
 
-2. **`OrderFinishing.tsx`** — Same pattern: `isCancelled` disables accept boxes, assign to box, MoveToExtraDialog, ExtraItemsTab, but keeps ProductionRateSection canManage unchanged.
-
-3. **`OrderPackaging.tsx`** — Same pattern.
-
-4. **`OrderBoxing.tsx`** — Same pattern. Additionally disable shipment creation.
-
-5. **`OrderDetail.tsx`** — Add a visible "Cancelled" banner/badge. The cancel button is already hidden when `status === 'cancelled'`. Start Order and Extra Inventory sections are already gated to pending orders, so no changes needed there.
-
-**Specific prop changes per phase page:**
-- `ExtraItemsTab canManage={canManage && !isCancelled}` — freezes extra retrieval
-- `ProductionRateSection canManage={canManage}` — unchanged, still allows machine assignment
-- All action buttons (accept, assign, terminate, redo, move to extra, create shipment) gated with `!isCancelled`
-- Box receive dialogs disabled when cancelled
-
-**No database changes needed** — the cancellation already releases reserved batches.
+### No database changes needed
+The `machine_production` table stays in the schema but is simply unused. No triggers, no backfills, no phase page modifications.
 
