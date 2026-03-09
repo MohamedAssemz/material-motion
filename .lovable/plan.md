@@ -1,37 +1,42 @@
 
 
-## Dashboard: Three Fixes
+## Plan: Order Cancellation Freeze Logic
 
-### 1. Remove Role Badge (line 336-340)
-Delete the `primaryRole` Badge rendered next to the time range selector.
+### Requirements
+1. When an order is cancelled, freeze all actions on phase pages **except** production rate (machine) assignment (which still respects role permissions)
+2. Unretrieved reserved extra batches should be released back to AVAILABLE on cancellation
 
-### 2. Fix Empty Throughput
-The `todayThroughput` object is hardcoded as `{}` on line 174 and never populated. 
+### Analysis
+- Requirement 2 is **already implemented** in `handleCancelOrder` in `OrderDetail.tsx` (lines 462-471) — it releases reserved extra batches back to AVAILABLE
+- Requirement 1 needs changes across 4 phase pages and their child components
 
-**Fix**: Add a query for `order_batches` updated within the selected time range (using `updated_at >= rangeStart`), then group by `current_state` and sum quantities. Map states to transition labels to populate the throughput chart. This shows how many items moved through each phase in the period.
+### Implementation
 
-```ts
-// New query in Promise.all:
-supabase.from('order_batches')
-  .select('current_state, quantity')
-  .gte('updated_at', rangeStart)
+**Core approach:** Each phase page already has a `canManage` boolean that gates actions. Add an `isCancelled` check derived from `order?.status === 'cancelled'` and use it to disable all actions except machine assignment.
 
-// Then build todayThroughput from results:
-const todayThroughput: Record<string, number> = {};
-(throughputRes.data || []).forEach((b) => {
-  todayThroughput[b.current_state] = (todayThroughput[b.current_state] || 0) + b.quantity;
-});
-```
+**Files to modify:**
 
-Update the throughput chart to use state labels (PHASE_LABELS) instead of TRANSITION_LABELS since we're grouping by `current_state`.
+1. **`OrderManufacturing.tsx`** — Add `const isCancelled = order?.status === 'cancelled'`. Pass `isCancelled` to disable:
+   - Box assignment dialog actions
+   - Terminate/redo actions
+   - MoveToExtraDialog
+   - ExtraItemsTab `canManage` → `canManage && !isCancelled`
+   - BoxReceiveDialog actions
+   - Keep `ProductionRateSection canManage={canManage}` unchanged (still allows machine assignment)
 
-### 3. Enhance Alerts & Attention
-- Group alerts by severity with section headers (Late, Approaching ETA)
-- Add relative time info (e.g., "2 days overdue", "due in 1 day")
-- Show alert icons with colored left borders for visual distinction
-- Add a "stalled orders" alert: orders `in_progress` with no batch updates in 3+ days
-- If no alerts, show a more descriptive all-clear state
+2. **`OrderFinishing.tsx`** — Same pattern: `isCancelled` disables accept boxes, assign to box, MoveToExtraDialog, ExtraItemsTab, but keeps ProductionRateSection canManage unchanged.
 
-### Files Changed
-- `src/pages/Dashboard.tsx` — all three fixes in one file
+3. **`OrderPackaging.tsx`** — Same pattern.
+
+4. **`OrderBoxing.tsx`** — Same pattern. Additionally disable shipment creation.
+
+5. **`OrderDetail.tsx`** — Add a visible "Cancelled" banner/badge. The cancel button is already hidden when `status === 'cancelled'`. Start Order and Extra Inventory sections are already gated to pending orders, so no changes needed there.
+
+**Specific prop changes per phase page:**
+- `ExtraItemsTab canManage={canManage && !isCancelled}` — freezes extra retrieval
+- `ProductionRateSection canManage={canManage}` — unchanged, still allows machine assignment
+- All action buttons (accept, assign, terminate, redo, move to extra, create shipment) gated with `!isCancelled`
+- Box receive dialogs disabled when cancelled
+
+**No database changes needed** — the cancellation already releases reserved batches.
 

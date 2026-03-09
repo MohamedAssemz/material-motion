@@ -18,7 +18,7 @@ import {
   CheckCircle, Clock, AlertCircle, Flag, CalendarClock,
   ArrowRight, Truck, Archive, FileText, Trophy, Activity, Wrench } from
 'lucide-react';
-import { startOfDay, subDays, format } from 'date-fns';
+import { startOfDay, subDays, format, formatDistanceToNow, differenceInDays } from 'date-fns';
 
 /* ─── types ─── */
 interface DashboardData {
@@ -31,6 +31,7 @@ interface DashboardData {
   lateBatches: Array<{id: string;order_id: string;product_id: string;eta: string;quantity: number;order: {order_number: string;status: string;} | null;}>;
   flaggedBatches: Array<{id: string;order_id: string;flagged_reason: string | null;quantity: number;order: {order_number: string;status: string;} | null;}>;
   approachingEtaOrders: Array<{id: string;order_number: string;estimated_fulfillment_time: string;}>;
+  stalledOrders: Array<{id: string;order_number: string;updated_at: string;}>;
   todayThroughput: Record<string, number>;
   extraInventoryCount: number;
   completedOrders: number;
@@ -151,7 +152,9 @@ export default function Dashboard() {
       extraRes,
       shipmentsRes,
       shippedBatchesRes,
-      machinesRes] =
+      machinesRes,
+      throughputRes,
+      stalledOrdersRes] =
       await Promise.all([
       user ? supabase.from('profiles').select('full_name').eq('id', user.id).single() : Promise.resolve({ data: null }),
       supabase.from('orders').select('status').gte('created_at', rangeStart),
@@ -162,7 +165,9 @@ export default function Dashboard() {
       supabase.from('extra_batches').select('quantity').eq('inventory_state', 'AVAILABLE'),
       supabase.from('shipments').select('id').gte('created_at', rangeStart),
       supabase.from('order_batches').select('product_id, quantity').in('current_state', ['shipped', 'ready_for_shipment']).gte('created_at', rangeStart),
-      supabase.from('machines').select('id, name')]
+      supabase.from('machines').select('id, name'),
+      supabase.from('order_batches').select('current_state, quantity').gte('updated_at', rangeStart),
+      supabase.from('orders').select('id, order_number, updated_at').eq('status', 'in_progress').lt('updated_at', new Date(Date.now() - 3 * 86400000).toISOString()).limit(10)]
       );
 
       const ordersByStatus: Record<string, number> = {};
@@ -172,6 +177,9 @@ export default function Dashboard() {
       (batchesRes.data || []).forEach((b: any) => {batchesByState[b.current_state] = (batchesByState[b.current_state] || 0) + b.quantity;});
 
       const todayThroughput: Record<string, number> = {};
+      (throughputRes.data || []).forEach((b: any) => {
+        todayThroughput[b.current_state] = (todayThroughput[b.current_state] || 0) + b.quantity;
+      });
 
       const extraInventoryCount = (extraRes.data || []).reduce((s, b) => s + b.quantity, 0);
 
@@ -226,6 +234,7 @@ export default function Dashboard() {
         lateBatches: activeLate.slice(0, 10),
         flaggedBatches: [],
         approachingEtaOrders: (approachingRes.data || []) as any,
+        stalledOrders: (stalledOrdersRes.data || []) as any,
         todayThroughput,
         extraInventoryCount,
         completedOrders: ordersByStatus.completed || 0,
@@ -280,10 +289,11 @@ export default function Dashboard() {
   const throughputData = useMemo(() => {
     if (!data) return [];
     return Object.entries(data.todayThroughput).
-    filter(([key]) => TRANSITION_LABELS[key]).
+    filter(([key]) => PHASE_LABELS[key]).
     map(([key, count]) => ({
-      name: TRANSITION_LABELS[key] || key,
-      value: count
+      name: PHASE_LABELS[key] || key,
+      value: count,
+      fill: PHASE_COLORS[key] || 'hsl(214, 95%, 36%)'
     }));
   }, [data]);
 
@@ -307,7 +317,7 @@ export default function Dashboard() {
 
   if (!data) return null;
 
-  const alertCount = (data.lateBatches?.length || 0) + (data.flaggedBatches?.length || 0) + (data.approachingEtaOrders?.length || 0);
+  const alertCount = (data.lateBatches?.length || 0) + (data.flaggedBatches?.length || 0) + (data.approachingEtaOrders?.length || 0) + (data.stalledOrders?.length || 0);
 
   return (
     <div className="p-4 md:p-6 space-y-6">
@@ -333,11 +343,6 @@ export default function Dashboard() {
               <SelectItem value="month">Last 30 Days</SelectItem>
             </SelectContent>
           </Select>
-          {primaryRole &&
-          <Badge variant="outline" className="capitalize text-xs">
-              {primaryRole.replace('_', ' ')}
-            </Badge>
-          }
         </div>
       </div>
 
@@ -580,8 +585,8 @@ export default function Dashboard() {
                   }} />
                 
                   <Bar dataKey="value" radius={[4, 4, 0, 0]} maxBarSize={40}>
-                    {throughputData.map((_, i) =>
-                  <Cell key={i} fill={TRANSITION_COLORS[i % TRANSITION_COLORS.length]} />
+                    {throughputData.map((entry, i) =>
+                  <Cell key={i} fill={entry.fill} />
                   )}
                   </Bar>
                 </BarChart>
@@ -604,39 +609,70 @@ export default function Dashboard() {
             </div>
             <CardDescription>Items needing your attention</CardDescription>
           </CardHeader>
-          <CardContent className="max-h-56 overflow-y-auto space-y-2">
+          <CardContent className="max-h-64 overflow-y-auto space-y-1">
             {alertCount === 0 &&
             <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
-                <CheckCircle className="h-8 w-8 mb-2 text-success" />
-                <p className="text-sm">All clear! No alerts.</p>
+                <CheckCircle className="h-10 w-10 mb-3 text-success" />
+                <p className="text-sm font-medium">All clear!</p>
+                <p className="text-xs text-muted-foreground mt-1">No late batches, upcoming deadlines, or stalled orders.</p>
               </div>
             }
-            {(data.lateBatches || []).map((b) =>
-            <Link key={`late-${b.id}`} to={`/orders/${b.order_id}`} className="flex items-start gap-2 p-2 rounded-md hover:bg-muted/50 transition-colors">
-                <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
-                <div className="min-w-0">
-                  <p className="text-sm font-medium truncate">Late: {b.order?.order_number || 'Unknown'}</p>
-                  <p className="text-xs text-muted-foreground">{b.quantity} items past ETA</p>
-                </div>
-              </Link>
+
+            {/* Late Batches */}
+            {(data.lateBatches?.length || 0) > 0 && (
+              <div className="space-y-1">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-destructive px-2 pt-1">Late</p>
+                {(data.lateBatches || []).map((b) => {
+                  const daysOverdue = differenceInDays(new Date(), new Date(b.eta));
+                  return (
+                    <Link key={`late-${b.id}`} to={`/orders/${b.order_id}`} className="flex items-start gap-2 p-2 rounded-md hover:bg-muted/50 transition-colors border-l-2 border-destructive">
+                      <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium truncate">{b.order?.order_number || 'Unknown'}</p>
+                        <p className="text-xs text-muted-foreground">{b.quantity} items · {daysOverdue > 0 ? `${daysOverdue}d overdue` : 'overdue'}</p>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
             )}
-            {(data.flaggedBatches || []).map((b) =>
-            <Link key={`flag-${b.id}`} to={`/orders/${b.order_id}`} className="flex items-start gap-2 p-2 rounded-md hover:bg-muted/50 transition-colors">
-                <Flag className="h-4 w-4 text-warning mt-0.5 shrink-0" />
-                <div className="min-w-0">
-                  <p className="text-sm font-medium truncate">Flagged: {b.order?.order_number || 'Unknown'}</p>
-                  <p className="text-xs text-muted-foreground">{b.flagged_reason || `${b.quantity} items`}</p>
-                </div>
-              </Link>
+
+            {/* Stalled Orders */}
+            {(data.stalledOrders?.length || 0) > 0 && (
+              <div className="space-y-1">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-warning px-2 pt-2">Stalled</p>
+                {(data.stalledOrders || []).map((o) => {
+                  const stalledDays = differenceInDays(new Date(), new Date(o.updated_at));
+                  return (
+                    <Link key={`stall-${o.id}`} to={`/orders/${o.id}`} className="flex items-start gap-2 p-2 rounded-md hover:bg-muted/50 transition-colors border-l-2 border-warning">
+                      <Clock className="h-4 w-4 text-warning mt-0.5 shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium truncate">{o.order_number}</p>
+                        <p className="text-xs text-muted-foreground">No updates for {stalledDays}d</p>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
             )}
-            {(data.approachingEtaOrders || []).map((o) =>
-            <Link key={`eta-${o.id}`} to={`/orders/${o.id}`} className="flex items-start gap-2 p-2 rounded-md hover:bg-muted/50 transition-colors">
-                <CalendarClock className="h-4 w-4 text-primary mt-0.5 shrink-0" />
-                <div className="min-w-0">
-                  <p className="text-sm font-medium truncate">{o.order_number} due soon</p>
-                  <p className="text-xs text-muted-foreground">ETA: {format(new Date(o.estimated_fulfillment_time), 'MMM d')}</p>
-                </div>
-              </Link>
+
+            {/* Approaching ETA */}
+            {(data.approachingEtaOrders?.length || 0) > 0 && (
+              <div className="space-y-1">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-primary px-2 pt-2">Approaching Deadline</p>
+                {(data.approachingEtaOrders || []).map((o) => {
+                  const timeLeft = formatDistanceToNow(new Date(o.estimated_fulfillment_time), { addSuffix: true });
+                  return (
+                    <Link key={`eta-${o.id}`} to={`/orders/${o.id}`} className="flex items-start gap-2 p-2 rounded-md hover:bg-muted/50 transition-colors border-l-2 border-primary">
+                      <CalendarClock className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium truncate">{o.order_number}</p>
+                        <p className="text-xs text-muted-foreground">Due {timeLeft}</p>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
             )}
           </CardContent>
         </Card>
