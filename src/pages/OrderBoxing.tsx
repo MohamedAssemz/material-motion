@@ -816,9 +816,8 @@ export default function OrderBoxing() {
               .eq("product_id", batch.product_id)
               .eq("order_item_id", batch.order_item_id)
               .eq("current_state", "shipped")
-              .eq("shipment_id", shipment.id)
-              .eq("is_terminated", false);
-            
+              .eq("shipment_id", shipment.id);
+
             if (batch.from_extra_state) {
               existingShipBatchQuery2 = existingShipBatchQuery2.eq("from_extra_state", batch.from_extra_state);
             } else {

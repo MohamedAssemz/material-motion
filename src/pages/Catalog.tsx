@@ -283,10 +283,10 @@ export default function Catalog() {
       // Delete related data first
       await Promise.all([
         supabase.from('product_categories').delete().eq('product_id', productToDelete.id),
-        supabase.from('product_potential_customers').delete().eq('product_id', productToDelete.id),
+        supabase.from('product_customers').delete().eq('product_id', productToDelete.id),
         supabase.from('product_images').delete().eq('product_id', productToDelete.id),
       ]);
-      
+
       // Delete the product
       const { error } = await supabase
         .from('products')

@@ -644,85 +644,9 @@ export default function OrderManufacturing() {
   };
 
   const handleMarkRedo = async () => {
-    if (totalSelected === 0 || !redoReason.trim()) return;
-    setSubmitting(true);
-
-    try {
-      for (const [groupKey, quantity] of productSelections.entries()) {
-        if (quantity <= 0) continue;
-
-        const group = productGroups.find((g) => g.groupKey === groupKey);
-        if (!group) continue;
-
-        let remainingQty = quantity;
-        const batchesToRedo = group.batches;
-
-        for (const batch of batchesToRedo) {
-          if (remainingQty <= 0) break;
-
-          const useQty = Math.min(batch.quantity, remainingQty);
-          remainingQty -= useQty;
-
-          if (useQty === batch.quantity) {
-            await supabase
-              .from("order_batches")
-              .update({
-                is_redo: true,
-                is_flagged: true,
-                redo_by: user?.id,
-                redo_reason: redoReason.trim(),
-                flagged_by: user?.id,
-                flagged_reason: redoReason.trim(),
-              })
-              .eq("id", batch.id);
-          } else {
-            // Create redo batch
-            const { data: qrCode } = await supabase.rpc("generate_extra_batch_code");
-            await supabase.from("order_batches").insert({
-              qr_code_data: qrCode,
-              order_id: id,
-              product_id: batch.product_id,
-              order_item_id: batch.order_item_id,
-              current_state: "in_manufacturing",
-              quantity: useQty,
-              is_redo: true,
-              is_flagged: true,
-              redo_by: user?.id,
-              redo_reason: redoReason.trim(),
-              flagged_by: user?.id,
-              flagged_reason: redoReason.trim(),
-              created_by: user?.id,
-            });
-
-            await supabase
-              .from("order_batches")
-              .update({
-                quantity: batch.quantity - useQty,
-              })
-              .eq("id", batch.id);
-          }
-        }
-      }
-
-      // Update order redo counter
-      const { data: orderData } = await supabase.from("orders").select("redo_counter").eq("id", id).single();
-      await supabase
-        .from("orders")
-        .update({
-          redo_counter: (orderData?.redo_counter || 0) + totalSelected,
-        })
-        .eq("id", id);
-
-      toast.success(`Marked ${totalSelected} items for redo`);
-      setRedoDialogOpen(false);
-      setRedoReason("");
-      setProductSelections(new Map());
-      fetchData();
-    } catch (error: any) {
-      toast.error(error.message);
-    } finally {
-      setSubmitting(false);
-    }
+    toast.error("Redo is not available in this version.");
+    setRedoDialogOpen(false);
+    setRedoReason("");
   };
 
   if (loading) {
