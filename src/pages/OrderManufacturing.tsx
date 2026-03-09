@@ -742,7 +742,7 @@ export default function OrderManufacturing() {
             {productGroups.length === 0 ? (
               <Card>
                 <CardContent className="p-8 text-center text-muted-foreground">
-                  No items in manufacturing phase for this order
+                  {t('phase.no_items_in_phase')}
                 </CardContent>
               </Card>
             ) : (
