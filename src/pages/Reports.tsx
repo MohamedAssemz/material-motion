@@ -10,6 +10,7 @@ import { ProductionFlowTab } from '@/components/reports/ProductionFlowTab';
 import { InventoryBoxesTab } from '@/components/reports/InventoryBoxesTab';
 import { CatalogInsightsTab } from '@/components/reports/CatalogInsightsTab';
 import { MachineProductionTab } from '@/components/reports/MachineProductionTab';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 export default function Reports() {
   const [loading, setLoading] = useState(true);
