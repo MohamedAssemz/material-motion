@@ -597,11 +597,6 @@ export default function Orders() {
                                 </div>
                               </TableCell>
                               <TableCell>{order.customer?.name || '-'}</TableCell>
-                              <TableCell>
-                                <Badge variant={order.priority === 'high' ? 'destructive' : 'secondary'}>
-                                  {order.priority}
-                                </Badge>
-                              </TableCell>
                               {tab === 'pending' && (
                                 <TableCell>
                                   <Badge variant={order.computed_status === 'in_progress' ? 'default' : 'outline'}>
