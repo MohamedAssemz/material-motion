@@ -177,7 +177,6 @@ export default function Dashboard() {
 
       // Filter out cancelled orders from alerts
       const activeLate = ((lateBatchesRes.data || []) as any[]).filter((b) => b.order?.status !== 'cancelled');
-      const activeFlagged = ((flaggedBatchesRes.data || []) as any[]).filter((b) => b.order?.status !== 'cancelled');
       const lateOrderIds = new Set(activeLate.map((b) => b.order_id));
 
       // Top 3 products by finished quantity
@@ -203,10 +202,13 @@ export default function Dashboard() {
       const totalFinished = Object.values(productQtyMap).reduce((s, v) => s + v, 0);
       const avgFinishedPerDay = Math.round(totalFinished / daysDiff * 10) / 10;
 
-      // Top machines
+      // Top machines — use order_batches machine columns since machine_production table doesn't exist
       const machineCountMap: Record<string, number> = {};
-      (machineProductionRes.data || []).forEach((m: any) => {
-        machineCountMap[m.machine_id] = (machineCountMap[m.machine_id] || 0) + 1;
+      ((batchesRes.data || []) as any[]).forEach((b: any) => {
+        const machineFields = [b.manufacturing_machine_id, b.finishing_machine_id, b.packaging_machine_id, b.boxing_machine_id];
+        machineFields.forEach((mid: string | null) => {
+          if (mid) machineCountMap[mid] = (machineCountMap[mid] || 0) + 1;
+        });
       });
       const machineNameMap = new Map((machinesRes.data || []).map((m: any) => [m.id, m.name]));
       const topMachines = Object.entries(machineCountMap).
