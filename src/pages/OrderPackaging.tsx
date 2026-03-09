@@ -171,7 +171,6 @@ export default function OrderPackaging() {
             "id, qr_code_data, current_state, quantity, product_id, order_item_id, box_id, manufacturing_machine_id, finishing_machine_id, packaging_machine_id, from_extra_state, product:products(id, name, sku, needs_packing)",
           )
           .eq("order_id", id)
-          .eq("is_terminated", false)
           .in("current_state", ["ready_for_packaging", "in_packaging"]),
         // Fetch completed items for this phase (moved to next phases)
         supabase
