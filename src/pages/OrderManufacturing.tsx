@@ -626,17 +626,6 @@ export default function OrderManufacturing() {
     }
   };
 
-  const handleTerminate = async () => {
-    toast.error("Terminate is not available in this version.");
-    setTerminateDialogOpen(false);
-    setTerminateReason("");
-  };
-
-  const handleMarkRedo = async () => {
-    toast.error("Redo is not available in this version.");
-    setRedoDialogOpen(false);
-    setRedoReason("");
-  };
 
   if (loading) {
     return (
