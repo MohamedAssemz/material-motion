@@ -357,8 +357,7 @@ export default function OrderFinishing() {
       const { data: occupiedBatches } = await supabase
         .from("order_batches")
         .select("box_id")
-        .not("box_id", "is", null)
-        .eq("is_terminated", false);
+        .not("box_id", "is", null);
       const occupiedIds = new Set(occupiedBatches?.map((b) => b.box_id) || []);
       setAvailableBoxes(allBoxes?.filter((box) => !occupiedIds.has(box.id)) || []);
     } catch (error: any) {

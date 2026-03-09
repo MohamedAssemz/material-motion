@@ -615,12 +615,12 @@ export default function OrderBoxing() {
                 .eq("id", existingBatch.id);
               if (updateError) throw updateError;
               
-              // Mark current batch as terminated (soft delete)
-              const { error: terminateError } = await supabase
+              // Delete current batch as it's been consolidated
+              const { error: deleteError } = await supabase
                 .from("order_batches")
-                .update({ is_terminated: true, terminated_reason: "Consolidated" })
+                .delete()
                 .eq("id", batch.id);
-              if (terminateError) throw terminateError;
+              if (deleteError) throw deleteError;
             } else {
               // No existing batch to consolidate, just update state
               const { error: updateError } = await supabase
