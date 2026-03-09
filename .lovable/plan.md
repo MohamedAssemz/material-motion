@@ -1,42 +1,36 @@
 
 
-## Plan: Order Cancellation Freeze Logic
+## Clean Slate: Delete All Order-Related Data
 
-### Requirements
-1. When an order is cancelled, freeze all actions on phase pages **except** production rate (machine) assignment (which still respects role permissions)
-2. Unretrieved reserved extra batches should be released back to AVAILABLE on cancellation
+### Current Data
 
-### Analysis
-- Requirement 2 is **already implemented** in `handleCancelOrder` in `OrderDetail.tsx` (lines 462-471) — it releases reserved extra batches back to AVAILABLE
-- Requirement 1 needs changes across 4 phase pages and their child components
+| Table | Rows |
+|-------|------|
+| orders | 10 |
+| order_items | 14 |
+| order_batches | 36 |
+| extra_batches | 20 |
+| extra_batch_history | 48 |
+| shipments | 6 |
+| raw_material_versions | 11 |
+| order_comments | 0 |
+| notifications | 0 |
 
-### Implementation
+### Plan
 
-**Core approach:** Each phase page already has a `canManage` boolean that gates actions. Add an `isCancelled` check derived from `order?.status === 'cancelled'` and use it to disable all actions except machine assignment.
+Run DELETE statements in the correct order to avoid foreign key / trigger conflicts. Also reset box contents since boxes reference batches via `items_list`.
 
-**Files to modify:**
+**Deletion order:**
+1. `extra_batch_history` (references extra_batches)
+2. `order_batches` (references orders, boxes, shipments)
+3. `extra_batches` (references extra_boxes)
+4. `shipments` (references orders)
+5. `raw_material_versions` (references orders)
+6. `order_comments` (references orders)
+7. `order_items` (references orders)
+8. `orders`
+9. Reset `boxes.items_list` to `'[]'` and `content_type` to `'EMPTY'`
+10. Reset `extra_boxes.items_list` to `'[]'` and `content_type` to `'EMPTY'`
 
-1. **`OrderManufacturing.tsx`** — Add `const isCancelled = order?.status === 'cancelled'`. Pass `isCancelled` to disable:
-   - Box assignment dialog actions
-   - Terminate/redo actions
-   - MoveToExtraDialog
-   - ExtraItemsTab `canManage` → `canManage && !isCancelled`
-   - BoxReceiveDialog actions
-   - Keep `ProductionRateSection canManage={canManage}` unchanged (still allows machine assignment)
-
-2. **`OrderFinishing.tsx`** — Same pattern: `isCancelled` disables accept boxes, assign to box, MoveToExtraDialog, ExtraItemsTab, but keeps ProductionRateSection canManage unchanged.
-
-3. **`OrderPackaging.tsx`** — Same pattern.
-
-4. **`OrderBoxing.tsx`** — Same pattern. Additionally disable shipment creation.
-
-5. **`OrderDetail.tsx`** — Add a visible "Cancelled" banner/badge. The cancel button is already hidden when `status === 'cancelled'`. Start Order and Extra Inventory sections are already gated to pending orders, so no changes needed there.
-
-**Specific prop changes per phase page:**
-- `ExtraItemsTab canManage={canManage && !isCancelled}` — freezes extra retrieval
-- `ProductionRateSection canManage={canManage}` — unchanged, still allows machine assignment
-- All action buttons (accept, assign, terminate, redo, move to extra, create shipment) gated with `!isCancelled`
-- Box receive dialogs disabled when cancelled
-
-**No database changes needed** — the cancellation already releases reserved batches.
+No schema or code changes needed — just data cleanup.
 
