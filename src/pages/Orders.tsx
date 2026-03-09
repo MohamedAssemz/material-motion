@@ -551,7 +551,6 @@ export default function Orders() {
                         <TableRow>
                           <TableHead>Order Number</TableHead>
                           <TableHead>Customer</TableHead>
-                          <TableHead>Priority</TableHead>
                           {tab === 'pending' && <TableHead>Status</TableHead>}
                           <TableHead>Units</TableHead>
                           <TableHead>EFT</TableHead>
