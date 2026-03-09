@@ -71,6 +71,7 @@ interface Product {
 export default function Catalog() {
   const navigate = useNavigate();
   const { hasRole } = useAuth();
+  const { t } = useLanguage();
   const { toast } = useToast();
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
