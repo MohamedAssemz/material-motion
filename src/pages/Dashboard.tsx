@@ -333,11 +333,6 @@ export default function Dashboard() {
               <SelectItem value="month">Last 30 Days</SelectItem>
             </SelectContent>
           </Select>
-          {primaryRole &&
-          <Badge variant="outline" className="capitalize text-xs">
-              {primaryRole.replace('_', ' ')}
-            </Badge>
-          }
         </div>
       </div>
 
