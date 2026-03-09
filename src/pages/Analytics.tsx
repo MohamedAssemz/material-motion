@@ -133,7 +133,7 @@ export default function Analytics() {
       });
       setBatchETAs(processedBatches);
 
-      // Fetch machine production stats
+      // Fetch machine production stats from order_batches machine columns
       const { data: machinesData } = await supabase
         .from('machines')
         .select('id, name, type');
@@ -143,9 +143,9 @@ export default function Analytics() {
       const weekAgo = new Date(today);
       weekAgo.setDate(weekAgo.getDate() - 7);
 
-      const { data: productionData } = await supabase
-        .from('machine_production')
-        .select('machine_id, created_at');
+      const { data: batchMachineData } = await supabase
+        .from('order_batches')
+        .select('manufacturing_machine_id, finishing_machine_id, packaging_machine_id, boxing_machine_id, quantity, updated_at');
 
       const machineStatsMap = new Map<string, MachineStats>();
       
@@ -160,16 +160,23 @@ export default function Analytics() {
         });
       });
 
-      (productionData || []).forEach((prod: any) => {
-        const stats = machineStatsMap.get(prod.machine_id);
-        if (stats) {
-          stats.total_production++;
-          const prodDate = new Date(prod.created_at);
-          if (prodDate >= today) {
-            stats.production_today++;
-          }
-          if (prodDate >= weekAgo) {
-            stats.production_this_week++;
+      const PHASE_COLS = ['manufacturing_machine_id', 'finishing_machine_id', 'packaging_machine_id', 'boxing_machine_id'] as const;
+      (batchMachineData || []).forEach((batch: any) => {
+        for (const col of PHASE_COLS) {
+          const machineId = batch[col];
+          if (machineId) {
+            const stats = machineStatsMap.get(machineId);
+            if (stats) {
+              const qty = batch.quantity || 1;
+              stats.total_production += qty;
+              const batchDate = new Date(batch.updated_at);
+              if (batchDate >= today) {
+                stats.production_today += qty;
+              }
+              if (batchDate >= weekAgo) {
+                stats.production_this_week += qty;
+              }
+            }
           }
         }
       });
