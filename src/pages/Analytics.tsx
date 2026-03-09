@@ -112,8 +112,6 @@ export default function Analytics() {
           current_state,
           quantity,
           lead_time_days,
-          is_redo,
-          is_terminated,
           product:products(name),
           order:orders(order_number)
         `)
