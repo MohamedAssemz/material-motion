@@ -158,14 +158,9 @@ All colors MUST be HSL.
 [dir="rtl"] .text-left  { text-align: right; }
 [dir="rtl"] .text-right { text-align: left;  }
 
-/* ── Flex direction for inline grouped items (keep icons beside text) ── */
-[dir="rtl"] .flex-row          { flex-direction: row-reverse; }
-/* Don't reverse flex-row-reverse — it should become ltr row */
-[dir="rtl"] .flex-row-reverse  { flex-direction: row; }
-
-/* Only reverse navigation / breadcrumb / toolbar rows, not arbitrary rows.
-   Override the global flex-row rule for rows that must NOT flip: */
-[dir="rtl"] .rtl-no-flip.flex-row { flex-direction: row; }
+/* ── RTL flex helpers for specific opt-in elements ── */
+/* Use class "rtl-flip" on flex rows that should visually reverse in RTL  */
+[dir="rtl"] .rtl-flip { flex-direction: row-reverse; }
 
 /* ── Margin logical-property helpers ── */
 [dir="rtl"] .ml-auto { margin-left: unset; margin-right: auto; }

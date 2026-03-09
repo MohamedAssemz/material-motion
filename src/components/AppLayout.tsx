@@ -184,7 +184,11 @@ export function AppLayout({ children }: AppLayoutProps) {
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top header */}
-        <header className="sticky top-0 z-30 flex items-center justify-between h-16 px-4 border-b border-border bg-card">
+        <header className={cn(
+          "sticky top-0 z-30 flex items-center h-16 px-4 border-b border-border bg-card",
+          isRTL ? "flex-row-reverse justify-between" : "justify-between"
+        )}>
+          {/* Mobile menu trigger — always on the "start" side */}
           <div className="flex items-center gap-3">
             <Button
               variant="ghost"
@@ -196,7 +200,8 @@ export function AppLayout({ children }: AppLayoutProps) {
             </Button>
           </div>
 
-          <div className="flex items-center gap-4">
+          {/* Right-side controls — always on "end" side */}
+          <div className={cn("flex items-center gap-4", isRTL && "flex-row-reverse")}>
             {/* Language toggle */}
             <Button
               variant="outline"
@@ -208,7 +213,7 @@ export function AppLayout({ children }: AppLayoutProps) {
               {language === 'en' ? 'AR' : 'EN'}
             </Button>
             
-            <div className="hidden sm:block text-right">
+            <div className={cn("hidden sm:block", isRTL ? "text-left" : "text-right")}>
               <p className="text-sm font-medium truncate max-w-[200px]">{user?.email}</p>
             </div>
             <Button variant="outline" size="icon" onClick={signOut} title={t('header.logout')}>
