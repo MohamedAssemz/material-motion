@@ -1,42 +1,66 @@
 
+## Plan: Machine Production Rate Analytics
 
-## Plan: Order Cancellation Freeze Logic
+### What we're building
+1. A new **"Machine Production"** tab in Reports & Analytics
+2. Enhanced **"Most Used Machines"** dashboard card with machine type, a mini production bar, and a deep-link to the new tab
 
-### Requirements
-1. When an order is cancelled, freeze all actions on phase pages **except** production rate (machine) assignment (which still respects role permissions)
-2. Unretrieved reserved extra batches should be released back to AVAILABLE on cancellation
+---
 
-### Analysis
-- Requirement 2 is **already implemented** in `handleCancelOrder` in `OrderDetail.tsx` (lines 462-471) — it releases reserved extra batches back to AVAILABLE
-- Requirement 1 needs changes across 4 phase pages and their child components
+### 1. New file: `src/components/reports/MachineProductionTab.tsx`
 
-### Implementation
+Self-contained component that fetches its own data (avoids bloating `Reports.tsx`).
 
-**Core approach:** Each phase page already has a `canManage` boolean that gates actions. Add an `isCancelled` check derived from `order?.status === 'cancelled'` and use it to disable all actions except machine assignment.
+**Data sources:**
+- `machine_production`: `id, machine_id, state_transition, created_at`
+- `machines`: `id, name, type`
 
-**Files to modify:**
+**Filters:**
+- Date preset (Today / This Week / Last 30 Days / Last 90 Days) + custom date pickers
+- Machine type (All / Manufacturing / Finishing / Packaging / Boxing)
 
-1. **`OrderManufacturing.tsx`** — Add `const isCancelled = order?.status === 'cancelled'`. Pass `isCancelled` to disable:
-   - Box assignment dialog actions
-   - Terminate/redo actions
-   - MoveToExtraDialog
-   - ExtraItemsTab `canManage` → `canManage && !isCancelled`
-   - BoxReceiveDialog actions
-   - Keep `ProductionRateSection canManage={canManage}` unchanged (still allows machine assignment)
+**Charts & sections:**
 
-2. **`OrderFinishing.tsx`** — Same pattern: `isCancelled` disables accept boxes, assign to box, MoveToExtraDialog, ExtraItemsTab, but keeps ProductionRateSection canManage unchanged.
+| Section | Type | Description |
+|---|---|---|
+| A | Horizontal bar | Total ops per machine, sorted descending, colored by type |
+| B | Stacked bar by day | Daily production trend, stacked by machine type |
+| C | Grouped bar | Per-machine-type phase breakdown (start vs finish ops) |
+| D | Ranked table | Machine name, type badge, total ops, trend indicator |
 
-3. **`OrderPackaging.tsx`** — Same pattern.
+**Phase derivation from `state_transition`:**
+- `start_manufacturing` / `finish_manufacturing` → Manufacturing
+- `start_finishing` / `finish_finishing` → Finishing
+- `start_packaging` / `finish_packaging` → Packaging
+- `start_boxing` / `finish_boxing` → Boxing
 
-4. **`OrderBoxing.tsx`** — Same pattern. Additionally disable shipment creation.
+---
 
-5. **`OrderDetail.tsx`** — Add a visible "Cancelled" banner/badge. The cancel button is already hidden when `status === 'cancelled'`. Start Order and Extra Inventory sections are already gated to pending orders, so no changes needed there.
+### 2. Update `src/pages/Reports.tsx`
 
-**Specific prop changes per phase page:**
-- `ExtraItemsTab canManage={canManage && !isCancelled}` — freezes extra retrieval
-- `ProductionRateSection canManage={canManage}` — unchanged, still allows machine assignment
-- All action buttons (accept, assign, terminate, redo, move to extra, create shipment) gated with `!isCancelled`
-- Box receive dialogs disabled when cancelled
+- Import `MachineProductionTab` and `Wrench` icon
+- Add 5th tab: `machine-production` with `Wrench` icon, label "Machine Rate"
+- Change `grid-cols-4` → `grid-cols-5` on the `TabsList`
+- Add `<TabsContent value="machine-production"><MachineProductionTab /></TabsContent>`
 
-**No database changes needed** — the cancellation already releases reserved batches.
+No new data props needed — the tab is self-fetching.
 
+---
+
+### 3. Update `src/pages/Dashboard.tsx` — "Most Used Machines" card
+
+**Data change:**
+- Change `supabase.from('machines').select('id, name')` → `select('id, name, type')`
+- Update `topMachines` type to `{ name: string; count: number; type: string }`
+
+**Card UI changes:**
+- Add a small colored type badge next to each machine name (blue=Manufacturing, purple=Finishing, indigo=Packaging, cyan=Boxing)
+- Show a mini horizontal progress bar per machine (relative to the top machine count)
+- Add "See detailed analytics →" link at the bottom of the card that navigates to `/reports?tab=machine-production`
+
+---
+
+### Technical notes
+- No database changes needed — `machine_production` already has all required columns
+- `MachineProductionTab` uses `useMemo` for all derived data (totals, daily trend, phase breakdown)
+- The tab is consistent with the pattern in `CatalogInsightsTab` (self-contained date filter + memoized aggregation)
