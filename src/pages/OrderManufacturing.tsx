@@ -17,8 +17,6 @@ import {
   Box,
   Loader2,
   AlertTriangle,
-  RotateCcw,
-  XCircle,
   Search,
   CheckCircle,
   Package,
