@@ -670,25 +670,25 @@ export default function OrderManufacturing() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">In Manufacturing</p>
+            <p className="text-sm text-muted-foreground">{t('phase.in_manufacturing')}</p>
             <p className="text-2xl font-bold text-primary">{totalInManufacturing}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Products</p>
+            <p className="text-sm text-muted-foreground">{t('phase.products_label')}</p>
             <p className="text-2xl font-bold">{productGroups.length}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Total Items</p>
+            <p className="text-sm text-muted-foreground">{t('phase.total_items')}</p>
             <p className="text-2xl font-bold">{totalInManufacturing}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Completed</p>
+            <p className="text-sm text-muted-foreground">{t('phase.completed')}</p>
             <p className="text-2xl font-bold text-green-600">{totalCompleted}</p>
           </CardContent>
         </Card>
