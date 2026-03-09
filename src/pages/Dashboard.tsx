@@ -524,17 +524,50 @@ export default function Dashboard() {
             <CardDescription>By production records in {TIME_RANGE_LABELS[timeRange].toLowerCase()}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            {data.topMachines.length > 0 ? data.topMachines.map((m, i) => (
-              <div key={i} className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className={`flex items-center justify-center h-6 w-6 rounded-full text-xs font-bold ${
-                    i === 0 ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground'
-                  }`}>{i + 1}</span>
-                  <span className="text-sm font-medium truncate">{m.name}</span>
-                </div>
-                <Badge variant="secondary" className="text-xs shrink-0">{m.count} ops</Badge>
-              </div>
-            )) : (
+            {data.topMachines.length > 0 ? (
+              <>
+                {data.topMachines.map((m, i) => {
+                  const maxCount = data.topMachines[0]?.count || 1;
+                  const pct = Math.round((m.count / maxCount) * 100);
+                  const typeColors: Record<string, string> = {
+                    manufacturing: 'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300',
+                    finishing: 'bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300',
+                    packaging: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300',
+                    boxing: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-950 dark:text-cyan-300',
+                  };
+                  const barColors: Record<string, string> = {
+                    manufacturing: 'hsl(214, 95%, 36%)',
+                    finishing: 'hsl(270, 60%, 50%)',
+                    packaging: 'hsl(240, 50%, 55%)',
+                    boxing: 'hsl(190, 80%, 40%)',
+                  };
+                  return (
+                    <div key={i} className="space-y-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className={`flex items-center justify-center h-6 w-6 rounded-full text-xs font-bold shrink-0 ${
+                            i === 0 ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground'
+                          }`}>{i + 1}</span>
+                          <span className="text-sm font-medium truncate">{m.name}</span>
+                          {m.type && (
+                            <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full capitalize ${typeColors[m.type] || 'bg-muted text-muted-foreground'}`}>
+                              {m.type}
+                            </span>
+                          )}
+                        </div>
+                        <Badge variant="secondary" className="text-xs shrink-0">{m.count} ops</Badge>
+                      </div>
+                      <div className="w-full bg-muted rounded-full h-1.5 ml-8">
+                        <div className="h-1.5 rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: barColors[m.type] || 'hsl(var(--primary))' }} />
+                      </div>
+                    </div>
+                  );
+                })}
+                <Link to="/reports?tab=machine-production" className="flex items-center justify-center gap-1 pt-2 text-xs text-primary hover:underline">
+                  See detailed analytics <ArrowRight className="h-3 w-3" />
+                </Link>
+              </>
+            ) : (
               <p className="text-sm text-muted-foreground text-center py-4">No machine activity yet</p>
             )}
           </CardContent>
