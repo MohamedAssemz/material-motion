@@ -14,6 +14,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { format } from 'date-fns';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface Order {
   id: string;
@@ -30,6 +31,7 @@ type TabStatus = 'active' | 'completed';
 
 export default function QueueManufacturing() {
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabStatus>('active');
@@ -57,14 +59,12 @@ export default function QueueManufacturing() {
 
   const fetchOrders = async () => {
     try {
-      // Fetch all order_batches
       const { data: orderBatchesData, error: batchError } = await supabase
         .from('order_batches')
         .select('order_id, current_state, quantity');
 
       if (batchError) throw batchError;
 
-      // Fetch all extra_batches in manufacturing state (reserved)
       const { data: extraBatchesData, error: extraError } = await supabase
         .from('extra_batches')
         .select('order_id, current_state, quantity')
@@ -74,8 +74,6 @@ export default function QueueManufacturing() {
 
       if (extraError) throw extraError;
 
-      // Get unique order IDs that have manufacturing-related batches (for active orders)
-      // OR any batches at all (for completed orders that went through this phase)
       const activeManufacturingOrderIds = new Set<string>();
       const allOrderIds = new Set<string>();
       
@@ -100,7 +98,6 @@ export default function QueueManufacturing() {
         return;
       }
 
-      // Fetch order details for all orders that have batches
       const { data: ordersData, error: ordersError } = await supabase
         .from('orders')
         .select('id, order_number, created_at, status')
@@ -108,7 +105,6 @@ export default function QueueManufacturing() {
 
       if (ordersError) throw ordersError;
 
-      // Fetch order items to get total units
       const { data: orderItemsData } = await supabase
         .from('order_items')
         .select('order_id, quantity')
@@ -149,7 +145,6 @@ export default function QueueManufacturing() {
           _hasActiveManufacturing: activeManufacturingOrderIds.has(order.id),
         };
       }).filter((order: any) => 
-        // Include if has active manufacturing items OR is completed
         order._hasActiveManufacturing || order._isCompleted
       );
 
@@ -182,10 +177,10 @@ export default function QueueManufacturing() {
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead>Order Number</TableHead>
-          <TableHead>In Manufacturing</TableHead>
-          <TableHead>Extra Items</TableHead>
-          <TableHead>Created Date</TableHead>
+          <TableHead>{t('queue.order_number')}</TableHead>
+          <TableHead>{t('queue.in_manufacturing')}</TableHead>
+          <TableHead>{t('queue.extra_items')}</TableHead>
+          <TableHead>{t('queue.created_date')}</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -198,14 +193,14 @@ export default function QueueManufacturing() {
             <TableCell className="font-medium">{order.order_number}</TableCell>
             <TableCell>
               {order.manufacturing_count > 0 && (
-                <Badge className="bg-blue-500">{order.manufacturing_count} items</Badge>
+                <Badge className="bg-blue-500">{order.manufacturing_count} {t('common.items')}</Badge>
               )}
             </TableCell>
             <TableCell>
               {order.extra_manufacturing_count > 0 && (
                 <Badge variant="outline" className="border-amber-500 text-amber-600">
                   <Package className="h-3 w-3 mr-1" />
-                  {order.extra_manufacturing_count} extra
+                  {order.extra_manufacturing_count} {t('phase.extra').toLowerCase()}
                 </Badge>
               )}
             </TableCell>
@@ -221,19 +216,19 @@ export default function QueueManufacturing() {
       <div>
         <h1 className="text-3xl font-bold flex items-center gap-2">
           <Factory className="h-8 w-8" />
-          Manufacturing Queue
+          {t('manufacturing.queue')}
         </h1>
-        <p className="text-muted-foreground">Orders awaiting raw materials or in manufacturing</p>
+        <p className="text-muted-foreground">{t('queue.awaiting')}</p>
       </div>
 
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabStatus)} className="space-y-4">
         <TabsList>
           <TabsTrigger value="active" className="gap-2">
-            Active
+            {t('common.active')}
             <Badge variant="secondary" className="ml-1">{activeOrders.length}</Badge>
           </TabsTrigger>
           <TabsTrigger value="completed" className="gap-2">
-            Completed
+            {t('status.completed')}
             <Badge variant="secondary" className="ml-1">{completedOrders.length}</Badge>
           </TabsTrigger>
         </TabsList>
@@ -247,7 +242,7 @@ export default function QueueManufacturing() {
                 </div>
               ) : activeOrders.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
-                  No active orders in manufacturing queue
+                  {t('queue.no_active_orders')}
                 </div>
               ) : (
                 renderTable(activeOrders)
@@ -265,7 +260,7 @@ export default function QueueManufacturing() {
                 </div>
               ) : completedOrders.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
-                  No completed orders with manufacturing history
+                  {t('queue.no_completed_orders')}
                 </div>
               ) : (
                 renderTable(completedOrders)

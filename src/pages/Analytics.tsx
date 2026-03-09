@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Factory, Clock, AlertTriangle, TrendingUp, BarChart3, Timer } from 'lucide-react';
+import { ArrowLeft, Factory, Clock, BarChart3, Timer } from 'lucide-react';
 import { format, formatDistanceToNow, differenceInDays } from 'date-fns';
 import {
   BarChart,
@@ -17,10 +17,9 @@ import {
   PieChart,
   Pie,
   Cell,
-  LineChart,
-  Line,
   Legend,
 } from 'recharts';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface BatchETA {
   id: string;
@@ -71,6 +70,7 @@ const STATE_COLORS: Record<string, string> = {
 
 export default function Analytics() {
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const [batchETAs, setBatchETAs] = useState<BatchETA[]>([]);
   const [machineStats, setMachineStats] = useState<MachineStats[]>([]);
   const [stateDistribution, setStateDistribution] = useState<StateDistribution[]>([]);
@@ -97,7 +97,6 @@ export default function Analytics() {
 
   const fetchAnalytics = async () => {
     try {
-      // Fetch batches with ETA
       const { data: batchesData } = await supabase
         .from('order_batches')
         .select(`
@@ -133,7 +132,6 @@ export default function Analytics() {
       });
       setBatchETAs(processedBatches);
 
-      // Fetch machine production stats from order_batches machine columns
       const { data: machinesData } = await supabase
         .from('machines')
         .select('id, name, type');
@@ -183,7 +181,6 @@ export default function Analytics() {
 
       setMachineStats(Array.from(machineStatsMap.values()).filter(m => m.total_production > 0));
 
-      // Fetch state distribution
       const { data: allBatches } = await supabase
         .from('order_batches')
         .select('current_state, quantity');
@@ -201,7 +198,6 @@ export default function Analytics() {
       }));
       setStateDistribution(distribution);
 
-      // Fetch global counters
       const { data: leadTimeData } = await supabase
         .from('order_batches')
         .select('lead_time_days')
@@ -236,11 +232,11 @@ export default function Analytics() {
       <div className="flex items-center gap-4">
         <Button variant="ghost" onClick={() => navigate('/')}>
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Dashboard
+          {t('analytics.back_to_dashboard')}
         </Button>
         <div>
-          <h1 className="text-3xl font-bold">Analytics & Timelines</h1>
-          <p className="text-muted-foreground">Production metrics and batch tracking</p>
+          <h1 className="text-3xl font-bold">{t('analytics.title')}</h1>
+          <p className="text-muted-foreground">{t('analytics.batch_tracking')}</p>
         </div>
       </div>
 
@@ -248,34 +244,23 @@ export default function Analytics() {
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Avg Lead Time</CardTitle>
+            <CardTitle className="text-sm font-medium">{t('analytics.avg_lead_time')}</CardTitle>
             <Timer className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-primary">{globalCounters.avgLeadTime} days</div>
-            <p className="text-xs text-muted-foreground">Average per stage</p>
+            <div className="text-2xl font-bold text-primary">{globalCounters.avgLeadTime} {t('analytics.days')}</div>
+            <p className="text-xs text-muted-foreground">{t('analytics.average_per_stage')}</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Late Batches</CardTitle>
+            <CardTitle className="text-sm font-medium">{t('analytics.late_batches')}</CardTitle>
             <Clock className="h-4 w-4 text-destructive" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-destructive">{globalCounters.lateBatches}</div>
-            <p className="text-xs text-muted-foreground">Past their ETA</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Late Batches</CardTitle>
-            <Clock className="h-4 w-4 text-destructive" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-destructive">{globalCounters.lateBatches}</div>
-            <p className="text-xs text-muted-foreground">Past their ETA</p>
+            <p className="text-xs text-muted-foreground">{t('analytics.past_eta')}</p>
           </CardContent>
         </Card>
       </div>
@@ -286,9 +271,9 @@ export default function Analytics() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <BarChart3 className="h-5 w-5" />
-              Items by State
+              {t('analytics.items_by_state')}
             </CardTitle>
-            <CardDescription>Current distribution of items across states</CardDescription>
+            <CardDescription>{t('analytics.current_distribution')}</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="h-[300px]">
@@ -328,9 +313,9 @@ export default function Analytics() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Factory className="h-5 w-5" />
-              Machine Production Rate
+              {t('analytics.machine_production_rate')}
             </CardTitle>
-            <CardDescription>Production output by machine</CardDescription>
+            <CardDescription>{t('analytics.production_output')}</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="h-[300px]">
@@ -348,13 +333,13 @@ export default function Analytics() {
                       }}
                     />
                     <Legend />
-                    <Bar dataKey="production_today" fill="hsl(214, 95%, 45%)" name="Today" />
-                    <Bar dataKey="production_this_week" fill="hsl(142, 76%, 36%)" name="This Week" />
+                    <Bar dataKey="production_today" fill="hsl(214, 95%, 45%)" name={t('dashboard.today')} />
+                    <Bar dataKey="production_this_week" fill="hsl(142, 76%, 36%)" name={t('dashboard.this_week')} />
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
                 <div className="flex items-center justify-center h-full text-muted-foreground">
-                  No machine production data available
+                  {t('analytics.no_machine_data')}
                 </div>
               )}
             </div>
@@ -367,13 +352,13 @@ export default function Analytics() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Clock className="h-5 w-5" />
-            Batch ETA Timeline
+            {t('analytics.batch_eta_timeline')}
           </CardTitle>
-          <CardDescription>Upcoming batch deadlines and late batches</CardDescription>
+          <CardDescription>{t('analytics.upcoming_deadlines')}</CardDescription>
         </CardHeader>
         <CardContent>
           {batchETAs.length === 0 ? (
-            <p className="text-center text-muted-foreground py-8">No batches with ETA set</p>
+            <p className="text-center text-muted-foreground py-8">{t('analytics.no_batches_eta')}</p>
           ) : (
             <div className="space-y-3 max-h-[400px] overflow-y-auto">
               {batchETAs.map((batch) => (
@@ -386,10 +371,10 @@ export default function Analytics() {
                   <div className="flex items-center gap-4">
                     <div className="text-center min-w-[60px]">
                       <div className={`text-lg font-bold ${batch.is_late ? 'text-destructive' : 'text-primary'}`}>
-                        {batch.is_late ? 'LATE' : `${batch.days_remaining}d`}
+                        {batch.is_late ? t('dashboard.late').toUpperCase() : `${batch.days_remaining}d`}
                       </div>
                       <div className="text-xs text-muted-foreground">
-                        {batch.is_late ? 'overdue' : 'remaining'}
+                        {batch.is_late ? t('analytics.overdue') : t('analytics.days_remaining')}
                       </div>
                     </div>
                     <div>
@@ -400,7 +385,7 @@ export default function Analytics() {
                         </Badge>
                       </div>
                       <p className="text-sm text-muted-foreground">
-                        {batch.product_name} • {batch.order_number} • {batch.quantity} items
+                        {batch.product_name} • {batch.order_number} • {batch.quantity} {t('common.items')}
                       </p>
                     </div>
                   </div>
