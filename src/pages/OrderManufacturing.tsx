@@ -468,7 +468,7 @@ export default function OrderManufacturing() {
 
   const handleOpenBoxDialog = () => {
     if (totalSelected === 0) {
-      toast.error("Please select items first");
+      toast.error(t('phase.select_items_first'));
       return;
     }
     setSelectedBox(null);
