@@ -784,12 +784,12 @@ export default function OrderPackaging() {
               <Package className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold">Packaging</h1>
+              <h1 className="text-2xl font-bold">{t('packaging.title')}</h1>
               <p className="text-muted-foreground">
                 {order.order_number} {order.customer?.name && `· ${order.customer.name}`}
                 {order.priority === "high" && (
                   <Badge variant="destructive" className="ml-2">
-                    High Priority
+                    {t('phase.high_priority')}
                   </Badge>
                 )}
               </p>
@@ -797,7 +797,7 @@ export default function OrderPackaging() {
           </div>
         </div>
         <Button variant="outline" onClick={() => navigate(`/orders/${id}`)}>
-          View Order Details
+          {t('phase.view_order_details')}
         </Button>
       </div>
 
