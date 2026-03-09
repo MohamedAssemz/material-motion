@@ -581,8 +581,6 @@ export default function OrderDetail() {
   const shippedItems = activeBatches
     .filter((b) => b.current_state === "shipped")
     .reduce((sum, b) => sum + b.quantity, 0);
-  const flaggedCount = 0;
-  const redoCount = 0;
 
   // Check if order is pending based on order status, not batch states
   // This ensures the UI remains consistent even when all order batches are deleted/replaced by extra inventory
