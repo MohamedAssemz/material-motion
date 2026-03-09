@@ -200,13 +200,6 @@ export default function Analytics() {
       setStateDistribution(distribution);
 
       // Fetch global counters
-      const { data: ordersData } = await supabase
-        .from('orders')
-        .select('termination_counter, redo_counter');
-
-      const totalTerminations = (ordersData || []).reduce((sum, o: any) => sum + (o.termination_counter || 0), 0);
-      const totalRedos = (ordersData || []).reduce((sum, o: any) => sum + (o.redo_counter || 0), 0);
-
       const { data: leadTimeData } = await supabase
         .from('order_batches')
         .select('lead_time_days')

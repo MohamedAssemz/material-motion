@@ -848,11 +848,10 @@ export default function OrderDetail() {
         );
       })()}
 
-      {/* Notes & Alerts */}
-      {(order.notes || flaggedCount > 0 || redoCount > 0) && (
+      {/* Notes */}
+      {order.notes && (
         <div className="space-y-2">
            {(() => {
-              // Show notes without packaging reference block
               const notes = order.notes || '';
               const startTag = "---PACKAGING_REFERENCE---";
               const endTag = "---END_PACKAGING_REFERENCE---";
@@ -872,29 +871,6 @@ export default function OrderDetail() {
                 </Card>
               );
            })()}
-          {(flaggedCount > 0 || redoCount > 0) && (
-            <Card className="border-warning">
-              <CardContent className="p-4 flex items-center gap-4">
-                <AlertTriangle className="h-5 w-5 text-warning" />
-                <div className="flex-1">
-                  {flaggedCount > 0 && (
-                    <span className="text-sm">
-                      {flaggedCount} flagged item(s)
-                    </span>
-                  )}
-                  {flaggedCount > 0 && redoCount > 0 && <span className="mx-2">·</span>}
-                  {redoCount > 0 && (
-                    <span className="text-sm">
-                      {redoCount} redo item(s)
-                    </span>
-                  )}
-                </div>
-                <Button variant="outline" size="sm" onClick={() => setFlaggedItemsOpen(true)}>
-                  View Details
-                </Button>
-              </CardContent>
-            </Card>
-          )}
         </div>
       )}
 

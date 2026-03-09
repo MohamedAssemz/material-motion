@@ -68,8 +68,7 @@ export function BoxSelectionDialog({
       const { data: batchesInBoxes } = await supabase
         .from('order_batches')
         .select('box_id')
-        .not('box_id', 'is', null)
-        .eq('is_terminated', false);
+        .not('box_id', 'is', null);
 
       // Create set of box IDs that have batches
       const boxesWithBatches = new Set(batchesInBoxes?.map(b => b.box_id) || []);

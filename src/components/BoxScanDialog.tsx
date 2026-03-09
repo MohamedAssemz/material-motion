@@ -223,7 +223,6 @@ export function BoxScanDialog({
           `)
           .eq('box_id', box.id)
           .eq('current_state', filterState || '')
-          .eq('is_terminated', false)
           .single();
 
         if (!batch) {

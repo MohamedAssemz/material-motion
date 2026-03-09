@@ -193,8 +193,7 @@ export function BoxLookupScanDialog({ open, onOpenChange }: BoxLookupScanDialogP
             current_state,
             product:products(sku, name)
           `)
-          .eq('box_id', boxData.id)
-          .eq('is_terminated', false);
+          .eq('box_id', boxData.id);
 
         batches = (orderBatches || []).map(b => ({
           id: b.id,

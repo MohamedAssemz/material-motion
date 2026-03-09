@@ -69,8 +69,7 @@ export default function BoxLookup() {
               current_state,
               product:products(name, sku)
             `)
-            .eq('box_id', orderBox.id)
-            .eq('is_terminated', false);
+            .eq('box_id', orderBox.id);
 
           const items = batches?.map(b => ({
             product_id: b.product_id,

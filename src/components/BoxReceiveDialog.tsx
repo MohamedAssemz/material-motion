@@ -337,7 +337,6 @@ export function BoxReceiveDialog({
           `)
           .eq('order_id', orderId)
           .eq('current_state', filterState)
-          .eq('is_terminated', false)
           .not('box_id', 'is', null);
 
         // Filter by product sku or name containing search term
