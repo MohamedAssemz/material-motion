@@ -210,18 +210,6 @@ export function AppLayout({ children }: AppLayoutProps) {
             
             <div className="hidden sm:block text-right">
               <p className="text-sm font-medium truncate max-w-[200px]">{user?.email}</p>
-              <div className="flex gap-1 justify-end mt-0.5">
-                {userRoles.slice(0, 2).map((role) => (
-                  <Badge key={role} variant="secondary" className="text-xs">
-                    {roleDisplayNames[role] || role}
-                  </Badge>
-                ))}
-                {userRoles.length > 2 && (
-                  <Badge variant="secondary" className="text-xs">
-                    +{userRoles.length - 2}
-                  </Badge>
-                )}
-              </div>
             </div>
             <Button variant="outline" size="icon" onClick={signOut} title={t('header.logout')}>
               <LogOut className="h-4 w-4" />
