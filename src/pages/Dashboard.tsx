@@ -289,10 +289,11 @@ export default function Dashboard() {
   const throughputData = useMemo(() => {
     if (!data) return [];
     return Object.entries(data.todayThroughput).
-    filter(([key]) => TRANSITION_LABELS[key]).
+    filter(([key]) => PHASE_LABELS[key]).
     map(([key, count]) => ({
-      name: TRANSITION_LABELS[key] || key,
-      value: count
+      name: PHASE_LABELS[key] || key,
+      value: count,
+      fill: PHASE_COLORS[key] || 'hsl(214, 95%, 36%)'
     }));
   }, [data]);
 
