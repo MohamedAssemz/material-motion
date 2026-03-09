@@ -1,42 +1,37 @@
 
 
-## Plan: Order Cancellation Freeze Logic
+## Fix Dashboard: Machine Bar Overflow + Empty Throughput
 
-### Requirements
-1. When an order is cancelled, freeze all actions on phase pages **except** production rate (machine) assignment (which still respects role permissions)
-2. Unretrieved reserved extra batches should be released back to AVAILABLE on cancellation
+### Issue 1: Most Used Machines Bar Overflow
 
-### Analysis
-- Requirement 2 is **already implemented** in `handleCancelOrder` in `OrderDetail.tsx` (lines 462-471) — it releases reserved extra batches back to AVAILABLE
-- Requirement 1 needs changes across 4 phase pages and their child components
+The progress bar (line 561-563) uses `ml-8` indentation plus the machine name, type badge, and count badge all competing for space. When names are long, the bar overflows the card.
 
-### Implementation
+**Fix**: Remove the progress bar entirely. Show a simpler list layout — just rank number, machine name, type badge, and count. Already limited to top 3, so no overflow risk without the bar.
 
-**Core approach:** Each phase page already has a `canManage` boolean that gates actions. Add an `isCancelled` check derived from `order?.status === 'cancelled'` and use it to disable all actions except machine assignment.
+### Issue 2: Throughput Card Always Empty
 
-**Files to modify:**
+Line 233 explicitly sets `todayThroughput: {}` with the comment "No longer tracking state transitions." The `throughputData` memo (lines 284-292) reads from this empty object, so the chart always shows "No production recorded."
 
-1. **`OrderManufacturing.tsx`** — Add `const isCancelled = order?.status === 'cancelled'`. Pass `isCancelled` to disable:
-   - Box assignment dialog actions
-   - Terminate/redo actions
-   - MoveToExtraDialog
-   - ExtraItemsTab `canManage` → `canManage && !isCancelled`
-   - BoxReceiveDialog actions
-   - Keep `ProductionRateSection canManage={canManage}` unchanged (still allows machine assignment)
+**Fix**: Query the `machine_production` table (which records actual state transitions with timestamps) and aggregate by `state_transition` within the time range. This table already exists and has data from production activity.
 
-2. **`OrderFinishing.tsx`** — Same pattern: `isCancelled` disables accept boxes, assign to box, MoveToExtraDialog, ExtraItemsTab, but keeps ProductionRateSection canManage unchanged.
+**Changes in `src/pages/Dashboard.tsx`:**
 
-3. **`OrderPackaging.tsx`** — Same pattern.
+1. Add `machine_production` query to the `Promise.all` block:
+   ```typescript
+   supabase.from('machine_production')
+     .select('state_transition')
+     .gte('created_at', rangeStart)
+   ```
 
-4. **`OrderBoxing.tsx`** — Same pattern. Additionally disable shipment creation.
+2. Aggregate `state_transition` counts to populate `todayThroughput`:
+   ```typescript
+   const throughputMap: Record<string, number> = {};
+   (machineProductionRes.data || []).forEach((r: any) => {
+     throughputMap[r.state_transition] = (throughputMap[r.state_transition] || 0) + 1;
+   });
+   ```
 
-5. **`OrderDetail.tsx`** — Add a visible "Cancelled" banner/badge. The cancel button is already hidden when `status === 'cancelled'`. Start Order and Extra Inventory sections are already gated to pending orders, so no changes needed there.
+3. Set `todayThroughput: throughputMap` instead of `{}`.
 
-**Specific prop changes per phase page:**
-- `ExtraItemsTab canManage={canManage && !isCancelled}` — freezes extra retrieval
-- `ProductionRateSection canManage={canManage}` — unchanged, still allows machine assignment
-- All action buttons (accept, assign, terminate, redo, move to extra, create shipment) gated with `!isCancelled`
-- Box receive dialogs disabled when cancelled
-
-**No database changes needed** — the cancellation already releases reserved batches.
+4. Remove the progress bar from Most Used Machines, keep just the list with rank, name, type badge, and ops count.
 
