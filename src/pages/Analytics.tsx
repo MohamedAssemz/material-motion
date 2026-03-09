@@ -241,30 +241,29 @@ export default function Analytics() {
       </div>
 
       {/* Global Counters */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Terminations</CardTitle>
-            <AlertTriangle className="h-4 w-4 text-destructive" />
+            <CardTitle className="text-sm font-medium">Avg Lead Time</CardTitle>
+            <Timer className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-destructive">{globalCounters.totalTerminations}</div>
-            <p className="text-xs text-muted-foreground">Items marked as lost</p>
+            <div className="text-2xl font-bold text-primary">{globalCounters.avgLeadTime} days</div>
+            <p className="text-xs text-muted-foreground">Average per stage</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Redos</CardTitle>
-            <TrendingUp className="h-4 w-4 text-warning" />
+            <CardTitle className="text-sm font-medium">Late Batches</CardTitle>
+            <Clock className="h-4 w-4 text-destructive" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-warning">{globalCounters.totalRedos}</div>
-            <p className="text-xs text-muted-foreground">Items sent for redo</p>
+            <div className="text-2xl font-bold text-destructive">{globalCounters.lateBatches}</div>
+            <p className="text-xs text-muted-foreground">Past their ETA</p>
           </CardContent>
         </Card>
-
-        <Card>
+      </div>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Avg Lead Time</CardTitle>
             <Timer className="h-4 w-4 text-primary" />
