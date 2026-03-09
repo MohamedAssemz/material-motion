@@ -98,11 +98,6 @@ export default function OrderManufacturing() {
 
   // Dialog states
   const [boxDialogOpen, setBoxDialogOpen] = useState(false);
-  const [terminateDialogOpen, setTerminateDialogOpen] = useState(false);
-  const [redoDialogOpen, setRedoDialogOpen] = useState(false);
-  const [moveToExtraDialogOpen, setMoveToExtraDialogOpen] = useState(false);
-  const [terminateReason, setTerminateReason] = useState("");
-  const [redoReason, setRedoReason] = useState("");
 
   // Box selection
   const [boxSearchCode, setBoxSearchCode] = useState("");
