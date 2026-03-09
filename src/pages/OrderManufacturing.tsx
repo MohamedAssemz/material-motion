@@ -115,32 +115,8 @@ export default function OrderManufacturing() {
   const canManage = hasRole("manufacturing_manager") || hasRole("admin");
   const isCancelled = order?.status === 'cancelled';
 
-  // Compute processed batches for Production Rate by subtracting retrieved quantities
-  const processedBatchesForRate = useMemo(() => {
-    if (retrievedFromExtraBatches.length === 0) return completedBatches;
-    const retrievedByGroup = new Map<string, number>();
-    retrievedFromExtraBatches.forEach(rb => {
-      const key = rb.order_item_id || rb.product_id;
-      retrievedByGroup.set(key, (retrievedByGroup.get(key) || 0) + rb.quantity);
-    });
-    const remaining = new Map(retrievedByGroup);
-    const adjusted: Batch[] = [];
-    for (const batch of completedBatches) {
-      const key = batch.order_item_id || batch.product_id;
-      const toSubtract = remaining.get(key) || 0;
-      if (toSubtract >= batch.quantity) {
-        remaining.set(key, toSubtract - batch.quantity);
-        continue;
-      }
-      if (toSubtract > 0) {
-        adjusted.push({ ...batch, quantity: batch.quantity - toSubtract } as Batch);
-        remaining.set(key, 0);
-      } else {
-        adjusted.push(batch);
-      }
-    }
-    return adjusted;
-  }, [completedBatches, retrievedFromExtraBatches]);
+  // completedBatches already excludes retrieved-from-extra items via from_extra_state filter
+  const processedBatchesForRate = completedBatches;
 
   useEffect(() => {
     fetchData();
