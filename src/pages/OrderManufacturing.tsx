@@ -722,7 +722,7 @@ export default function OrderManufacturing() {
         <TabsList className="grid grid-cols-3 w-full max-w-xl">
           <TabsTrigger value="active">Active ({totalInManufacturing})</TabsTrigger>
           <TabsTrigger value="extra">Extra</TabsTrigger>
-          <TabsTrigger value="completed">Completed ({totalCompleted})</TabsTrigger>
+          <TabsTrigger value="completed">Processed ({totalCompleted})</TabsTrigger>
         </TabsList>
 
         <TabsContent value="active" className="space-y-4">
