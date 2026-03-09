@@ -112,8 +112,7 @@ export function BoxDetailsDialog({
             current_state,
             product:products(name, sku)
           `)
-          .eq('box_id', boxId)
-          .eq('is_terminated', false);
+          .eq('box_id', boxId);
 
         if (error) throw error;
         setOrderBatches((data || []).map(b => ({
