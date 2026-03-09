@@ -147,8 +147,6 @@ export default function OrderDetail() {
   const [rawMaterialsOpen, setRawMaterialsOpen] = useState(false);
   
   const [shipmentDialogOpen, setShipmentDialogOpen] = useState(false);
-  const [boxAssignDialogOpen, setBoxAssignDialogOpen] = useState(false);
-  const [leadTimeDialogOpen, setLeadTimeDialogOpen] = useState(false);
   const [extraInventoryOpen, setExtraInventoryOpen] = useState(false);
   const [startOrderOpen, setStartOrderOpen] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
