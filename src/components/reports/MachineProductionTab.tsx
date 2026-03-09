@@ -97,7 +97,7 @@ export function MachineProductionTab() {
     const fetchData = async () => {
       setLoading(true);
       const [orderBatchesRes, extraBatchesRes, machinesRes] = await Promise.all([
-        supabase.from('order_batches').select('manufacturing_machine_id, finishing_machine_id, packaging_machine_id, boxing_machine_id, quantity, updated_at'),
+        supabase.from('order_batches').select('manufacturing_machine_id, finishing_machine_id, packaging_machine_id, boxing_machine_id, quantity, updated_at, from_extra_state'),
         supabase.from('extra_batches').select('manufacturing_machine_id, finishing_machine_id, packaging_machine_id, boxing_machine_id, quantity, updated_at'),
         supabase.from('machines').select('id, name, type'),
       ]);
