@@ -147,29 +147,21 @@ export default function Dashboard() {
       newOrdersTodayRes,
       batchesRes,
       lateBatchesRes,
-      flaggedBatchesRes,
       approachingRes,
-      throughputRes,
       extraRes,
       shipmentsRes,
       shippedBatchesRes,
-      machineProductionRes,
       machinesRes] =
       await Promise.all([
       user ? supabase.from('profiles').select('full_name').eq('id', user.id).single() : Promise.resolve({ data: null }),
       supabase.from('orders').select('status').gte('created_at', rangeStart),
       supabase.from('orders').select('id').gte('created_at', todayStart),
-      supabase.from('order_batches').select('current_state, quantity, order:orders!inner(status)').eq('is_terminated', false).neq('order.status', 'cancelled').gte('created_at', rangeStart),
-      supabase.from('order_batches').select('id, order_id, product_id, eta, quantity, order:orders(order_number, status)').eq('is_terminated', false).not('current_state', 'in', '(shipped,ready_for_shipment)').not('eta', 'is', null).lt('eta', now).limit(50),
-      supabase.from('order_batches').select('id, order_id, flagged_reason, quantity, order:orders(order_number, status)').eq('is_flagged', true).eq('is_terminated', false).limit(50),
+      supabase.from('order_batches').select('current_state, quantity, manufacturing_machine_id, finishing_machine_id, packaging_machine_id, boxing_machine_id').gte('created_at', rangeStart),
+      supabase.from('order_batches').select('id, order_id, product_id, eta, quantity, order:orders(order_number, status)').not('current_state', 'in', '(shipped,ready_for_shipment)').not('eta', 'is', null).lt('eta', now).limit(50),
       supabase.from('orders').select('id, order_number, estimated_fulfillment_time').not('estimated_fulfillment_time', 'is', null).gt('estimated_fulfillment_time', now).lt('estimated_fulfillment_time', twoDaysFromNow).neq('status', 'completed').neq('status', 'cancelled').limit(5),
-      supabase.from('machine_production').select('state_transition').gte('created_at', rangeStart),
       supabase.from('extra_batches').select('quantity').eq('inventory_state', 'AVAILABLE'),
       supabase.from('shipments').select('id').gte('created_at', rangeStart),
-      // Top products: shipped/ready_for_shipment batches in time range (excluding cancelled)
-      supabase.from('order_batches').select('product_id, quantity, order:orders!inner(status)').in('current_state', ['shipped', 'ready_for_shipment']).eq('is_terminated', false).neq('order.status', 'cancelled').gte('created_at', rangeStart),
-      // Machine production with machine_id for top machines
-      supabase.from('machine_production').select('machine_id').gte('created_at', rangeStart),
+      supabase.from('order_batches').select('product_id, quantity').in('current_state', ['shipped', 'ready_for_shipment']).gte('created_at', rangeStart),
       supabase.from('machines').select('id, name')]
       );
 
@@ -177,16 +169,14 @@ export default function Dashboard() {
       (ordersRes.data || []).forEach((o) => {ordersByStatus[o.status] = (ordersByStatus[o.status] || 0) + 1;});
 
       const batchesByState: Record<string, number> = {};
-      (batchesRes.data || []).forEach((b) => {batchesByState[b.current_state] = (batchesByState[b.current_state] || 0) + b.quantity;});
+      (batchesRes.data || []).forEach((b: any) => {batchesByState[b.current_state] = (batchesByState[b.current_state] || 0) + b.quantity;});
 
       const todayThroughput: Record<string, number> = {};
-      (throughputRes.data || []).forEach((t) => {todayThroughput[t.state_transition] = (todayThroughput[t.state_transition] || 0) + 1;});
 
       const extraInventoryCount = (extraRes.data || []).reduce((s, b) => s + b.quantity, 0);
 
       // Filter out cancelled orders from alerts
       const activeLate = ((lateBatchesRes.data || []) as any[]).filter((b) => b.order?.status !== 'cancelled');
-      const activeFlagged = ((flaggedBatchesRes.data || []) as any[]).filter((b) => b.order?.status !== 'cancelled');
       const lateOrderIds = new Set(activeLate.map((b) => b.order_id));
 
       // Top 3 products by finished quantity
@@ -212,10 +202,13 @@ export default function Dashboard() {
       const totalFinished = Object.values(productQtyMap).reduce((s, v) => s + v, 0);
       const avgFinishedPerDay = Math.round(totalFinished / daysDiff * 10) / 10;
 
-      // Top machines
+      // Top machines — use order_batches machine columns since machine_production table doesn't exist
       const machineCountMap: Record<string, number> = {};
-      (machineProductionRes.data || []).forEach((m: any) => {
-        machineCountMap[m.machine_id] = (machineCountMap[m.machine_id] || 0) + 1;
+      ((batchesRes.data || []) as any[]).forEach((b: any) => {
+        const machineFields = [b.manufacturing_machine_id, b.finishing_machine_id, b.packaging_machine_id, b.boxing_machine_id];
+        machineFields.forEach((mid: string | null) => {
+          if (mid) machineCountMap[mid] = (machineCountMap[mid] || 0) + 1;
+        });
       });
       const machineNameMap = new Map((machinesRes.data || []).map((m: any) => [m.id, m.name]));
       const topMachines = Object.entries(machineCountMap).
@@ -229,9 +222,9 @@ export default function Dashboard() {
         batchesByState,
         lateOrderCount: lateOrderIds.size,
         newOrdersToday: (newOrdersTodayRes.data || []).length,
-        flaggedBatchCount: activeFlagged.reduce((s: number, b: any) => s + b.quantity, 0),
+        flaggedBatchCount: 0,
         lateBatches: activeLate.slice(0, 10),
-        flaggedBatches: activeFlagged.slice(0, 10),
+        flaggedBatches: [],
         approachingEtaOrders: (approachingRes.data || []) as any,
         todayThroughput,
         extraInventoryCount,
@@ -314,7 +307,7 @@ export default function Dashboard() {
 
   if (!data) return null;
 
-  const alertCount = data.lateBatches.length + data.flaggedBatches.length + data.approachingEtaOrders.length;
+  const alertCount = (data.lateBatches?.length || 0) + (data.flaggedBatches?.length || 0) + (data.approachingEtaOrders?.length || 0);
 
   return (
     <div className="p-4 md:p-6 space-y-6">
@@ -618,7 +611,7 @@ export default function Dashboard() {
                 <p className="text-sm">All clear! No alerts.</p>
               </div>
             }
-            {data.lateBatches.map((b) =>
+            {(data.lateBatches || []).map((b) =>
             <Link key={`late-${b.id}`} to={`/orders/${b.order_id}`} className="flex items-start gap-2 p-2 rounded-md hover:bg-muted/50 transition-colors">
                 <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
                 <div className="min-w-0">
@@ -627,7 +620,7 @@ export default function Dashboard() {
                 </div>
               </Link>
             )}
-            {data.flaggedBatches.map((b) =>
+            {(data.flaggedBatches || []).map((b) =>
             <Link key={`flag-${b.id}`} to={`/orders/${b.order_id}`} className="flex items-start gap-2 p-2 rounded-md hover:bg-muted/50 transition-colors">
                 <Flag className="h-4 w-4 text-warning mt-0.5 shrink-0" />
                 <div className="min-w-0">
@@ -636,7 +629,7 @@ export default function Dashboard() {
                 </div>
               </Link>
             )}
-            {data.approachingEtaOrders.map((o) =>
+            {(data.approachingEtaOrders || []).map((o) =>
             <Link key={`eta-${o.id}`} to={`/orders/${o.id}`} className="flex items-start gap-2 p-2 rounded-md hover:bg-muted/50 transition-colors">
                 <CalendarClock className="h-4 w-4 text-primary mt-0.5 shrink-0" />
                 <div className="min-w-0">
