@@ -705,9 +705,13 @@ export default function OrderDetail() {
       quantity: b.quantity,
     }));
 
-  // Order state
-  const orderState =
-    shippedItems === totalItems && totalItems > 0 ? "Fulfilled" : shippedItems > 0 ? "In Progress" : "Pending";
+  // Order state - consistent with Orders table logic
+  const orderState = (() => {
+    if (order.status === 'cancelled') return "Cancelled";
+    if (order.status === 'completed' || (shippedItems === totalItems && totalItems > 0)) return "Fulfilled";
+    if (order.status === 'in_progress') return "In Progress";
+    return "Pending";
+  })();
 
   return (
     <div className="p-6 space-y-6">
