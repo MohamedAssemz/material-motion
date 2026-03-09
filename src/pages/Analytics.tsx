@@ -75,8 +75,6 @@ export default function Analytics() {
   const [machineStats, setMachineStats] = useState<MachineStats[]>([]);
   const [stateDistribution, setStateDistribution] = useState<StateDistribution[]>([]);
   const [globalCounters, setGlobalCounters] = useState<GlobalCounters>({
-    totalTerminations: 0,
-    totalRedos: 0,
     avgLeadTime: 0,
     lateBatches: 0,
   });
