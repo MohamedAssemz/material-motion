@@ -200,7 +200,7 @@ export default function OrderManufacturing() {
       setBatches((batchesRes.data || []) as unknown as Batch[]);
       const allCompleted = (completedRes.data || []) as any[];
       const filteredCompleted = allCompleted.filter(
-        (b: any) => !['extra_finishing', 'extra_packaging', 'extra_boxing'].includes(b.from_extra_state)
+        (b: any) => !['extra_manufacturing', 'extra_finishing', 'extra_packaging', 'extra_boxing'].includes(b.from_extra_state)
       );
       setCompletedBatches(filteredCompleted as unknown as Batch[]);
     } catch (error: any) {

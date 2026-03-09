@@ -1,44 +1,42 @@
 
 
-## Fix: Production Rate Shows 19 Instead of Correct Count
+## Plan: Order Cancellation Freeze Logic
 
-### Problem
+### Requirements
+1. When an order is cancelled, freeze all actions on phase pages **except** production rate (machine) assignment (which still respects role permissions)
+2. Unretrieved reserved extra batches should be released back to AVAILABLE on cancellation
 
-The Production Rate section in Manufacturing currently shows 19 assignable items, but the actual count should reflect only items that were **genuinely processed through manufacturing in this order** — excluding items retrieved from extra inventory.
+### Analysis
+- Requirement 2 is **already implemented** in `handleCancelOrder` in `OrderDetail.tsx` (lines 462-471) — it releases reserved extra batches back to AVAILABLE
+- Requirement 1 needs changes across 4 phase pages and their child components
 
-### Root Cause
+### Implementation
 
-On line 202-204 of `OrderManufacturing.tsx`, `completedBatches` excludes batches from later extra states but **does not exclude `extra_manufacturing`**:
+**Core approach:** Each phase page already has a `canManage` boolean that gates actions. Add an `isCancelled` check derived from `order?.status === 'cancelled'` and use it to disable all actions except machine assignment.
 
-```typescript
-const filteredCompleted = allCompleted.filter(
-  (b: any) => !['extra_finishing', 'extra_packaging', 'extra_boxing'].includes(b.from_extra_state)
-);
-```
+**Files to modify:**
 
-This means the 20 items retrieved from `extra_manufacturing` are included in `completedBatches`. The `processedBatchesForRate` memo then tries to subtract retrieved quantities, but batch splitting during the force-empty/re-process workflow causes an off-by-one mismatch (20 retrieved batches minus 20 subtracted = should be 0, but splitting artifacts cause it to land on 19 instead of the true count).
+1. **`OrderManufacturing.tsx`** — Add `const isCancelled = order?.status === 'cancelled'`. Pass `isCancelled` to disable:
+   - Box assignment dialog actions
+   - Terminate/redo actions
+   - MoveToExtraDialog
+   - ExtraItemsTab `canManage` → `canManage && !isCancelled`
+   - BoxReceiveDialog actions
+   - Keep `ProductionRateSection canManage={canManage}` unchanged (still allows machine assignment)
 
-### Fix
+2. **`OrderFinishing.tsx`** — Same pattern: `isCancelled` disables accept boxes, assign to box, MoveToExtraDialog, ExtraItemsTab, but keeps ProductionRateSection canManage unchanged.
 
-**`src/pages/OrderManufacturing.tsx` (line 203):** Add `extra_manufacturing` to the exclusion list so retrieved items are never included in the production rate source data:
+3. **`OrderPackaging.tsx`** — Same pattern.
 
-```typescript
-const filteredCompleted = allCompleted.filter(
-  (b: any) => !['extra_manufacturing', 'extra_finishing', 'extra_packaging', 'extra_boxing'].includes(b.from_extra_state)
-);
-```
+4. **`OrderBoxing.tsx`** — Same pattern. Additionally disable shipment creation.
 
-Apply the same pattern to the other phase pages:
+5. **`OrderDetail.tsx`** — Add a visible "Cancelled" banner/badge. The cancel button is already hidden when `status === 'cancelled'`. Start Order and Extra Inventory sections are already gated to pending orders, so no changes needed there.
 
-- **`src/pages/OrderFinishing.tsx`:** Add `'extra_finishing'` to its exclusion list
-- **`src/pages/OrderPackaging.tsx`:** Add `'extra_packaging'` to its exclusion list  
-- **`src/pages/OrderBoxing.tsx`:** Add `'extra_boxing'` to its exclusion list
+**Specific prop changes per phase page:**
+- `ExtraItemsTab canManage={canManage && !isCancelled}` — freezes extra retrieval
+- `ProductionRateSection canManage={canManage}` — unchanged, still allows machine assignment
+- All action buttons (accept, assign, terminate, redo, move to extra, create shipment) gated with `!isCancelled`
+- Box receive dialogs disabled when cancelled
 
-Also apply the same fix in `MachineProductionTab.tsx`:
-
-- **`src/components/reports/MachineProductionTab.tsx`:** Update query to include `from_extra_state`, and skip machine columns in `flattenBatches` where `from_extra_state` matches the phase (`extra_${type}`)
-
-### Result
-
-For order TESTNOW: Production Rate will show only the items that were actually manufactured in this order, with no contamination from extra inventory retrievals regardless of batch splitting.
+**No database changes needed** — the cancellation already releases reserved batches.
 

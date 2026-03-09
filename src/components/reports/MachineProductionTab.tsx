@@ -62,7 +62,8 @@ function flattenBatches(batches: any[], dateField: string): FlatRecord[] {
   for (const b of batches) {
     for (const { col, type } of PHASE_COLUMNS) {
       const machineId = b[col];
-      if (machineId) {
+      // Skip machine assignments for batches that were retrieved from extra inventory at this phase
+      if (machineId && b.from_extra_state !== `extra_${type}`) {
         results.push({ machine_id: machineId, type, quantity: b.quantity || 1, date: b[dateField] });
       }
     }
@@ -96,7 +97,7 @@ export function MachineProductionTab() {
     const fetchData = async () => {
       setLoading(true);
       const [orderBatchesRes, extraBatchesRes, machinesRes] = await Promise.all([
-        supabase.from('order_batches').select('manufacturing_machine_id, finishing_machine_id, packaging_machine_id, boxing_machine_id, quantity, updated_at'),
+        supabase.from('order_batches').select('manufacturing_machine_id, finishing_machine_id, packaging_machine_id, boxing_machine_id, quantity, updated_at, from_extra_state'),
         supabase.from('extra_batches').select('manufacturing_machine_id, finishing_machine_id, packaging_machine_id, boxing_machine_id, quantity, updated_at'),
         supabase.from('machines').select('id, name, type'),
       ]);

@@ -228,7 +228,7 @@ export default function OrderPackaging() {
       setOrder(orderRes.data as Order);
       setBatches(batchesWithData as Batch[]);
       const filteredCompleted = allCompletedWithData.filter(
-        (b: any) => b.from_extra_state !== 'extra_boxing'
+        (b: any) => !['extra_packaging', 'extra_boxing'].includes(b.from_extra_state)
       );
       setCompletedBatches(filteredCompleted as Batch[]);
     } catch (error: any) {
