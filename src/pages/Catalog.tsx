@@ -553,13 +553,13 @@ export default function Catalog() {
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Product</AlertDialogTitle>
+            <AlertDialogTitle>{t('catalog.delete_product')}</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete "{productToDelete?.name}"? This action cannot be undone.
+              {t('catalog.delete_confirm')} "{productToDelete?.name}"? {t('catalog.cannot_undone')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={deleting}>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleConfirmDelete}
               disabled={deleting}
