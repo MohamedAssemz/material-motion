@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -56,41 +57,11 @@ const PHASE_COLORS: Record<string, string> = {
   shipped: 'hsl(142, 76%, 36%)'
 };
 
-const PHASE_LABELS: Record<string, string> = {
-  in_manufacturing: 'Manufacturing',
-  ready_for_finishing: 'Ready Finishing',
-  in_finishing: 'Finishing',
-  ready_for_packaging: 'Ready Packaging',
-  in_packaging: 'Packaging',
-  ready_for_boxing: 'Ready Boxing',
-  in_boxing: 'Boxing',
-  ready_for_shipment: 'Ready Shipment',
-  shipped: 'Shipped'
-};
-
 const ORDER_STATUS_COLORS: Record<string, string> = {
   pending: 'hsl(38, 92%, 50%)',
   in_progress: 'hsl(214, 95%, 36%)',
   completed: 'hsl(142, 76%, 36%)',
   cancelled: 'hsl(0, 72%, 51%)'
-};
-
-const ORDER_STATUS_LABELS: Record<string, string> = {
-  pending: 'Not Started',
-  in_progress: 'In Progress',
-  completed: 'Completed',
-  cancelled: 'Cancelled'
-};
-
-const TRANSITION_LABELS: Record<string, string> = {
-  'start_manufacturing': 'Manufacturing',
-  'finish_manufacturing': 'Manufactured',
-  'start_finishing': 'Finishing',
-  'finish_finishing': 'Finished',
-  'start_packaging': 'Packaging',
-  'finish_packaging': 'Packaged',
-  'start_boxing': 'Boxing',
-  'finish_boxing': 'Boxed'
 };
 
 const TRANSITION_COLORS = [
@@ -104,20 +75,7 @@ const TRANSITION_COLORS = [
 'hsl(170, 55%, 45%)'];
 
 
-const TIME_RANGE_LABELS: Record<TimeRange, string> = {
-  today: 'Today',
-  week: 'This Week',
-  month: 'Last 30 Days'
-};
-
 /* ─── helpers ─── */
-function getGreeting() {
-  const h = new Date().getHours();
-  if (h < 12) return 'Good morning';
-  if (h < 18) return 'Good afternoon';
-  return 'Good evening';
-}
-
 function getTimeRangeStart(range: TimeRange): Date {
   const now = new Date();
   switch (range) {
@@ -130,10 +88,43 @@ function getTimeRangeStart(range: TimeRange): Date {
 /* ─── component ─── */
 export default function Dashboard() {
   const { user, hasRole, primaryRole } = useAuth();
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState<TimeRange>('today');
+
+  const getGreeting = useCallback(() => {
+    const h = new Date().getHours();
+    if (h < 12) return t('dashboard.good_morning');
+    if (h < 18) return t('dashboard.good_afternoon');
+    return t('dashboard.good_evening');
+  }, [t]);
+
+  const PHASE_LABELS: Record<string, string> = useMemo(() => ({
+    in_manufacturing: t('state.in_manufacturing'),
+    ready_for_finishing: t('state.ready_for_finishing'),
+    in_finishing: t('state.in_finishing'),
+    ready_for_packaging: t('state.ready_for_packaging'),
+    in_packaging: t('state.in_packaging'),
+    ready_for_boxing: t('state.ready_for_boxing'),
+    in_boxing: t('state.in_boxing'),
+    ready_for_shipment: t('state.ready_for_shipment'),
+    shipped: t('state.shipped')
+  }), [t]);
+
+  const ORDER_STATUS_LABELS: Record<string, string> = useMemo(() => ({
+    pending: t('status.not_started'),
+    in_progress: t('status.in_progress'),
+    completed: t('status.completed'),
+    cancelled: t('status.cancelled')
+  }), [t]);
+
+  const TIME_RANGE_LABELS: Record<TimeRange, string> = useMemo(() => ({
+    today: t('dashboard.today'),
+    week: t('dashboard.this_week'),
+    month: t('dashboard.last_30_days')
+  }), [t]);
 
   const fetchAll = useCallback(async () => {
     try {
@@ -183,17 +174,14 @@ export default function Dashboard() {
 
       const extraInventoryCount = (extraRes.data || []).reduce((s, b) => s + b.quantity, 0);
 
-      // Filter out cancelled orders from alerts
       const activeLate = ((lateBatchesRes.data || []) as any[]).filter((b) => b.order?.status !== 'cancelled');
       const lateOrderIds = new Set(activeLate.map((b) => b.order_id));
 
-      // Top 3 products by finished quantity
       const productQtyMap: Record<string, number> = {};
       (shippedBatchesRes.data || []).forEach((b: any) => {
         productQtyMap[b.product_id] = (productQtyMap[b.product_id] || 0) + b.quantity;
       });
 
-      // We need product names — fetch them if we have product ids
       const topProductIds = Object.entries(productQtyMap).
       sort((a, b) => b[1] - a[1]).
       slice(0, 3);
@@ -204,13 +192,11 @@ export default function Dashboard() {
         topProducts = topProductIds.map(([id, qty]) => ({ name: prodMap.get(id) || 'Unknown', quantity: qty }));
       }
 
-      // Avg finished items per day
       const rangeStartDate = getTimeRangeStart(timeRange);
       const daysDiff = Math.max(1, Math.ceil((Date.now() - rangeStartDate.getTime()) / 86400000));
       const totalFinished = Object.values(productQtyMap).reduce((s, v) => s + v, 0);
       const avgFinishedPerDay = Math.round(totalFinished / daysDiff * 10) / 10;
 
-      // Top machines — use order_batches machine columns since machine_production table doesn't exist
       const machineCountMap: Record<string, number> = {};
       ((batchesRes.data || []) as any[]).forEach((b: any) => {
         const machineFields = [b.manufacturing_machine_id, b.finishing_machine_id, b.packaging_machine_id, b.boxing_machine_id];
@@ -274,7 +260,7 @@ export default function Dashboard() {
       value: data.batchesByState[key] || 0,
       fill: PHASE_COLORS[key]
     }));
-  }, [data]);
+  }, [data, PHASE_LABELS]);
 
   const donutData = useMemo(() => {
     if (!data) return [];
@@ -284,7 +270,7 @@ export default function Dashboard() {
       value: data.ordersByStatus[status] || 0,
       fill: ORDER_STATUS_COLORS[status] || 'hsl(216, 12%, 60%)'
     }));
-  }, [data]);
+  }, [data, ORDER_STATUS_LABELS]);
 
   const throughputData = useMemo(() => {
     if (!data) return [];
@@ -295,7 +281,7 @@ export default function Dashboard() {
       value: count,
       fill: PHASE_COLORS[key] || 'hsl(214, 95%, 36%)'
     }));
-  }, [data]);
+  }, [data, PHASE_LABELS]);
 
   const canCreateOrders = hasRole('admin');
   const readyForShipment = data?.batchesByState.ready_for_shipment || 0;
@@ -329,7 +315,7 @@ export default function Dashboard() {
             {getGreeting()}, {data.profile?.full_name || 'there'}
           </h1>
           <p className="text-sm text-muted-foreground">
-            Here's your factory overview — {TIME_RANGE_LABELS[timeRange]}
+            {t('dashboard.factory_overview')} — {TIME_RANGE_LABELS[timeRange]}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -338,9 +324,9 @@ export default function Dashboard() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="today">Today</SelectItem>
-              <SelectItem value="week">This Week</SelectItem>
-              <SelectItem value="month">Last 30 Days</SelectItem>
+              <SelectItem value="today">{t('dashboard.today')}</SelectItem>
+              <SelectItem value="week">{t('dashboard.this_week')}</SelectItem>
+              <SelectItem value="month">{t('dashboard.last_30_days')}</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -349,22 +335,20 @@ export default function Dashboard() {
       {/* ═══════ KPI CARDS ═══════ */}
       <div className="grid gap-4 grid-cols-2 md:grid-cols-3">
         <div onClick={() => navigate('/orders')} className="cursor-pointer h-full">
-          <KpiCard icon={TrendingUp} label="Active Orders" value={activeOrders} sub={TIME_RANGE_LABELS[timeRange]} color="text-primary" />
+          <KpiCard icon={TrendingUp} label={t('dashboard.active_orders')} value={activeOrders} sub={TIME_RANGE_LABELS[timeRange]} color="text-primary" />
         </div>
         <div onClick={() => navigate('/orders')} className="cursor-pointer h-full">
-          <KpiCard icon={FileText} label="New Orders" value={data.newOrdersToday} sub="Today" color="text-primary" />
+          <KpiCard icon={FileText} label={t('dashboard.new_orders')} value={data.newOrdersToday} sub={t('dashboard.today')} color="text-primary" />
         </div>
         <div onClick={() => navigate('/orders')} className="cursor-pointer h-full">
-          <KpiCard icon={CheckCircle} label="Completed" value={data.completedOrders} sub={`${data.shipmentsCount} shipments`} color="text-success" />
+          <KpiCard icon={CheckCircle} label={t('dashboard.completed')} value={data.completedOrders} sub={`${data.shipmentsCount} ${t('dashboard.shipments')}`} color="text-success" />
         </div>
         <div onClick={() => navigate('/orders')} className="cursor-pointer h-full">
-          <KpiCard icon={AlertTriangle} label="Late Orders" value={data.lateOrderCount} sub="With late batches" color="text-destructive" highlight={data.lateOrderCount > 0} />
+          <KpiCard icon={AlertTriangle} label={t('dashboard.late_orders')} value={data.lateOrderCount} sub={t('dashboard.with_late_batches')} color="text-destructive" highlight={data.lateOrderCount > 0} />
         </div>
-        
-
         
         <div onClick={() => navigate('/extra-inventory')} className="cursor-pointer h-full">
-          <KpiCard icon={Archive} label="Extra Inventory" value={data.extraInventoryCount} sub="Available items" color="text-primary" />
+          <KpiCard icon={Archive} label={t('dashboard.extra_inventory')} value={data.extraInventoryCount} sub={t('dashboard.available_items')} color="text-primary" />
         </div>
       </div>
 
@@ -377,12 +361,12 @@ export default function Dashboard() {
                 <Truck className="h-5 w-5 text-success" />
               </div>
               <div>
-                <p className="font-semibold text-sm">{readyForShipment} items ready for shipment</p>
-                <p className="text-xs text-muted-foreground">Ready to be added to a Kartona</p>
+                <p className="font-semibold text-sm">{readyForShipment} {t('dashboard.items_ready_shipment')}</p>
+                <p className="text-xs text-muted-foreground">{t('dashboard.ready_to_kartona')}</p>
               </div>
             </div>
             <Button variant="outline" size="sm" asChild>
-              <Link to="/queues/boxing">View <ArrowRight className="ml-1 h-3 w-3" /></Link>
+              <Link to="/queues/boxing">{t('common.view')} <ArrowRight className="ml-1 h-3 w-3" /></Link>
             </Button>
           </CardContent>
         </Card>
@@ -393,8 +377,8 @@ export default function Dashboard() {
         {/* Production Pipeline */}
         <Card className="lg:col-span-3">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">Production Pipeline</CardTitle>
-            <CardDescription>Item distribution across phases</CardDescription>
+            <CardTitle className="text-base">{t('dashboard.production_pipeline')}</CardTitle>
+            <CardDescription>{t('dashboard.item_distribution')}</CardDescription>
           </CardHeader>
           <CardContent className="h-72">
             <ResponsiveContainer width="100%" height="100%">
@@ -423,8 +407,8 @@ export default function Dashboard() {
         {/* Order Status Donut */}
         <Card className="lg:col-span-2">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">Order Status Breakdown</CardTitle>
-            <CardDescription>Distribution by status</CardDescription>
+            <CardTitle className="text-base">{t('dashboard.order_status_breakdown')}</CardTitle>
+            <CardDescription>{t('dashboard.distribution_by_status')}</CardDescription>
           </CardHeader>
           <CardContent className="h-72 flex items-center justify-center">
             {donutData.some((d) => d.value > 0) ?
@@ -462,12 +446,12 @@ export default function Dashboard() {
                     {totalOrders}
                   </text>
                   <text x="50%" y="58%" textAnchor="middle" dominantBaseline="middle" className="fill-muted-foreground text-xs">
-                    orders
+                    {t('dashboard.orders_label')}
                   </text>
                 </PieChart>
               </ResponsiveContainer> :
 
-            <p className="text-sm text-muted-foreground">No orders yet</p>
+            <p className="text-sm text-muted-foreground">{t('dashboard.no_orders_yet')}</p>
             }
           </CardContent>
         </Card>
@@ -480,9 +464,9 @@ export default function Dashboard() {
           <CardHeader className="pb-2">
             <div className="flex items-center gap-2">
               <Trophy className="h-4 w-4 text-primary" />
-              <CardTitle className="text-base">Top Products</CardTitle>
+              <CardTitle className="text-base">{t('dashboard.top_products')}</CardTitle>
             </div>
-            <CardDescription>Most completed in {TIME_RANGE_LABELS[timeRange].toLowerCase()}</CardDescription>
+            <CardDescription>{t('dashboard.most_completed_in')} {TIME_RANGE_LABELS[timeRange].toLowerCase()}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {data.topProducts.length > 0 ? data.topProducts.map((p, i) =>
@@ -493,10 +477,10 @@ export default function Dashboard() {
                 }>{i + 1}</span>
                   <span className="text-sm font-medium truncate">{p.name}</span>
                 </div>
-                <Badge variant="secondary" className="text-xs shrink-0">{p.quantity} units</Badge>
+                <Badge variant="secondary" className="text-xs shrink-0">{p.quantity} {t('common.units')}</Badge>
               </div>
             ) :
-            <p className="text-sm text-muted-foreground text-center py-4">No completed items yet</p>
+            <p className="text-sm text-muted-foreground text-center py-4">{t('dashboard.no_completed_yet')}</p>
             }
           </CardContent>
         </Card>
@@ -506,13 +490,13 @@ export default function Dashboard() {
           <CardHeader className="pb-2">
             <div className="flex items-center gap-2">
               <Activity className="h-4 w-4 text-primary" />
-              <CardTitle className="text-base">Avg. Finished / Day</CardTitle>
+              <CardTitle className="text-base">{t('dashboard.avg_finished_day')}</CardTitle>
             </div>
-            <CardDescription>Daily average in {TIME_RANGE_LABELS[timeRange].toLowerCase()}</CardDescription>
+            <CardDescription>{t('dashboard.daily_average_in')} {TIME_RANGE_LABELS[timeRange].toLowerCase()}</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col items-center justify-center py-6">
             <p className="text-4xl font-bold text-primary">{data.avgFinishedPerDay}</p>
-            <p className="text-sm text-muted-foreground mt-1">items per day</p>
+            <p className="text-sm text-muted-foreground mt-1">{t('dashboard.items_per_day')}</p>
           </CardContent>
         </Card>
 
@@ -521,9 +505,9 @@ export default function Dashboard() {
           <CardHeader className="pb-2">
             <div className="flex items-center gap-2">
               <Wrench className="h-4 w-4 text-primary" />
-              <CardTitle className="text-base">Most Used Machines</CardTitle>
+              <CardTitle className="text-base">{t('dashboard.most_used_machines')}</CardTitle>
             </div>
-            <CardDescription>By production records in {TIME_RANGE_LABELS[timeRange].toLowerCase()}</CardDescription>
+            <CardDescription>{t('dashboard.by_production_records')} {TIME_RANGE_LABELS[timeRange].toLowerCase()}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {data.topMachines.length > 0 ? data.topMachines.map((m, i) =>
@@ -534,10 +518,10 @@ export default function Dashboard() {
                 }>{i + 1}</span>
                   <span className="text-sm font-medium truncate">{m.name}</span>
                 </div>
-                <Badge variant="secondary" className="text-xs shrink-0">{m.count} ops</Badge>
+                <Badge variant="secondary" className="text-xs shrink-0">{m.count} {t('dashboard.ops')}</Badge>
               </div>
             ) :
-            <p className="text-sm text-muted-foreground text-center py-4">No machine activity yet</p>
+            <p className="text-sm text-muted-foreground text-center py-4">{t('dashboard.no_machine_activity')}</p>
             }
           </CardContent>
         </Card>
@@ -545,20 +529,20 @@ export default function Dashboard() {
 
       {/* ═══════ QUEUE CARDS ═══════ */}
       <div>
-        <h2 className="text-base font-semibold mb-3">Production Queues</h2>
+        <h2 className="text-base font-semibold mb-3">{t('dashboard.production_queues')}</h2>
         <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
-          <QueueCard name="Manufacturing" href="/queues/manufacturing" icon={Factory}
+          <QueueCard name={t('nav.manufacturing')} href="/queues/manufacturing" icon={Factory}
           waiting={0} inProgress={data.batchesByState.in_manufacturing || 0}
-          waitingLabel="Waiting" bgClass="bg-blue-50 dark:bg-blue-950/30" iconClass="text-blue-600 dark:text-blue-400" />
-          <QueueCard name="Finishing" href="/queues/finishing" icon={Sparkles}
+          waitingLabel={t('dashboard.waiting')} activeLabel={t('dashboard.active_label')} bgClass="bg-blue-50 dark:bg-blue-950/30" iconClass="text-blue-600 dark:text-blue-400" />
+          <QueueCard name={t('nav.finishing')} href="/queues/finishing" icon={Sparkles}
           waiting={data.batchesByState.ready_for_finishing || 0} inProgress={data.batchesByState.in_finishing || 0}
-          waitingLabel="Ready" bgClass="bg-purple-50 dark:bg-purple-950/30" iconClass="text-purple-600 dark:text-purple-400" />
-          <QueueCard name="Packaging" href="/queues/packaging" icon={Package}
+          waitingLabel={t('dashboard.ready')} activeLabel={t('dashboard.active_label')} bgClass="bg-purple-50 dark:bg-purple-950/30" iconClass="text-purple-600 dark:text-purple-400" />
+          <QueueCard name={t('nav.packaging')} href="/queues/packaging" icon={Package}
           waiting={data.batchesByState.ready_for_packaging || 0} inProgress={data.batchesByState.in_packaging || 0}
-          waitingLabel="Ready" bgClass="bg-indigo-50 dark:bg-indigo-950/30" iconClass="text-indigo-600 dark:text-indigo-400" />
-          <QueueCard name="Boxing" href="/queues/boxing" icon={Box}
+          waitingLabel={t('dashboard.ready')} activeLabel={t('dashboard.active_label')} bgClass="bg-indigo-50 dark:bg-indigo-950/30" iconClass="text-indigo-600 dark:text-indigo-400" />
+          <QueueCard name={t('nav.boxing')} href="/queues/boxing" icon={Box}
           waiting={data.batchesByState.ready_for_boxing || 0} inProgress={data.batchesByState.in_boxing || 0}
-          waitingLabel="Ready" bgClass="bg-cyan-50 dark:bg-cyan-950/30" iconClass="text-cyan-600 dark:text-cyan-400" />
+          waitingLabel={t('dashboard.ready')} activeLabel={t('dashboard.active_label')} bgClass="bg-cyan-50 dark:bg-cyan-950/30" iconClass="text-cyan-600 dark:text-cyan-400" />
         </div>
       </div>
 
@@ -566,8 +550,8 @@ export default function Dashboard() {
       <div className="grid gap-4 lg:grid-cols-5">
         <Card className="lg:col-span-3">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">{timeRange === 'today' ? "Today's" : TIME_RANGE_LABELS[timeRange]} Throughput</CardTitle>
-            <CardDescription>Items processed per phase</CardDescription>
+            <CardTitle className="text-base">{timeRange === 'today' ? t('dashboard.today') : TIME_RANGE_LABELS[timeRange]} {t('dashboard.throughput')}</CardTitle>
+            <CardDescription>{t('dashboard.items_processed_per_phase')}</CardDescription>
           </CardHeader>
           <CardContent className="h-64">
             {throughputData.length > 0 ?
@@ -593,7 +577,7 @@ export default function Dashboard() {
               </ResponsiveContainer> :
 
             <div className="flex items-center justify-center h-full">
-                <p className="text-sm text-muted-foreground">No production recorded</p>
+                <p className="text-sm text-muted-foreground">{t('dashboard.no_production_recorded')}</p>
               </div>
             }
           </CardContent>
@@ -602,26 +586,26 @@ export default function Dashboard() {
         <Card className="lg:col-span-2">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-base">Alerts & Attention</CardTitle>
+              <CardTitle className="text-base">{t('dashboard.alerts_attention')}</CardTitle>
               {alertCount > 0 &&
               <Badge variant="destructive" className="text-xs">{alertCount}</Badge>
               }
             </div>
-            <CardDescription>Items needing your attention</CardDescription>
+            <CardDescription>{t('dashboard.items_needing_attention')}</CardDescription>
           </CardHeader>
           <CardContent className="max-h-64 overflow-y-auto space-y-1">
             {alertCount === 0 &&
             <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
                 <CheckCircle className="h-10 w-10 mb-3 text-success" />
-                <p className="text-sm font-medium">All clear!</p>
-                <p className="text-xs text-muted-foreground mt-1">No late batches, upcoming deadlines, or stalled orders.</p>
+                <p className="text-sm font-medium">{t('dashboard.all_clear')}</p>
+                <p className="text-xs text-muted-foreground mt-1">{t('dashboard.no_alerts_desc')}</p>
               </div>
             }
 
             {/* Late Batches */}
             {(data.lateBatches?.length || 0) > 0 && (
               <div className="space-y-1">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-destructive px-2 pt-1">Late</p>
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-destructive px-2 pt-1">{t('dashboard.late')}</p>
                 {(data.lateBatches || []).map((b) => {
                   const daysOverdue = differenceInDays(new Date(), new Date(b.eta));
                   return (
@@ -629,7 +613,7 @@ export default function Dashboard() {
                       <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium truncate">{b.order?.order_number || 'Unknown'}</p>
-                        <p className="text-xs text-muted-foreground">{b.quantity} items · {daysOverdue > 0 ? `${daysOverdue}d overdue` : 'overdue'}</p>
+                        <p className="text-xs text-muted-foreground">{b.quantity} {t('common.items')} · {daysOverdue > 0 ? `${daysOverdue}d ${t('dashboard.overdue')}` : t('dashboard.overdue')}</p>
                       </div>
                     </Link>
                   );
@@ -640,7 +624,7 @@ export default function Dashboard() {
             {/* Stalled Orders */}
             {(data.stalledOrders?.length || 0) > 0 && (
               <div className="space-y-1">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-warning px-2 pt-2">Stalled</p>
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-warning px-2 pt-2">{t('dashboard.stalled')}</p>
                 {(data.stalledOrders || []).map((o) => {
                   const stalledDays = differenceInDays(new Date(), new Date(o.updated_at));
                   return (
@@ -648,7 +632,7 @@ export default function Dashboard() {
                       <Clock className="h-4 w-4 text-warning mt-0.5 shrink-0" />
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium truncate">{o.order_number}</p>
-                        <p className="text-xs text-muted-foreground">No updates for {stalledDays}d</p>
+                        <p className="text-xs text-muted-foreground">{t('dashboard.no_updates_for')} {stalledDays}d</p>
                       </div>
                     </Link>
                   );
@@ -659,7 +643,7 @@ export default function Dashboard() {
             {/* Approaching ETA */}
             {(data.approachingEtaOrders?.length || 0) > 0 && (
               <div className="space-y-1">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-primary px-2 pt-2">Approaching Deadline</p>
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-primary px-2 pt-2">{t('dashboard.approaching_deadline')}</p>
                 {(data.approachingEtaOrders || []).map((o) => {
                   const timeLeft = formatDistanceToNow(new Date(o.estimated_fulfillment_time), { addSuffix: true });
                   return (
@@ -667,7 +651,7 @@ export default function Dashboard() {
                       <CalendarClock className="h-4 w-4 text-primary mt-0.5 shrink-0" />
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium truncate">{o.order_number}</p>
-                        <p className="text-xs text-muted-foreground">Due {timeLeft}</p>
+                        <p className="text-xs text-muted-foreground">{t('dashboard.due')} {timeLeft}</p>
                       </div>
                     </Link>
                   );
@@ -700,10 +684,10 @@ function KpiCard({ icon: Icon, label, value, sub, color, highlight
 
 }
 
-function QueueCard({ name, href, icon: Icon, waiting, inProgress, waitingLabel, bgClass, iconClass
+function QueueCard({ name, href, icon: Icon, waiting, inProgress, waitingLabel, activeLabel, bgClass, iconClass
 
 
-}: {name: string;href: string;icon: React.ElementType;waiting: number;inProgress: number;waitingLabel: string;bgClass: string;iconClass: string;}) {
+}: {name: string;href: string;icon: React.ElementType;waiting: number;inProgress: number;waitingLabel: string;activeLabel: string;bgClass: string;iconClass: string;}) {
   const total = waiting + inProgress;
   return (
     <Link to={href}>
@@ -722,7 +706,7 @@ function QueueCard({ name, href, icon: Icon, waiting, inProgress, waitingLabel, 
               <p className="text-base font-bold text-warning">{waiting}</p>
             </div>
             <div className="p-1.5 rounded bg-muted/50 text-center">
-              <p className="text-[10px] text-muted-foreground">Active</p>
+              <p className="text-[10px] text-muted-foreground">{activeLabel}</p>
               <p className="text-base font-bold text-primary">{inProgress}</p>
             </div>
           </div>

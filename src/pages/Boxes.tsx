@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -51,6 +52,7 @@ interface ExtraBoxData {
 
 export default function Boxes() {
   const { hasRole } = useAuth();
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [orderBoxes, setOrderBoxes] = useState<OrderBoxData[]>([]);
@@ -61,7 +63,6 @@ export default function Boxes() {
   const [newBoxCount, setNewBoxCount] = useState(1);
   const [newExtraBoxCount, setNewExtraBoxCount] = useState(1);
 
-  // Details dialog state
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [selectedBox, setSelectedBox] = useState<{
     boxType: 'order' | 'extra';
@@ -73,11 +74,8 @@ export default function Boxes() {
     primaryState: string | null;
   } | null>(null);
 
-  // Print dialog state
   const [printDialogOpen, setPrintDialogOpen] = useState(false);
   const [printBoxType, setPrintBoxType] = useState<'order' | 'extra'>('order');
-
-  // Scan lookup dialog state
   const [scanDialogOpen, setScanDialogOpen] = useState(false);
 
   const canManage = hasRole('admin');
@@ -85,7 +83,6 @@ export default function Boxes() {
   const [extraPage, setExtraPage] = useState(1);
   const PAGE_SIZE = 25;
 
-  // Order tab filters
   const [orderSearch, setOrderSearch] = useState('');
   const [orderStatusFilter, setOrderStatusFilter] = useState('all');
   const [orderBatchFilter, setOrderBatchFilter] = useState('all');
@@ -93,7 +90,6 @@ export default function Boxes() {
   const [orderDateFrom, setOrderDateFrom] = useState<Date | undefined>();
   const [orderDateTo, setOrderDateTo] = useState<Date | undefined>();
 
-  // Extra tab filters
   const [extraSearch, setExtraSearch] = useState('');
   const [extraStatusFilter, setExtraStatusFilter] = useState('all');
   const [extraBatchFilter, setExtraBatchFilter] = useState('all');
@@ -101,65 +97,48 @@ export default function Boxes() {
   const [extraDateFrom, setExtraDateFrom] = useState<Date | undefined>();
   const [extraDateTo, setExtraDateTo] = useState<Date | undefined>();
 
-  // Normalize search input for box codes
   const normalizeBoxSearch = (input: string, prefix: string) => {
     const trimmed = input.trim();
     if (!trimmed) return '';
-    // If pure number, prepend prefix
     if (/^\d+$/.test(trimmed)) return `${prefix}${trimmed}`;
     return trimmed.toUpperCase();
   };
 
-  // Generic box filter
   const filterBoxes = <T extends OrderBoxData | ExtraBoxData>(
-    boxes: T[],
-    search: string,
-    prefix: string,
-    statusFilter: string,
-    batchFilter: string,
-    qtyFilter: string,
-    dateFrom: Date | undefined,
-    dateTo: Date | undefined,
+    boxes: T[], search: string, prefix: string, statusFilter: string,
+    batchFilter: string, qtyFilter: string, dateFrom: Date | undefined, dateTo: Date | undefined,
   ): T[] => {
     let result = boxes;
-
     if (search.trim()) {
       const normalized = normalizeBoxSearch(search, prefix);
       result = result.filter(b => b.box_code.toUpperCase().includes(normalized));
     }
-
     if (statusFilter !== 'all') {
       if (statusFilter === 'empty') result = result.filter(b => b.batch_count === 0 && b.is_active);
       else if (statusFilter === 'occupied') result = result.filter(b => b.batch_count > 0);
       else if (statusFilter === 'inactive') result = result.filter(b => !b.is_active);
     }
-
     if (batchFilter !== 'all') {
       if (batchFilter === '0') result = result.filter(b => b.batch_count === 0);
       else if (batchFilter === '1-5') result = result.filter(b => b.batch_count >= 1 && b.batch_count <= 5);
       else if (batchFilter === '6-10') result = result.filter(b => b.batch_count >= 6 && b.batch_count <= 10);
       else if (batchFilter === '10+') result = result.filter(b => b.batch_count > 10);
     }
-
     if (qtyFilter !== 'all') {
       if (qtyFilter === '0') result = result.filter(b => b.total_quantity === 0);
       else if (qtyFilter === '1-10') result = result.filter(b => b.total_quantity >= 1 && b.total_quantity <= 10);
       else if (qtyFilter === '11-50') result = result.filter(b => b.total_quantity >= 11 && b.total_quantity <= 50);
       else if (qtyFilter === '50+') result = result.filter(b => b.total_quantity > 50);
     }
-
     if (dateFrom || dateTo) {
       result = result.filter(b => {
         const created = new Date(b.created_at);
-        if (dateFrom && dateTo) {
-          return isWithinInterval(created, { start: startOfDay(dateFrom), end: endOfDay(dateTo) });
-        }
+        if (dateFrom && dateTo) return isWithinInterval(created, { start: startOfDay(dateFrom), end: endOfDay(dateTo) });
         if (dateFrom) return created >= startOfDay(dateFrom);
         if (dateTo) return created <= endOfDay(dateTo);
         return true;
       });
     }
-
     return result;
   };
 
@@ -173,23 +152,16 @@ export default function Boxes() {
     [extraBoxes, extraSearch, extraStatusFilter, extraBatchFilter, extraQtyFilter, extraDateFrom, extraDateTo]
   );
 
-  // Reset pages on filter change
   useEffect(() => { setOrderPage(1); }, [orderSearch, orderStatusFilter, orderBatchFilter, orderQtyFilter, orderDateFrom, orderDateTo]);
   useEffect(() => { setExtraPage(1); }, [extraSearch, extraStatusFilter, extraBatchFilter, extraQtyFilter, extraDateFrom, extraDateTo]);
 
   const openBoxDetails = useCallback((
-    boxType: 'order' | 'extra',
-    boxId: string,
-    boxCode: string,
-    createdAt: string,
-    isActive: boolean,
-    contentType: string,
-    primaryState: string | null
+    boxType: 'order' | 'extra', boxId: string, boxCode: string, createdAt: string, isActive: boolean, contentType: string, primaryState: string | null
   ) => {
     setSelectedBox({ boxType, boxId, boxCode, createdAt, isActive, contentType, primaryState });
     setDetailsOpen(true);
-    toast({ title: 'Box Found', description: `Opened details for ${boxCode}` });
-  }, [toast]);
+    toast({ title: t('warehouse.box_found'), description: `${t('warehouse.opened_details')} ${boxCode}` });
+  }, [toast, t]);
 
   const handleBoxScan = useCallback(async (rawCode: string) => {
     const normalized = rawCode.trim().toUpperCase();
@@ -207,7 +179,7 @@ export default function Boxes() {
       if (dbOrderBox) { openBoxDetails('order', dbOrderBox.id, dbOrderBox.box_code, dbOrderBox.created_at, dbOrderBox.is_active, dbOrderBox.content_type || 'EMPTY', null); return; }
       const { data: dbExtraBox } = await supabase.from('extra_boxes').select('id, box_code, is_active, created_at, content_type').eq('box_code', boxCode).maybeSingle();
       if (dbExtraBox) { openBoxDetails('extra', dbExtraBox.id, dbExtraBox.box_code, dbExtraBox.created_at, dbExtraBox.is_active, dbExtraBox.content_type || 'EMPTY', null); return; }
-      toast({ title: 'Box Not Found', description: `No box found with code "${boxCode}"`, variant: 'destructive' }); return;
+      toast({ title: t('toast.not_found'), description: `${boxCode}`, variant: 'destructive' }); return;
     }
 
     if (batchMatch) {
@@ -216,7 +188,7 @@ export default function Boxes() {
         const { data: orderBatch } = await supabase.from('order_batches').select('box_id, box:boxes(id, box_code, is_active, created_at, content_type)').eq('qr_code_data', batchCode).maybeSingle();
         if (orderBatch) {
           if (orderBatch.box_id && orderBatch.box) { const box = orderBatch.box as any; openBoxDetails('order', box.id, box.box_code, box.created_at, box.is_active, box.content_type || 'EMPTY', null); }
-          else { toast({ title: 'Batch Not In Box', description: `Batch ${batchCode} is not currently assigned to a box`, variant: 'destructive' }); }
+          else { toast({ title: t('toast.not_found'), description: batchCode, variant: 'destructive' }); }
           return;
         }
       }
@@ -224,15 +196,15 @@ export default function Boxes() {
         const { data: extraBatch } = await supabase.from('extra_batches').select('box_id, box:extra_boxes(id, box_code, is_active, created_at, content_type)').eq('qr_code_data', batchCode).maybeSingle();
         if (extraBatch) {
           if (extraBatch.box_id && extraBatch.box) { const box = extraBatch.box as any; openBoxDetails('extra', box.id, box.box_code, box.created_at, box.is_active, box.content_type || 'EMPTY', null); }
-          else { toast({ title: 'Batch Not In Box', description: `Batch ${batchCode} is not currently assigned to a box`, variant: 'destructive' }); }
+          else { toast({ title: t('toast.not_found'), description: batchCode, variant: 'destructive' }); }
           return;
         }
       }
-      toast({ title: 'Batch Not Found', description: `No batch found with code "${batchCode}"`, variant: 'destructive' }); return;
+      toast({ title: t('toast.not_found'), description: batchCode, variant: 'destructive' }); return;
     }
 
-    toast({ title: 'Unrecognized Scan', description: `Could not parse box or batch code from "${normalized.slice(0, 30)}${normalized.length > 30 ? '...' : ''}"`, variant: 'destructive' });
-  }, [orderBoxes, extraBoxes, toast, openBoxDetails]);
+    toast({ title: t('toast.error'), description: normalized.slice(0, 30), variant: 'destructive' });
+  }, [orderBoxes, extraBoxes, toast, openBoxDetails, t]);
 
   useEffect(() => {
     fetchBoxes();
@@ -249,10 +221,8 @@ export default function Boxes() {
     try {
       const { data: orderBoxesData, error: orderBoxesError } = await supabase.from('boxes').select('*').order('box_code');
       if (orderBoxesError) throw orderBoxesError;
-
       const orderBoxIds = orderBoxesData?.map(b => b.id) || [];
       const { data: orderBatchesData } = await supabase.from('order_batches').select('box_id, quantity, current_state').in('box_id', orderBoxIds);
-
       const orderBatchStats = new Map<string, { count: number; total: number; state: string | null }>();
       orderBatchesData?.forEach(batch => {
         if (batch.box_id) {
@@ -262,7 +232,6 @@ export default function Boxes() {
           orderBatchStats.set(batch.box_id, existing);
         }
       });
-
       const orderBoxesMapped: OrderBoxData[] = (orderBoxesData || []).map(box => {
         const stats = orderBatchStats.get(box.id) || { count: 0, total: 0, state: null };
         return { id: box.id, box_code: box.box_code, is_active: box.is_active, created_at: box.created_at, content_type: box.content_type || 'EMPTY', items_list: Array.isArray(box.items_list) ? box.items_list : [], batch_count: stats.count, total_quantity: stats.total, primary_state: stats.state };
@@ -271,10 +240,8 @@ export default function Boxes() {
 
       const { data: extraBoxesData, error: extraBoxesError } = await supabase.from('extra_boxes').select('*').order('box_code');
       if (extraBoxesError) throw extraBoxesError;
-
       const extraBoxIds = extraBoxesData?.map(b => b.id) || [];
       const { data: extraBatchesData } = await supabase.from('extra_batches').select('box_id, quantity, current_state').in('box_id', extraBoxIds);
-
       const extraBatchStats = new Map<string, { count: number; total: number; state: string | null }>();
       extraBatchesData?.forEach(batch => {
         if (batch.box_id) {
@@ -284,14 +251,13 @@ export default function Boxes() {
           extraBatchStats.set(batch.box_id, existing);
         }
       });
-
       const extraBoxesMapped: ExtraBoxData[] = (extraBoxesData || []).map(box => {
         const stats = extraBatchStats.get(box.id) || { count: 0, total: 0, state: null };
         return { id: box.id, box_code: box.box_code, is_active: box.is_active, created_at: box.created_at, content_type: box.content_type || 'EMPTY', items_list: Array.isArray(box.items_list) ? box.items_list : [], batch_count: stats.count, total_quantity: stats.total, primary_state: stats.state };
       });
       setExtraBoxes(extraBoxesMapped);
     } catch (error: any) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      toast({ title: t('toast.error'), description: error.message, variant: 'destructive' });
     } finally {
       setLoading(false);
     }
@@ -305,9 +271,9 @@ export default function Boxes() {
         const { error } = await supabase.from('boxes').insert({ box_code: boxCode || `BOX-${Date.now()}-${i}`, is_active: true });
         if (error) throw error;
       }
-      toast({ title: 'Success', description: `Created ${newBoxCount} order box(es)` });
+      toast({ title: t('toast.success'), description: `${t('toast.created_successfully')} (${newBoxCount})` });
       setDialogOpen(false); setNewBoxCount(1); fetchBoxes();
-    } catch (error: any) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); }
+    } catch (error: any) { toast({ title: t('toast.error'), description: error.message, variant: 'destructive' }); }
   };
 
   const handleCreateExtraBoxes = async (e: React.FormEvent) => {
@@ -318,9 +284,9 @@ export default function Boxes() {
         const { error } = await supabase.from('extra_boxes').insert({ box_code: boxCode || `EBOX-${Date.now()}-${i}`, is_active: true });
         if (error) throw error;
       }
-      toast({ title: 'Success', description: `Created ${newExtraBoxCount} extra box(es)` });
+      toast({ title: t('toast.success'), description: `${t('toast.created_successfully')} (${newExtraBoxCount})` });
       setExtraDialogOpen(false); setNewExtraBoxCount(1); fetchBoxes();
-    } catch (error: any) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); }
+    } catch (error: any) { toast({ title: t('toast.error'), description: error.message, variant: 'destructive' }); }
   };
 
   const handleToggleOrderBoxActive = async (box: OrderBoxData, e: React.MouseEvent) => {
@@ -328,9 +294,9 @@ export default function Boxes() {
     try {
       const { error } = await supabase.from('boxes').update({ is_active: !box.is_active }).eq('id', box.id);
       if (error) throw error;
-      toast({ title: 'Success', description: `Box ${box.box_code} ${!box.is_active ? 'activated' : 'deactivated'}` });
+      toast({ title: t('toast.success'), description: `${box.box_code} ${!box.is_active ? t('common.active') : t('common.inactive')}` });
       fetchBoxes();
-    } catch (error: any) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); }
+    } catch (error: any) { toast({ title: t('toast.error'), description: error.message, variant: 'destructive' }); }
   };
 
   const handleToggleExtraBoxActive = async (box: ExtraBoxData, e: React.MouseEvent) => {
@@ -338,9 +304,9 @@ export default function Boxes() {
     try {
       const { error } = await supabase.from('extra_boxes').update({ is_active: !box.is_active }).eq('id', box.id);
       if (error) throw error;
-      toast({ title: 'Success', description: `Extra Box ${box.box_code} ${!box.is_active ? 'activated' : 'deactivated'}` });
+      toast({ title: t('toast.success'), description: `${box.box_code} ${!box.is_active ? t('common.active') : t('common.inactive')}` });
       fetchBoxes();
-    } catch (error: any) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); }
+    } catch (error: any) { toast({ title: t('toast.error'), description: error.message, variant: 'destructive' }); }
   };
 
   const handleOrderBoxClick = (box: OrderBoxData) => {
@@ -380,7 +346,6 @@ export default function Boxes() {
     );
   }
 
-  // Filter bar component to avoid duplication
   const renderFilterBar = (
     search: string, setSearch: (v: string) => void,
     statusFilter: string, setStatusFilter: (v: string) => void,
@@ -388,7 +353,6 @@ export default function Boxes() {
     qtyFilter: string, setQtyFilter: (v: string) => void,
     dateFrom: Date | undefined, setDateFrom: (v: Date | undefined) => void,
     dateTo: Date | undefined, setDateTo: (v: Date | undefined) => void,
-    placeholder: string,
   ) => (
     <Card>
       <CardContent className="pt-6">
@@ -397,25 +361,25 @@ export default function Boxes() {
             <div className="flex-1">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input placeholder={placeholder} value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+                <Input placeholder={t('warehouse.search_box')} value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
               </div>
             </div>
             <div className="w-full sm:w-[150px]">
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger><SelectValue placeholder="Status" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder={t('common.status')} /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Statuses</SelectItem>
-                  <SelectItem value="empty">Empty</SelectItem>
-                  <SelectItem value="occupied">Occupied</SelectItem>
-                  <SelectItem value="inactive">Inactive</SelectItem>
+                  <SelectItem value="all">{t('warehouse.all_statuses')}</SelectItem>
+                  <SelectItem value="empty">{t('warehouse.empty')}</SelectItem>
+                  <SelectItem value="occupied">{t('warehouse.occupied')}</SelectItem>
+                  <SelectItem value="inactive">{t('common.inactive')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="w-full sm:w-[140px]">
               <Select value={batchFilter} onValueChange={setBatchFilter}>
-                <SelectTrigger><SelectValue placeholder="Batches" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder={t('warehouse.batches')} /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Any Batches</SelectItem>
+                  <SelectItem value="all">{t('warehouse.any_batches')}</SelectItem>
                   <SelectItem value="0">0</SelectItem>
                   <SelectItem value="1-5">1–5</SelectItem>
                   <SelectItem value="6-10">6–10</SelectItem>
@@ -425,9 +389,9 @@ export default function Boxes() {
             </div>
             <div className="w-full sm:w-[140px]">
               <Select value={qtyFilter} onValueChange={setQtyFilter}>
-                <SelectTrigger><SelectValue placeholder="Quantity" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder={t('common.quantity')} /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Any Qty</SelectItem>
+                  <SelectItem value="all">{t('warehouse.any_qty')}</SelectItem>
                   <SelectItem value="0">0</SelectItem>
                   <SelectItem value="1-10">1–10</SelectItem>
                   <SelectItem value="11-50">11–50</SelectItem>
@@ -438,12 +402,12 @@ export default function Boxes() {
           </div>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground whitespace-nowrap">From:</span>
+              <span className="text-sm text-muted-foreground whitespace-nowrap">{t('warehouse.from')}</span>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button variant="outline" size="sm" className={cn("w-[140px] justify-start text-left font-normal", !dateFrom && "text-muted-foreground")}>
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {dateFrom ? format(dateFrom, 'PP') : 'Pick date'}
+                    {dateFrom ? format(dateFrom, 'PP') : t('warehouse.pick_date')}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
@@ -457,12 +421,12 @@ export default function Boxes() {
               )}
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground whitespace-nowrap">To:</span>
+              <span className="text-sm text-muted-foreground whitespace-nowrap">{t('warehouse.to')}</span>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button variant="outline" size="sm" className={cn("w-[140px] justify-start text-left font-normal", !dateTo && "text-muted-foreground")}>
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {dateTo ? format(dateTo, 'PP') : 'Pick date'}
+                    {dateTo ? format(dateTo, 'PP') : t('warehouse.pick_date')}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
@@ -491,13 +455,13 @@ export default function Boxes() {
             </Button>
             <Box className="h-6 w-6 text-primary" />
             <div>
-              <h1 className="text-xl font-bold">Box Management</h1>
-              <p className="text-sm text-muted-foreground">Manage order and extra inventory boxes</p>
+              <h1 className="text-xl font-bold">{t('warehouse.box_management')}</h1>
+              <p className="text-sm text-muted-foreground">{t('warehouse.manage_desc')}</p>
             </div>
           </div>
           <Button onClick={() => setScanDialogOpen(true)}>
             <QrCode className="mr-2 h-4 w-4" />
-            Scan
+            {t('warehouse.scan')}
           </Button>
         </div>
       </header>
@@ -505,8 +469,8 @@ export default function Boxes() {
       <div className="container mx-auto p-6 space-y-6">
         <Tabs defaultValue="order" className="w-full">
           <TabsList className="grid w-full grid-cols-2 max-w-md">
-            <TabsTrigger value="order">Order Boxes ({orderBoxes.length})</TabsTrigger>
-            <TabsTrigger value="extra">Extra Boxes ({extraBoxes.length})</TabsTrigger>
+            <TabsTrigger value="order">{t('warehouse.order_boxes')} ({orderBoxes.length})</TabsTrigger>
+            <TabsTrigger value="extra">{t('warehouse.extra_boxes')} ({extraBoxes.length})</TabsTrigger>
           </TabsList>
 
           {/* Order Boxes Tab */}
@@ -514,24 +478,24 @@ export default function Boxes() {
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => { setPrintBoxType('order'); setPrintDialogOpen(true); }} disabled={orderBoxes.length === 0}>
                 <Printer className="mr-2 h-4 w-4" />
-                Print Labels
+                {t('warehouse.print_labels')}
               </Button>
               {canManage && (
                 <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
                   <DialogTrigger asChild>
-                    <Button><Plus className="mr-2 h-4 w-4" />Create Order Boxes</Button>
+                    <Button><Plus className="mr-2 h-4 w-4" />{t('warehouse.create_order_boxes')}</Button>
                   </DialogTrigger>
                   <DialogContent>
-                    <DialogHeader><DialogTitle>Create Order Boxes</DialogTitle></DialogHeader>
+                    <DialogHeader><DialogTitle>{t('warehouse.create_order_boxes')}</DialogTitle></DialogHeader>
                     <form onSubmit={handleCreateOrderBoxes} className="space-y-4">
                       <div>
-                        <Label htmlFor="count">Number of boxes to create</Label>
+                        <Label htmlFor="count">{t('warehouse.num_boxes')}</Label>
                         <NumericInput id="count" min={1} max={100} value={newBoxCount} onValueChange={(val) => setNewBoxCount(val ?? 1)} required />
-                        <p className="text-xs text-muted-foreground mt-1">Box codes will be auto-generated (e.g., BOX-0001)</p>
+                        <p className="text-xs text-muted-foreground mt-1">{t('warehouse.box_auto_gen')}</p>
                       </div>
                       <div className="flex gap-2">
-                        <Button type="submit" className="flex-1">Create</Button>
-                        <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
+                        <Button type="submit" className="flex-1">{t('common.create')}</Button>
+                        <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>{t('common.cancel')}</Button>
                       </div>
                     </form>
                   </DialogContent>
@@ -539,44 +503,20 @@ export default function Boxes() {
               )}
             </div>
 
-            {/* Filters */}
-            {renderFilterBar(orderSearch, setOrderSearch, orderStatusFilter, setOrderStatusFilter, orderBatchFilter, setOrderBatchFilter, orderQtyFilter, setOrderQtyFilter, orderDateFrom, setOrderDateFrom, orderDateTo, setOrderDateTo, "Search by box number (e.g. 42)...")}
+            {renderFilterBar(orderSearch, setOrderSearch, orderStatusFilter, setOrderStatusFilter, orderBatchFilter, setOrderBatchFilter, orderQtyFilter, setOrderQtyFilter, orderDateFrom, setOrderDateFrom, orderDateTo, setOrderDateTo)}
 
-            {/* Stats */}
             <div className="grid gap-4 md:grid-cols-3">
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div><p className="text-sm text-muted-foreground">Empty Boxes</p><p className="text-2xl font-bold text-green-600">{emptyOrderBoxes.length}</p></div>
-                    <Box className="h-8 w-8 text-green-600 opacity-50" />
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div><p className="text-sm text-muted-foreground">Occupied Boxes</p><p className="text-2xl font-bold text-blue-600">{occupiedOrderBoxes.length}</p></div>
-                    <Package className="h-8 w-8 text-blue-600 opacity-50" />
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div><p className="text-sm text-muted-foreground">Inactive Boxes</p><p className="text-2xl font-bold text-muted-foreground">{inactiveOrderBoxes.length}</p></div>
-                    <Box className="h-8 w-8 text-muted-foreground opacity-50" />
-                  </div>
-                </CardContent>
-              </Card>
+              <Card><CardContent className="pt-6"><div className="flex items-center justify-between"><div><p className="text-sm text-muted-foreground">{t('warehouse.empty_boxes')}</p><p className="text-2xl font-bold text-green-600">{emptyOrderBoxes.length}</p></div><Box className="h-8 w-8 text-green-600 opacity-50" /></div></CardContent></Card>
+              <Card><CardContent className="pt-6"><div className="flex items-center justify-between"><div><p className="text-sm text-muted-foreground">{t('warehouse.occupied_boxes')}</p><p className="text-2xl font-bold text-blue-600">{occupiedOrderBoxes.length}</p></div><Package className="h-8 w-8 text-blue-600 opacity-50" /></div></CardContent></Card>
+              <Card><CardContent className="pt-6"><div className="flex items-center justify-between"><div><p className="text-sm text-muted-foreground">{t('warehouse.inactive_boxes')}</p><p className="text-2xl font-bold text-muted-foreground">{inactiveOrderBoxes.length}</p></div><Box className="h-8 w-8 text-muted-foreground opacity-50" /></div></CardContent></Card>
             </div>
 
-            {/* Table */}
             <Card>
               <CardHeader>
                 <CardTitle>
-                  Order Boxes
+                  {t('warehouse.order_boxes')}
                   {filteredOrderBoxes.length !== orderBoxes.length && (
-                    <span className="ml-2 text-sm font-normal text-muted-foreground">({filteredOrderBoxes.length} of {orderBoxes.length})</span>
+                    <span className="ml-2 text-sm font-normal text-muted-foreground">({filteredOrderBoxes.length} / {orderBoxes.length})</span>
                   )}
                 </CardTitle>
               </CardHeader>
@@ -584,19 +524,19 @@ export default function Boxes() {
                 {filteredOrderBoxes.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
                     <Box className="mx-auto h-12 w-12 mb-4 opacity-50" />
-                    {orderBoxes.length === 0 ? <><p>No order boxes created yet</p><p className="text-sm">Create boxes to start tracking order batches</p></> : <p>No boxes match the current filters</p>}
+                    {orderBoxes.length === 0 ? <><p>{t('warehouse.no_order_boxes')}</p><p className="text-sm">{t('warehouse.create_to_start')}</p></> : <p>{t('warehouse.no_filter_match')}</p>}
                   </div>
                 ) : (
                   <>
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Box Code</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Batches</TableHead>
-                        <TableHead>Total Qty</TableHead>
-                        <TableHead>Created</TableHead>
-                        <TableHead className="text-right">Active</TableHead>
+                        <TableHead>{t('warehouse.box_code')}</TableHead>
+                        <TableHead>{t('common.status')}</TableHead>
+                        <TableHead>{t('warehouse.batches')}</TableHead>
+                        <TableHead>{t('warehouse.total_qty')}</TableHead>
+                        <TableHead>{t('table.created')}</TableHead>
+                        <TableHead className="text-right">{t('common.active')}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -607,7 +547,7 @@ export default function Boxes() {
                             {box.batch_count > 0 && box.primary_state ? (
                               <Badge className={getOrderStateColor(box.primary_state)}>{formatState(box.primary_state)}</Badge>
                             ) : (
-                              <Badge variant="outline" className="text-green-600 border-green-600">EMPTY</Badge>
+                              <Badge variant="outline" className="text-green-600 border-green-600">{t('warehouse.empty').toUpperCase()}</Badge>
                             )}
                           </TableCell>
                           <TableCell>{box.batch_count > 0 ? <span className="text-sm">{box.batch_count}</span> : <span className="text-muted-foreground">0</span>}</TableCell>
@@ -632,24 +572,24 @@ export default function Boxes() {
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => { setPrintBoxType('extra'); setPrintDialogOpen(true); }} disabled={extraBoxes.length === 0}>
                 <Printer className="mr-2 h-4 w-4" />
-                Print Labels
+                {t('warehouse.print_labels')}
               </Button>
               {canManage && (
                 <Dialog open={extraDialogOpen} onOpenChange={setExtraDialogOpen}>
                   <DialogTrigger asChild>
-                    <Button><Plus className="mr-2 h-4 w-4" />Create Extra Boxes</Button>
+                    <Button><Plus className="mr-2 h-4 w-4" />{t('warehouse.create_extra_boxes')}</Button>
                   </DialogTrigger>
                   <DialogContent>
-                    <DialogHeader><DialogTitle>Create Extra Boxes</DialogTitle></DialogHeader>
+                    <DialogHeader><DialogTitle>{t('warehouse.create_extra_boxes')}</DialogTitle></DialogHeader>
                     <form onSubmit={handleCreateExtraBoxes} className="space-y-4">
                       <div>
-                        <Label htmlFor="extra-count">Number of boxes to create</Label>
+                        <Label htmlFor="extra-count">{t('warehouse.num_boxes')}</Label>
                         <NumericInput id="extra-count" min={1} max={100} value={newExtraBoxCount} onValueChange={(val) => setNewExtraBoxCount(val ?? 1)} required />
-                        <p className="text-xs text-muted-foreground mt-1">Box codes will be auto-generated (e.g., EBOX-0001)</p>
+                        <p className="text-xs text-muted-foreground mt-1">{t('warehouse.ebox_auto_gen')}</p>
                       </div>
                       <div className="flex gap-2">
-                        <Button type="submit" className="flex-1">Create</Button>
-                        <Button type="button" variant="outline" onClick={() => setExtraDialogOpen(false)}>Cancel</Button>
+                        <Button type="submit" className="flex-1">{t('common.create')}</Button>
+                        <Button type="button" variant="outline" onClick={() => setExtraDialogOpen(false)}>{t('common.cancel')}</Button>
                       </div>
                     </form>
                   </DialogContent>
@@ -657,44 +597,20 @@ export default function Boxes() {
               )}
             </div>
 
-            {/* Filters */}
-            {renderFilterBar(extraSearch, setExtraSearch, extraStatusFilter, setExtraStatusFilter, extraBatchFilter, setExtraBatchFilter, extraQtyFilter, setExtraQtyFilter, extraDateFrom, setExtraDateFrom, extraDateTo, setExtraDateTo, "Search by box number (e.g. 42)...")}
+            {renderFilterBar(extraSearch, setExtraSearch, extraStatusFilter, setExtraStatusFilter, extraBatchFilter, setExtraBatchFilter, extraQtyFilter, setExtraQtyFilter, extraDateFrom, setExtraDateFrom, extraDateTo, setExtraDateTo)}
 
-            {/* Stats */}
             <div className="grid gap-4 md:grid-cols-3">
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div><p className="text-sm text-muted-foreground">Empty Boxes</p><p className="text-2xl font-bold text-green-600">{emptyExtraBoxes.length}</p></div>
-                    <Box className="h-8 w-8 text-green-600 opacity-50" />
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div><p className="text-sm text-muted-foreground">Occupied Boxes</p><p className="text-2xl font-bold text-amber-600">{occupiedExtraBoxes.length}</p></div>
-                    <Package className="h-8 w-8 text-amber-600 opacity-50" />
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div><p className="text-sm text-muted-foreground">Inactive Boxes</p><p className="text-2xl font-bold text-muted-foreground">{inactiveExtraBoxes.length}</p></div>
-                    <Box className="h-8 w-8 text-muted-foreground opacity-50" />
-                  </div>
-                </CardContent>
-              </Card>
+              <Card><CardContent className="pt-6"><div className="flex items-center justify-between"><div><p className="text-sm text-muted-foreground">{t('warehouse.empty_boxes')}</p><p className="text-2xl font-bold text-green-600">{emptyExtraBoxes.length}</p></div><Box className="h-8 w-8 text-green-600 opacity-50" /></div></CardContent></Card>
+              <Card><CardContent className="pt-6"><div className="flex items-center justify-between"><div><p className="text-sm text-muted-foreground">{t('warehouse.occupied_boxes')}</p><p className="text-2xl font-bold text-amber-600">{occupiedExtraBoxes.length}</p></div><Package className="h-8 w-8 text-amber-600 opacity-50" /></div></CardContent></Card>
+              <Card><CardContent className="pt-6"><div className="flex items-center justify-between"><div><p className="text-sm text-muted-foreground">{t('warehouse.inactive_boxes')}</p><p className="text-2xl font-bold text-muted-foreground">{inactiveExtraBoxes.length}</p></div><Box className="h-8 w-8 text-muted-foreground opacity-50" /></div></CardContent></Card>
             </div>
 
-            {/* Table */}
             <Card>
               <CardHeader>
                 <CardTitle>
-                  Extra Boxes
+                  {t('warehouse.extra_boxes')}
                   {filteredExtraBoxes.length !== extraBoxes.length && (
-                    <span className="ml-2 text-sm font-normal text-muted-foreground">({filteredExtraBoxes.length} of {extraBoxes.length})</span>
+                    <span className="ml-2 text-sm font-normal text-muted-foreground">({filteredExtraBoxes.length} / {extraBoxes.length})</span>
                   )}
                 </CardTitle>
               </CardHeader>
@@ -702,19 +618,19 @@ export default function Boxes() {
                 {filteredExtraBoxes.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
                     <Box className="mx-auto h-12 w-12 mb-4 opacity-50" />
-                    {extraBoxes.length === 0 ? <><p>No extra boxes created yet</p><p className="text-sm">Create extra boxes to store surplus inventory</p></> : <p>No boxes match the current filters</p>}
+                    {extraBoxes.length === 0 ? <><p>{t('warehouse.no_extra_boxes')}</p><p className="text-sm">{t('warehouse.create_extra_to_start')}</p></> : <p>{t('warehouse.no_filter_match')}</p>}
                   </div>
                 ) : (
                   <>
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Box Code</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Batches</TableHead>
-                        <TableHead>Total Qty</TableHead>
-                        <TableHead>Created</TableHead>
-                        <TableHead className="text-right">Active</TableHead>
+                        <TableHead>{t('warehouse.box_code')}</TableHead>
+                        <TableHead>{t('common.status')}</TableHead>
+                        <TableHead>{t('warehouse.batches')}</TableHead>
+                        <TableHead>{t('warehouse.total_qty')}</TableHead>
+                        <TableHead>{t('table.created')}</TableHead>
+                        <TableHead className="text-right">{t('common.active')}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -725,7 +641,7 @@ export default function Boxes() {
                             {box.batch_count > 0 && box.primary_state ? (
                               <Badge className={getExtraStateColor(box.primary_state)}>{formatState(box.primary_state)}</Badge>
                             ) : (
-                              <Badge variant="outline" className="text-green-600 border-green-600">EMPTY</Badge>
+                              <Badge variant="outline" className="text-green-600 border-green-600">{t('warehouse.empty').toUpperCase()}</Badge>
                             )}
                           </TableCell>
                           <TableCell>{box.batch_count > 0 ? <span className="text-sm">{box.batch_count}</span> : <span className="text-muted-foreground">0</span>}</TableCell>
@@ -755,7 +671,7 @@ export default function Boxes() {
         open={printDialogOpen}
         onOpenChange={setPrintDialogOpen}
         boxes={printBoxType === 'order' ? orderBoxes.map(b => ({ id: b.id, box_code: b.box_code, box_type: 'order' as const })) : extraBoxes.map(b => ({ id: b.id, box_code: b.box_code, box_type: 'extra' as const }))}
-        title={printBoxType === 'order' ? 'Print Order Box Labels' : 'Print Extra Box Labels'}
+        title={printBoxType === 'order' ? `${t('common.print')} ${t('warehouse.order_boxes')}` : `${t('common.print')} ${t('warehouse.extra_boxes')}`}
       />
 
       <BoxLookupScanDialog open={scanDialogOpen} onOpenChange={setScanDialogOpen} />
