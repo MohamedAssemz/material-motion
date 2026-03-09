@@ -146,11 +146,10 @@ export default function Dashboard() {
         batchesRes,
         lateBatchesRes,
         approachingRes,
-        throughputRes,
         extraRes,
         shipmentsRes,
         shippedBatchesRes,
-        machineProductionRes,
+        machineBatchesRes,
         machinesRes,
       ] = await Promise.all([
         user ? supabase.from('profiles').select('full_name').eq('id', user.id).single() : Promise.resolve({ data: null }),
@@ -159,13 +158,12 @@ export default function Dashboard() {
         supabase.from('order_batches').select('current_state, quantity, order:orders!inner(status)').neq('order.status', 'cancelled').gte('created_at', rangeStart),
         supabase.from('order_batches').select('id, order_id, product_id, eta, quantity, order:orders(order_number, status)').not('current_state', 'in', '(shipped,ready_for_shipment)').not('eta', 'is', null).lt('eta', now).limit(50),
         supabase.from('orders').select('id, order_number, estimated_fulfillment_time').not('estimated_fulfillment_time', 'is', null).gt('estimated_fulfillment_time', now).lt('estimated_fulfillment_time', twoDaysFromNow).neq('status', 'completed').neq('status', 'cancelled').limit(5),
-        supabase.from('machine_production').select('state_transition').gte('created_at', rangeStart),
         supabase.from('extra_batches').select('quantity').eq('inventory_state', 'AVAILABLE'),
         supabase.from('shipments').select('id').gte('created_at', rangeStart),
         // Top products: shipped/ready_for_shipment batches in time range (excluding cancelled)
         supabase.from('order_batches').select('product_id, quantity, order:orders!inner(status)').in('current_state', ['shipped', 'ready_for_shipment']).neq('order.status', 'cancelled').gte('created_at', rangeStart),
-        // Machine production with machine_id for top machines
-        supabase.from('machine_production').select('machine_id').gte('created_at', rangeStart),
+        // Machine assignments from order_batches
+        supabase.from('order_batches').select('manufacturing_machine_id, finishing_machine_id, packaging_machine_id, boxing_machine_id, quantity').gte('updated_at', rangeStart),
         supabase.from('machines').select('id, name, type'),
       ]);
 
@@ -174,9 +172,6 @@ export default function Dashboard() {
 
       const batchesByState: Record<string, number> = {};
       (batchesRes.data || []).forEach(b => { batchesByState[b.current_state] = (batchesByState[b.current_state] || 0) + b.quantity; });
-
-      const todayThroughput: Record<string, number> = {};
-      (throughputRes.data || []).forEach(t => { todayThroughput[t.state_transition] = (todayThroughput[t.state_transition] || 0) + 1; });
 
       const extraInventoryCount = (extraRes.data || []).reduce((s, b) => s + b.quantity, 0);
 
@@ -207,10 +202,16 @@ export default function Dashboard() {
       const totalFinished = Object.values(productQtyMap).reduce((s, v) => s + v, 0);
       const avgFinishedPerDay = Math.round((totalFinished / daysDiff) * 10) / 10;
 
-      // Top machines
+      // Top machines - aggregate from batch machine columns
       const machineCountMap: Record<string, number> = {};
-      (machineProductionRes.data || []).forEach((m: any) => {
-        machineCountMap[m.machine_id] = (machineCountMap[m.machine_id] || 0) + 1;
+      const PHASE_COLS = ['manufacturing_machine_id', 'finishing_machine_id', 'packaging_machine_id', 'boxing_machine_id'] as const;
+      (machineBatchesRes.data || []).forEach((b: any) => {
+        for (const col of PHASE_COLS) {
+          const machineId = b[col];
+          if (machineId) {
+            machineCountMap[machineId] = (machineCountMap[machineId] || 0) + (b.quantity || 1);
+          }
+        }
       });
       const machineDataMap = new Map((machinesRes.data || []).map((m: any) => [m.id, { name: m.name, type: m.type }]));
       const topMachines = Object.entries(machineCountMap)
@@ -229,7 +230,7 @@ export default function Dashboard() {
         newOrdersToday: (newOrdersTodayRes.data || []).length,
         lateBatches: activeLate.slice(0, 10),
         approachingEtaOrders: (approachingRes.data || []) as any,
-        todayThroughput,
+        todayThroughput: {}, // No longer tracking state transitions
         extraInventoryCount,
         completedOrders: ordersByStatus.completed || 0,
         shipmentsCount: (shipmentsRes.data || []).length,
