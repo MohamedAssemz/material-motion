@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -17,7 +18,6 @@ import { ArrowLeft, Plus, Package, Loader2, Box, Search, Trash2 } from 'lucide-r
 import { format } from 'date-fns';
 import { TablePagination } from '@/components/TablePagination';
 import { ExtraBoxSelectionDialog } from '@/components/ExtraBoxSelectionDialog';
-
 
 interface Product {
   id: string;
@@ -41,13 +41,6 @@ interface ExtraBatch {
   } | null;
 }
 
-const EXTRA_STATE_LABELS: Record<string, string> = {
-  extra_manufacturing: 'Extra Manufacturing',
-  extra_finishing: 'Extra Finishing',
-  extra_packaging: 'Extra Packaging',
-  extra_boxing: 'Extra Boxing',
-};
-
 const EXTRA_STATE_COLORS: Record<string, string> = {
   extra_manufacturing: 'bg-blue-500 text-white',
   extra_finishing: 'bg-purple-500 text-white',
@@ -57,6 +50,7 @@ const EXTRA_STATE_COLORS: Record<string, string> = {
 
 export default function ExtraInventory() {
   const { user, hasRole } = useAuth();
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [batches, setBatches] = useState<ExtraBatch[]>([]);
@@ -79,89 +73,54 @@ export default function ExtraInventory() {
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 25;
 
-  // Filter state
   const [searchQuery, setSearchQuery] = useState('');
   const [stateFilter, setStateFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
 
   const canManage = hasRole('admin');
 
+  const EXTRA_STATE_LABELS: Record<string, string> = useMemo(() => ({
+    extra_manufacturing: t('extra.state.extra_manufacturing'),
+    extra_finishing: t('extra.state.extra_finishing'),
+    extra_packaging: t('extra.state.extra_packaging'),
+    extra_boxing: t('extra.state.extra_boxing'),
+  }), [t]);
 
-  // Filtered batches
   const filteredBatches = useMemo(() => {
     let result = batches;
-
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      result = result.filter(b =>
-        b.product.name.toLowerCase().includes(q) ||
-        b.product.sku.toLowerCase().includes(q)
-      );
+      result = result.filter(b => b.product.name.toLowerCase().includes(q) || b.product.sku.toLowerCase().includes(q));
     }
-
-    if (stateFilter !== 'all') {
-      result = result.filter(b => b.current_state === stateFilter);
-    }
-
-    if (statusFilter !== 'all') {
-      result = result.filter(b => b.inventory_state === statusFilter);
-    }
-
+    if (stateFilter !== 'all') result = result.filter(b => b.current_state === stateFilter);
+    if (statusFilter !== 'all') result = result.filter(b => b.inventory_state === statusFilter);
     return result;
   }, [batches, searchQuery, stateFilter, statusFilter]);
 
-  // Reset page on filter change
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchQuery, stateFilter, statusFilter]);
+  useEffect(() => { setCurrentPage(1); }, [searchQuery, stateFilter, statusFilter]);
 
   useEffect(() => {
     fetchData();
-
     const channel = supabase
       .channel('extra-batches')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'extra_batches' }, () => {
-        fetchData();
-      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'extra_batches' }, () => { fetchData(); })
       .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, []);
 
   const fetchData = async () => {
     try {
       const [productsRes, batchesRes] = await Promise.all([
         supabase.from('products').select('id, sku, name').order('sku'),
-        supabase
-          .from('extra_batches')
-          .select(`
-            id,
-            product_id,
-            quantity,
-            current_state,
-            inventory_state,
-            created_at,
-            box_id,
-            qr_code_data,
-            product:products(id, sku, name)
-          `)
-          .order('created_at', { ascending: false }),
+        supabase.from('extra_batches').select(`id, product_id, quantity, current_state, inventory_state, created_at, box_id, qr_code_data, product:products(id, sku, name)`).order('created_at', { ascending: false }),
       ]);
-
       if (productsRes.error) throw productsRes.error;
       if (batchesRes.error) throw batchesRes.error;
 
       const boxIds = batchesRes.data?.filter(b => b.box_id).map(b => b.box_id) || [];
       let boxMap = new Map();
-      
       if (boxIds.length > 0) {
-        const { data: boxesData } = await supabase
-          .from('extra_boxes')
-          .select('id, box_code')
-          .in('id', boxIds);
-        
+        const { data: boxesData } = await supabase.from('extra_boxes').select('id, box_code').in('id', boxIds);
         boxesData?.forEach(box => boxMap.set(box.id, box));
       }
 
@@ -174,11 +133,7 @@ export default function ExtraInventory() {
       setProducts(productsRes.data || []);
       setBatches(batchesWithBoxes);
     } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.message,
-        variant: 'destructive',
-      });
+      toast({ title: t('toast.error'), description: error.message, variant: 'destructive' });
     } finally {
       setLoading(false);
     }
@@ -186,86 +141,38 @@ export default function ExtraInventory() {
 
   const handleCreateExtraBatch = async (e: React.FormEvent) => {
     e.preventDefault();
-
     if (!formData.product_id || formData.quantity < 1) {
-      toast({
-        title: 'Validation Error',
-        description: 'Please select a product and enter a valid quantity',
-        variant: 'destructive',
-      });
+      toast({ title: t('extra.validation_error'), description: t('extra.select_product_valid'), variant: 'destructive' });
       return;
     }
-
     if (!formData.box_id) {
-      toast({
-        title: 'Validation Error',
-        description: 'Please select an Extra Box (EBox) for this batch',
-        variant: 'destructive',
-      });
+      toast({ title: t('extra.validation_error'), description: t('extra.select_ebox_valid'), variant: 'destructive' });
       return;
     }
 
     setSubmitting(true);
     try {
-      const { data: boxBatches } = await supabase
-        .from('extra_batches')
-        .select('current_state')
-        .eq('box_id', formData.box_id)
-        .limit(1);
-
+      const { data: boxBatches } = await supabase.from('extra_batches').select('current_state').eq('box_id', formData.box_id).limit(1);
       if (boxBatches && boxBatches.length > 0 && boxBatches[0].current_state !== formData.current_state) {
-        toast({
-          title: 'State Mismatch',
-          description: `This EBox already contains batches in "${EXTRA_STATE_LABELS[boxBatches[0].current_state]}" state. All batches in an EBox must have the same state.`,
-          variant: 'destructive',
-        });
+        toast({ title: t('extra.state_mismatch'), description: `${EXTRA_STATE_LABELS[boxBatches[0].current_state]}`, variant: 'destructive' });
         setSubmitting(false);
         return;
       }
 
-      const { data: existingBatch } = await supabase
-        .from('extra_batches')
-        .select('id, quantity')
-        .eq('product_id', formData.product_id)
-        .eq('box_id', formData.box_id)
-        .eq('current_state', formData.current_state)
-        .eq('inventory_state', 'AVAILABLE')
-        .maybeSingle();
+      const { data: existingBatch } = await supabase.from('extra_batches').select('id, quantity').eq('product_id', formData.product_id).eq('box_id', formData.box_id).eq('current_state', formData.current_state).eq('inventory_state', 'AVAILABLE').maybeSingle();
 
       if (existingBatch) {
-        const { error } = await supabase
-          .from('extra_batches')
-          .update({ 
-            quantity: existingBatch.quantity + formData.quantity,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', existingBatch.id);
-
+        const { error } = await supabase.from('extra_batches').update({ quantity: existingBatch.quantity + formData.quantity, updated_at: new Date().toISOString() }).eq('id', existingBatch.id);
         if (error) throw error;
-
-        toast({
-          title: 'Success',
-          description: `Added ${formData.quantity} units to existing batch (total: ${existingBatch.quantity + formData.quantity})`,
-        });
+        toast({ title: t('toast.success'), description: `${formData.quantity} → ${existingBatch.quantity + formData.quantity}` });
       } else {
         const { data: qrCode } = await supabase.rpc('generate_extra_batch_code');
-
         const { error } = await supabase.from('extra_batches').insert({
-          product_id: formData.product_id,
-          quantity: formData.quantity,
-          current_state: formData.current_state,
-          inventory_state: 'AVAILABLE',
-          qr_code_data: qrCode || `EB-${Date.now()}`,
-          box_id: formData.box_id,
-          created_by: user?.id,
+          product_id: formData.product_id, quantity: formData.quantity, current_state: formData.current_state,
+          inventory_state: 'AVAILABLE', qr_code_data: qrCode || `EB-${Date.now()}`, box_id: formData.box_id, created_by: user?.id,
         });
-
         if (error) throw error;
-
-        toast({
-          title: 'Success',
-          description: 'Extra inventory batch created',
-        });
+        toast({ title: t('toast.success'), description: t('toast.created_successfully') });
       }
 
       setDialogOpen(false);
@@ -273,11 +180,7 @@ export default function ExtraInventory() {
       setSelectedBoxCode('');
       fetchData();
     } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.message,
-        variant: 'destructive',
-      });
+      toast({ title: t('toast.error'), description: error.message, variant: 'destructive' });
     } finally {
       setSubmitting(false);
     }
@@ -285,82 +188,33 @@ export default function ExtraInventory() {
 
   const handleAssignBox = async (boxId: string, _boxCode?: string) => {
     if (!selectedBatchForBox) return;
-
     const batch = batches.find(b => b.id === selectedBatchForBox);
     if (!batch) return;
 
     try {
-      const { data: boxBatches } = await supabase
-        .from('extra_batches')
-        .select('current_state')
-        .eq('box_id', boxId)
-        .neq('id', batch.id)
-        .limit(1);
-
+      const { data: boxBatches } = await supabase.from('extra_batches').select('current_state').eq('box_id', boxId).neq('id', batch.id).limit(1);
       if (boxBatches && boxBatches.length > 0 && boxBatches[0].current_state !== batch.current_state) {
-        toast({
-          title: 'State Mismatch',
-          description: `This EBox contains batches in "${EXTRA_STATE_LABELS[boxBatches[0].current_state]}" state. Cannot add a batch with "${EXTRA_STATE_LABELS[batch.current_state]}" state.`,
-          variant: 'destructive',
-        });
+        toast({ title: t('extra.state_mismatch'), description: `${EXTRA_STATE_LABELS[boxBatches[0].current_state]}`, variant: 'destructive' });
         return;
       }
 
-      const { data: existingBatch } = await supabase
-        .from('extra_batches')
-        .select('id, quantity')
-        .eq('product_id', batch.product_id)
-        .eq('box_id', boxId)
-        .eq('current_state', batch.current_state)
-        .eq('inventory_state', batch.inventory_state)
-        .neq('id', batch.id)
-        .maybeSingle();
+      const { data: existingBatch } = await supabase.from('extra_batches').select('id, quantity').eq('product_id', batch.product_id).eq('box_id', boxId).eq('current_state', batch.current_state).eq('inventory_state', batch.inventory_state).neq('id', batch.id).maybeSingle();
 
       if (existingBatch) {
-        const { error: updateError } = await supabase
-          .from('extra_batches')
-          .update({ 
-            quantity: existingBatch.quantity + batch.quantity,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', existingBatch.id);
-
-        if (updateError) throw updateError;
-
-        const { error: deleteError } = await supabase
-          .from('extra_batches')
-          .delete()
-          .eq('id', selectedBatchForBox);
-
-        if (deleteError) throw deleteError;
-
-        toast({
-          title: 'Success',
-          description: `Merged ${batch.quantity} units into existing batch`,
-        });
+        await supabase.from('extra_batches').update({ quantity: existingBatch.quantity + batch.quantity, updated_at: new Date().toISOString() }).eq('id', existingBatch.id);
+        await supabase.from('extra_batches').delete().eq('id', selectedBatchForBox);
+        toast({ title: t('toast.success'), description: `${batch.quantity} units merged` });
       } else {
-        const { error: batchError } = await supabase
-          .from('extra_batches')
-          .update({ box_id: boxId })
-          .eq('id', selectedBatchForBox);
-
+        const { error: batchError } = await supabase.from('extra_batches').update({ box_id: boxId }).eq('id', selectedBatchForBox);
         if (batchError) throw batchError;
-
-        toast({
-          title: 'Success',
-          description: 'Box assigned to batch',
-        });
+        toast({ title: t('toast.success'), description: t('toast.updated_successfully') });
       }
 
       setSelectedBatchForBox(null);
       setBoxDialogOpen(false);
       fetchData();
     } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.message,
-        variant: 'destructive',
-      });
+      toast({ title: t('toast.error'), description: error.message, variant: 'destructive' });
     }
   };
 
@@ -368,49 +222,24 @@ export default function ExtraInventory() {
     if (!canManage) return;
     setDeletingBatchId(batch.id);
     try {
-      // If reserved, un-reserve first: reduce order_items.deducted_to_extra
       if (batch.inventory_state === 'RESERVED') {
-        // Find the reservation info from the batch itself (order_item_id is on extra_batches)
-        const { data: batchData } = await supabase
-          .from('extra_batches')
-          .select('order_item_id, quantity')
-          .eq('id', batch.id)
-          .single();
-
+        const { data: batchData } = await supabase.from('extra_batches').select('order_item_id, quantity').eq('id', batch.id).single();
         if (batchData?.order_item_id) {
-          const { data: orderItem } = await supabase
-            .from('order_items')
-            .select('deducted_to_extra')
-            .eq('id', batchData.order_item_id)
-            .single();
-
+          const { data: orderItem } = await supabase.from('order_items').select('deducted_to_extra').eq('id', batchData.order_item_id).single();
           if (orderItem) {
-            await supabase
-              .from('order_items')
-              .update({ deducted_to_extra: Math.max(0, orderItem.deducted_to_extra - batchData.quantity) })
-              .eq('id', batchData.order_item_id);
+            await supabase.from('order_items').update({ deducted_to_extra: Math.max(0, orderItem.deducted_to_extra - batchData.quantity) }).eq('id', batchData.order_item_id);
           }
-
-          // Clear reservation fields first to pass validation
-          await supabase
-            .from('extra_batches')
-            .update({ inventory_state: 'AVAILABLE', order_id: null, order_item_id: null })
-            .eq('id', batch.id);
+          await supabase.from('extra_batches').update({ inventory_state: 'AVAILABLE', order_id: null, order_item_id: null }).eq('id', batch.id);
         }
       }
 
-      // Delete the batch
-      const { error } = await supabase
-        .from('extra_batches')
-        .delete()
-        .eq('id', batch.id);
-
+      const { error } = await supabase.from('extra_batches').delete().eq('id', batch.id);
       if (error) throw error;
 
-      toast({ title: 'Deleted', description: 'Extra batch deleted successfully' });
+      toast({ title: t('toast.deleted_successfully') });
       fetchData();
     } catch (error: any) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      toast({ title: t('toast.error'), description: error.message, variant: 'destructive' });
     } finally {
       setDeletingBatchId(null);
     }
@@ -446,8 +275,8 @@ export default function ExtraInventory() {
             </Button>
             <Package className="h-6 w-6 text-amber-500" />
             <div>
-              <h1 className="text-xl font-bold">Extra Inventory</h1>
-              <p className="text-sm text-muted-foreground">Batch-based surplus inventory tracking</p>
+              <h1 className="text-xl font-bold">{t('extra.title')}</h1>
+              <p className="text-sm text-muted-foreground">{t('extra.batch_tracking')}</p>
             </div>
           </div>
 
@@ -456,22 +285,19 @@ export default function ExtraInventory() {
               <DialogTrigger asChild>
                 <Button>
                   <Plus className="mr-2 h-4 w-4" />
-                  Add Extra Batch
+                  {t('extra.add_batch')}
                 </Button>
               </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Create Extra Inventory Batch</DialogTitle>
+                <DialogTitle>{t('extra.create_batch')}</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleCreateExtraBatch} className="space-y-4">
                 <div>
-                  <Label>Product *</Label>
-                  <Select
-                    value={formData.product_id}
-                    onValueChange={(value) => setFormData({ ...formData, product_id: value })}
-                  >
+                  <Label>{t('common.product')} *</Label>
+                  <Select value={formData.product_id} onValueChange={(value) => setFormData({ ...formData, product_id: value })}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Select product" />
+                      <SelectValue placeholder={t('extra.select_product')} />
                     </SelectTrigger>
                     <SelectContent>
                       {products.map((product) => (
@@ -483,44 +309,29 @@ export default function ExtraInventory() {
                   </Select>
                 </div>
                 <div>
-                  <Label>Quantity *</Label>
-                  <NumericInput
-                    min={1}
-                    value={formData.quantity}
-                    onValueChange={(val) => setFormData({ ...formData, quantity: val ?? 1 })}
-                    required
-                  />
+                  <Label>{t('common.quantity')} *</Label>
+                  <NumericInput min={1} value={formData.quantity} onValueChange={(val) => setFormData({ ...formData, quantity: val ?? 1 })} required />
                 </div>
                 <div>
-                  <Label>Current State</Label>
-                  <Select
-                    value={formData.current_state}
-                    onValueChange={(value) => setFormData({ ...formData, current_state: value })}
-                  >
+                  <Label>{t('extra.current_state')}</Label>
+                  <Select value={formData.current_state} onValueChange={(value) => setFormData({ ...formData, current_state: value })}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="extra_manufacturing">Extra Manufacturing</SelectItem>
-                      <SelectItem value="extra_finishing">Extra Finishing</SelectItem>
-                      <SelectItem value="extra_packaging">Extra Packaging</SelectItem>
-                      <SelectItem value="extra_boxing">Extra Boxing</SelectItem>
+                      <SelectItem value="extra_manufacturing">{t('extra.state.extra_manufacturing')}</SelectItem>
+                      <SelectItem value="extra_finishing">{t('extra.state.extra_finishing')}</SelectItem>
+                      <SelectItem value="extra_packaging">{t('extra.state.extra_packaging')}</SelectItem>
+                      <SelectItem value="extra_boxing">{t('extra.state.extra_boxing')}</SelectItem>
                     </SelectContent>
                   </Select>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Current production state of these extra units
-                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">{t('extra.state_desc')}</p>
                 </div>
                 
                 <div>
-                  <Label>Extra Box (EBox) *</Label>
+                  <Label>{t('warehouse.extra_boxes')} *</Label>
                   <div className="flex gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="flex-1 justify-start"
-                      onClick={() => setCreateBoxDialogOpen(true)}
-                    >
+                    <Button type="button" variant="outline" className="flex-1 justify-start" onClick={() => setCreateBoxDialogOpen(true)}>
                       {formData.box_id && selectedBoxCode ? (
                         <span className="flex items-center gap-2">
                           <Box className="h-4 w-4 text-primary" />
@@ -529,37 +340,28 @@ export default function ExtraInventory() {
                       ) : (
                         <span className="text-muted-foreground flex items-center gap-2">
                           <Box className="h-4 w-4" />
-                          Select an EBox...
+                          {t('extra.select_ebox')}
                         </span>
                       )}
                     </Button>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Only boxes matching the selected state are shown.
-                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">{t('extra.only_matching_state')}</p>
                 </div>
 
                 <div className="flex gap-2">
                   <Button type="submit" className="flex-1" disabled={submitting || !formData.box_id}>
                     {submitting ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Creating...
-                      </>
+                      <><Loader2 className="mr-2 h-4 w-4 animate-spin" />{t('extra.creating')}</>
                     ) : (
-                      'Create Batch'
+                      t('extra.create_batch_btn')
                     )}
                   </Button>
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    onClick={() => {
-                      setDialogOpen(false);
-                      setFormData({ product_id: '', quantity: 1, current_state: 'extra_manufacturing', box_id: '' });
-                      setSelectedBoxCode('');
-                    }}
-                  >
-                    Cancel
+                  <Button type="button" variant="outline" onClick={() => {
+                    setDialogOpen(false);
+                    setFormData({ product_id: '', quantity: 1, current_state: 'extra_manufacturing', box_id: '' });
+                    setSelectedBoxCode('');
+                  }}>
+                    {t('common.cancel')}
                   </Button>
                 </div>
               </form>
@@ -577,46 +379,16 @@ export default function ExtraInventory() {
           setSelectedBoxCode(boxCode || '');
           setCreateBoxDialogOpen(false);
         }}
-        title="Select Extra Box for Batch"
+        title={t('extra.select_box_title')}
         filterByState={formData.current_state}
       />
 
       <div className="container mx-auto p-6 space-y-6">
         {/* Stats */}
         <div className="grid gap-4 md:grid-cols-3">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Available Units</p>
-                  <p className="text-2xl font-bold text-green-600">{totalAvailable}</p>
-                </div>
-                <Package className="h-8 w-8 text-green-600 opacity-50" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Available Batches</p>
-                  <p className="text-2xl font-bold">{availableBatches.length}</p>
-                </div>
-                <Package className="h-8 w-8 text-muted-foreground opacity-50" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Reserved</p>
-                  <p className="text-2xl font-bold text-amber-600">{reservedBatches.length}</p>
-                </div>
-                <Package className="h-8 w-8 text-amber-600 opacity-50" />
-              </div>
-            </CardContent>
-          </Card>
+          <Card><CardContent className="pt-6"><div className="flex items-center justify-between"><div><p className="text-sm text-muted-foreground">{t('extra.available_units')}</p><p className="text-2xl font-bold text-green-600">{totalAvailable}</p></div><Package className="h-8 w-8 text-green-600 opacity-50" /></div></CardContent></Card>
+          <Card><CardContent className="pt-6"><div className="flex items-center justify-between"><div><p className="text-sm text-muted-foreground">{t('extra.available_batches')}</p><p className="text-2xl font-bold">{availableBatches.length}</p></div><Package className="h-8 w-8 text-muted-foreground opacity-50" /></div></CardContent></Card>
+          <Card><CardContent className="pt-6"><div className="flex items-center justify-between"><div><p className="text-sm text-muted-foreground">{t('extra.reserved_count')}</p><p className="text-2xl font-bold text-amber-600">{reservedBatches.length}</p></div><Package className="h-8 w-8 text-amber-600 opacity-50" /></div></CardContent></Card>
         </div>
 
         {/* Search and Filters */}
@@ -626,37 +398,28 @@ export default function ExtraInventory() {
               <div className="flex-1">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search by product name or SKU..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-9"
-                  />
+                  <Input placeholder={t('extra.search_product_sku')} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9" />
                 </div>
               </div>
               <div className="w-full sm:w-[180px]">
                 <Select value={stateFilter} onValueChange={setStateFilter}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="All States" />
-                  </SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder={t('extra.all_states')} /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All States</SelectItem>
-                    <SelectItem value="extra_manufacturing">Extra Manufacturing</SelectItem>
-                    <SelectItem value="extra_finishing">Extra Finishing</SelectItem>
-                    <SelectItem value="extra_packaging">Extra Packaging</SelectItem>
-                    <SelectItem value="extra_boxing">Extra Boxing</SelectItem>
+                    <SelectItem value="all">{t('extra.all_states')}</SelectItem>
+                    <SelectItem value="extra_manufacturing">{t('extra.state.extra_manufacturing')}</SelectItem>
+                    <SelectItem value="extra_finishing">{t('extra.state.extra_finishing')}</SelectItem>
+                    <SelectItem value="extra_packaging">{t('extra.state.extra_packaging')}</SelectItem>
+                    <SelectItem value="extra_boxing">{t('extra.state.extra_boxing')}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div className="w-full sm:w-[150px]">
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="All Statuses" />
-                  </SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder={t('extra.all_statuses')} /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Statuses</SelectItem>
-                    <SelectItem value="AVAILABLE">Available</SelectItem>
-                    <SelectItem value="RESERVED">Reserved</SelectItem>
+                    <SelectItem value="all">{t('extra.all_statuses')}</SelectItem>
+                    <SelectItem value="AVAILABLE">{t('extra.available')}</SelectItem>
+                    <SelectItem value="RESERVED">{t('extra.reserved')}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -668,11 +431,9 @@ export default function ExtraInventory() {
         <Card>
           <CardHeader>
             <CardTitle>
-              Extra Inventory Batches
+              {t('extra.extra_batches')}
               {filteredBatches.length !== batches.length && (
-                <span className="ml-2 text-sm font-normal text-muted-foreground">
-                  ({filteredBatches.length} of {batches.length})
-                </span>
+                <span className="ml-2 text-sm font-normal text-muted-foreground">({filteredBatches.length} / {batches.length})</span>
               )}
             </CardTitle>
           </CardHeader>
@@ -681,12 +442,9 @@ export default function ExtraInventory() {
               <div className="text-center py-8 text-muted-foreground">
                 <Package className="mx-auto h-12 w-12 mb-4 opacity-50" />
                 {batches.length === 0 ? (
-                  <>
-                    <p>No extra inventory batches</p>
-                    <p className="text-sm">Create batches when overproduction occurs</p>
-                  </>
+                  <><p>{t('extra.no_batches')}</p><p className="text-sm">{t('extra.create_when_overproduction')}</p></>
                 ) : (
-                  <p>No batches match the current filters</p>
+                  <p>{t('extra.no_filter_match')}</p>
                 )}
               </div>
             ) : (
@@ -694,12 +452,12 @@ export default function ExtraInventory() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Product</TableHead>
-                    <TableHead>Quantity</TableHead>
-                    <TableHead>Current State</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Box</TableHead>
-                    <TableHead>Created</TableHead>
+                    <TableHead>{t('common.product')}</TableHead>
+                    <TableHead>{t('common.quantity')}</TableHead>
+                    <TableHead>{t('extra.current_state')}</TableHead>
+                    <TableHead>{t('common.status')}</TableHead>
+                    <TableHead>{t('table.box')}</TableHead>
+                    <TableHead>{t('table.created')}</TableHead>
                     {canManage && <TableHead className="w-[60px]"></TableHead>}
                   </TableRow>
                 </TableHeader>
@@ -720,7 +478,7 @@ export default function ExtraInventory() {
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline" className={getInventoryStateColor(batch.inventory_state)}>
-                          {batch.inventory_state}
+                          {batch.inventory_state === 'AVAILABLE' ? t('extra.available') : batch.inventory_state === 'RESERVED' ? t('extra.reserved') : batch.inventory_state}
                         </Badge>
                       </TableCell>
                       <TableCell>
@@ -730,35 +488,17 @@ export default function ExtraInventory() {
                             <span className="font-mono text-sm">{batch.box.box_code}</span>
                           </div>
                         ) : (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              setSelectedBatchForBox(batch.id);
-                              setBoxDialogOpen(true);
-                            }}
-                            disabled={batch.inventory_state === 'RESERVED'}
-                          >
+                          <Button variant="ghost" size="sm" onClick={() => { setSelectedBatchForBox(batch.id); setBoxDialogOpen(true); }} disabled={batch.inventory_state === 'RESERVED'}>
                             <Box className="h-4 w-4 mr-1" />
-                            Assign
+                            {t('extra.assign')}
                           </Button>
                         )}
                       </TableCell>
                       <TableCell>{format(new Date(batch.created_at), 'PP')}</TableCell>
                       {canManage && (
                         <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-destructive hover:text-destructive"
-                            onClick={() => setBatchToDelete(batch)}
-                            disabled={deletingBatchId === batch.id}
-                          >
-                            {deletingBatchId === batch.id ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <Trash2 className="h-4 w-4" />
-                            )}
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setBatchToDelete(batch)} disabled={deletingBatchId === batch.id}>
+                            {deletingBatchId === batch.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
                           </Button>
                         </TableCell>
                       )}
@@ -766,43 +506,32 @@ export default function ExtraInventory() {
                   ))}
                 </TableBody>
               </Table>
-              <TablePagination
-                currentPage={currentPage}
-                totalItems={filteredBatches.length}
-                pageSize={PAGE_SIZE}
-                onPageChange={setCurrentPage}
-              />
+              <TablePagination currentPage={currentPage} totalItems={filteredBatches.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />
               </>
             )}
           </CardContent>
         </Card>
       </div>
 
-      <ExtraBoxSelectionDialog
-        open={boxDialogOpen}
-        onOpenChange={setBoxDialogOpen}
-        onConfirm={handleAssignBox}
-        title="Assign Extra Box"
-      />
+      <ExtraBoxSelectionDialog open={boxDialogOpen} onOpenChange={setBoxDialogOpen} onConfirm={handleAssignBox} title={t('extra.assign_box')} />
 
-      {/* Delete Confirmation Dialog */}
       <AlertDialog open={!!batchToDelete} onOpenChange={(open) => { if (!open) setBatchToDelete(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Extra Batch</AlertDialogTitle>
+            <AlertDialogTitle>{t('extra.delete_batch')}</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete this extra batch ({batchToDelete?.product?.name} × {batchToDelete?.quantity})?
-              {batchToDelete?.inventory_state === 'RESERVED' && ' This batch is currently reserved for an order. Deleting it will release the reservation.'}
-              {' '}This action cannot be undone.
+              {t('extra.delete_confirm')} ({batchToDelete?.product?.name} × {batchToDelete?.quantity})?
+              {batchToDelete?.inventory_state === 'RESERVED' && ` ${t('extra.reserved_release')}`}
+              {' '}{t('extra.cannot_undo')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => { if (batchToDelete) { handleDeleteBatch(batchToDelete); setBatchToDelete(null); } }}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Delete
+              {t('common.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

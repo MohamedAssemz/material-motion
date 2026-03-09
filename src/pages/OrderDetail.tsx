@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -137,6 +138,7 @@ export default function OrderDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { hasRole, user } = useAuth();
+  const { t } = useLanguage();
   const [order, setOrder] = useState<Order | null>(null);
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -191,28 +193,20 @@ export default function OrderDetail() {
     };
   }, [id]);
 
-  // Fetch extra inventory counts only when orderItems are loaded
   useEffect(() => {
     if (orderItems.length > 0) {
       fetchExtraInventoryCounts();
     } else {
-      // Reset counts if no order items
       setExtraInventoryCounts({});
     }
   }, [orderItems]);
 
   const fetchOrder = async () => {
     try {
-      // Fetch order and order_items separately
       const [orderRes, orderItemsRes] = await Promise.all([
         supabase
           .from("orders")
-          .select(
-            `
-            *,
-            customer:customers(name, code)
-          `,
-          )
+          .select(`*, customer:customers(name, code)`)
           .eq("id", id)
           .maybeSingle(),
         supabase
@@ -228,7 +222,6 @@ export default function OrderDetail() {
         return;
       }
 
-      // Fetch batches separately
       const { data: batchesData, error: batchesError } = await supabase
         .from("order_batches")
         .select("id, qr_code_data, current_state, quantity, product_id, order_item_id, eta, lead_time_days, box_id, from_extra_state, product:products(id, name, sku, needs_packing)")
@@ -236,7 +229,6 @@ export default function OrderDetail() {
 
       if (batchesError) throw batchesError;
 
-      // Fetch box info for batches with box_id
       const boxIds = batchesData?.filter((b: any) => b.box_id).map((b: any) => b.box_id) || [];
       let boxMap = new Map();
 
@@ -258,7 +250,6 @@ export default function OrderDetail() {
         .eq("id", orderData.created_by)
         .maybeSingle();
 
-      // Store order_items as well for the Order Items table
       setOrderItems(orderItemsRes.data || []);
       setOrder({
         ...orderData,
@@ -275,8 +266,6 @@ export default function OrderDetail() {
 
   const fetchExtraInventoryCounts = async () => {
     try {
-      // State mapping: extra batches in each state are usable for that corresponding phase
-      // e.g., extra_manufacturing batches can be used when order is in manufacturing phase
       const states = [
         { phase: 'manufacturing', state: 'extra_manufacturing' },
         { phase: 'finishing', state: 'extra_finishing' },
@@ -284,16 +273,11 @@ export default function OrderDetail() {
         { phase: 'boxing', state: 'extra_boxing' },
       ];
 
-      // Get product IDs from order items to filter extra inventory
       const orderProductIds = orderItems.map(oi => oi.product_id);
-      
-      // Get product IDs that have at least one needs_boxing=true order item
-      // extra_boxing batches can ONLY be used by items that need boxing
       const boxingEligibleProductIds = orderItems
         .filter(oi => oi.needs_boxing)
         .map(oi => oi.product_id);
 
-      // If no order items, return empty counts
       if (orderProductIds.length === 0) {
         setExtraInventoryCounts({});
         return;
@@ -302,18 +286,15 @@ export default function OrderDetail() {
       const counts: Record<string, number> = {};
 
       for (const { phase, state } of states) {
-        // For extra_boxing, only count products with needs_boxing=true items
         const productIds = state === 'extra_boxing' 
           ? boxingEligibleProductIds 
           : orderProductIds;
         
-        // If no eligible products for this state, count is 0
         if (productIds.length === 0) {
           counts[phase] = 0;
           continue;
         }
         
-        // Only fetch extra batches that match products in this order
         const { data, error } = await supabase
           .from('extra_batches')
           .select('quantity')
@@ -334,9 +315,7 @@ export default function OrderDetail() {
 
   const fetchReservedExtraCounts = async () => {
     if (!id) return;
-    
     try {
-      // Fetch reserved extra batches for this specific order
       const { data, error } = await supabase
         .from('extra_batches')
         .select('current_state, quantity')
@@ -345,7 +324,6 @@ export default function OrderDetail() {
 
       if (error) throw error;
 
-      // Map extra batch states to phase names
       const phaseMap: Record<string, string> = {
         'extra_manufacturing': 'manufacturing',
         'extra_finishing': 'finishing',
@@ -353,18 +331,10 @@ export default function OrderDetail() {
         'extra_boxing': 'boxing',
       };
 
-      const counts: Record<string, number> = {
-        manufacturing: 0,
-        finishing: 0,
-        packaging: 0,
-        boxing: 0,
-      };
-
+      const counts: Record<string, number> = { manufacturing: 0, finishing: 0, packaging: 0, boxing: 0 };
       (data || []).forEach((batch) => {
         const phase = phaseMap[batch.current_state];
-        if (phase) {
-          counts[phase] += batch.quantity;
-        }
+        if (phase) counts[phase] += batch.quantity;
       });
 
       setReservedExtraCounts(counts);
@@ -375,10 +345,7 @@ export default function OrderDetail() {
 
   const fetchAddedToExtraCounts = async () => {
     if (!id) return;
-    
     try {
-      // Fetch from extra_batch_history - CREATED events where this order was the source
-      // This tracks items moved from this order to extra inventory permanently
       const { data, error } = await supabase
         .from('extra_batch_history')
         .select('from_state, quantity')
@@ -387,7 +354,6 @@ export default function OrderDetail() {
 
       if (error) throw error;
 
-      // Map from_state to phase names
       const phaseMap: Record<string, string> = {
         'in_manufacturing': 'manufacturing',
         'in_finishing': 'finishing',
@@ -395,18 +361,10 @@ export default function OrderDetail() {
         'in_boxing': 'boxing',
       };
 
-      const counts: Record<string, number> = {
-        manufacturing: 0,
-        finishing: 0,
-        packaging: 0,
-        boxing: 0,
-      };
-
+      const counts: Record<string, number> = { manufacturing: 0, finishing: 0, packaging: 0, boxing: 0 };
       (data || []).forEach((record) => {
         const phase = phaseMap[record.from_state || ''];
-        if (phase) {
-          counts[phase] += record.quantity;
-        }
+        if (phase) counts[phase] += record.quantity;
       });
 
       setAddedToExtraCounts(counts);
@@ -433,18 +391,10 @@ export default function OrderDetail() {
         'extra_boxing': 'boxing',
       };
 
-      const counts: Record<string, number> = {
-        manufacturing: 0,
-        finishing: 0,
-        packaging: 0,
-        boxing: 0,
-      };
-
+      const counts: Record<string, number> = { manufacturing: 0, finishing: 0, packaging: 0, boxing: 0 };
       (data || []).forEach((record) => {
         const phase = phaseMap[record.from_state || ''];
-        if (phase) {
-          counts[phase] += record.quantity;
-        }
+        if (phase) counts[phase] += record.quantity;
       });
 
       setRetrievedFromExtraCounts(counts);
@@ -456,7 +406,6 @@ export default function OrderDetail() {
 
   const handleCancelOrder = async () => {
     try {
-      // Release reserved extra batches back to AVAILABLE
       await supabase
         .from("extra_batches")
         .update({ 
@@ -473,11 +422,11 @@ export default function OrderDetail() {
         .eq("id", id);
       if (error) throw error;
 
-      toast.success("Order cancelled successfully");
+      toast.success(t('toast.success'));
       navigate("/orders");
     } catch (error) {
       console.error("Error cancelling order:", error);
-      toast.error("Failed to cancel order");
+      toast.error(t('toast.action_failed'));
     }
   };
 
@@ -568,33 +517,27 @@ export default function OrderDetail() {
       <div className="p-6">
         <Button variant="ghost" onClick={() => navigate("/orders")}>
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Orders
+          {t('orders.back_to_orders')}
         </Button>
-        <p className="text-center text-muted-foreground mt-8">Order not found</p>
+        <p className="text-center text-muted-foreground mt-8">{t('orders.not_found')}</p>
       </div>
     );
   }
 
   const activeBatches = order.batches;
-  // Total items = planned order quantity from order_items (not affected by extra inventory reservation)
   const totalItems = orderItems.reduce((sum, item) => sum + item.quantity, 0);
   const shippedItems = activeBatches
     .filter((b) => b.current_state === "shipped")
     .reduce((sum, b) => sum + b.quantity, 0);
 
-  // Check if order is pending based on order status, not batch states
-  // This ensures the UI remains consistent even when all order batches are deleted/replaced by extra inventory
-  // Order can be "pending" or "waiting_for_rm" before being started
   const isPendingOrder = order.status === "pending" || order.status === "waiting_for_rm";
 
-  // Calculate phase stats with optional filter for phases that can be skipped
   const getPhaseStats = (
     inState: string, 
     readyState: string | undefined, 
     phaseName: string,
     phaseFilter?: (batch: Batch) => boolean
   ): PhaseStats => {
-    // Apply filter to get only relevant batches for this phase
     const relevantBatches = phaseFilter ? activeBatches.filter(phaseFilter) : activeBatches;
     
     const waiting = readyState
@@ -603,7 +546,6 @@ export default function OrderDetail() {
     const inProgress = relevantBatches.filter((b) => b.current_state === inState).reduce((sum, b) => sum + b.quantity, 0);
     const stateIndex = getAllStates().indexOf(inState as UnitState);
     
-    // Phase hierarchy: items retrieved from a later phase's extra state never went through earlier phases
     const laterExtraStates: Record<string, string[]> = {
       manufacturing: ['extra_finishing', 'extra_packaging', 'extra_boxing'],
       finishing: ['extra_packaging', 'extra_boxing'],
@@ -614,18 +556,13 @@ export default function OrderDetail() {
     
     const pastStateBatches = relevantBatches.filter((b) => {
       if (getAllStates().indexOf(b.current_state as UnitState) <= stateIndex) return false;
-      // Exclude batches that skipped this phase entirely (retrieved from a later phase's extra)
       if (excludeStates.includes((b as any).from_extra_state)) return false;
       return true;
     });
     
-    // Retrieved = from extra_batch_history CONSUMED events (immutable source of truth)
     const retrieved = retrievedFromExtraCounts[phaseName] || 0;
-    
-    // Completed = total batches past this state
     const totalPast = pastStateBatches.reduce((sum, b) => sum + b.quantity, 0);
     
-    // Defensive hybrid: use both batch labels and history diff to handle corrupted provenance
     const phaseExtraState = `extra_${phaseName}`;
     const processedByLabels = pastStateBatches
       .filter((b) => (b as any).from_extra_state !== phaseExtraState)
@@ -641,15 +578,12 @@ export default function OrderDetail() {
 
   const manufacturingStats = getPhaseStats("in_manufacturing", undefined, "manufacturing");
   const finishingStats = getPhaseStats("in_finishing", "ready_for_finishing", "finishing");
-  // Packaging: only count items where product.needs_packing is true (items that skip packaging shouldn't count)
   const packagingStats = getPhaseStats("in_packaging", "ready_for_packaging", "packaging", (b) => b.product?.needs_packing !== false);
-  // Boxing: only count items where order_item.needs_boxing is true
   const boxingStats = getPhaseStats("in_boxing", "ready_for_boxing", "boxing", (b) => {
     const orderItem = orderItems.find(oi => oi.id === b.order_item_id);
     return orderItem?.needs_boxing !== false;
   });
 
-  // Items grouped by product for each state
   const getProductsByState = (state: string) => {
     const stateData = new Map<
       string,
@@ -674,7 +608,6 @@ export default function OrderDetail() {
     return Array.from(stateData.entries());
   };
 
-  // Boxes by state
   const getBoxesByState = (state: string) => {
     const boxData = new Map<string, { code: string; quantity: number; batches: Batch[] }>();
     activeBatches
@@ -705,13 +638,52 @@ export default function OrderDetail() {
       quantity: b.quantity,
     }));
 
-  // Order state - consistent with Orders table logic
   const orderState = (() => {
-    if (order.status === 'cancelled') return "Cancelled";
-    if (order.status === 'completed' || (shippedItems === totalItems && totalItems > 0)) return "Fulfilled";
-    if (order.status === 'in_progress') return "In Progress";
-    return "Pending";
+    if (order.status === 'cancelled') return t('status.cancelled');
+    if (order.status === 'completed' || (shippedItems === totalItems && totalItems > 0)) return t('status.fulfilled');
+    if (order.status === 'in_progress') return t('status.in_progress');
+    return t('status.pending');
   })();
+
+  // Helper to render phase stats card
+  const renderPhaseStats = (stats: PhaseStats) => (
+    <div className="space-y-1 text-sm">
+      <div className="flex justify-between">
+        <span className="text-muted-foreground">{t('orders.waiting')}</span>
+        <span className="font-medium text-warning">{stats.waiting}</span>
+      </div>
+      <div className="flex justify-between">
+        <span className="text-muted-foreground">{t('orders.in_progress_label')}</span>
+        <span className="font-medium text-primary">{stats.inProgress}</span>
+      </div>
+      <div className="flex justify-between">
+        <span className="text-muted-foreground">{t('orders.processed')}</span>
+        <span className="font-medium text-green-600">{stats.processed}</span>
+      </div>
+      {stats.retrieved > 0 && (
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">{t('orders.retrieved')}</span>
+          <span className="font-medium text-purple-600">{stats.retrieved}</span>
+        </div>
+      )}
+      {stats.addedToExtra > 0 && (
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">{t('orders.added_to_extra_label')}</span>
+          <span className="font-medium text-orange-600">{stats.addedToExtra}</span>
+        </div>
+      )}
+      {stats.extraToRetrieve > 0 && (
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">{t('orders.extra_to_retrieve')}</span>
+          <span className="font-medium text-amber-600">{stats.extraToRetrieve}</span>
+        </div>
+      )}
+      <div className="flex justify-between border-t pt-1 mt-1">
+        <span className="font-medium text-muted-foreground">{t('orders.completed_label')}</span>
+        <span className="font-bold">{stats.completed}</span>
+      </div>
+    </div>
+  );
 
   return (
     <div className="p-6 space-y-6">
@@ -724,12 +696,12 @@ export default function OrderDetail() {
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-3xl font-bold">{order.order_number}</h1>
-              {order.status === 'cancelled' && <Badge variant="destructive">Cancelled</Badge>}
-              {order.priority === "high" && <Badge variant="destructive">High Priority</Badge>}
-              <Badge variant={orderState === "Fulfilled" ? "default" : "secondary"}>{orderState}</Badge>
+              {order.status === 'cancelled' && <Badge variant="destructive">{t('status.cancelled')}</Badge>}
+              {order.priority === "high" && <Badge variant="destructive">{t('orders.high_priority')}</Badge>}
+              <Badge variant={orderState === t('status.fulfilled') ? "default" : "secondary"}>{orderState}</Badge>
             </div>
             <p className="text-muted-foreground">
-              {order.customer?.name || "No Customer"} · Created {format(new Date(order.created_at), "PPP")}
+              {order.customer?.name || t('orders.no_customer')} · {t('table.created')} {format(new Date(order.created_at), "PPP")}
             </p>
           </div>
         </div>
@@ -737,33 +709,33 @@ export default function OrderDetail() {
           {isPendingOrder && canUpdate && (
             <Button onClick={() => setStartOrderOpen(true)}>
               <Play className="h-4 w-4 mr-1" />
-              Start Order
+              {t('orders.start_order')}
             </Button>
           )}
           <Button variant="outline" size="sm" onClick={handlePrintOrder}>
             <Printer className="h-4 w-4 mr-1" />
-            Print
+            {t('common.print')}
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm">
                 <StickyNote className="h-4 w-4 mr-1" />
-                Notes
+                {t('common.notes')}
                 <ChevronDown className="h-3 w-3 ml-1" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={() => setRawMaterialsOpen(true)}>
                 <FileText className="h-4 w-4 mr-2" />
-                Raw Materials
+                {t('orders.raw_materials')}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setPackagingRefOpen(true)}>
                 <Package className="h-4 w-4 mr-2" />
-                Packaging Reference
+                {t('orders.packaging_reference')}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setCommentsOpen(true)}>
                 <MessageSquare className="h-4 w-4 mr-2" />
-                Comments
+                {t('orders.comments')}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -772,20 +744,20 @@ export default function OrderDetail() {
               <AlertDialogTrigger asChild>
                 <Button variant="destructive" size="sm">
                   <Trash2 className="h-4 w-4 mr-1" />
-                  Cancel Order
+                  {t('orders.cancel_order')}
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Cancel Order</AlertDialogTitle>
+                  <AlertDialogTitle>{t('orders.cancel_order')}</AlertDialogTitle>
                   <AlertDialogDescription>
-                    This will cancel the order and release any reserved extra inventory. The order will be moved to the Cancelled tab. This action cannot be undone.
+                    {t('orders.cancel_confirm_desc')}
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel>Go Back</AlertDialogCancel>
+                  <AlertDialogCancel>{t('orders.go_back')}</AlertDialogCancel>
                   <AlertDialogAction onClick={handleCancelOrder} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                    Cancel Order
+                    {t('orders.cancel_order')}
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
@@ -801,20 +773,20 @@ export default function OrderDetail() {
           <div className={`grid grid-cols-1 gap-4 ${totalAddedToExtra > 0 ? 'md:grid-cols-5' : 'md:grid-cols-4'}`}>
             <Card>
               <CardContent className="p-4">
-                <p className="text-sm text-muted-foreground">Total Items</p>
+                <p className="text-sm text-muted-foreground">{t('orders.total_items')}</p>
                 <p className="text-2xl font-bold">{totalItems}</p>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="p-4">
-                <p className="text-sm text-muted-foreground">Shipped</p>
+                <p className="text-sm text-muted-foreground">{t('orders.shipped')}</p>
                 <p className="text-2xl font-bold text-green-600">{shippedItems}</p>
               </CardContent>
             </Card>
             {totalAddedToExtra > 0 && (
               <Card>
                 <CardContent className="p-4">
-                  <p className="text-sm text-muted-foreground">Added to Extra</p>
+                  <p className="text-sm text-muted-foreground">{t('orders.added_to_extra')}</p>
                   <p className="text-2xl font-bold text-orange-500 flex items-center gap-2">
                     <Package className="h-5 w-5" />
                     {totalAddedToExtra}
@@ -824,15 +796,15 @@ export default function OrderDetail() {
             )}
             <Card>
               <CardContent className="p-4">
-                <p className="text-sm text-muted-foreground">Shipping</p>
+                <p className="text-sm text-muted-foreground">{t('orders.shipping')}</p>
                 <p className="text-2xl font-bold flex items-center gap-2">
                   {order.shipping_type === "international" ? (
                     <>
-                      <Plane className="h-5 w-5" /> International
+                      <Plane className="h-5 w-5" /> {t('orders.international')}
                     </>
                   ) : (
                     <>
-                      <Truck className="h-5 w-5" /> Domestic
+                      <Truck className="h-5 w-5" /> {t('orders.domestic')}
                     </>
                   )}
                 </p>
@@ -840,11 +812,11 @@ export default function OrderDetail() {
             </Card>
             <Card>
               <CardContent className="p-4">
-                <p className="text-sm text-muted-foreground">EFT</p>
+                <p className="text-sm text-muted-foreground">{t('orders.eft')}</p>
                 <p className="text-2xl font-bold">
                   {order.estimated_fulfillment_time
                     ? format(new Date(order.estimated_fulfillment_time), "MMM d")
-                    : "Not set"}
+                    : t('orders.not_set')}
                 </p>
               </CardContent>
             </Card>
@@ -869,7 +841,7 @@ export default function OrderDetail() {
               return (
                 <Card>
                   <CardContent className="p-4">
-                    <p className="text-sm font-medium mb-1">Notes</p>
+                    <p className="text-sm font-medium mb-1">{t('common.notes')}</p>
                     <p className="text-sm text-muted-foreground whitespace-pre-wrap">{displayNotes}</p>
                   </CardContent>
                 </Card>
@@ -882,10 +854,10 @@ export default function OrderDetail() {
       <Card>
         <CardHeader>
           <CardTitle className={isPendingOrder ? 'text-muted-foreground' : ''}>
-            Production Timeline
+            {t('orders.production_timeline')}
           </CardTitle>
           <CardDescription>
-            {isPendingOrder ? 'Start the order to begin tracking progress' : 'Track progress through each phase'}
+            {isPendingOrder ? t('orders.start_to_track') : t('orders.track_progress')}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -894,13 +866,13 @@ export default function OrderDetail() {
               <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-4">
                 <Clock className="h-6 w-6 text-muted-foreground" />
               </div>
-              <p className="text-muted-foreground font-medium">Timeline Inactive</p>
+              <p className="text-muted-foreground font-medium">{t('orders.timeline_inactive')}</p>
               <p className="text-sm text-muted-foreground mt-1">
-                Click "Start Order" to begin production
+                {t('orders.click_start')}
               </p>
               <div className="mt-4 text-sm">
                 <span className="font-medium">{totalItems}</span>
-                <span className="text-muted-foreground"> items planned</span>
+                <span className="text-muted-foreground"> {t('orders.items_planned')}</span>
               </div>
             </div>
           ) : (
@@ -912,44 +884,9 @@ export default function OrderDetail() {
                       <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/30">
                         <Factory className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                       </div>
-                      <p className="font-medium">Manufacturing</p>
+                      <p className="font-medium">{t('state.manufacturing')}</p>
                     </div>
-                    <div className="space-y-1 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Waiting</span>
-                        <span className="font-medium text-warning">{manufacturingStats.waiting}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">In Progress</span>
-                        <span className="font-medium text-primary">{manufacturingStats.inProgress}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Processed</span>
-                        <span className="font-medium text-green-600">{manufacturingStats.processed}</span>
-                      </div>
-                      {manufacturingStats.retrieved > 0 && (
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Retrieved</span>
-                          <span className="font-medium text-purple-600">{manufacturingStats.retrieved}</span>
-                        </div>
-                      )}
-                      {manufacturingStats.addedToExtra > 0 && (
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Added to Extra</span>
-                          <span className="font-medium text-orange-600">{manufacturingStats.addedToExtra}</span>
-                        </div>
-                      )}
-                      {manufacturingStats.extraToRetrieve > 0 && (
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Extra (to retrieve)</span>
-                          <span className="font-medium text-amber-600">{manufacturingStats.extraToRetrieve}</span>
-                        </div>
-                      )}
-                      <div className="flex justify-between border-t pt-1 mt-1">
-                        <span className="font-medium text-muted-foreground">Completed</span>
-                        <span className="font-bold">{manufacturingStats.completed}</span>
-                      </div>
-                    </div>
+                    {renderPhaseStats(manufacturingStats)}
                   </CardContent>
                 </Card>
               </Link>
@@ -961,44 +898,9 @@ export default function OrderDetail() {
                       <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-900/30">
                         <Sparkles className="h-5 w-5 text-purple-600 dark:text-purple-400" />
                       </div>
-                      <p className="font-medium">Finishing</p>
+                      <p className="font-medium">{t('state.finishing')}</p>
                     </div>
-                    <div className="space-y-1 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Waiting</span>
-                        <span className="font-medium text-warning">{finishingStats.waiting}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">In Progress</span>
-                        <span className="font-medium text-primary">{finishingStats.inProgress}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Processed</span>
-                        <span className="font-medium text-green-600">{finishingStats.processed}</span>
-                      </div>
-                      {finishingStats.retrieved > 0 && (
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Retrieved</span>
-                          <span className="font-medium text-purple-600">{finishingStats.retrieved}</span>
-                        </div>
-                      )}
-                      {finishingStats.addedToExtra > 0 && (
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Added to Extra</span>
-                          <span className="font-medium text-orange-600">{finishingStats.addedToExtra}</span>
-                        </div>
-                      )}
-                      {finishingStats.extraToRetrieve > 0 && (
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Extra (to retrieve)</span>
-                          <span className="font-medium text-amber-600">{finishingStats.extraToRetrieve}</span>
-                        </div>
-                      )}
-                      <div className="flex justify-between border-t pt-1 mt-1">
-                        <span className="font-medium text-muted-foreground">Completed</span>
-                        <span className="font-bold">{finishingStats.completed}</span>
-                      </div>
-                    </div>
+                    {renderPhaseStats(finishingStats)}
                   </CardContent>
                 </Card>
               </Link>
@@ -1010,44 +912,9 @@ export default function OrderDetail() {
                       <div className="p-2 rounded-lg bg-indigo-100 dark:bg-indigo-900/30">
                         <Package className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
                       </div>
-                      <p className="font-medium">Packaging</p>
+                      <p className="font-medium">{t('state.packaging')}</p>
                     </div>
-                    <div className="space-y-1 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Waiting</span>
-                        <span className="font-medium text-warning">{packagingStats.waiting}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">In Progress</span>
-                        <span className="font-medium text-primary">{packagingStats.inProgress}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Processed</span>
-                        <span className="font-medium text-green-600">{packagingStats.processed}</span>
-                      </div>
-                      {packagingStats.retrieved > 0 && (
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Retrieved</span>
-                          <span className="font-medium text-purple-600">{packagingStats.retrieved}</span>
-                        </div>
-                      )}
-                      {packagingStats.addedToExtra > 0 && (
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Added to Extra</span>
-                          <span className="font-medium text-orange-600">{packagingStats.addedToExtra}</span>
-                        </div>
-                      )}
-                      {packagingStats.extraToRetrieve > 0 && (
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Extra (to retrieve)</span>
-                          <span className="font-medium text-amber-600">{packagingStats.extraToRetrieve}</span>
-                        </div>
-                      )}
-                      <div className="flex justify-between border-t pt-1 mt-1">
-                        <span className="font-medium text-muted-foreground">Completed</span>
-                        <span className="font-bold">{packagingStats.completed}</span>
-                      </div>
-                    </div>
+                    {renderPhaseStats(packagingStats)}
                   </CardContent>
                 </Card>
               </Link>
@@ -1059,44 +926,9 @@ export default function OrderDetail() {
                       <div className="p-2 rounded-lg bg-cyan-100 dark:bg-cyan-900/30">
                         <Box className="h-5 w-5 text-cyan-600 dark:text-cyan-400" />
                       </div>
-                      <p className="font-medium">Boxing</p>
+                      <p className="font-medium">{t('state.boxing')}</p>
                     </div>
-                    <div className="space-y-1 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Waiting</span>
-                        <span className="font-medium text-warning">{boxingStats.waiting}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">In Progress</span>
-                        <span className="font-medium text-primary">{boxingStats.inProgress}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Processed</span>
-                        <span className="font-medium text-green-600">{boxingStats.processed}</span>
-                      </div>
-                      {boxingStats.retrieved > 0 && (
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Retrieved</span>
-                          <span className="font-medium text-purple-600">{boxingStats.retrieved}</span>
-                        </div>
-                      )}
-                      {boxingStats.addedToExtra > 0 && (
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Added to Extra</span>
-                          <span className="font-medium text-orange-600">{boxingStats.addedToExtra}</span>
-                        </div>
-                      )}
-                      {boxingStats.extraToRetrieve > 0 && (
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Extra (to retrieve)</span>
-                          <span className="font-medium text-amber-600">{boxingStats.extraToRetrieve}</span>
-                        </div>
-                      )}
-                      <div className="flex justify-between border-t pt-1 mt-1">
-                        <span className="font-medium text-muted-foreground">Completed</span>
-                        <span className="font-bold">{boxingStats.completed}</span>
-                      </div>
-                    </div>
+                    {renderPhaseStats(boxingStats)}
                   </CardContent>
                 </Card>
               </Link>
@@ -1109,8 +941,8 @@ export default function OrderDetail() {
       {isPendingOrder && canUpdate && (
         <Card>
           <CardHeader>
-            <CardTitle>Extra Inventory</CardTitle>
-            <CardDescription>Available extra items that can be used for this order</CardDescription>
+            <CardTitle>{t('orders.extra_inventory')}</CardTitle>
+            <CardDescription>{t('orders.available_extra')}</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -1125,7 +957,7 @@ export default function OrderDetail() {
                   }}
                 >
                   <span className="text-2xl font-bold text-primary hover:text-primary">{extraInventoryCounts[phase] || 0}</span>
-                  <span className="text-xs text-muted-foreground capitalize hover:text-muted-foreground">{phase}</span>
+                  <span className="text-xs text-muted-foreground hover:text-muted-foreground">{t(`state.${phase}`)}</span>
                 </Button>
               ))}
             </div>
@@ -1138,11 +970,11 @@ export default function OrderDetail() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
-              <CardTitle>Shipments</CardTitle>
-              <CardDescription>View and manage order shipments</CardDescription>
+              <CardTitle>{t('orders.shipments')}</CardTitle>
+              <CardDescription>{t('orders.view_manage_shipments')}</CardDescription>
             </div>
             <Button variant="outline" onClick={() => navigate(`/orders/${id}/boxing?tab=shipments`)}>
-              View Shipments
+              {t('orders.view_shipments')}
             </Button>
           </CardHeader>
           <CardContent>
@@ -1150,7 +982,7 @@ export default function OrderDetail() {
               <div className="flex items-center gap-2">
                 <CheckCircle className="h-5 w-5 text-green-600" />
                 <span className="text-sm">
-                  {shippedItems} / {totalItems} items shipped
+                  {shippedItems} / {totalItems} {t('orders.items_shipped')}
                 </span>
               </div>
             </div>
@@ -1161,25 +993,24 @@ export default function OrderDetail() {
       {/* Order Items Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Order Items</CardTitle>
-          <CardDescription>Products included in this order</CardDescription>
+          <CardTitle>{t('orders.order_items')}</CardTitle>
+          <CardDescription>{t('orders.products_in_order')}</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className="border-b">
-                  <th className="text-left p-3 font-medium">Product</th>
-                  <th className="text-left p-3 font-medium">SKU</th>
-                  <th className="text-center p-3 font-medium">Quantity</th>
-                  <th className="text-center p-3 font-medium">Packing</th>
-                  <th className="text-center p-3 font-medium">Boxing</th>
-                  <th className="text-center p-3 font-medium">Progress</th>
+                  <th className="text-left p-3 font-medium">{t('common.product')}</th>
+                  <th className="text-left p-3 font-medium">{t('catalog.sku')}</th>
+                  <th className="text-center p-3 font-medium">{t('common.quantity')}</th>
+                  <th className="text-center p-3 font-medium">{t('orders.packing')}</th>
+                  <th className="text-center p-3 font-medium">{t('orders.boxing_col')}</th>
+                  <th className="text-center p-3 font-medium">{t('orders.progress')}</th>
                 </tr>
               </thead>
               <tbody>
                 {orderItems.map((item) => {
-                  // Match batches by order_item_id, or fall back to product_id for legacy batches
                   const itemBatches = activeBatches.filter((b) => 
                     b.order_item_id === item.id || 
                     (b.order_item_id === null && b.product_id === item.product_id)
@@ -1197,19 +1028,19 @@ export default function OrderDetail() {
                       <td className="p-3 text-center">
                         {item.product?.needs_packing ? (
                           <Badge variant="outline" className="bg-primary/10">
-                            Yes
+                            {t('common.yes')}
                           </Badge>
                         ) : (
-                          <Badge variant="secondary">No</Badge>
+                          <Badge variant="secondary">{t('common.no')}</Badge>
                         )}
                       </td>
                       <td className="p-3 text-center">
                         {item.needs_boxing ? (
                           <Badge variant="outline" className="bg-primary/10">
-                            Yes
+                            {t('common.yes')}
                           </Badge>
                         ) : (
-                          <Badge variant="secondary">No</Badge>
+                          <Badge variant="secondary">{t('common.no')}</Badge>
                         )}
                       </td>
                       <td className="p-3">
@@ -1243,61 +1074,53 @@ export default function OrderDetail() {
           id: b.id,
           batch_code: b.qr_code_data,
           product_id: b.product_id,
-          product_name: b.product.name,
-          product_sku: b.product.sku,
+          product_name: b.product?.name || 'Unknown',
+          product_sku: b.product?.sku || 'N/A',
           quantity: b.quantity,
         }))}
-        onRefresh={() => fetchOrder()}
+        onRefresh={fetchOrder}
       />
+      <BoxAssignmentDialog open={boxAssignDialogOpen} onOpenChange={setBoxAssignDialogOpen} orderId={id!} onAssigned={fetchOrder} />
+      <LeadTimeDialog open={leadTimeDialogOpen} onOpenChange={setLeadTimeDialogOpen} />
       <ExtraInventoryDialog 
         open={extraInventoryOpen} 
         onOpenChange={setExtraInventoryOpen} 
-        orderId={id!}
         phase={selectedExtraPhase}
-        orderItems={orderItems.map(item => ({
-          id: item.id,
-          product_id: item.product_id,
-          quantity: item.quantity,
-          needs_boxing: item.needs_boxing,
+        orderId={id!}
+        orderItems={orderItems.map(oi => ({
+          id: oi.id,
+          product_id: oi.product_id,
+          quantity: oi.quantity,
+          needs_boxing: oi.needs_boxing,
+          needs_packing: oi.product?.needs_packing ?? true,
         }))}
-        onItemsSelected={(selections) => {
+        onItemsSelected={() => {
           fetchOrder();
           fetchExtraInventoryCounts();
         }}
       />
-      <StartOrderDialog
-        open={startOrderOpen}
+      <StartOrderDialog 
+        open={startOrderOpen} 
         onOpenChange={setStartOrderOpen}
         orderId={id!}
-        orderItems={orderItems.map(item => ({
-          id: item.id,
-          product_id: item.product_id,
-          quantity: item.quantity,
-          product: item.product,
-        }))}
+        orderNumber={order?.order_number || ''}
+        orderItems={orderItems}
         onOrderStarted={() => {
           fetchOrder();
-          fetchExtraInventoryCounts();
         }}
       />
-      <OrderCommentsDrawer
+      <OrderCommentsDrawer 
         orderId={id!}
         orderNumber={order?.order_number || ''}
         open={commentsOpen}
         onOpenChange={setCommentsOpen}
       />
       <Dialog open={packagingRefOpen} onOpenChange={setPackagingRefOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Package className="h-5 w-5" />
-              Packaging Reference
-            </DialogTitle>
+            <DialogTitle>{t('orders.packaging_reference')}</DialogTitle>
           </DialogHeader>
           <PackagingReferenceDisplay notes={order?.notes || null} />
-          {!order?.notes?.includes('---PACKAGING_REFERENCE---') && (
-            <p className="text-sm text-muted-foreground text-center py-4">No packaging reference defined for this order.</p>
-          )}
         </DialogContent>
       </Dialog>
     </div>
