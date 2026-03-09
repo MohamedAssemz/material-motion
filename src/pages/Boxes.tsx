@@ -250,7 +250,7 @@ export default function Boxes() {
       if (orderBoxesError) throw orderBoxesError;
 
       const orderBoxIds = orderBoxesData?.map(b => b.id) || [];
-      const { data: orderBatchesData } = await supabase.from('order_batches').select('box_id, quantity, current_state').in('box_id', orderBoxIds).eq('is_terminated', false);
+      const { data: orderBatchesData } = await supabase.from('order_batches').select('box_id, quantity, current_state').in('box_id', orderBoxIds);
 
       const orderBatchStats = new Map<string, { count: number; total: number; state: string | null }>();
       orderBatchesData?.forEach(batch => {
