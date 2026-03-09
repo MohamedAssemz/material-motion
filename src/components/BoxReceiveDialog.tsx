@@ -299,8 +299,7 @@ export function BoxReceiveDialog({
           `)
           .eq('box_id', box.id)
           .eq('order_id', orderId)
-          .eq('current_state', filterState)
-          .eq('is_terminated', false);
+          .eq('current_state', filterState);
 
         if (!batches?.length) {
           toast({
