@@ -150,7 +150,7 @@ export default function Dashboard() {
         extraRes,
         shipmentsRes,
         shippedBatchesRes,
-        machineProductionRes,
+        machineBatchesRes,
         machinesRes,
       ] = await Promise.all([
         user ? supabase.from('profiles').select('full_name').eq('id', user.id).single() : Promise.resolve({ data: null }),
@@ -159,13 +159,12 @@ export default function Dashboard() {
         supabase.from('order_batches').select('current_state, quantity, order:orders!inner(status)').neq('order.status', 'cancelled').gte('created_at', rangeStart),
         supabase.from('order_batches').select('id, order_id, product_id, eta, quantity, order:orders(order_number, status)').not('current_state', 'in', '(shipped,ready_for_shipment)').not('eta', 'is', null).lt('eta', now).limit(50),
         supabase.from('orders').select('id, order_number, estimated_fulfillment_time').not('estimated_fulfillment_time', 'is', null).gt('estimated_fulfillment_time', now).lt('estimated_fulfillment_time', twoDaysFromNow).neq('status', 'completed').neq('status', 'cancelled').limit(5),
-        supabase.from('machine_production').select('state_transition').gte('created_at', rangeStart),
         supabase.from('extra_batches').select('quantity').eq('inventory_state', 'AVAILABLE'),
         supabase.from('shipments').select('id').gte('created_at', rangeStart),
         // Top products: shipped/ready_for_shipment batches in time range (excluding cancelled)
         supabase.from('order_batches').select('product_id, quantity, order:orders!inner(status)').in('current_state', ['shipped', 'ready_for_shipment']).neq('order.status', 'cancelled').gte('created_at', rangeStart),
-        // Machine production with machine_id for top machines
-        supabase.from('machine_production').select('machine_id').gte('created_at', rangeStart),
+        // Machine assignments from order_batches
+        supabase.from('order_batches').select('manufacturing_machine_id, finishing_machine_id, packaging_machine_id, boxing_machine_id, quantity').gte('updated_at', rangeStart),
         supabase.from('machines').select('id, name, type'),
       ]);
 

@@ -1,7 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
@@ -10,16 +9,16 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   Cell, Legend,
 } from 'recharts';
-import { CalendarIcon, Wrench, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { CalendarIcon, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { format, subDays, startOfDay, isWithinInterval, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
 
 /* ─── types ─── */
-interface MachineRecord {
-  id: string;
+interface FlatRecord {
   machine_id: string;
-  state_transition: string;
-  created_at: string;
+  type: string;
+  quantity: number;
+  date: string; // ISO
 }
 interface Machine {
   id: string;
@@ -29,7 +28,6 @@ interface Machine {
 
 type DurationPreset = 'today' | 'week' | '30days' | '90days' | 'custom';
 
-/* ─── constants ─── */
 const DURATION_LABELS: Record<DurationPreset, string> = {
   today: 'Today',
   week: 'This Week',
@@ -52,12 +50,24 @@ const MACHINE_TYPE_BADGE: Record<string, string> = {
   boxing: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-950 dark:text-cyan-300',
 };
 
-function getPhaseFromTransition(transition: string): string | null {
-  if (transition.includes('manufacturing')) return 'manufacturing';
-  if (transition.includes('finishing')) return 'finishing';
-  if (transition.includes('packaging')) return 'packaging';
-  if (transition.includes('boxing')) return 'boxing';
-  return null;
+const PHASE_COLUMNS = [
+  { col: 'manufacturing_machine_id', type: 'manufacturing' },
+  { col: 'finishing_machine_id', type: 'finishing' },
+  { col: 'packaging_machine_id', type: 'packaging' },
+  { col: 'boxing_machine_id', type: 'boxing' },
+] as const;
+
+function flattenBatches(batches: any[], dateField: string): FlatRecord[] {
+  const results: FlatRecord[] = [];
+  for (const b of batches) {
+    for (const { col, type } of PHASE_COLUMNS) {
+      const machineId = b[col];
+      if (machineId) {
+        results.push({ machine_id: machineId, type, quantity: b.quantity || 1, date: b[dateField] });
+      }
+    }
+  }
+  return results;
 }
 
 function getDateRange(preset: DurationPreset, customFrom?: Date, customTo?: Date): { from: Date; to: Date } {
@@ -72,7 +82,7 @@ function getDateRange(preset: DurationPreset, customFrom?: Date, customTo?: Date
 }
 
 export function MachineProductionTab() {
-  const [records, setRecords] = useState<MachineRecord[]>([]);
+  const [allRecords, setAllRecords] = useState<FlatRecord[]>([]);
   const [machines, setMachines] = useState<Machine[]>([]);
   const [loading, setLoading] = useState(true);
   const [duration, setDuration] = useState<DurationPreset>('30days');
@@ -85,11 +95,16 @@ export function MachineProductionTab() {
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
-      const [recordsRes, machinesRes] = await Promise.all([
-        supabase.from('machine_production').select('id, machine_id, state_transition, created_at'),
+      const [orderBatchesRes, extraBatchesRes, machinesRes] = await Promise.all([
+        supabase.from('order_batches').select('manufacturing_machine_id, finishing_machine_id, packaging_machine_id, boxing_machine_id, quantity, updated_at'),
+        supabase.from('extra_batches').select('manufacturing_machine_id, finishing_machine_id, packaging_machine_id, boxing_machine_id, quantity, updated_at'),
         supabase.from('machines').select('id, name, type'),
       ]);
-      setRecords(recordsRes.data || []);
+      const flat = [
+        ...flattenBatches(orderBatchesRes.data || [], 'updated_at'),
+        ...flattenBatches(extraBatchesRes.data || [], 'updated_at'),
+      ];
+      setAllRecords(flat);
       setMachines(machinesRes.data || []);
       setLoading(false);
     };
@@ -104,22 +119,19 @@ export function MachineProductionTab() {
   const machineMap = useMemo(() => new Map(machines.map(m => [m.id, m])), [machines]);
 
   const filteredRecords = useMemo(() => {
-    return records.filter(r => {
-      const d = parseISO(r.created_at);
+    return allRecords.filter(r => {
+      const d = parseISO(r.date);
       if (!isWithinInterval(d, { start: dateFrom, end: dateTo })) return false;
-      if (typeFilter !== 'all') {
-        const machine = machineMap.get(r.machine_id);
-        if (!machine || machine.type !== typeFilter) return false;
-      }
+      if (typeFilter !== 'all' && r.type !== typeFilter) return false;
       return true;
     });
-  }, [records, dateFrom, dateTo, typeFilter, machineMap]);
+  }, [allRecords, dateFrom, dateTo, typeFilter]);
 
-  /* A: Total ops per machine */
+  /* A: Total units per machine */
   const machineOpsData = useMemo(() => {
     const countMap: Record<string, number> = {};
     filteredRecords.forEach(r => {
-      countMap[r.machine_id] = (countMap[r.machine_id] || 0) + 1;
+      countMap[r.machine_id] = (countMap[r.machine_id] || 0) + r.quantity;
     });
     return Object.entries(countMap)
       .map(([id, count]) => {
@@ -134,66 +146,47 @@ export function MachineProductionTab() {
   const dailyTrendData = useMemo(() => {
     const dayMap: Record<string, Record<string, number>> = {};
     filteredRecords.forEach(r => {
-      const day = format(parseISO(r.created_at), 'MMM d');
-      const machine = machineMap.get(r.machine_id);
-      const type = machine?.type || 'unknown';
+      const day = format(parseISO(r.date), 'yyyy-MM-dd');
       if (!dayMap[day]) dayMap[day] = {};
-      dayMap[day][type] = (dayMap[day][type] || 0) + 1;
+      dayMap[day][r.type] = (dayMap[day][r.type] || 0) + r.quantity;
     });
     return Object.entries(dayMap)
-      .sort((a, b) => {
-        // sort chronologically by first occurrence
-        const aIdx = records.findIndex(r => format(parseISO(r.created_at), 'MMM d') === a[0]);
-        const bIdx = records.findIndex(r => format(parseISO(r.created_at), 'MMM d') === b[0]);
-        return aIdx - bIdx;
-      })
-      .map(([day, types]) => ({ day, ...types }))
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([day, types]) => ({ day: format(parseISO(day), 'MMM d'), ...types }))
       .slice(-30);
-  }, [filteredRecords, machineMap, records]);
+  }, [filteredRecords]);
 
-  /* C: Phase breakdown (start vs finish per phase) */
-  const phaseBreakdownData = useMemo(() => {
+  /* C: Units per phase */
+  const phaseData = useMemo(() => {
     const phases = ['manufacturing', 'finishing', 'packaging', 'boxing'];
     return phases.map(phase => {
-      let started = 0, finished = 0;
-      filteredRecords.forEach(r => {
-        if (getPhaseFromTransition(r.state_transition) !== phase) return;
-        if (r.state_transition.startsWith('start_')) started++;
-        else finished++;
-      });
-      return { phase: phase.charAt(0).toUpperCase() + phase.slice(1), started, finished };
+      let total = 0;
+      filteredRecords.forEach(r => { if (r.type === phase) total += r.quantity; });
+      return { phase: phase.charAt(0).toUpperCase() + phase.slice(1), units: total };
     });
   }, [filteredRecords]);
 
   /* D: Ranked table with trend */
   const rankedMachines = useMemo(() => {
-    const now = new Date();
     const halfDuration = (dateTo.getTime() - dateFrom.getTime()) / 2;
     const midPoint = new Date(dateFrom.getTime() + halfDuration);
 
     const currentMap: Record<string, number> = {};
     const prevMap: Record<string, number> = {};
+    const totalMap: Record<string, number> = {};
 
-    records.forEach(r => {
-      const d = parseISO(r.created_at);
-      if (d >= midPoint && d <= dateTo) {
-        if (typeFilter !== 'all') {
-          const m = machineMap.get(r.machine_id);
-          if (!m || m.type !== typeFilter) return;
-        }
-        currentMap[r.machine_id] = (currentMap[r.machine_id] || 0) + 1;
-      } else if (d >= dateFrom && d < midPoint) {
-        if (typeFilter !== 'all') {
-          const m = machineMap.get(r.machine_id);
-          if (!m || m.type !== typeFilter) return;
-        }
-        prevMap[r.machine_id] = (prevMap[r.machine_id] || 0) + 1;
-      }
+    filteredRecords.forEach(r => {
+      totalMap[r.machine_id] = (totalMap[r.machine_id] || 0) + r.quantity;
     });
 
-    const totalMap: Record<string, number> = {};
-    filteredRecords.forEach(r => {
-      totalMap[r.machine_id] = (totalMap[r.machine_id] || 0) + 1;
+    allRecords.forEach(r => {
+      if (typeFilter !== 'all' && r.type !== typeFilter) return;
+      const d = parseISO(r.date);
+      if (d >= midPoint && d <= dateTo) {
+        currentMap[r.machine_id] = (currentMap[r.machine_id] || 0) + r.quantity;
+      } else if (d >= dateFrom && d < midPoint) {
+        prevMap[r.machine_id] = (prevMap[r.machine_id] || 0) + r.quantity;
+      }
     });
 
     return Object.entries(totalMap)
@@ -205,7 +198,7 @@ export function MachineProductionTab() {
         const trend = prev === 0 ? (curr > 0 ? 'up' : 'flat') : curr > prev ? 'up' : curr < prev ? 'down' : 'flat';
         return { rank: idx + 1, id, name: m?.name || 'Unknown', type: m?.type || '', total, trend };
       });
-  }, [filteredRecords, records, dateFrom, dateTo, typeFilter, machineMap]);
+  }, [filteredRecords, allRecords, dateFrom, dateTo, typeFilter, machineMap]);
 
   const machineTypes = useMemo(() => [...new Set(machines.map(m => m.type))], [machines]);
 
@@ -217,7 +210,7 @@ export function MachineProductionTab() {
     );
   }
 
-  const totalOps = filteredRecords.length;
+  const totalUnits = filteredRecords.reduce((s, r) => s + r.quantity, 0);
   const uniqueMachinesActive = new Set(filteredRecords.map(r => r.machine_id)).size;
 
   return (
@@ -278,8 +271,8 @@ export function MachineProductionTab() {
 
             <div className="ml-auto flex gap-4 text-sm">
               <div className="text-center">
-                <p className="text-2xl font-bold text-primary">{totalOps}</p>
-                <p className="text-xs text-muted-foreground">Total Ops</p>
+                <p className="text-2xl font-bold text-primary">{totalUnits}</p>
+                <p className="text-xs text-muted-foreground">Total Units</p>
               </div>
               <div className="text-center">
                 <p className="text-2xl font-bold text-primary">{uniqueMachinesActive}</p>
@@ -290,11 +283,11 @@ export function MachineProductionTab() {
         </CardContent>
       </Card>
 
-      {/* A: Total ops per machine (horizontal bar) */}
+      {/* A: Units per machine (horizontal bar) */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">Operations per Machine</CardTitle>
-          <CardDescription>Total production records per machine in selected period</CardDescription>
+          <CardTitle className="text-base">Units per Machine</CardTitle>
+          <CardDescription>Total units assigned per machine in selected period</CardDescription>
         </CardHeader>
         <CardContent className="h-72">
           {machineOpsData.length > 0 ? (
@@ -305,7 +298,7 @@ export function MachineProductionTab() {
                 <YAxis dataKey="name" type="category" width={120} tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} />
                 <Tooltip
                   contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 'var(--radius)', fontSize: 12 }}
-                  formatter={(v) => [v, 'Operations']}
+                  formatter={(v) => [v, 'Units']}
                 />
                 <Bar dataKey="count" radius={[0, 4, 4, 0]} maxBarSize={22}>
                   {machineOpsData.map((entry, i) => (
@@ -316,19 +309,18 @@ export function MachineProductionTab() {
             </ResponsiveContainer>
           ) : (
             <div className="flex items-center justify-center h-full">
-              <p className="text-sm text-muted-foreground">No machine production data</p>
+              <p className="text-sm text-muted-foreground">No machine data for selected period</p>
             </div>
           )}
         </CardContent>
       </Card>
 
-      {/* B + C: Daily trend + Phase breakdown */}
+      {/* B + C: Daily trend + Units per phase */}
       <div className="grid gap-4 lg:grid-cols-2">
-        {/* B: Daily trend stacked by type */}
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Daily Production Trend</CardTitle>
-            <CardDescription>Operations per day, stacked by machine type</CardDescription>
+            <CardDescription>Units per day, stacked by machine type</CardDescription>
           </CardHeader>
           <CardContent className="h-64">
             {dailyTrendData.length > 0 ? (
@@ -337,9 +329,7 @@ export function MachineProductionTab() {
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                   <XAxis dataKey="day" tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} interval="preserveStartEnd" />
                   <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} />
-                  <Tooltip
-                    contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 'var(--radius)', fontSize: 12 }}
-                  />
+                  <Tooltip contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 'var(--radius)', fontSize: 12 }} />
                   <Legend wrapperStyle={{ fontSize: 11 }} />
                   {['manufacturing', 'finishing', 'packaging', 'boxing'].map(type => (
                     <Bar key={type} dataKey={type} stackId="a" fill={MACHINE_TYPE_COLORS[type]} name={type.charAt(0).toUpperCase() + type.slice(1)} maxBarSize={32} />
@@ -354,25 +344,24 @@ export function MachineProductionTab() {
           </CardContent>
         </Card>
 
-        {/* C: Phase breakdown (start vs finish) */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">Phase Breakdown</CardTitle>
-            <CardDescription>Started vs finished operations per phase</CardDescription>
+            <CardTitle className="text-base">Units per Phase</CardTitle>
+            <CardDescription>Total units assigned per production phase</CardDescription>
           </CardHeader>
           <CardContent className="h-64">
-            {phaseBreakdownData.some(d => d.started > 0 || d.finished > 0) ? (
+            {phaseData.some(d => d.units > 0) ? (
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={phaseBreakdownData} margin={{ left: 0, right: 10 }}>
+                <BarChart data={phaseData} margin={{ left: 0, right: 10 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                   <XAxis dataKey="phase" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} />
                   <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} />
-                  <Tooltip
-                    contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 'var(--radius)', fontSize: 12 }}
-                  />
-                  <Legend wrapperStyle={{ fontSize: 11 }} />
-                  <Bar dataKey="started" name="Started" fill="hsl(214, 95%, 36%)" radius={[4, 4, 0, 0]} maxBarSize={28} />
-                  <Bar dataKey="finished" name="Finished" fill="hsl(142, 76%, 36%)" radius={[4, 4, 0, 0]} maxBarSize={28} />
+                  <Tooltip contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 'var(--radius)', fontSize: 12 }} />
+                  <Bar dataKey="units" name="Units" radius={[4, 4, 0, 0]} maxBarSize={48}>
+                    {phaseData.map((entry, i) => (
+                      <Cell key={i} fill={MACHINE_TYPE_COLORS[entry.phase.toLowerCase()] || 'hsl(216,12%,60%)'} />
+                    ))}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             ) : (
@@ -388,7 +377,7 @@ export function MachineProductionTab() {
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Machine Leaderboard</CardTitle>
-          <CardDescription>Ranked by total operations, with trend vs previous half of period</CardDescription>
+          <CardDescription>Ranked by total units, with trend vs previous half of period</CardDescription>
         </CardHeader>
         <CardContent>
           {rankedMachines.length > 0 ? (
@@ -415,7 +404,7 @@ export function MachineProductionTab() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      <span className="text-sm font-semibold w-12 text-right">{m.total} ops</span>
+                      <span className="text-sm font-semibold w-16 text-right">{m.total} units</span>
                       {m.trend === 'up' && <TrendingUp className="h-4 w-4 text-success" />}
                       {m.trend === 'down' && <TrendingDown className="h-4 w-4 text-destructive" />}
                       {m.trend === 'flat' && <Minus className="h-4 w-4 text-muted-foreground" />}
@@ -425,7 +414,7 @@ export function MachineProductionTab() {
               })}
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground text-center py-8">No machine production data for selected filters</p>
+            <p className="text-sm text-muted-foreground text-center py-8">No machine data for selected filters</p>
           )}
         </CardContent>
       </Card>
