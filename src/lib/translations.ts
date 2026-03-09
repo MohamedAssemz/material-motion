@@ -842,6 +842,48 @@ export const translations: Record<string, TranslationEntry> = {
   "queue.no_active_packaging":  { en: "No active orders in packaging queue", ar: "لا توجد طلبات نشطة في طابور التعبئة" },
   "queue.no_completed_packaging": { en: "No completed orders with packaging history", ar: "لا توجد طلبات مكتملة مع سجل التعبئة" },
   "queue.no_active_boxing":     { en: "No active orders in boxing queue", ar: "لا توجد طلبات نشطة في طابور التعليب" },
+
+  // ══════════════════════════════════════════
+  //  ORDERS PAGE
+  // ══════════════════════════════════════════
+  "orders.view_manage":         { en: "View and manage production orders", ar: "عرض وإدارة طلبات الإنتاج" },
+  "orders.search_orders":       { en: "Search orders...",  ar: "بحث في الطلبات..." },
+  "orders.filters":             { en: "Filters",           ar: "الفلاتر" },
+  "orders.clear_all":           { en: "Clear All",         ar: "مسح الكل" },
+  "orders.created_date":        { en: "Created Date",      ar: "تاريخ الإنشاء" },
+  "orders.pick_dates":          { en: "Pick dates",        ar: "اختر التواريخ" },
+  "orders.items_quantity":      { en: "Items Quantity",    ar: "كمية العناصر" },
+  "orders.min":                 { en: "Min",               ar: "الحد الأدنى" },
+  "orders.max":                 { en: "Max",               ar: "الحد الأقصى" },
+  "orders.eft_date":            { en: "EFT Date",          ar: "تاريخ التنفيذ" },
+  "orders.all_priorities":      { en: "All Priorities",    ar: "جميع الأولويات" },
+  "orders.no_orders":           { en: "No orders found",   ar: "لم يتم العثور على طلبات" },
+  "orders.items_to_extra":      { en: "items moved to extra inventory", ar: "عناصر نُقلت للمخزون الإضافي" },
+
+  // ══════════════════════════════════════════
+  //  PHASE COMMON (additional)
+  // ══════════════════════════════════════════
+  "phase.accept_into_phase":    { en: "Accept Boxes into", ar: "قبول الصناديق في" },
+  "phase.about_to_accept":      { en: "You are about to accept", ar: "أنت على وشك قبول" },
+  "phase.boxes_into_phase":     { en: "box(es) into the",  ar: "صندوق(صناديق) في مرحلة" },
+  "phase.lead_time":            { en: "Lead Time (days)",  ar: "وقت التنفيذ (أيام)" },
+  "phase.expected_complete_by": { en: "Items will be expected to complete by", ar: "من المتوقع اكتمال العناصر بحلول" },
+  "phase.no_boxes_matching":    { en: "No boxes matching", ar: "لا توجد صناديق مطابقة" },
+  "phase.type_to_filter":       { en: "Type to filter boxes...", ar: "اكتب لتصفية الصناديق..." },
+  "phase.search_box_product":   { en: "Search by Box Code, Product SKU, or Name", ar: "البحث بكود الصندوق أو رمز المنتج أو الاسم" },
+  "phase.clear":                { en: "Clear",             ar: "مسح" },
+  "phase.available":            { en: "available",         ar: "متاح" },
+  "phase.no_items_in":          { en: "No items in",       ar: "لا توجد عناصر في" },
+  "phase.needs_boxing":         { en: "Needs Boxing",      ar: "يحتاج تعليب" },
+  "phase.no_boxing":            { en: "No Boxing",         ar: "بدون تعليب" },
+  "phase.assign_items":         { en: "Assign",            ar: "تعيين" },
+  "phase.select_available_box": { en: "Select Available Box", ar: "اختر صندوق متاح" },
+  "phase.no_machines_found":    { en: "No machines found", ar: "لم يتم العثور على ماكينات" },
+  "phase.route_items":          { en: "Route Items",       ar: "توجيه العناصر" },
+  "phase.no_items_ready_shipment": { en: "No items ready for shipment", ar: "لا توجد عناصر جاهزة للشحن" },
+  "phase.packaging_reference":  { en: "Packaging Reference", ar: "مرجع التعبئة" },
+  "phase.move_to_ready_shipment": { en: "Move to Ready for Shipment", ar: "نقل لجاهز للشحن" },
+  "phase.no_items_boxing":      { en: "No items in boxing", ar: "لا توجد عناصر في التعليب" },
   "queue.no_completed_boxing":  { en: "No completed orders with boxing history", ar: "لا توجد طلبات مكتملة مع سجل التعليب" },
   "queue.all_statuses":         { en: "All Statuses",   ar: "جميع الحالات" },
   "queue.has_shipped":          { en: "Has Shipped Items", ar: "يحتوي عناصر مشحونة" },
