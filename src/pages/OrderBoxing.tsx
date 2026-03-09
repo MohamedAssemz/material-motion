@@ -1127,12 +1127,12 @@ export default function OrderBoxing() {
               <Box className="h-6 w-6 text-cyan-600 dark:text-cyan-400" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold">Boxing</h1>
+              <h1 className="text-2xl font-bold">{t('boxing.title')}</h1>
               <p className="text-muted-foreground">
                 {order.order_number} {order.customer?.name && `· ${order.customer.name}`}
                 {order.priority === "high" && (
                   <Badge variant="destructive" className="ml-2">
-                    High Priority
+                    {t('phase.high_priority')}
                   </Badge>
                 )}
               </p>
@@ -1141,11 +1141,11 @@ export default function OrderBoxing() {
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => navigate(`/orders/${id}`)}>
-            View Order Details
+            {t('phase.view_order_details')}
           </Button>
           <Button variant="outline" onClick={() => setNotesDialogOpen(true)}>
             <Package className="mr-2 h-4 w-4" />
-            Packaging Reference
+            {t('phase.packaging_reference')}
           </Button>
         </div>
       </div>
