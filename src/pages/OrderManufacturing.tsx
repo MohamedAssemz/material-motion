@@ -41,8 +41,6 @@ interface Batch {
   eta: string | null;
   lead_time_days: number | null;
   box_id: string | null;
-  is_flagged?: boolean;
-  is_redo?: boolean;
   manufacturing_machine_id?: string | null;
   from_extra_state?: string | null;
   product: {
