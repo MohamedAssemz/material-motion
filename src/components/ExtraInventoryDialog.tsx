@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { NumericInput } from '@/components/ui/numeric-input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -747,14 +748,13 @@ export function ExtraInventoryDialog({
                                 </span>
                                 <div className="ml-auto flex items-center gap-2">
                                   <Label className="text-xs">Qty:</Label>
-                                  <Input
-                                    type="number"
-                                    min="0"
+                                  <NumericInput
+                                    min={0}
                                     max={batch.quantity}
-                                    value={selections.get(batch.id) || ''}
-                                    onChange={e => handleQuantityChange(
+                                    value={selections.get(batch.id) || undefined}
+                                    onValueChange={val => handleQuantityChange(
                                       batch.id, 
-                                      parseInt(e.target.value) || 0, 
+                                      val ?? 0, 
                                       batch.quantity,
                                       batch.product_id,
                                       batch.current_state

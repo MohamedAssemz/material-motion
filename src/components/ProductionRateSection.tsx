@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { NumericInput } from '@/components/ui/numeric-input';
 import { Settings, Loader2, PackageX, ChevronDown, ChevronRight } from 'lucide-react';
 import {
   Select,
@@ -326,14 +326,12 @@ export function ProductionRateSection({
 
                   {group.unassignedQty > 0 && canManage && (
                     <div className="flex items-center gap-2 flex-wrap">
-                      <Input
-                        type="number"
+                      <NumericInput
                         min={1}
                         max={group.unassignedQty}
-                        value={qtyValue}
-                        onChange={(e) => {
-                          const val = parseInt(e.target.value) || 0;
-                          setQtyInputs(prev => new Map(prev).set(group.groupKey, val));
+                        value={qtyValue || undefined}
+                        onValueChange={(val) => {
+                          setQtyInputs(prev => new Map(prev).set(group.groupKey, val ?? 0));
                         }}
                         className="w-20 h-9"
                       />

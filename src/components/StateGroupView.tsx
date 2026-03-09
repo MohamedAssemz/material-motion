@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
+import { NumericInput } from '@/components/ui/numeric-input';
 import { Box, Package, ChevronDown, ChevronRight, Printer } from 'lucide-react';
 import { getStateLabel, isInState, isReadyForState, type UnitState } from '@/lib/stateMachine';
 
@@ -217,14 +217,13 @@ export function StateGroupView({
                     </div>
                     {canUpdate && (
                       <div className="flex items-center gap-2">
-                        <Input
-                          type="number"
-                          min="0"
+                        <NumericInput
+                          min={0}
                           max={product.quantity}
-                          value={productSelections.get(product.product_id) || ''}
-                          onChange={(e) => handleProductQuantityChange(
+                          value={productSelections.get(product.product_id) || undefined}
+                          onValueChange={(val) => handleProductQuantityChange(
                             product.product_id, 
-                            parseInt(e.target.value) || 0,
+                            val ?? 0,
                             product.quantity
                           )}
                           placeholder="0"

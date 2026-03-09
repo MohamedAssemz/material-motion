@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { NumericInput } from '@/components/ui/numeric-input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -483,11 +484,10 @@ export default function ExtraInventory() {
                 </div>
                 <div>
                   <Label>Quantity *</Label>
-                  <Input
-                    type="number"
-                    min="1"
+                  <NumericInput
+                    min={1}
                     value={formData.quantity}
-                    onChange={(e) => setFormData({ ...formData, quantity: parseInt(e.target.value) || 1 })}
+                    onValueChange={(val) => setFormData({ ...formData, quantity: val ?? 1 })}
                     required
                   />
                 </div>

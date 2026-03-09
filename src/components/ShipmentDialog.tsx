@@ -8,7 +8,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { NumericInput } from '@/components/ui/numeric-input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
@@ -322,12 +322,11 @@ export function ShipmentDialog({
                   <p className="text-sm text-muted-foreground">{product.product_sku}</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Input
-                    type="number"
+                  <NumericInput
                     min={0}
                     max={product.available_quantity}
-                    value={product.selected_quantity || ''}
-                    onChange={(e) => handleQuantityChange(product.product_id, parseInt(e.target.value) || 0)}
+                    value={product.selected_quantity || undefined}
+                    onValueChange={(val) => handleQuantityChange(product.product_id, val ?? 0)}
                     className="w-24"
                     placeholder="0"
                   />

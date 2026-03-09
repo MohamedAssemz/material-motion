@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { NumericInput } from "@/components/ui/numeric-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -569,11 +570,10 @@ export default function OrderCreate() {
                   </div>
                   <div className="w-32">
                     <Label>Quantity *</Label>
-                    <Input
-                      type="number"
-                      min="1"
+                    <NumericInput
+                      min={1}
                       value={item.quantity}
-                      onChange={(e) => updateItem(index, "quantity", parseInt(e.target.value) || 1)}
+                      onValueChange={(val) => updateItem(index, "quantity", val ?? 1)}
                     />
                   </div>
                   <div className="flex items-center gap-2 pb-1">
@@ -693,15 +693,13 @@ export default function OrderCreate() {
                                 })}
                               </SelectContent>
                             </Select>
-                            <Input
-                              type="number"
+                            <NumericInput
                               min={1}
                               max={maxQty > 0 ? maxQty : 1}
                               value={row.quantity}
-                              onChange={(e) => {
+                              onValueChange={(val) => {
                                 const newRows = [...packagingRows];
-                                const val = parseInt(e.target.value) || 1;
-                                newRows[index] = { ...newRows[index], quantity: Math.min(val, maxQty > 0 ? maxQty : 1) };
+                                newRows[index] = { ...newRows[index], quantity: val ?? 1 };
                                 setPackagingRows(newRows);
                               }}
                               className="w-20"

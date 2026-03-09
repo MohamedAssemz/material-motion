@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { NumericInput } from "@/components/ui/numeric-input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -1330,14 +1331,12 @@ export default function OrderBoxing() {
                           {canManage && !isCancelled && (
                             <div className="flex items-center gap-2">
                               <Label className="text-xs text-muted-foreground">Select</Label>
-                              <Input
-                                type="number"
+                              <NumericInput
                                 min={0}
                                 max={group.quantity}
-                                value={productSelections.get(key) || 0}
-                                onChange={(e) => {
-                                  const val = Math.min(Math.max(0, parseInt(e.target.value) || 0), group.quantity);
-                                  setProductSelections((prev) => new Map(prev).set(key, val));
+                                value={productSelections.get(key) || undefined}
+                                onValueChange={(val) => {
+                                  setProductSelections((prev) => new Map(prev).set(key, val ?? 0));
                                 }}
                                 className="w-20 h-8"
                               />
@@ -1442,14 +1441,12 @@ export default function OrderBoxing() {
                           {canManage && !isCancelled && (
                             <div className="flex items-center gap-2">
                               <Label className="text-xs text-muted-foreground">Select</Label>
-                              <Input
-                                type="number"
+                              <NumericInput
                                 min={0}
                                 max={group.quantity}
-                                value={readyForShipmentSelections.get(key) || 0}
-                                onChange={(e) => {
-                                  const val = Math.min(Math.max(0, parseInt(e.target.value) || 0), group.quantity);
-                                  setReadyForShipmentSelections((prev) => new Map(prev).set(key, val));
+                                value={readyForShipmentSelections.get(key) || undefined}
+                                onValueChange={(val) => {
+                                  setReadyForShipmentSelections((prev) => new Map(prev).set(key, val ?? 0));
                                 }}
                                 className="w-20 h-8"
                               />

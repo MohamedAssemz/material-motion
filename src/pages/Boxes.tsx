@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { NumericInput } from '@/components/ui/numeric-input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -525,7 +526,7 @@ export default function Boxes() {
                     <form onSubmit={handleCreateOrderBoxes} className="space-y-4">
                       <div>
                         <Label htmlFor="count">Number of boxes to create</Label>
-                        <Input id="count" type="number" min="1" max="100" value={newBoxCount} onChange={(e) => setNewBoxCount(parseInt(e.target.value) || 1)} required />
+                        <NumericInput id="count" min={1} max={100} value={newBoxCount} onValueChange={(val) => setNewBoxCount(val ?? 1)} required />
                         <p className="text-xs text-muted-foreground mt-1">Box codes will be auto-generated (e.g., BOX-0001)</p>
                       </div>
                       <div className="flex gap-2">
@@ -643,7 +644,7 @@ export default function Boxes() {
                     <form onSubmit={handleCreateExtraBoxes} className="space-y-4">
                       <div>
                         <Label htmlFor="extra-count">Number of boxes to create</Label>
-                        <Input id="extra-count" type="number" min="1" max="100" value={newExtraBoxCount} onChange={(e) => setNewExtraBoxCount(parseInt(e.target.value) || 1)} required />
+                        <NumericInput id="extra-count" min={1} max={100} value={newExtraBoxCount} onValueChange={(val) => setNewExtraBoxCount(val ?? 1)} required />
                         <p className="text-xs text-muted-foreground mt-1">Box codes will be auto-generated (e.g., EBOX-0001)</p>
                       </div>
                       <div className="flex gap-2">
