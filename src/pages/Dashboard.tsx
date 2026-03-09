@@ -230,7 +230,7 @@ export default function Dashboard() {
         newOrdersToday: (newOrdersTodayRes.data || []).length,
         lateBatches: activeLate.slice(0, 10),
         approachingEtaOrders: (approachingRes.data || []) as any,
-        todayThroughput,
+        todayThroughput: {}, // No longer tracking state transitions
         extraInventoryCount,
         completedOrders: ordersByStatus.completed || 0,
         shipmentsCount: (shipmentsRes.data || []).length,
