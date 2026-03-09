@@ -147,10 +147,10 @@ export default function Orders() {
       const ordersWithStatus = [];
       
       for (const order of ordersData || []) {
-        const { data: batches } = await supabase
+        const { data: batches } = await (supabase
           .from('order_batches')
           .select('current_state, quantity')
-          .eq('order_id', order.id)
+          .eq('order_id', order.id) as any)
           .eq('is_terminated', false);
 
           const batchTotalCount = batches?.reduce((sum, b) => sum + b.quantity, 0) || 0;
