@@ -698,7 +698,13 @@ export default function OrderPackaging() {
         const nextState = group.needs_boxing ? "in_boxing" : "ready_for_shipment";
 
         let remainingQty = quantity;
-        for (const batch of group.batches) {
+        const sortedBatches = [...group.batches].sort((a, b) => {
+          const aHasMachine = a.packaging_machine_id ? 0 : 1;
+          const bHasMachine = b.packaging_machine_id ? 0 : 1;
+          if (aHasMachine !== bHasMachine) return aHasMachine - bHasMachine;
+          return a.quantity - b.quantity;
+        });
+        for (const batch of sortedBatches) {
           if (remainingQty <= 0) break;
           const useQty = Math.min(batch.quantity, remainingQty);
           remainingQty -= useQty;
