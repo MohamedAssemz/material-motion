@@ -144,13 +144,14 @@ export default function Orders() {
       const profilesMap = new Map(profilesData?.map(p => [p.id, p]) || []);
 
       // Get batch counts for each order to calculate status
-      const ordersWithStatus = await Promise.all(
-        (ordersData || []).map(async (order) => {
-          const { data: batches } = await supabase
-            .from('order_batches')
-            .select('current_state, quantity')
-            .eq('order_id', order.id)
-            .eq('is_terminated', false);
+      const ordersWithStatus = [];
+      
+      for (const order of ordersData || []) {
+        const { data: batches } = await (supabase
+          .from('order_batches')
+          .select('current_state, quantity')
+          .eq('order_id', order.id) as any)
+          .eq('is_terminated', false);
 
           const batchTotalCount = batches?.reduce((sum, b) => sum + b.quantity, 0) || 0;
           const shippedCount = batches?.filter(b => b.current_state === 'shipped').reduce((sum, b) => sum + b.quantity, 0) || 0;
@@ -173,16 +174,15 @@ export default function Orders() {
             computed_status = 'in_progress';
           }
 
-          return {
-            ...order,
-            profiles: order.created_by ? profilesMap.get(order.created_by) : null,
-            unit_count: unitCount,
-            shipped_count: shippedCount,
-            computed_status,
-            extra_count: extraCountsByOrder.get(order.id) || 0,
-          };
-        })
-      );
+        ordersWithStatus.push({
+          ...order,
+          profiles: order.created_by ? profilesMap.get(order.created_by) : null,
+          unit_count: unitCount,
+          shipped_count: shippedCount,
+          computed_status,
+          extra_count: extraCountsByOrder.get(order.id) || 0,
+        });
+      }
 
       setOrders(ordersWithStatus);
 
@@ -551,7 +551,6 @@ export default function Orders() {
                         <TableRow>
                           <TableHead>Order Number</TableHead>
                           <TableHead>Customer</TableHead>
-                          <TableHead>Priority</TableHead>
                           {tab === 'pending' && <TableHead>Status</TableHead>}
                           <TableHead>Units</TableHead>
                           <TableHead>EFT</TableHead>
@@ -561,7 +560,7 @@ export default function Orders() {
                       <TableBody>
                         {paginatedOrders.length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={tab === 'pending' ? 7 : 6} className="text-center text-muted-foreground">
+                            <TableCell colSpan={tab === 'pending' ? 6 : 5} className="text-center text-muted-foreground">
                               No orders found
                             </TableCell>
                           </TableRow>
@@ -598,11 +597,6 @@ export default function Orders() {
                                 </div>
                               </TableCell>
                               <TableCell>{order.customer?.name || '-'}</TableCell>
-                              <TableCell>
-                                <Badge variant={order.priority === 'high' ? 'destructive' : 'secondary'}>
-                                  {order.priority}
-                                </Badge>
-                              </TableCell>
                               {tab === 'pending' && (
                                 <TableCell>
                                   <Badge variant={order.computed_status === 'in_progress' ? 'default' : 'outline'}>
