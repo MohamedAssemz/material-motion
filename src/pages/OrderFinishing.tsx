@@ -781,31 +781,31 @@ export default function OrderFinishing() {
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <Card>
           <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Ready for Finishing</p>
+            <p className="text-sm text-muted-foreground">{t('finishing.ready_for_finishing')}</p>
             <p className="text-2xl font-bold text-warning">{totalReadyForFinishing}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">In Finishing</p>
+            <p className="text-sm text-muted-foreground">{t('finishing.in_finishing')}</p>
             <p className="text-2xl font-bold text-primary">{totalInFinishing}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Boxes Waiting</p>
+            <p className="text-sm text-muted-foreground">{t('phase.boxes_waiting')}</p>
             <p className="text-2xl font-bold">{readyBoxGroups.length}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Products in Finishing</p>
+            <p className="text-sm text-muted-foreground">{t('finishing.products_in_finishing')}</p>
             <p className="text-2xl font-bold">{inFinishingGroups.length}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Completed</p>
+            <p className="text-sm text-muted-foreground">{t('phase.completed')}</p>
             <p className="text-2xl font-bold text-green-600">{totalCompleted}</p>
           </CardContent>
         </Card>
