@@ -169,10 +169,9 @@ export default function Dashboard() {
       (ordersRes.data || []).forEach((o) => {ordersByStatus[o.status] = (ordersByStatus[o.status] || 0) + 1;});
 
       const batchesByState: Record<string, number> = {};
-      (batchesRes.data || []).forEach((b) => {batchesByState[b.current_state] = (batchesByState[b.current_state] || 0) + b.quantity;});
+      (batchesRes.data || []).forEach((b: any) => {batchesByState[b.current_state] = (batchesByState[b.current_state] || 0) + b.quantity;});
 
       const todayThroughput: Record<string, number> = {};
-      (throughputRes.data || []).forEach((t) => {todayThroughput[t.state_transition] = (todayThroughput[t.state_transition] || 0) + 1;});
 
       const extraInventoryCount = (extraRes.data || []).reduce((s, b) => s + b.quantity, 0);
 
