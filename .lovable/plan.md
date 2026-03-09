@@ -1,42 +1,69 @@
 
 
-## Plan: Order Cancellation Freeze Logic
+## Arabic Translation & RTL Enhancement - Phased Approach
 
-### Requirements
-1. When an order is cancelled, freeze all actions on phase pages **except** production rate (machine) assignment (which still respects role permissions)
-2. Unretrieved reserved extra batches should be released back to AVAILABLE on cancellation
+Given the size of this application (~27 pages, ~50+ components), I'll divide this into 4 manageable phases.
 
-### Analysis
-- Requirement 2 is **already implemented** in `handleCancelOrder` in `OrderDetail.tsx` (lines 462-471) — it releases reserved extra batches back to AVAILABLE
-- Requirement 1 needs changes across 4 phase pages and their child components
+---
 
-### Implementation
+### Phase 1: Core RTL Infrastructure (This Phase)
+**Goal**: Make RTL layout work correctly system-wide
 
-**Core approach:** Each phase page already has a `canManage` boolean that gates actions. Add an `isCancelled` check derived from `order?.status === 'cancelled'` and use it to disable all actions except machine assignment.
+**Changes:**
+1. **`src/components/ui/sheet.tsx`** — Add RTL-aware side detection: sheets that open from "right" in LTR should open from "left" in RTL (and vice versa)
+2. **`src/index.css`** — Expand RTL utilities:
+   - `gap-x`, `ml-*`, `mr-*`, `pl-*`, `pr-*` logical equivalents
+   - `text-left`/`text-right` flipping
+   - `left-*`/`right-*` positioning swaps
+3. **`src/components/ui/drawer.tsx`** — Add RTL text alignment in headers
+4. **`src/components/ui/dialog.tsx`** — Ensure close button position flips in RTL
+
+---
+
+### Phase 2: Expand Translations File
+**Goal**: Add all missing keys for full Arabic coverage
+
+**Changes to `src/lib/translations.ts`:**
+- Add ~200 more keys covering:
+  - Table headers (columns, sorting labels)
+  - Form labels & placeholders (all inputs)
+  - Toast messages (success, error, warnings)
+  - Empty states & loading messages
+  - Date/time labels (Today, Yesterday, etc.)
+  - Dialog titles & buttons
+  - Queue-specific actions
+  - Dashboard alerts & KPIs
+
+---
+
+### Phase 3: Page-by-Page Translation Integration
+**Goal**: Replace hardcoded strings with `t()` calls
+
+**Priority order (batch by functional area):**
+1. **Core pages**: Dashboard, Orders, OrderDetail
+2. **Queue pages**: QueueManufacturing/Finishing/Packaging/Boxing + their Order* counterparts
+3. **Inventory pages**: Boxes, ExtraInventory, Warehouse
+4. **Catalog pages**: Catalog, CatalogBrands, CatalogCategories, Products
+5. **Admin pages**: Admin, Machines, Customers, Reports, Auth
+
+---
+
+### Phase 4: Component-Level Translation
+**Goal**: Translate all shared components
+
+- Dialogs: BoxAssignmentDialog, ShipmentDialog, LeadTimeDialog, etc.
+- Cards: BatchCard, UnitCard, ProductCard
+- Tables: TablePagination, all table headers
+- Forms: All input labels and validation messages
+
+---
+
+### Starting with Phase 1 Now
 
 **Files to modify:**
+1. `src/components/ui/sheet.tsx` — RTL-aware side prop
+2. `src/index.css` — Comprehensive RTL utility classes
+3. `src/components/ui/dialog.tsx` — Close button RTL positioning
 
-1. **`OrderManufacturing.tsx`** — Add `const isCancelled = order?.status === 'cancelled'`. Pass `isCancelled` to disable:
-   - Box assignment dialog actions
-   - Terminate/redo actions
-   - MoveToExtraDialog
-   - ExtraItemsTab `canManage` → `canManage && !isCancelled`
-   - BoxReceiveDialog actions
-   - Keep `ProductionRateSection canManage={canManage}` unchanged (still allows machine assignment)
-
-2. **`OrderFinishing.tsx`** — Same pattern: `isCancelled` disables accept boxes, assign to box, MoveToExtraDialog, ExtraItemsTab, but keeps ProductionRateSection canManage unchanged.
-
-3. **`OrderPackaging.tsx`** — Same pattern.
-
-4. **`OrderBoxing.tsx`** — Same pattern. Additionally disable shipment creation.
-
-5. **`OrderDetail.tsx`** — Add a visible "Cancelled" banner/badge. The cancel button is already hidden when `status === 'cancelled'`. Start Order and Extra Inventory sections are already gated to pending orders, so no changes needed there.
-
-**Specific prop changes per phase page:**
-- `ExtraItemsTab canManage={canManage && !isCancelled}` — freezes extra retrieval
-- `ProductionRateSection canManage={canManage}` — unchanged, still allows machine assignment
-- All action buttons (accept, assign, terminate, redo, move to extra, create shipment) gated with `!isCancelled`
-- Box receive dialogs disabled when cancelled
-
-**No database changes needed** — the cancellation already releases reserved batches.
+This establishes the foundation so that when translations are added, the layout flips correctly.
 
