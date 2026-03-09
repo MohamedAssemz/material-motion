@@ -297,4 +297,146 @@ export const translations: Record<string, TranslationEntry> = {
   "customers.add":            { en: "Add Customer",         ar: "إضافة عميل" },
   "customers.name":           { en: "Customer Name",        ar: "اسم العميل" },
   "customers.code":           { en: "Customer Code",        ar: "رمز العميل" },
+
+  // ══════════════════════════════════════════
+  //  TABLE HEADERS
+  // ══════════════════════════════════════════
+  "table.order":              { en: "Order",                ar: "الطلب" },
+  "table.customer":           { en: "Customer",             ar: "العميل" },
+  "table.status":             { en: "Status",               ar: "الحالة" },
+  "table.items":              { en: "Items",                ar: "العناصر" },
+  "table.total_units":        { en: "Total Units",          ar: "إجمالي الوحدات" },
+  "table.date":               { en: "Date",                 ar: "التاريخ" },
+  "table.actions":            { en: "Actions",              ar: "إجراءات" },
+  "table.product":            { en: "Product",              ar: "المنتج" },
+  "table.sku":                { en: "SKU",                  ar: "رمز المنتج" },
+  "table.quantity":           { en: "Quantity",             ar: "الكمية" },
+  "table.state":              { en: "State",                ar: "الحالة" },
+  "table.priority":           { en: "Priority",             ar: "الأولوية" },
+  "table.shipping":           { en: "Shipping",             ar: "الشحن" },
+  "table.eft":                { en: "EFT",                  ar: "وقت التنفيذ" },
+  "table.created":            { en: "Created",              ar: "تاريخ الإنشاء" },
+  "table.updated":            { en: "Updated",              ar: "تاريخ التحديث" },
+  "table.machine":            { en: "Machine",              ar: "الماكينة" },
+  "table.box":                { en: "Box",                  ar: "الصندوق" },
+  "table.user":               { en: "User",                 ar: "المستخدم" },
+  "table.role":               { en: "Role",                 ar: "الدور" },
+
+  // ══════════════════════════════════════════
+  //  FORM LABELS
+  // ══════════════════════════════════════════
+  "form.name":                { en: "Name",                 ar: "الاسم" },
+  "form.email":               { en: "Email",                ar: "البريد الإلكتروني" },
+  "form.password":            { en: "Password",             ar: "كلمة المرور" },
+  "form.confirm_password":    { en: "Confirm Password",     ar: "تأكيد كلمة المرور" },
+  "form.description":         { en: "Description",          ar: "الوصف" },
+  "form.notes":               { en: "Notes",                ar: "ملاحظات" },
+  "form.type":                { en: "Type",                 ar: "النوع" },
+  "form.size":                { en: "Size",                 ar: "الحجم" },
+  "form.color":               { en: "Color",                ar: "اللون" },
+  "form.brand":               { en: "Brand",                ar: "العلامة التجارية" },
+  "form.category":            { en: "Category",             ar: "الفئة" },
+  "form.country":             { en: "Country",              ar: "البلد" },
+  "form.lead_time_days":      { en: "Lead Time (Days)",     ar: "وقت التنفيذ (أيام)" },
+  "form.estimated_date":      { en: "Estimated Date",       ar: "التاريخ المتوقع" },
+  "form.needs_packing":       { en: "Needs Packing",        ar: "يحتاج تعبئة" },
+  "form.is_active":           { en: "Is Active",            ar: "نشط" },
+  "form.image_url":           { en: "Image URL",            ar: "رابط الصورة" },
+  "form.upload_image":        { en: "Upload Image",         ar: "رفع صورة" },
+  "form.machine_type":        { en: "Machine Type",         ar: "نوع الماكينة" },
+
+  // ══════════════════════════════════════════
+  //  TOAST MESSAGES
+  // ══════════════════════════════════════════
+  "toast.success":            { en: "Success",              ar: "نجاح" },
+  "toast.error":              { en: "Error",                ar: "خطأ" },
+  "toast.warning":            { en: "Warning",              ar: "تحذير" },
+  "toast.info":               { en: "Info",                 ar: "معلومة" },
+  "toast.saved_successfully": { en: "Saved successfully",   ar: "تم الحفظ بنجاح" },
+  "toast.updated_successfully":{en: "Updated successfully", ar: "تم التحديث بنجاح" },
+  "toast.deleted_successfully":{en: "Deleted successfully", ar: "تم الحذف بنجاح" },
+  "toast.created_successfully":{en: "Created successfully", ar: "تم الإنشاء بنجاح" },
+  "toast.action_failed":      { en: "Action failed",        ar: "فشلت العملية" },
+  "toast.invalid_input":      { en: "Invalid input",        ar: "إدخال غير صالح" },
+  "toast.network_error":      { en: "Network error",        ar: "خطأ في الشبكة" },
+  "toast.unauthorized":       { en: "Unauthorized",         ar: "غير مصرح" },
+  "toast.not_found":          { en: "Not found",            ar: "غير موجود" },
+  "toast.upload_failed":      { en: "Upload failed",        ar: "فشل الرفع" },
+  "toast.upload_success":     { en: "Upload successful",    ar: "تم الرفع بنجاح" },
+
+  // ══════════════════════════════════════════
+  //  EMPTY STATES
+  // ══════════════════════════════════════════
+  "empty.no_data":            { en: "No data available",    ar: "لا توجد بيانات متاحة" },
+  "empty.no_orders":          { en: "No orders found",      ar: "لم يتم العثور على طلبات" },
+  "empty.no_products":        { en: "No products found",    ar: "لم يتم العثور على منتجات" },
+  "empty.no_customers":       { en: "No customers found",   ar: "لم يتم العثور على عملاء" },
+  "empty.no_machines":        { en: "No machines found",    ar: "لم يتم العثور على ماكينات" },
+  "empty.no_users":           { en: "No users found",       ar: "لم يتم العثور على مستخدمين" },
+  "empty.no_boxes":           { en: "No boxes found",       ar: "لم يتم العثور على صناديق" },
+  "empty.no_results":         { en: "No results match your search", ar: "لا توجد نتائج تطابق بحثك" },
+  "empty.select_item":        { en: "Select an item to view details", ar: "حدد عنصراً لعرض التفاصيل" },
+
+  // ══════════════════════════════════════════
+  //  DATE LABELS
+  // ══════════════════════════════════════════
+  "date.today":               { en: "Today",                ar: "اليوم" },
+  "date.yesterday":           { en: "Yesterday",            ar: "أمس" },
+  "date.tomorrow":            { en: "Tomorrow",             ar: "غداً" },
+  "date.this_week":           { en: "This Week",            ar: "هذا الأسبوع" },
+  "date.last_week":           { en: "Last Week",            ar: "الأسبوع الماضي" },
+  "date.this_month":          { en: "This Month",           ar: "هذا الشهر" },
+  "date.last_month":          { en: "Last Month",           ar: "الشهر الماضي" },
+  "date.this_year":           { en: "This Year",            ar: "هذا العام" },
+  "date.custom_range":        { en: "Custom Range",         ar: "نطاق مخصص" },
+  "date.start_date":          { en: "Start Date",           ar: "تاريخ البدء" },
+  "date.end_date":            { en: "End Date",             ar: "تاريخ الانتهاء" },
+
+  // ══════════════════════════════════════════
+  //  DIALOG TITLES
+  // ══════════════════════════════════════════
+  "dialog.confirm_delete":    { en: "Confirm Deletion",     ar: "تأكيد الحذف" },
+  "dialog.are_you_sure":      { en: "Are you sure?",        ar: "هل أنت متأكد؟" },
+  "dialog.cannot_undo":       { en: "This action cannot be undone.", ar: "لا يمكن التراجع عن هذا الإجراء." },
+  "dialog.assign_box":        { en: "Assign Box",           ar: "تعيين صندوق" },
+  "dialog.assign_machine":    { en: "Assign Machine",       ar: "تعيين ماكينة" },
+  "dialog.update_status":     { en: "Update Status",        ar: "تحديث الحالة" },
+  "dialog.add_notes":         { en: "Add Notes",            ar: "إضافة ملاحظات" },
+  "dialog.view_details":      { en: "View Details",         ar: "عرض التفاصيل" },
+  "dialog.print_label":       { en: "Print Label",          ar: "طباعة ملصق" },
+  "dialog.scan_barcode":      { en: "Scan Barcode",         ar: "مسح الباركود" },
+
+  // ══════════════════════════════════════════
+  //  QUEUE ACTIONS
+  // ══════════════════════════════════════════
+  "queue.start_batch":        { en: "Start Batch",          ar: "بدء الدفعة" },
+  "queue.finish_batch":       { en: "Finish Batch",         ar: "إنهاء الدفعة" },
+  "queue.move_next":          { en: "Move to Next Phase",   ar: "الانتقال للمرحلة التالية" },
+  "queue.mark_ready":         { en: "Mark as Ready",        ar: "تحديد كجاهز" },
+  "queue.pause":              { en: "Pause",                ar: "إيقاف مؤقت" },
+  "queue.resume":             { en: "Resume",               ar: "استئناف" },
+  "queue.qc_pass":            { en: "QC Pass",              ar: "اجتياز الفحص" },
+  "queue.qc_fail":            { en: "QC Fail",              ar: "فشل الفحص" },
+  "queue.assign":             { en: "Assign",               ar: "تعيين" },
+  "queue.unassign":           { en: "Unassign",             ar: "إلغاء التعيين" },
+
+  // ══════════════════════════════════════════
+  //  VARIOUS EXTRAS
+  // ══════════════════════════════════════════
+  "extra.print_guide":        { en: "Print Guide",          ar: "طباعة الدليل" },
+  "extra.add_to_order":       { en: "Add to Order",         ar: "إضافة للطلب" },
+  "extra.search_boxes":       { en: "Search Boxes",         ar: "البحث في الصناديق" },
+  "extra.move_directly":      { en: "Move Directly",        ar: "نقل مباشر" },
+  "extra.assign_to_box":      { en: "Assign to Box",        ar: "تعيين إلى صندوق" },
+
+  "catalog.duplicate":        { en: "Duplicate",            ar: "تكرار" },
+  "catalog.manage_brands":    { en: "Manage Brands",        ar: "إدارة العلامات التجارية" },
+  "catalog.manage_categories":{ en: "Manage Categories",    ar: "إدارة الفئات" },
+  "catalog.download_template":{ en: "Download Template",    ar: "تحميل النموذج" },
+
+  "order.packaging_reference":{ en: "Packaging Reference",  ar: "مرجع التعبئة" },
+  "order.raw_material_images":{ en: "Raw Material Images",  ar: "صور المواد الخام" },
+  "order.create_kartona":     { en: "Create Kartona",       ar: "إنشاء كرتونة" },
+  "order.add_item":           { en: "Add Item",             ar: "إضافة عنصر" },
+  "order.remove_item":        { en: "Remove Item",          ar: "إزالة عنصر" },
 };
