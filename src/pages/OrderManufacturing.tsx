@@ -648,12 +648,12 @@ export default function OrderManufacturing() {
               <Factory className="h-6 w-6 text-blue-600 dark:text-blue-400" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold">Manufacturing</h1>
+              <h1 className="text-2xl font-bold">{t('nav.manufacturing')}</h1>
               <p className="text-muted-foreground">
                 {order.order_number} {order.customer?.name && `· ${order.customer.name}`}
                 {order.priority === "high" && (
                   <Badge variant="destructive" className="ml-2">
-                    High Priority
+                    {t('phase.high_priority')}
                   </Badge>
                 )}
               </p>
@@ -662,7 +662,7 @@ export default function OrderManufacturing() {
         </div>
 
         <Button variant="outline" onClick={() => navigate(`/orders/${id}`)}>
-          View Order Details
+          {t('phase.view_order_details')}
         </Button>
       </div>
 
