@@ -873,7 +873,7 @@ export default function OrderManufacturing() {
       <Dialog open={boxDialogOpen} onOpenChange={setBoxDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Assign to Box</DialogTitle>
+            <DialogTitle>{t('phase.assign_to_box')}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             {/* Machine Selection */}
