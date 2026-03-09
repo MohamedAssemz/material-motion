@@ -51,8 +51,6 @@ interface StateDistribution {
 }
 
 interface GlobalCounters {
-  totalTerminations: number;
-  totalRedos: number;
   avgLeadTime: number;
   lateBatches: number;
 }
