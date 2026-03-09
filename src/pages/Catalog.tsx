@@ -481,14 +481,14 @@ export default function Catalog() {
         <Card className="p-12 text-center">
           <Package className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
           <h3 className="text-lg font-semibold mb-2">
-            {products.length === 0 ? 'No products yet' : 'No products match your filters'}
+            {products.length === 0 ? t('catalog.no_products_yet') : t('catalog.no_match')}
           </h3>
           <p className="text-muted-foreground">
             {products.length === 0 && canManage 
-              ? 'Get started by adding your first product' 
+              ? t('catalog.get_started') 
               : hasActiveFilters 
-                ? 'Try adjusting your filters' 
-                : 'Products will appear here once added'}
+                ? t('catalog.try_adjusting') 
+                : t('catalog.products_appear')}
           </p>
         </Card>
       ) : (
