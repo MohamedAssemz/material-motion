@@ -310,7 +310,7 @@ export default function Dashboard() {
 
   if (!data) return null;
 
-  const alertCount = data.lateBatches.length + data.flaggedBatches.length + data.approachingEtaOrders.length;
+  const alertCount = data.lateBatches.length + data.approachingEtaOrders.length;
 
   return (
     <div className="p-4 md:p-6 space-y-6">
