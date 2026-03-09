@@ -26,6 +26,7 @@ export default function Reports() {
   const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'order-performance');
   const [showExports, setShowExports] = useState(false);
+  const { t } = useLanguage();
 
   useEffect(() => {
     const tab = searchParams.get('tab');
