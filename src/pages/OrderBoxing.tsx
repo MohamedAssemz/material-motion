@@ -1107,9 +1107,9 @@ export default function OrderBoxing() {
       <div className="p-6">
         <Button variant="ghost" onClick={() => navigate("/orders")}>
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Back
+          {t('common.back')}
         </Button>
-        <p className="text-center text-muted-foreground mt-8">Order not found</p>
+        <p className="text-center text-muted-foreground mt-8">{t('phase.order_not_found')}</p>
       </div>
     );
   }
