@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import {
@@ -44,7 +44,9 @@ interface OrderBatchDetail {
   qr_code_data: string | null;
   quantity: number;
   current_state: string;
+  order_id: string;
   product: { name: string; sku: string } | null;
+  order: { order_number: string } | null;
 }
 
 interface ExtraBatchDetail {
@@ -54,6 +56,17 @@ interface ExtraBatchDetail {
   current_state: string;
   inventory_state: string;
   product: { name: string; sku: string } | null;
+}
+
+interface GroupedBySku {
+  sku: string;
+  name: string;
+  totalQty: number;
+  batchIds: string[];
+}
+
+interface ExtraGroupedBySku extends GroupedBySku {
+  inventory_state: string;
 }
 
 export function BoxDetailsDialog({
@@ -79,6 +92,47 @@ export function BoxDetailsDialog({
   const isAdmin = hasRole('admin');
   const batchCount = boxType === 'order' ? orderBatches.length : extraBatches.length;
   const isEmpty = batchCount === 0;
+
+  // Derive order number(s) from order batches
+  const orderNumbers = useMemo(() => {
+    if (boxType !== 'order' || orderBatches.length === 0) return [];
+    const unique = new Set<string>();
+    orderBatches.forEach(b => {
+      if (b.order?.order_number) unique.add(b.order.order_number);
+    });
+    return Array.from(unique).sort();
+  }, [orderBatches, boxType]);
+
+  // Group order batches by SKU
+  const groupedOrderBatches = useMemo((): GroupedBySku[] => {
+    const map = new Map<string, GroupedBySku>();
+    orderBatches.forEach(b => {
+      const sku = b.product?.sku || 'N/A';
+      if (!map.has(sku)) {
+        map.set(sku, { sku, name: b.product?.name || '-', totalQty: 0, batchIds: [] });
+      }
+      const g = map.get(sku)!;
+      g.totalQty += b.quantity;
+      g.batchIds.push(b.id);
+    });
+    return Array.from(map.values()).sort((a, b) => a.sku.localeCompare(b.sku));
+  }, [orderBatches]);
+
+  // Group extra batches by SKU + inventory_state
+  const groupedExtraBatches = useMemo((): ExtraGroupedBySku[] => {
+    const map = new Map<string, ExtraGroupedBySku>();
+    extraBatches.forEach(b => {
+      const sku = b.product?.sku || 'N/A';
+      const key = `${sku}::${b.inventory_state}`;
+      if (!map.has(key)) {
+        map.set(key, { sku, name: b.product?.name || '-', totalQty: 0, batchIds: [], inventory_state: b.inventory_state });
+      }
+      const g = map.get(key)!;
+      g.totalQty += b.quantity;
+      g.batchIds.push(b.id);
+    });
+    return Array.from(map.values()).sort((a, b) => a.sku.localeCompare(b.sku));
+  }, [extraBatches]);
 
   const previousStateMap: Record<string, string> = {
     ready_for_finishing: 'in_manufacturing',
@@ -110,7 +164,9 @@ export function BoxDetailsDialog({
             qr_code_data,
             quantity,
             current_state,
-            product:products(name, sku)
+            order_id,
+            product:products(name, sku),
+            order:orders(order_number)
           `)
           .eq('box_id', boxId);
 
@@ -118,6 +174,7 @@ export function BoxDetailsDialog({
         setOrderBatches((data || []).map(b => ({
           ...b,
           product: b.product as { name: string; sku: string } | null,
+          order: b.order as { order_number: string } | null,
         })));
       } else {
         const { data, error } = await supabase
@@ -164,7 +221,6 @@ export function BoxDetailsDialog({
           }
         }
       }
-      // Clear box items_list
       const table = boxType === 'order' ? 'boxes' : 'extra_boxes';
       await supabase.from(table).update({ items_list: [] }).eq('id', boxId);
 
@@ -232,7 +288,7 @@ export function BoxDetailsDialog({
 
           <div className="space-y-4">
             {/* Box Info */}
-            <div className="grid grid-cols-3 gap-4 text-sm">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
               <div>
                 <p className="text-muted-foreground">Created</p>
                 <p className="font-medium">{format(new Date(createdAt), 'PPP')}</p>
@@ -245,12 +301,18 @@ export function BoxDetailsDialog({
                 <p className="text-muted-foreground">Content Type</p>
                 <p className="font-medium">{contentType}</p>
               </div>
+              {boxType === 'order' && orderNumbers.length > 0 && (
+                <div>
+                  <p className="text-muted-foreground">Order</p>
+                  <p className="font-medium font-mono">{orderNumbers.join(', ')}</p>
+                </div>
+              )}
             </div>
 
             {/* Batches Section */}
             <div>
               <h3 className="font-semibold mb-2">
-                Batches ({loading ? '...' : batchCount})
+                Products ({loading ? '...' : boxType === 'order' ? groupedOrderBatches.length : groupedExtraBatches.length})
               </h3>
 
               {loading ? (
@@ -265,23 +327,17 @@ export function BoxDetailsDialog({
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>QR Code</TableHead>
                       <TableHead>Product SKU</TableHead>
                       <TableHead>Product Name</TableHead>
-                      <TableHead className="text-right">Qty</TableHead>
+                      <TableHead className="text-right">Total Qty</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {orderBatches.map((batch) => (
-                      <TableRow key={batch.id}>
-                        <TableCell className="font-mono text-sm">
-                          {batch.qr_code_data || '-'}
-                        </TableCell>
-                        <TableCell className="font-mono text-sm">
-                          {batch.product?.sku || '-'}
-                        </TableCell>
-                        <TableCell>{batch.product?.name || '-'}</TableCell>
-                        <TableCell className="text-right">{batch.quantity}</TableCell>
+                    {groupedOrderBatches.map((group) => (
+                      <TableRow key={group.sku}>
+                        <TableCell className="font-mono text-sm">{group.sku}</TableCell>
+                        <TableCell>{group.name}</TableCell>
+                        <TableCell className="text-right font-medium">{group.totalQty}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -290,30 +346,24 @@ export function BoxDetailsDialog({
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>QR Code</TableHead>
                       <TableHead>Product SKU</TableHead>
                       <TableHead>Product Name</TableHead>
-                      <TableHead className="text-right">Qty</TableHead>
+                      <TableHead className="text-right">Total Qty</TableHead>
                       <TableHead>Inv State</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {extraBatches.map((batch) => (
-                      <TableRow key={batch.id}>
-                        <TableCell className="font-mono text-sm">
-                          {batch.qr_code_data || '-'}
-                        </TableCell>
-                        <TableCell className="font-mono text-sm">
-                          {batch.product?.sku || '-'}
-                        </TableCell>
-                        <TableCell>{batch.product?.name || '-'}</TableCell>
-                        <TableCell className="text-right">{batch.quantity}</TableCell>
+                    {groupedExtraBatches.map((group) => (
+                      <TableRow key={`${group.sku}-${group.inventory_state}`}>
+                        <TableCell className="font-mono text-sm">{group.sku}</TableCell>
+                        <TableCell>{group.name}</TableCell>
+                        <TableCell className="text-right font-medium">{group.totalQty}</TableCell>
                         <TableCell>
                           <Badge
-                            variant={batch.inventory_state === 'RESERVED' ? 'default' : 'outline'}
-                            className={batch.inventory_state === 'RESERVED' ? 'bg-amber-500' : ''}
+                            variant={group.inventory_state === 'RESERVED' ? 'default' : 'outline'}
+                            className={group.inventory_state === 'RESERVED' ? 'bg-amber-500' : ''}
                           >
-                            {batch.inventory_state}
+                            {group.inventory_state}
                           </Badge>
                         </TableCell>
                       </TableRow>
