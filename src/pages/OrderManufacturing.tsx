@@ -17,8 +17,6 @@ import {
   Box,
   Loader2,
   AlertTriangle,
-  RotateCcw,
-  XCircle,
   Search,
   CheckCircle,
   Package,
@@ -43,8 +41,6 @@ interface Batch {
   eta: string | null;
   lead_time_days: number | null;
   box_id: string | null;
-  is_flagged?: boolean;
-  is_redo?: boolean;
   manufacturing_machine_id?: string | null;
   from_extra_state?: string | null;
   product: {
@@ -102,11 +98,7 @@ export default function OrderManufacturing() {
 
   // Dialog states
   const [boxDialogOpen, setBoxDialogOpen] = useState(false);
-  const [terminateDialogOpen, setTerminateDialogOpen] = useState(false);
-  const [redoDialogOpen, setRedoDialogOpen] = useState(false);
   const [moveToExtraDialogOpen, setMoveToExtraDialogOpen] = useState(false);
-  const [terminateReason, setTerminateReason] = useState("");
-  const [redoReason, setRedoReason] = useState("");
 
   // Box selection
   const [boxSearchCode, setBoxSearchCode] = useState("");
@@ -635,17 +627,6 @@ export default function OrderManufacturing() {
     }
   };
 
-  const handleTerminate = async () => {
-    toast.error("Terminate is not available in this version.");
-    setTerminateDialogOpen(false);
-    setTerminateReason("");
-  };
-
-  const handleMarkRedo = async () => {
-    toast.error("Redo is not available in this version.");
-    setRedoDialogOpen(false);
-    setRedoReason("");
-  };
 
   if (loading) {
     return (
@@ -766,18 +747,6 @@ export default function OrderManufacturing() {
                 >
                   <Package className="h-4 w-4 mr-2" />
                   Assign to Extra
-                </Button>
-                <Button variant="outline" onClick={() => setRedoDialogOpen(true)} disabled={totalSelected === 0}>
-                  <RotateCcw className="h-4 w-4 mr-2" />
-                  Mark Redo
-                </Button>
-                <Button
-                  variant="destructive"
-                  onClick={() => setTerminateDialogOpen(true)}
-                  disabled={totalSelected === 0}
-                >
-                  <XCircle className="h-4 w-4 mr-2" />
-                  Terminate
                 </Button>
               </CardContent>
             </Card>
@@ -1003,71 +972,6 @@ export default function OrderManufacturing() {
             <Button onClick={handleAssignToBox} disabled={!selectedBox || submitting}>
               {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Assign {totalSelected} Items
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Terminate Dialog */}
-      <Dialog open={terminateDialogOpen} onOpenChange={setTerminateDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Terminate Items</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <Alert variant="destructive">
-              <AlertTriangle className="h-4 w-4" />
-              <AlertDescription>Terminating {totalSelected} item(s). This action cannot be undone.</AlertDescription>
-            </Alert>
-            <div>
-              <Label>Reason for Termination</Label>
-              <Textarea
-                value={terminateReason}
-                onChange={(e) => setTerminateReason(e.target.value)}
-                placeholder="Enter reason..."
-                className="mt-2"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setTerminateDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button variant="destructive" onClick={handleTerminate} disabled={!terminateReason.trim() || submitting}>
-              {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Terminate
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Redo Dialog */}
-      <Dialog open={redoDialogOpen} onOpenChange={setRedoDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Mark Items for Redo</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <p className="text-sm text-muted-foreground">
-              Marking {totalSelected} item(s) for redo. They will be flagged and reset to pending raw materials.
-            </p>
-            <div>
-              <Label>Reason for Redo</Label>
-              <Textarea
-                value={redoReason}
-                onChange={(e) => setRedoReason(e.target.value)}
-                placeholder="Enter reason..."
-                className="mt-2"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setRedoDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleMarkRedo} disabled={!redoReason.trim() || submitting}>
-              {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Mark Redo
             </Button>
           </DialogFooter>
         </DialogContent>
