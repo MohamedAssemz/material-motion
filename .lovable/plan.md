@@ -1,52 +1,42 @@
-## Problem Analysis
 
-The user clarifies that items moved to extra inventory during manufacturing ARE actually processed items and should count toward production metrics for machine assignment. The current logic incorrectly excludes them from completion counts.
 
-## Current Issue Investigation
+## Plan: Order Cancellation Freeze Logic
 
-From examining the code and the user's feedback:
+### Requirements
+1. When an order is cancelled, freeze all actions on phase pages **except** production rate (machine) assignment (which still respects role permissions)
+2. Unretrieved reserved extra batches should be released back to AVAILABLE on cancellation
 
-1. **Manufacturing "Waiting" Count**: Still incorrectly showing items in `in_manufacturing` as "waiting" due to `readyState` parameter
-2. **Completed Count Logic**: Currently showing 75 completed (50 processed + 25 moved to extra), but the user confirms this is actually CORRECT - items moved to extra inventory are processed items that should count toward production rates
+### Analysis
+- Requirement 2 is **already implemented** in `handleCancelOrder` in `OrderDetail.tsx` (lines 462-471) — it releases reserved extra batches back to AVAILABLE
+- Requirement 1 needs changes across 4 phase pages and their child components
 
-## Root Cause
+### Implementation
 
-The confusion stems from different interpretations of "completed":
+**Core approach:** Each phase page already has a `canManage` boolean that gates actions. Add an `isCancelled` check derived from `order?.status === 'cancelled'` and use it to disable all actions except machine assignment.
 
-- **UI Logic**: Treats "completed" as items that moved to next phase only
-- **Business Logic**: Should treat "completed" as items that were processed through the current phase (including those diverted to extra inventory)
+**Files to modify:**
 
-## Technical Solution
+1. **`OrderManufacturing.tsx`** — Add `const isCancelled = order?.status === 'cancelled'`. Pass `isCancelled` to disable:
+   - Box assignment dialog actions
+   - Terminate/redo actions
+   - MoveToExtraDialog
+   - ExtraItemsTab `canManage` → `canManage && !isCancelled`
+   - BoxReceiveDialog actions
+   - Keep `ProductionRateSection canManage={canManage}` unchanged (still allows machine assignment)
 
-### 1. Fix Manufacturing Waiting Count
+2. **`OrderFinishing.tsx`** — Same pattern: `isCancelled` disables accept boxes, assign to box, MoveToExtraDialog, ExtraItemsTab, but keeps ProductionRateSection canManage unchanged.
 
-- **File**: `src/pages/OrderDetail.tsx` 
-- **Action**: Remove `readyState` parameter for manufacturing stats call
-- **Reason**: Items start directly in `in_manufacturing`, no waiting state needed
+3. **`OrderPackaging.tsx`** — Same pattern.
 
-### 2. Clarify Production Rate Logic
+4. **`OrderBoxing.tsx`** — Same pattern. Additionally disable shipment creation.
 
-- **File**: `src/pages/OrderManufacturing.tsx`
-- **Current**: `totalCompleted = completedGroups.reduce(...) + totalAddedToExtra`
-- **Analysis**: This is actually CORRECT per user feedback - both counts represent processed items
-- **Action**: Update UI labels/comments to clarify that "completed" means "processed through this phase" not "moved to next phase"
+5. **`OrderDetail.tsx`** — Add a visible "Cancelled" banner/badge. The cancel button is already hidden when `status === 'cancelled'`. Start Order and Extra Inventory sections are already gated to pending orders, so no changes needed there.
 
-### 3. Update ProductionRateSection Integration
+**Specific prop changes per phase page:**
+- `ExtraItemsTab canManage={canManage && !isCancelled}` — freezes extra retrieval
+- `ProductionRateSection canManage={canManage}` — unchanged, still allows machine assignment
+- All action buttons (accept, assign, terminate, redo, move to extra, create shipment) gated with `!isCancelled`
+- Box receive dialogs disabled when cancelled
 
-- **File**: `src/components/ProductionRateSection.tsx`
-- **Action**: Ensure extra batches that were processed in this phase count toward machine assignment calculations
-- **Reason**: Items moved to extra inventory still contribute to production rate metrics
+**No database changes needed** — the cancellation already releases reserved batches.
 
-## Implementation Plan
-
-1. **OrderDetail.tsx**: Remove manufacturing waiting count by fixing `getPhaseStats` call
-2. **OrderManufacturing.tsx**: Keep existing completion logic but improve UI clarity with better labels
-3. **Verify**: Extra batches properly contribute to production rate calculations in ProductionRateSection
-4. **Test**: Ensure counts align between order detail timeline and manufacturing page
-
-## Expected Outcome
-
-- Manufacturing timeline shows 0 waiting items (correct workflow) (should not have a waiting entry to begin with)
-- Completed count includes items processed through manufacturing (including those moved to extra inventory)
-- Production rate section properly accounts for all processed items for machine assignment
-- Clear distinction between "processed" vs "progressed to next phase" in UI labels

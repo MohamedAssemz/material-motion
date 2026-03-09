@@ -451,6 +451,7 @@ export default function OrderManufacturing() {
   completedGroups.sort((a, b) => a.product_name.localeCompare(b.product_name));
 
   const totalAddedToExtra = addedToExtraItems.reduce((sum, item) => sum + item.quantity, 0);
+  // totalCompleted includes items processed through manufacturing AND items moved to extra inventory
   const totalCompleted = completedGroups.reduce((sum, g) => g.batches.reduce((s, b) => s + b.quantity, 0) + sum, 0) + totalAddedToExtra;
   const totalSelected = Array.from(productSelections.values()).reduce((a, b) => a + b, 0);
 
@@ -722,7 +723,7 @@ export default function OrderManufacturing() {
         <TabsList className="grid grid-cols-3 w-full max-w-xl">
           <TabsTrigger value="active">Active ({totalInManufacturing})</TabsTrigger>
           <TabsTrigger value="extra">Extra</TabsTrigger>
-          <TabsTrigger value="completed">Completed ({totalCompleted})</TabsTrigger>
+          <TabsTrigger value="completed">Processed ({totalCompleted})</TabsTrigger>
         </TabsList>
 
         <TabsContent value="active" className="space-y-4">
