@@ -317,7 +317,7 @@ export default function Dashboard() {
 
   if (!data) return null;
 
-  const alertCount = (data.lateBatches?.length || 0) + (data.flaggedBatches?.length || 0) + (data.approachingEtaOrders?.length || 0);
+  const alertCount = (data.lateBatches?.length || 0) + (data.flaggedBatches?.length || 0) + (data.approachingEtaOrders?.length || 0) + (data.stalledOrders?.length || 0);
 
   return (
     <div className="p-4 md:p-6 space-y-6">
