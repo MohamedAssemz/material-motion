@@ -212,11 +212,14 @@ export default function Dashboard() {
       (machineProductionRes.data || []).forEach((m: any) => {
         machineCountMap[m.machine_id] = (machineCountMap[m.machine_id] || 0) + 1;
       });
-      const machineNameMap = new Map((machinesRes.data || []).map((m: any) => [m.id, m.name]));
+      const machineDataMap = new Map((machinesRes.data || []).map((m: any) => [m.id, { name: m.name, type: m.type }]));
       const topMachines = Object.entries(machineCountMap)
         .sort((a, b) => b[1] - a[1])
         .slice(0, 3)
-        .map(([id, count]) => ({ name: machineNameMap.get(id) || 'Unknown', count }));
+        .map(([id, count]) => {
+          const machineData = machineDataMap.get(id);
+          return { name: machineData?.name || 'Unknown', count, type: machineData?.type || '' };
+        });
 
       setData({
         profile: profileRes.data as any,
