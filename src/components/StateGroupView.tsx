@@ -97,7 +97,9 @@ export function StateGroupView({
         let remaining = qty;
         const batchAllocs: Array<{ id: string; quantity: number }> = [];
         
-        for (const batch of product.batches) {
+        // Sort batches: prioritize those with any machine assigned
+        const sortedBatches = [...product.batches].sort((a, b) => a.quantity - b.quantity);
+        for (const batch of sortedBatches) {
           if (remaining <= 0) break;
           const take = Math.min(remaining, batch.quantity);
           batchAllocs.push({ id: batch.id, quantity: take });

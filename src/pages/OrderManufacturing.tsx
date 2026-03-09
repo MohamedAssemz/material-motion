@@ -507,8 +507,13 @@ export default function OrderManufacturing() {
 
         let remainingQty = quantity;
 
-        // Sort batches by quantity
-        const sortedBatches = [...group.batches].sort((a, b) => a.quantity - b.quantity);
+        // Sort batches: prioritize those with machine assigned, then by quantity
+        const sortedBatches = [...group.batches].sort((a, b) => {
+          const aHasMachine = a.manufacturing_machine_id ? 0 : 1;
+          const bHasMachine = b.manufacturing_machine_id ? 0 : 1;
+          if (aHasMachine !== bHasMachine) return aHasMachine - bHasMachine;
+          return a.quantity - b.quantity;
+        });
 
         for (const batch of sortedBatches) {
           if (remainingQty <= 0) break;

@@ -1,31 +1,42 @@
 
 
-## Prioritize Machine-Assigned Batches When Processing
+## Plan: Order Cancellation Freeze Logic
 
-### Problem
-In `OrderManufacturing.tsx` line 511, batches are sorted only by quantity. When processing items, the system may pick unassigned batches first, ignoring ones that already have a `manufacturing_machine_id`. This happens after force-emptying a box returns items to manufacturing — the re-processed items come from the wrong (unassigned) batch.
+### Requirements
+1. When an order is cancelled, freeze all actions on phase pages **except** production rate (machine) assignment (which still respects role permissions)
+2. Unretrieved reserved extra batches should be released back to AVAILABLE on cancellation
 
-The same pattern exists in other phase pages where batches are iterated without machine-priority sorting.
+### Analysis
+- Requirement 2 is **already implemented** in `handleCancelOrder` in `OrderDetail.tsx` (lines 462-471) — it releases reserved extra batches back to AVAILABLE
+- Requirement 1 needs changes across 4 phase pages and their child components
 
-### Changes
+### Implementation
 
-**1. `src/pages/OrderManufacturing.tsx`** — Change the batch sort in `handleAssignToBox` (line 511) to prioritize batches with `manufacturing_machine_id` first, then by quantity:
-```ts
-const sortedBatches = [...group.batches].sort((a, b) => {
-  const aHasMachine = a.manufacturing_machine_id ? 0 : 1;
-  const bHasMachine = b.manufacturing_machine_id ? 0 : 1;
-  if (aHasMachine !== bHasMachine) return aHasMachine - bHasMachine;
-  return a.quantity - b.quantity;
-});
-```
+**Core approach:** Each phase page already has a `canManage` boolean that gates actions. Add an `isCancelled` check derived from `order?.status === 'cancelled'` and use it to disable all actions except machine assignment.
 
-**2. `src/pages/OrderFinishing.tsx`** — Same pattern for `finishing_machine_id` in the batch iteration loop.
+**Files to modify:**
 
-**3. `src/pages/OrderPackaging.tsx`** — Same pattern for `packaging_machine_id` in both batch iteration loops.
+1. **`OrderManufacturing.tsx`** — Add `const isCancelled = order?.status === 'cancelled'`. Pass `isCancelled` to disable:
+   - Box assignment dialog actions
+   - Terminate/redo actions
+   - MoveToExtraDialog
+   - ExtraItemsTab `canManage` → `canManage && !isCancelled`
+   - BoxReceiveDialog actions
+   - Keep `ProductionRateSection canManage={canManage}` unchanged (still allows machine assignment)
 
-**4. `src/pages/OrderBoxing.tsx`** — Same pattern for `boxing_machine_id` in batch iteration loops.
+2. **`OrderFinishing.tsx`** — Same pattern: `isCancelled` disables accept boxes, assign to box, MoveToExtraDialog, ExtraItemsTab, but keeps ProductionRateSection canManage unchanged.
 
-**5. `src/components/StateGroupView.tsx`** — Sort batches by whether they have any machine ID assigned before distributing quantity allocations.
+3. **`OrderPackaging.tsx`** — Same pattern.
 
-This ensures that when selecting a quantity to process, the system always consumes batches with machine assignments first, preserving production traceability.
+4. **`OrderBoxing.tsx`** — Same pattern. Additionally disable shipment creation.
+
+5. **`OrderDetail.tsx`** — Add a visible "Cancelled" banner/badge. The cancel button is already hidden when `status === 'cancelled'`. Start Order and Extra Inventory sections are already gated to pending orders, so no changes needed there.
+
+**Specific prop changes per phase page:**
+- `ExtraItemsTab canManage={canManage && !isCancelled}` — freezes extra retrieval
+- `ProductionRateSection canManage={canManage}` — unchanged, still allows machine assignment
+- All action buttons (accept, assign, terminate, redo, move to extra, create shipment) gated with `!isCancelled`
+- Box receive dialogs disabled when cancelled
+
+**No database changes needed** — the cancellation already releases reserved batches.
 
