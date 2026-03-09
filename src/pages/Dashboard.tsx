@@ -234,6 +234,7 @@ export default function Dashboard() {
         lateBatches: activeLate.slice(0, 10),
         flaggedBatches: [],
         approachingEtaOrders: (approachingRes.data || []) as any,
+        stalledOrders: (stalledOrdersRes.data || []) as any,
         todayThroughput,
         extraInventoryCount,
         completedOrders: ordersByStatus.completed || 0,
