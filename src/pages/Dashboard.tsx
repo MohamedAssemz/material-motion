@@ -241,6 +241,14 @@ export default function Dashboard() {
         avgFinishedPerDay,
         topMachines,
       });
+
+      // Aggregate throughput from machine_production
+      const throughputMap: Record<string, number> = {};
+      (machineProductionRes.data || []).forEach((r: any) => {
+        throughputMap[r.state_transition] = (throughputMap[r.state_transition] || 0) + 1;
+      });
+
+      setData(prev => prev ? { ...prev, todayThroughput: throughputMap } : prev);
     } catch (e) {
       console.error('Dashboard fetch error:', e);
     } finally {
