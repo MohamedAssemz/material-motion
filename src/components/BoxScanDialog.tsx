@@ -198,7 +198,6 @@ export function BoxScanDialog({
           .from('order_batches')
           .select('id')
           .eq('box_id', box.id)
-          .eq('is_terminated', false)
           .single();
 
         if (existingBatch) {
