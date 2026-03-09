@@ -1,41 +1,42 @@
 
-## Root Cause
 
-In the **Completed** tab of the Manufacturing phase, `ProductionRateSection` shows batches that have already advanced past manufacturing (they're now in `ready_for_packaging` state in the DB, with `box_id` set). When the user tries to assign a machine to a **partial** quantity (e.g. assigning 9 out of a batch of 10), the `assign_machine_to_batches` database function does a **split**:
+## Plan: Order Cancellation Freeze Logic
 
-1. Updates the existing batch → sets quantity to 9 + assigns machine ✅
-2. **Inserts a new "remainder" batch** of 1 — but only inherits `current_state` (`ready_for_packaging`), **not `box_id`** ❌
+### Requirements
+1. When an order is cancelled, freeze all actions on phase pages **except** production rate (machine) assignment (which still respects role permissions)
+2. Unretrieved reserved extra batches should be released back to AVAILABLE on cancellation
 
-The `check_batch_container_integrity` trigger then fires on that INSERT and raises:
-> `"Order batches in state 'ready_for_packaging' must be assigned to a box"`
+### Analysis
+- Requirement 2 is **already implemented** in `handleCancelOrder` in `OrderDetail.tsx` (lines 462-471) — it releases reserved extra batches back to AVAILABLE
+- Requirement 1 needs changes across 4 phase pages and their child components
 
-because `ready_for_packaging` is a transitioning state that requires `box_id` — but the remainder batch was created without one.
+### Implementation
 
-## Fix: One database migration
+**Core approach:** Each phase page already has a `canManage` boolean that gates actions. Add an `isCancelled` check derived from `order?.status === 'cancelled'` and use it to disable all actions except machine assignment.
 
-Update the `assign_machine_to_batches` function in two places:
+**Files to modify:**
 
-**1. Add `box_id` to the cursor SELECT:**
-```sql
-SELECT id, quantity, order_id, product_id, order_item_id, current_state,
-       created_by, eta, lead_time_days, from_extra_state, box_id  -- add box_id
-FROM order_batches
-WHERE id = ANY(p_batch_ids)
-```
+1. **`OrderManufacturing.tsx`** — Add `const isCancelled = order?.status === 'cancelled'`. Pass `isCancelled` to disable:
+   - Box assignment dialog actions
+   - Terminate/redo actions
+   - MoveToExtraDialog
+   - ExtraItemsTab `canManage` → `canManage && !isCancelled`
+   - BoxReceiveDialog actions
+   - Keep `ProductionRateSection canManage={canManage}` unchanged (still allows machine assignment)
 
-**2. Add `box_id` to the remainder batch INSERT:**
-```sql
-INSERT INTO order_batches (
-  order_id, product_id, order_item_id, current_state,
-  quantity, created_by, eta, lead_time_days, from_extra_state, box_id  -- add box_id
-) VALUES (
-  v_batch.order_id, v_batch.product_id, v_batch.order_item_id,
-  v_batch.current_state, v_batch.quantity - v_remaining,
-  v_batch.created_by, v_batch.eta, v_batch.lead_time_days,
-  v_batch.from_extra_state, v_batch.box_id  -- inherit box_id
-);
-```
+2. **`OrderFinishing.tsx`** — Same pattern: `isCancelled` disables accept boxes, assign to box, MoveToExtraDialog, ExtraItemsTab, but keeps ProductionRateSection canManage unchanged.
 
-This same bug would affect machine assignment in the Completed tab of **all** production phases (finishing, packaging, boxing) whenever a partial quantity is assigned and the batch is in a transitioning state that requires a box. The fix covers all of them since they all use the same RPC.
+3. **`OrderPackaging.tsx`** — Same pattern.
 
-No frontend changes needed — this is purely a database function fix.
+4. **`OrderBoxing.tsx`** — Same pattern. Additionally disable shipment creation.
+
+5. **`OrderDetail.tsx`** — Add a visible "Cancelled" banner/badge. The cancel button is already hidden when `status === 'cancelled'`. Start Order and Extra Inventory sections are already gated to pending orders, so no changes needed there.
+
+**Specific prop changes per phase page:**
+- `ExtraItemsTab canManage={canManage && !isCancelled}` — freezes extra retrieval
+- `ProductionRateSection canManage={canManage}` — unchanged, still allows machine assignment
+- All action buttons (accept, assign, terminate, redo, move to extra, create shipment) gated with `!isCancelled`
+- Box receive dialogs disabled when cancelled
+
+**No database changes needed** — the cancellation already releases reserved batches.
+
