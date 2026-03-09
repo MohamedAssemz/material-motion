@@ -76,9 +76,6 @@ interface Batch {
   eta: string | null;
   lead_time_days: number | null;
   box_id: string | null;
-  is_terminated?: boolean;
-  is_redo?: boolean;
-  is_flagged?: boolean;
   product: {
     id: string;
     name: string;
