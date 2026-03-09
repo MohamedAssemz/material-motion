@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -78,6 +79,7 @@ interface ProductGroup {
 export default function OrderManufacturing() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const { hasRole, user } = useAuth();
   const [order, setOrder] = useState<Order | null>(null);
   const [batches, setBatches] = useState<Batch[]>([]);
@@ -466,7 +468,7 @@ export default function OrderManufacturing() {
 
   const handleOpenBoxDialog = () => {
     if (totalSelected === 0) {
-      toast.error("Please select items first");
+      toast.error(t('phase.select_items_first'));
       return;
     }
     setSelectedBox(null);
@@ -624,9 +626,9 @@ export default function OrderManufacturing() {
       <div className="p-6">
         <Button variant="ghost" onClick={() => navigate("/orders")}>
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Back
+          {t('common.back')}
         </Button>
-        <p className="text-center text-muted-foreground mt-8">Order not found</p>
+        <p className="text-center text-muted-foreground mt-8">{t('phase.order_not_found')}</p>
       </div>
     );
   }
@@ -646,12 +648,12 @@ export default function OrderManufacturing() {
               <Factory className="h-6 w-6 text-blue-600 dark:text-blue-400" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold">Manufacturing</h1>
+              <h1 className="text-2xl font-bold">{t('nav.manufacturing')}</h1>
               <p className="text-muted-foreground">
                 {order.order_number} {order.customer?.name && `· ${order.customer.name}`}
                 {order.priority === "high" && (
                   <Badge variant="destructive" className="ml-2">
-                    High Priority
+                    {t('phase.high_priority')}
                   </Badge>
                 )}
               </p>
@@ -660,7 +662,7 @@ export default function OrderManufacturing() {
         </div>
 
         <Button variant="outline" onClick={() => navigate(`/orders/${id}`)}>
-          View Order Details
+          {t('phase.view_order_details')}
         </Button>
       </div>
 
@@ -668,25 +670,25 @@ export default function OrderManufacturing() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">In Manufacturing</p>
+            <p className="text-sm text-muted-foreground">{t('phase.in_manufacturing')}</p>
             <p className="text-2xl font-bold text-primary">{totalInManufacturing}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Products</p>
+            <p className="text-sm text-muted-foreground">{t('phase.products_label')}</p>
             <p className="text-2xl font-bold">{productGroups.length}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Total Items</p>
+            <p className="text-sm text-muted-foreground">{t('phase.total_items')}</p>
             <p className="text-2xl font-bold">{totalInManufacturing}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Completed</p>
+            <p className="text-sm text-muted-foreground">{t('phase.completed')}</p>
             <p className="text-2xl font-bold text-green-600">{totalCompleted}</p>
           </CardContent>
         </Card>
@@ -695,17 +697,17 @@ export default function OrderManufacturing() {
       {isCancelled && (
         <Card className="border-destructive bg-destructive/10">
           <CardContent className="p-4 flex items-center gap-2 text-destructive font-medium">
-            <Badge variant="destructive">Cancelled</Badge>
-            This order has been cancelled. Actions are frozen except machine assignment.
+            <Badge variant="destructive">{t('status.cancelled')}</Badge>
+            {t('phase.cancelled_order_msg')}
           </CardContent>
         </Card>
       )}
 
       <Tabs defaultValue="active" className="space-y-4">
         <TabsList className="grid grid-cols-3 w-full max-w-xl">
-          <TabsTrigger value="active">Active ({totalInManufacturing})</TabsTrigger>
-          <TabsTrigger value="extra">Extra</TabsTrigger>
-          <TabsTrigger value="completed">Processed ({totalCompleted})</TabsTrigger>
+          <TabsTrigger value="active">{t('phase.active_tab')} ({totalInManufacturing})</TabsTrigger>
+          <TabsTrigger value="extra">{t('phase.extra_tab')}</TabsTrigger>
+          <TabsTrigger value="completed">{t('phase.processed_tab')} ({totalCompleted})</TabsTrigger>
         </TabsList>
 
         <TabsContent value="active" className="space-y-4">
@@ -715,21 +717,21 @@ export default function OrderManufacturing() {
               <CardContent className="p-4 flex flex-wrap items-center gap-3">
                 <div className="flex-1 text-sm text-muted-foreground">
                   {totalSelected > 0
-                    ? `${totalSelected} selected${totalSelectedInManufacturing > 0 ? ` (${totalSelectedInManufacturing} in manufacturing)` : ""}`
-                    : "Select quantities below, then choose an action"}
+                    ? `${totalSelected} ${t('phase.selected')}${totalSelectedInManufacturing > 0 ? ` (${totalSelectedInManufacturing} ${t('phase.in_manufacturing').toLowerCase()})` : ""}`
+                    : t('phase.select_quantities')}
                 </div>
                 <Button onClick={handleOpenBoxDialog} disabled={totalSelected === 0}>
                   <Box className="h-4 w-4 mr-2" />
-                  Assign to Box
+                  {t('phase.assign_to_box')}
                 </Button>
                 <Button
                   variant="secondary"
                   onClick={() => setMoveToExtraDialogOpen(true)}
                   disabled={totalSelectedInManufacturing === 0}
-                  title="Move selected items from 'In Manufacturing' to Extra Inventory"
+                  title={t('phase.assign_to_extra')}
                 >
                   <Package className="h-4 w-4 mr-2" />
-                  Assign to Extra
+                  {t('phase.assign_to_extra')}
                 </Button>
               </CardContent>
             </Card>
@@ -740,7 +742,7 @@ export default function OrderManufacturing() {
             {productGroups.length === 0 ? (
               <Card>
                 <CardContent className="p-8 text-center text-muted-foreground">
-                  No items in manufacturing phase for this order
+                  {t('phase.no_items_in_phase')}
                 </CardContent>
               </Card>
             ) : (
@@ -762,17 +764,17 @@ export default function OrderManufacturing() {
                           )}
                         </div>
                         <p className="text-sm text-muted-foreground">
-                          {group.product_sku} · {group.needs_packing ? "Needs Packing" : "No Packing"}
+                          {group.product_sku} · {group.needs_packing ? t('phase.needs_packing') : t('phase.no_packing')}
                         </p>
                       </div>
                       <div className="flex items-center gap-6">
                         <div className="text-center">
-                          <p className="text-xs text-muted-foreground">In Mfg</p>
+                          <p className="text-xs text-muted-foreground">{t('phase.in_mfg')}</p>
                           <p className="text-lg font-semibold text-primary">{group.inManufacturing}</p>
                         </div>
                         {canManage && !isCancelled && (
                           <div className="flex items-center gap-2">
-                            <Label className="text-xs text-muted-foreground">Select</Label>
+                            <Label className="text-xs text-muted-foreground">{t('phase.select_label')}</Label>
                             <NumericInput
                               min={0}
                               max={group.inManufacturing}
@@ -801,7 +803,7 @@ export default function OrderManufacturing() {
             <div className="space-y-3">
               <div className="flex items-center gap-2 pb-2 border-b border-orange-200 dark:border-orange-900">
                 <Package className="h-4 w-4 text-orange-600" />
-                <h3 className="text-sm font-semibold text-orange-700 dark:text-orange-400">Added to Extra from this Order</h3>
+                <h3 className="text-sm font-semibold text-orange-700 dark:text-orange-400">{t('phase.added_to_extra_order')}</h3>
               </div>
               {addedToExtraItems.map((item) => (
                 <Card
@@ -814,7 +816,7 @@ export default function OrderManufacturing() {
                         <p className="font-medium">{item.product_name}</p>
                         <p className="text-sm text-muted-foreground">{item.product_sku}</p>
                       </div>
-                      <Badge className="bg-orange-500 hover:bg-orange-600 text-white">{item.quantity} to extra</Badge>
+                      <Badge className="bg-orange-500 hover:bg-orange-600 text-white">{item.quantity} {t('phase.to_extra')}</Badge>
                     </div>
                   </CardContent>
                 </Card>
@@ -861,7 +863,7 @@ export default function OrderManufacturing() {
 
           {completedGroups.length === 0 && retrievedFromExtraBatches.length === 0 && (
             <Card>
-              <CardContent className="p-8 text-center text-muted-foreground">No completed items yet</CardContent>
+              <CardContent className="p-8 text-center text-muted-foreground">{t('phase.no_completed_yet')}</CardContent>
             </Card>
           )}
         </TabsContent>
@@ -871,12 +873,12 @@ export default function OrderManufacturing() {
       <Dialog open={boxDialogOpen} onOpenChange={setBoxDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Assign to Box</DialogTitle>
+            <DialogTitle>{t('phase.assign_to_box')}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             {/* Machine Selection */}
             <div>
-              <Label>Manufacturing Machine (Optional)</Label>
+              <Label>{t('manufacturing.machine_optional')}</Label>
               <div className="mt-2">
                 <SearchableSelect
                   options={machines.map((m) => ({ value: m.id, label: m.name }))}

@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -70,6 +71,7 @@ interface Product {
 export default function Catalog() {
   const navigate = useNavigate();
   const { hasRole } = useAuth();
+  const { t } = useLanguage();
   const { toast } = useToast();
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -350,15 +352,15 @@ export default function Catalog() {
             <Package className="h-6 w-6 text-primary" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold">Product Catalog</h1>
-            <p className="text-muted-foreground text-sm">{products.length} products</p>
+            <h1 className="text-2xl font-bold">{t('catalog.title')}</h1>
+            <p className="text-muted-foreground text-sm">{products.length} {t('catalog.products_count')}</p>
           </div>
         </div>
         
         <div className="flex items-center gap-2 flex-wrap">
           <Button variant="outline" size="sm" onClick={() => navigate('/reports?tab=catalog-insights')}>
             <BarChart3 className="mr-2 h-4 w-4" />
-            Catalog Insights
+            {t('catalog.catalog_insights')}
           </Button>
           {canManage && (
             <>
@@ -366,29 +368,29 @@ export default function Catalog() {
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="sm">
                     <Settings2 className="mr-2 h-4 w-4" />
-                    Manage
+                    {t('catalog.manage')}
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48">
                   <DropdownMenuItem onClick={() => setCategoryListOpen(true)}>
                     <Tag className="mr-2 h-4 w-4" />
-                    Categories
+                    {t('catalog.categories')}
                     <Badge variant="secondary" className="ml-auto">{categories.length}</Badge>
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => setBrandListOpen(true)}>
                     <Palette className="mr-2 h-4 w-4" />
-                    Brands
+                    {t('catalog.brands')}
                     <Badge variant="secondary" className="ml-auto">{brands.length}</Badge>
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => navigate('/customers')}>
                     <Users className="mr-2 h-4 w-4" />
-                    Customers
+                    {t('catalog.customers')}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
               <Button variant="outline" size="sm" onClick={() => setBulkUploadOpen(true)}>
                 <Upload className="mr-2 h-4 w-4" />
-                Bulk Upload
+                {t('catalog.bulk_upload')}
               </Button>
               <Button onClick={() => { 
                 setEditingProduct(null); 
@@ -397,7 +399,7 @@ export default function Catalog() {
                 setProductFormOpen(true); 
               }}>
                 <Plus className="mr-2 h-4 w-4" />
-                Add Product
+                {t('catalog.add_product')}
               </Button>
             </>
           )}
@@ -411,7 +413,7 @@ export default function Catalog() {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search products by name, SKU, or description..."
+                placeholder={t('catalog.search_placeholder')}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
@@ -420,7 +422,7 @@ export default function Catalog() {
             {hasActiveFilters && (
               <Button variant="ghost" onClick={clearFilters} size="sm">
                 <X className="mr-1 h-4 w-4" />
-                Clear filters
+                {t('catalog.clear_filters')}
               </Button>
             )}
           </div>
@@ -431,7 +433,7 @@ export default function Catalog() {
                 <SelectValue placeholder="Category" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Categories</SelectItem>
+                <SelectItem value="all">{t('catalog.all_categories')}</SelectItem>
                 {categories.map(c => (
                   <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                 ))}
@@ -440,10 +442,10 @@ export default function Catalog() {
 
             <Select value={selectedBrand} onValueChange={setSelectedBrand}>
               <SelectTrigger>
-                <SelectValue placeholder="Brand" />
+                <SelectValue placeholder={t('catalog.brands')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Brands</SelectItem>
+                <SelectItem value="all">{t('catalog.all_brands')}</SelectItem>
                 {brands.map(b => (
                   <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
                 ))}
@@ -452,10 +454,10 @@ export default function Catalog() {
 
             <Select value={selectedSize} onValueChange={setSelectedSize}>
               <SelectTrigger>
-                <SelectValue placeholder="Size" />
+                <SelectValue placeholder={t('catalog.all_sizes')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Sizes</SelectItem>
+                <SelectItem value="all">{t('catalog.all_sizes')}</SelectItem>
                 {SIZE_OPTIONS.map(s => (
                   <SelectItem key={s} value={s}>{s}</SelectItem>
                 ))}
@@ -465,10 +467,10 @@ export default function Catalog() {
             <CountrySelect
               value={selectedCountry}
               onValueChange={setSelectedCountry}
-              placeholder="Country"
+              placeholder={t('catalog.all_countries')}
               availableCountryCodes={uniqueCountryCodes}
               showAllOption
-              allOptionLabel="All Countries"
+              allOptionLabel={t('catalog.all_countries')}
             />
           </div>
         </div>
@@ -479,14 +481,14 @@ export default function Catalog() {
         <Card className="p-12 text-center">
           <Package className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
           <h3 className="text-lg font-semibold mb-2">
-            {products.length === 0 ? 'No products yet' : 'No products match your filters'}
+            {products.length === 0 ? t('catalog.no_products_yet') : t('catalog.no_match')}
           </h3>
           <p className="text-muted-foreground">
             {products.length === 0 && canManage 
-              ? 'Get started by adding your first product' 
+              ? t('catalog.get_started') 
               : hasActiveFilters 
-                ? 'Try adjusting your filters' 
-                : 'Products will appear here once added'}
+                ? t('catalog.try_adjusting') 
+                : t('catalog.products_appear')}
           </p>
         </Card>
       ) : (
@@ -551,13 +553,13 @@ export default function Catalog() {
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Product</AlertDialogTitle>
+            <AlertDialogTitle>{t('catalog.delete_product')}</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete "{productToDelete?.name}"? This action cannot be undone.
+              {t('catalog.delete_confirm')} "{productToDelete?.name}"? {t('catalog.cannot_undone')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={deleting}>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleConfirmDelete}
               disabled={deleting}
