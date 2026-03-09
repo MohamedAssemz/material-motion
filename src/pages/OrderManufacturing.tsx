@@ -747,18 +747,6 @@ export default function OrderManufacturing() {
                   <Package className="h-4 w-4 mr-2" />
                   Assign to Extra
                 </Button>
-                <Button variant="outline" onClick={() => setRedoDialogOpen(true)} disabled={totalSelected === 0}>
-                  <RotateCcw className="h-4 w-4 mr-2" />
-                  Mark Redo
-                </Button>
-                <Button
-                  variant="destructive"
-                  onClick={() => setTerminateDialogOpen(true)}
-                  disabled={totalSelected === 0}
-                >
-                  <XCircle className="h-4 w-4 mr-2" />
-                  Terminate
-                </Button>
               </CardContent>
             </Card>
           )}
