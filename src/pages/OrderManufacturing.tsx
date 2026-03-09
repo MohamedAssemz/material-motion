@@ -79,6 +79,7 @@ interface ProductGroup {
 export default function OrderManufacturing() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const { hasRole, user } = useAuth();
   const [order, setOrder] = useState<Order | null>(null);
   const [batches, setBatches] = useState<Batch[]>([]);
