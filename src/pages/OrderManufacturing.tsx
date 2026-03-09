@@ -878,7 +878,7 @@ export default function OrderManufacturing() {
           <div className="space-y-4 py-4">
             {/* Machine Selection */}
             <div>
-              <Label>Manufacturing Machine (Optional)</Label>
+              <Label>{t('manufacturing.machine_optional')}</Label>
               <div className="mt-2">
                 <SearchableSelect
                   options={machines.map((m) => ({ value: m.id, label: m.name }))}

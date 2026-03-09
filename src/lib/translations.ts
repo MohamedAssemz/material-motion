@@ -911,26 +911,15 @@ export const translations: Record<string, TranslationEntry> = {
   "phase.no_boxes_ready_finishing": { en: "No boxes ready for finishing", ar: "لا توجد صناديق جاهزة للتشطيب" },
   "phase.no_boxes_ready_packaging": { en: "No boxes ready for packaging", ar: "لا توجد صناديق جاهزة للتعبئة" },
   "phase.no_boxes_ready_boxing": { en: "No boxes ready for boxing", ar: "لا توجد صناديق جاهزة للتعليب" },
-
-  // Boxing phase specific
+  // Boxing phase specific (new, non-duplicate)
   "boxing.ready_for_shipment_stat": { en: "Ready for Shipment", ar: "جاهز للشحن" },
   "boxing.shipped_stat":        { en: "Shipped",          ar: "تم الشحن" },
-  "boxing.total_kartonas":      { en: "Total Kartonas",   ar: "إجمالي الكراتين" },
-  "boxing.total_shipped":       { en: "Total Shipped",    ar: "إجمالي المشحون" },
-  "boxing.create_kartona":      { en: "Create Kartona",   ar: "إنشاء كرتونة" },
-  "boxing.move_to_ready":       { en: "Move to Ready for Shipment", ar: "نقل إلى جاهز للشحن" },
   "boxing.processing":          { en: "Processing",       ar: "المعالجة" },
   "boxing.ready_shipment_tab":  { en: "Ready for Shipment", ar: "جاهز للشحن" },
   "boxing.shipments_tab":       { en: "Shipments",        ar: "الشحنات" },
   "boxing.kartona_details":     { en: "Kartona Details",  ar: "تفاصيل الكرتونة" },
   "boxing.notes":               { en: "Notes",            ar: "ملاحظات" },
-  "boxing.dimensions":          { en: "Dimensions (cm)",  ar: "الأبعاد (سم)" },
-  "boxing.length":              { en: "Length",           ar: "الطول" },
-  "boxing.width":               { en: "Width",            ar: "العرض" },
-  "boxing.height":              { en: "Height",           ar: "الارتفاع" },
-  "boxing.weight":              { en: "Weight (kg)",      ar: "الوزن (كجم)" },
   "boxing.seal_ship":           { en: "Seal & Ship",      ar: "إغلاق وشحن" },
-  "boxing.order_notes":         { en: "Order Notes",      ar: "ملاحظات الطلب" },
   "boxing.no_notes":            { en: "No notes for this order", ar: "لا توجد ملاحظات لهذا الطلب" },
 
   // Catalog page
@@ -959,7 +948,7 @@ export const translations: Record<string, TranslationEntry> = {
   "catalog.cannot_undone":      { en: "This action cannot be undone.", ar: "هذا الإجراء لا يمكن التراجع عنه." },
   "catalog.product_deleted":    { en: "Product Deleted",  ar: "تم حذف المنتج" },
 
-  // Report tab extras
+  // Report tab extras (non-duplicate)
   "reports.on_time_completion": { en: "On-Time Completion Rate", ar: "معدل الإكمال في الوقت" },
   "reports.total_orders":       { en: "Total Orders",     ar: "إجمالي الطلبات" },
   "reports.orders_created_vs":  { en: "Orders Created vs Completed", ar: "الطلبات المنشأة مقابل المكتملة" },
@@ -973,12 +962,8 @@ export const translations: Record<string, TranslationEntry> = {
   "reports.avg_time_phase":     { en: "Average Time Spent in Each Phase", ar: "متوسط الوقت المستغرق في كل مرحلة" },
   "reports.phase_backlog":      { en: "Phase Backlog Size", ar: "حجم تراكم المرحلة" },
   "reports.boxes_created_vs":   { en: "Boxes Created vs Shipped", ar: "الصناديق المنشأة مقابل المشحونة" },
-  "reports.avg_items_box":      { en: "Average Items per Box", ar: "متوسط العناصر لكل صندوق" },
   "reports.no_shipments_range": { en: "No shipments in range", ar: "لا توجد شحنات في النطاق" },
   "reports.no_box_data":        { en: "No box data in range", ar: "لا توجد بيانات صناديق في النطاق" },
-  "reports.unique_products":    { en: "Unique Products",  ar: "منتجات فريدة" },
-  "reports.unique_customers":   { en: "Unique Customers", ar: "عملاء فريدون" },
-  "reports.unique_countries":   { en: "Unique Countries", ar: "دول فريدة" },
   "reports.no_product_data":    { en: "No product data for this period", ar: "لا توجد بيانات منتجات لهذه الفترة" },
   "reports.no_country_period":  { en: "No country data for this period", ar: "لا توجد بيانات دول لهذه الفترة" },
   "reports.no_customer_period": { en: "No customer data for this period", ar: "لا توجد بيانات عملاء لهذه الفترة" },
