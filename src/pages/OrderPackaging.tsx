@@ -805,31 +805,31 @@ export default function OrderPackaging() {
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <Card>
           <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Ready for Packaging</p>
+            <p className="text-sm text-muted-foreground">{t('packaging.ready_for_packaging')}</p>
             <p className="text-2xl font-bold text-warning">{totalReadyForPackaging}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">In Packaging</p>
+            <p className="text-sm text-muted-foreground">{t('packaging.in_progress')}</p>
             <p className="text-2xl font-bold text-primary">{totalInPackaging}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Boxes Waiting</p>
+            <p className="text-sm text-muted-foreground">{t('phase.boxes_waiting')}</p>
             <p className="text-2xl font-bold">{readyBoxGroups.length}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Products</p>
+            <p className="text-sm text-muted-foreground">{t('phase.products')}</p>
             <p className="text-2xl font-bold">{inPackagingGroups.length}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Completed</p>
+            <p className="text-sm text-muted-foreground">{t('phase.completed')}</p>
             <p className="text-2xl font-bold text-green-600">{totalCompleted}</p>
           </CardContent>
         </Card>
