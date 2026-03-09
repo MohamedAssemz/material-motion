@@ -433,7 +433,7 @@ export default function Catalog() {
                 <SelectValue placeholder="Category" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Categories</SelectItem>
+                <SelectItem value="all">{t('catalog.all_categories')}</SelectItem>
                 {categories.map(c => (
                   <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                 ))}
@@ -442,10 +442,10 @@ export default function Catalog() {
 
             <Select value={selectedBrand} onValueChange={setSelectedBrand}>
               <SelectTrigger>
-                <SelectValue placeholder="Brand" />
+                <SelectValue placeholder={t('catalog.brands')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Brands</SelectItem>
+                <SelectItem value="all">{t('catalog.all_brands')}</SelectItem>
                 {brands.map(b => (
                   <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
                 ))}
@@ -454,10 +454,10 @@ export default function Catalog() {
 
             <Select value={selectedSize} onValueChange={setSelectedSize}>
               <SelectTrigger>
-                <SelectValue placeholder="Size" />
+                <SelectValue placeholder={t('catalog.all_sizes')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Sizes</SelectItem>
+                <SelectItem value="all">{t('catalog.all_sizes')}</SelectItem>
                 {SIZE_OPTIONS.map(s => (
                   <SelectItem key={s} value={s}>{s}</SelectItem>
                 ))}
@@ -467,10 +467,10 @@ export default function Catalog() {
             <CountrySelect
               value={selectedCountry}
               onValueChange={setSelectedCountry}
-              placeholder="Country"
+              placeholder={t('catalog.all_countries')}
               availableCountryCodes={uniqueCountryCodes}
               showAllOption
-              allOptionLabel="All Countries"
+              allOptionLabel={t('catalog.all_countries')}
             />
           </div>
         </div>
