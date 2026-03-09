@@ -89,40 +89,26 @@ export default function OrderCreate() {
 
   const fetchData = async () => {
     try {
-      const [productsRes, customersRes, potentialCustomersRes] = await Promise.all([
+      const [productsRes, customersRes, productCustomersRes] = await Promise.all([
         supabase.from("products").select("id, sku, name").order("sku"),
         supabase.from("customers").select("id, name, code, is_domestic").order("name"),
-        supabase.from("product_potential_customers").select("parent_product_id, customer_id"),
+        supabase.from("product_customers").select("product_id, customer_id"),
       ]);
 
       if (productsRes.error) throw productsRes.error;
       if (customersRes.error) throw customersRes.error;
-      if (potentialCustomersRes.error) throw potentialCustomersRes.error;
+      if (productCustomersRes.error) throw productCustomersRes.error;
 
-      // Get parent_product_id for each product
-      const productParentMap = new Map<string, string>();
-      const { data: productParents } = await supabase.from("products").select("id, parent_product_id");
-      productParents?.forEach((p) => {
-        if (p.parent_product_id) productParentMap.set(p.id, p.parent_product_id);
-      });
-
-      // Build customer->product mapping via parent products
+      // Build customer->product mapping (directly by product_id)
       const customerProductMap = new Map<string, Set<string>>();
-      potentialCustomersRes.data?.forEach((pc: any) => {
+      (productCustomersRes.data || []).forEach((pc: any) => {
         if (!customerProductMap.has(pc.customer_id)) {
           customerProductMap.set(pc.customer_id, new Set());
         }
-        customerProductMap.get(pc.customer_id)!.add(pc.parent_product_id);
+        customerProductMap.get(pc.customer_id)!.add(pc.product_id);
       });
 
-      // Attach parent product IDs to products
-      const productsWithParent =
-        productsRes.data?.map((p) => ({
-          ...p,
-          parent_product_id: productParentMap.get(p.id) || null,
-        })) || [];
-
-      setProducts(productsWithParent);
+      setProducts(productsRes.data || []);
       setCustomers(customersRes.data || []);
       setCustomerProductMapping(customerProductMap);
     } catch (error: any) {
