@@ -822,10 +822,10 @@ export default function OrderFinishing() {
 
       <Tabs defaultValue="receive" className="space-y-4">
         <TabsList className="grid grid-cols-4 w-full max-w-2xl">
-          <TabsTrigger value="receive">Receive ({readyBoxGroups.length})</TabsTrigger>
-          <TabsTrigger value="process">Process ({totalInFinishing})</TabsTrigger>
-          <TabsTrigger value="extra">Extra</TabsTrigger>
-          <TabsTrigger value="completed">Completed ({totalCompleted})</TabsTrigger>
+          <TabsTrigger value="receive">{t('phase.receive')} ({readyBoxGroups.length})</TabsTrigger>
+          <TabsTrigger value="process">{t('phase.process')} ({totalInFinishing})</TabsTrigger>
+          <TabsTrigger value="extra">{t('phase.extra')}</TabsTrigger>
+          <TabsTrigger value="completed">{t('phase.completed')} ({totalCompleted})</TabsTrigger>
         </TabsList>
 
         <TabsContent value="receive" className="space-y-4">
