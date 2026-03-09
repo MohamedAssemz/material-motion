@@ -208,8 +208,6 @@ export default function Analytics() {
         : 0;
 
       setGlobalCounters({
-        totalTerminations,
-        totalRedos,
         avgLeadTime: Math.round(avgLeadTime * 10) / 10,
         lateBatches: processedBatches.filter(b => b.is_late).length,
       });
