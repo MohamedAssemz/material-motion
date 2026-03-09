@@ -1114,14 +1114,14 @@ export default function OrderDetail() {
                 <Button
                   key={phase}
                   variant="outline"
-                  className="h-auto py-4 flex flex-col items-center gap-2"
+                  className="h-auto py-4 flex flex-col items-center gap-2 [&>span]:hover:text-inherit"
                   onClick={() => {
                     setSelectedExtraPhase(phase);
                     setExtraInventoryOpen(true);
                   }}
                 >
-                  <span className="text-2xl font-bold text-primary">{extraInventoryCounts[phase] || 0}</span>
-                  <span className="text-xs text-muted-foreground capitalize">{phase}</span>
+                  <span className="text-2xl font-bold text-primary hover:text-primary">{extraInventoryCounts[phase] || 0}</span>
+                  <span className="text-xs text-muted-foreground capitalize hover:text-muted-foreground">{phase}</span>
                 </Button>
               ))}
             </div>
