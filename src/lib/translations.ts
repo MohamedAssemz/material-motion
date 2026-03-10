@@ -835,12 +835,12 @@ export const translations: Record<string, TranslationEntry> = {
 
   // Queue page descriptions
   "queue.finishing_desc":       { en: "Orders awaiting finishing or in finishing", ar: "طلبات في انتظار التشطيب أو قيد التشطيب" },
-  "queue.packaging_desc":       { en: "Orders awaiting packaging materials or in packaging", ar: "طلبات في انتظار مواد التعبئة أو قيد التعبئة" },
+  "queue.packaging_desc":       { en: "Orders awaiting packaging materials or in packaging", ar: "طلبات في انتظار مواد التغليف أو قيد التغليف" },
   "queue.boxing_desc":          { en: "Orders awaiting boxing materials or in boxing", ar: "طلبات في انتظار مواد التعليب أو قيد التعليب" },
   "queue.no_active_finishing":  { en: "No active orders in finishing queue", ar: "لا توجد طلبات نشطة في طابور التشطيب" },
   "queue.no_completed_finishing": { en: "No completed orders with finishing history", ar: "لا توجد طلبات مكتملة مع سجل التشطيب" },
-  "queue.no_active_packaging":  { en: "No active orders in packaging queue", ar: "لا توجد طلبات نشطة في طابور التعبئة" },
-  "queue.no_completed_packaging": { en: "No completed orders with packaging history", ar: "لا توجد طلبات مكتملة مع سجل التعبئة" },
+  "queue.no_active_packaging":  { en: "No active orders in packaging queue", ar: "لا توجد طلبات نشطة في طابور التغليف" },
+  "queue.no_completed_packaging": { en: "No completed orders with packaging history", ar: "لا توجد طلبات مكتملة مع سجل التغليف" },
   "queue.no_active_boxing":     { en: "No active orders in boxing queue", ar: "لا توجد طلبات نشطة في طابور التعليب" },
 
   // ══════════════════════════════════════════
