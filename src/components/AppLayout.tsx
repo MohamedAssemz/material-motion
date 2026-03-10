@@ -111,6 +111,7 @@ export function AppLayout({ children }: AppLayoutProps) {
         {/* Logo/Header */}
         <div className={cn(
           "flex items-center h-16 px-4 border-b border-sidebar-border",
+          isRTL && "flex-row-reverse",
           collapsed ? "justify-center" : "gap-3"
         )}>
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 shrink-0">
