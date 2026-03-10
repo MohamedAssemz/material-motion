@@ -439,7 +439,7 @@ export const translations: Record<string, TranslationEntry> = {
   "state.in_finishing":         { en: "In Finishing",                  ar: "قيد التشطيب" },
   "state.manufacturing":        { en: "Manufacturing",                ar: "التصنيع" },
   "state.finishing":            { en: "Finishing",                     ar: "التشطيب" },
-  "state.packaging":            { en: "Packaging",                    ar: "التعبئة" },
+  "state.packaging":            { en: "Packaging",                    ar: "التغليف" },
   "state.boxing":               { en: "Boxing",                       ar: "التعليب" },
 
   // ══════════════════════════════════════════
