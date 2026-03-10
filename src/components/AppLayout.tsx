@@ -139,7 +139,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                   onClick={() => setMobileOpen(false)}
                   className={cn(
                     "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors group",
-                    isRTL && "flex-row-reverse text-right",
+                    isRTL && "flex-row-reverse",
                     active 
                       ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium" 
                       : "text-sidebar-foreground hover:bg-sidebar-accent/50",
@@ -153,7 +153,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                   )} />
                   {!collapsed && (
                     <>
-                      <span className="flex-1 truncate">{t(item.translationKey)}</span>
+                      <span className="truncate">{t(item.translationKey)}</span>
                       {item.badge && (
                         <Badge 
                           variant="secondary" 
