@@ -232,7 +232,7 @@ export const translations: Record<string, TranslationEntry> = {
   "orders.no_customer":       { en: "No Customer",         ar: "بدون عميل" },
   "orders.not_found":         { en: "Order not found",     ar: "الطلب غير موجود" },
   "orders.back_to_orders":    { en: "Back to Orders",      ar: "العودة للطلبات" },
-  "orders.packaging_reference": { en: "Packaging Reference", ar: "مرجع التعبئة" },
+  "orders.packaging_reference": { en: "Packaging Reference", ar: "مرجع التغليف" },
 
   // ══════════════════════════════════════════
   //  MANUFACTURING
