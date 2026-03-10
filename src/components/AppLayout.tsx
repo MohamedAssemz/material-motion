@@ -86,7 +86,7 @@ export function AppLayout({ children }: AppLayoutProps) {
     : (collapsed ? ChevronRight : ChevronLeft);
 
   return (
-    <div className={cn("flex min-h-screen w-full bg-background", isRTL && "flex-row-reverse")}>
+    <div className="flex min-h-screen w-full bg-background">
       {/* Mobile overlay */}
       {mobileOpen && (
         <div 
