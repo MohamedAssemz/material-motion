@@ -202,17 +202,6 @@ export function AppLayout({ children }: AppLayoutProps) {
 
           {/* Right-side controls — always on "end" side */}
           <div className={cn("flex items-center gap-4", isRTL && "flex-row-reverse")}>
-            {/* Language toggle */}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={toggleLanguage}
-              className="gap-2 font-medium"
-            >
-              <Globe className="h-4 w-4" />
-              {language === 'en' ? 'AR' : 'EN'}
-            </Button>
-            
             <div className={cn("hidden sm:block", isRTL ? "text-left" : "text-right")}>
               <p className="text-sm font-medium truncate max-w-[200px]">{user?.email}</p>
             </div>
