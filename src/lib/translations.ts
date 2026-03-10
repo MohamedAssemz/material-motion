@@ -114,7 +114,7 @@ export const translations: Record<string, TranslationEntry> = {
   // ══════════════════════════════════════════
   //  APP HEADER
   // ══════════════════════════════════════════
-  "header.miracle_erp":     { en: "Miracle ERP",        ar: "ميراكل ERP" },
+  "header.miracle_erp":     { en: "Miracle",            ar: "ميراكل" },
   "header.production_system": { en: "Production System", ar: "نظام الإنتاج" },
   "header.logout":          { en: "Logout",             ar: "تسجيل الخروج" },
 
