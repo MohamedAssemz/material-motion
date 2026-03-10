@@ -41,7 +41,7 @@ export const translations: Record<string, TranslationEntry> = {
   "nav.catalog":          { en: "Catalog",            ar: "الكتالوج" },
   "nav.manufacturing":    { en: "Manufacturing",      ar: "التصنيع" },
   "nav.finishing":        { en: "Finishing",           ar: "التشطيب" },
-  "nav.packaging":        { en: "Packaging",          ar: "التعبئة" },
+  "nav.packaging":        { en: "Packaging",          ar: "التغليف" },
   "nav.boxing":           { en: "Boxing",             ar: "التعليب" },
   "nav.warehouse":        { en: "Warehouse",          ar: "المستودع" },
   "nav.extra_inventory":  { en: "Extra Inventory",    ar: "المخزون الإضافي" },

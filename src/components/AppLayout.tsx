@@ -168,16 +168,28 @@ export function AppLayout({ children }: AppLayoutProps) {
           </nav>
         </ScrollArea>
 
-        {/* Collapse button */}
-        <div className="hidden lg:flex justify-end p-2 border-t border-sidebar-border">
+        {/* Language toggle + Collapse button */}
+        <div className="flex flex-col gap-2 p-2 border-t border-sidebar-border">
           <Button
             variant="ghost"
-            size="icon"
-            onClick={() => setCollapsed(!collapsed)}
-            className="h-8 w-8"
+            size={collapsed ? "icon" : "default"}
+            onClick={toggleLanguage}
+            className={cn("gap-2 font-medium", collapsed ? "h-8 w-8" : "w-full justify-start")}
+            title={language === 'en' ? 'التبديل إلى العربية' : 'Switch to English'}
           >
-            <CollapseIcon className="h-4 w-4" />
+            <Globe className="h-4 w-4 shrink-0" />
+            {!collapsed && (language === 'en' ? 'Arabic' : 'English')}
           </Button>
+          <div className="hidden lg:flex justify-end">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setCollapsed(!collapsed)}
+              className="h-8 w-8"
+            >
+              <CollapseIcon className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </aside>
 
