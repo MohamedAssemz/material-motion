@@ -586,7 +586,7 @@ export const translations: Record<string, TranslationEntry> = {
   "catalog.manage_categories":{ en: "Manage Categories",    ar: "إدارة الفئات" },
   "catalog.download_template":{ en: "Download Template",    ar: "تحميل النموذج" },
 
-  "order.packaging_reference":{ en: "Packaging Reference",  ar: "مرجع التعبئة" },
+  "order.packaging_reference":{ en: "Packaging Reference",  ar: "مرجع التغليف" },
   "order.raw_material_images":{ en: "Raw Material Images",  ar: "صور المواد الخام" },
   "order.create_kartona":     { en: "Create Kartona",       ar: "إنشاء كرتونة" },
   "order.add_item":           { en: "Add Item",             ar: "إضافة عنصر" },
