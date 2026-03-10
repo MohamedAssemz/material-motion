@@ -556,10 +556,10 @@ export default function Dashboard() {
           <CardContent className="h-64">
             {throughputData.length > 0 ?
             <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={throughputData} margin={{ left: 0, right: 10 }}>
+                <BarChart data={throughputData} margin={{ left: isRTL ? 10 : 0, right: isRTL ? 0 : 10 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} />
-                  <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} />
+                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} reversed={isRTL} />
+                  <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} orientation={isRTL ? 'right' : 'left'} />
                   <Tooltip
                   contentStyle={{
                     background: 'hsl(var(--card))',

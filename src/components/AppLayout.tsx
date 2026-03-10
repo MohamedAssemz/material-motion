@@ -153,7 +153,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                   )} />
                   {!collapsed && (
                     <>
-                      <span className="flex-1 truncate">{t(item.translationKey)}</span>
+                      <span className="truncate">{t(item.translationKey)}</span>
                       {item.badge && (
                         <Badge 
                           variant="secondary" 
