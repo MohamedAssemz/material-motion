@@ -223,7 +223,7 @@ export const translations: Record<string, TranslationEntry> = {
   "orders.view_manage_shipments": { en: "View and manage order shipments", ar: "عرض وإدارة شحنات الطلب" },
   "orders.order_items":       { en: "Order Items",         ar: "عناصر الطلب" },
   "orders.products_in_order": { en: "Products included in this order", ar: "المنتجات في هذا الطلب" },
-  "orders.packing":           { en: "Packing",             ar: "التعبئة" },
+  "orders.packing":           { en: "Packing",             ar: "التغليف" },
   "orders.boxing_col":        { en: "Boxing",              ar: "التعليب" },
   "orders.progress":          { en: "Progress",            ar: "التقدم" },
   "orders.go_back":           { en: "Go Back",             ar: "رجوع" },
