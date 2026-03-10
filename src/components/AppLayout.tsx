@@ -138,6 +138,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                   onClick={() => setMobileOpen(false)}
                   className={cn(
                     "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors group",
+                    isRTL && "flex-row-reverse text-right",
                     active 
                       ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium" 
                       : "text-sidebar-foreground hover:bg-sidebar-accent/50",
