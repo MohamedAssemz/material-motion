@@ -881,7 +881,7 @@ export const translations: Record<string, TranslationEntry> = {
   "phase.no_machines_found":    { en: "No machines found", ar: "لم يتم العثور على ماكينات" },
   "phase.route_items":          { en: "Route Items",       ar: "توجيه العناصر" },
   "phase.no_items_ready_shipment": { en: "No items ready for shipment", ar: "لا توجد عناصر جاهزة للشحن" },
-  "phase.packaging_reference":  { en: "Packaging Reference", ar: "مرجع التعبئة" },
+  "phase.packaging_reference":  { en: "Packaging Reference", ar: "مرجع التغليف" },
   "phase.move_to_ready_shipment": { en: "Move to Ready for Shipment", ar: "نقل لجاهز للشحن" },
   "phase.no_items_boxing":      { en: "No items in boxing", ar: "لا توجد عناصر في التعليب" },
   "queue.no_completed_boxing":  { en: "No completed orders with boxing history", ar: "لا توجد طلبات مكتملة مع سجل التعليب" },
