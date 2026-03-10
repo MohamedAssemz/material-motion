@@ -41,7 +41,7 @@ export const translations: Record<string, TranslationEntry> = {
   "nav.catalog":          { en: "Catalog",            ar: "الكتالوج" },
   "nav.manufacturing":    { en: "Manufacturing",      ar: "التصنيع" },
   "nav.finishing":        { en: "Finishing",           ar: "التشطيب" },
-  "nav.packaging":        { en: "Packaging",          ar: "التعبئة" },
+  "nav.packaging":        { en: "Packaging",          ar: "التغليف" },
   "nav.boxing":           { en: "Boxing",             ar: "التعليب" },
   "nav.warehouse":        { en: "Warehouse",          ar: "المستودع" },
   "nav.extra_inventory":  { en: "Extra Inventory",    ar: "المخزون الإضافي" },
@@ -108,13 +108,13 @@ export const translations: Record<string, TranslationEntry> = {
   "role.admin":                   { en: "Administrator",          ar: "مدير النظام" },
   "role.manufacturing_manager":   { en: "Manufacturing Manager",  ar: "مدير التصنيع" },
   "role.finishing_manager":       { en: "Finishing Manager",      ar: "مدير التشطيب" },
-  "role.packaging_manager":       { en: "Packaging Manager",     ar: "مدير التعبئة" },
+  "role.packaging_manager":       { en: "Packaging Manager",     ar: "مدير التغليف" },
   "role.boxing_manager":          { en: "Boxing Manager",        ar: "مدير التعليب" },
 
   // ══════════════════════════════════════════
   //  APP HEADER
   // ══════════════════════════════════════════
-  "header.miracle_erp":     { en: "Miracle ERP",        ar: "ميراكل ERP" },
+  "header.miracle_erp":     { en: "Miracle",            ar: "ميراكل" },
   "header.production_system": { en: "Production System", ar: "نظام الإنتاج" },
   "header.logout":          { en: "Logout",             ar: "تسجيل الخروج" },
 
@@ -223,7 +223,7 @@ export const translations: Record<string, TranslationEntry> = {
   "orders.view_manage_shipments": { en: "View and manage order shipments", ar: "عرض وإدارة شحنات الطلب" },
   "orders.order_items":       { en: "Order Items",         ar: "عناصر الطلب" },
   "orders.products_in_order": { en: "Products included in this order", ar: "المنتجات في هذا الطلب" },
-  "orders.packing":           { en: "Packing",             ar: "التعبئة" },
+  "orders.packing":           { en: "Packing",             ar: "التغليف" },
   "orders.boxing_col":        { en: "Boxing",              ar: "التعليب" },
   "orders.progress":          { en: "Progress",            ar: "التقدم" },
   "orders.go_back":           { en: "Go Back",             ar: "رجوع" },
@@ -232,7 +232,7 @@ export const translations: Record<string, TranslationEntry> = {
   "orders.no_customer":       { en: "No Customer",         ar: "بدون عميل" },
   "orders.not_found":         { en: "Order not found",     ar: "الطلب غير موجود" },
   "orders.back_to_orders":    { en: "Back to Orders",      ar: "العودة للطلبات" },
-  "orders.packaging_reference": { en: "Packaging Reference", ar: "مرجع التعبئة" },
+  "orders.packaging_reference": { en: "Packaging Reference", ar: "مرجع التغليف" },
 
   // ══════════════════════════════════════════
   //  MANUFACTURING
@@ -255,9 +255,9 @@ export const translations: Record<string, TranslationEntry> = {
   // ══════════════════════════════════════════
   //  PACKAGING
   // ══════════════════════════════════════════
-  "packaging.title":          { en: "Packaging",            ar: "التعبئة" },
-  "packaging.queue":          { en: "Packaging Queue",      ar: "طابور التعبئة" },
-  "packaging.in_progress":    { en: "In Packaging",         ar: "قيد التعبئة" },
+  "packaging.title":          { en: "Packaging",            ar: "التغليف" },
+  "packaging.queue":          { en: "Packaging Queue",      ar: "طابور التغليف" },
+  "packaging.in_progress":    { en: "In Packaging",         ar: "قيد التغليف" },
 
   // ══════════════════════════════════════════
   //  BOXING
@@ -423,9 +423,9 @@ export const translations: Record<string, TranslationEntry> = {
   "state.waiting_for_rm":     { en: "Waiting for Raw Material",       ar: "في انتظار المواد الخام" },
   "state.in_manufacturing":   { en: "In Manufacturing",               ar: "قيد التصنيع" },
   "state.manufactured":       { en: "Manufactured",                   ar: "تم التصنيع" },
-  "state.waiting_for_pm":     { en: "Waiting for Packaging Material", ar: "في انتظار مواد التعبئة" },
-  "state.in_packaging":       { en: "In Packaging",                   ar: "قيد التعبئة" },
-  "state.packaged":           { en: "Packaged",                       ar: "تم التعبئة" },
+  "state.waiting_for_pm":     { en: "Waiting for Packaging Material", ar: "في انتظار مواد التغليف" },
+  "state.in_packaging":       { en: "In Packaging",                   ar: "قيد التغليف" },
+  "state.packaged":           { en: "Packaged",                       ar: "تم التغليف" },
   "state.waiting_for_bm":     { en: "Waiting for Boxing Material",    ar: "في انتظار مواد التعليب" },
   "state.in_boxing":          { en: "In Boxing",                      ar: "قيد التعليب" },
   "state.boxed":              { en: "Boxed",                          ar: "تم التعليب" },
@@ -439,7 +439,7 @@ export const translations: Record<string, TranslationEntry> = {
   "state.in_finishing":         { en: "In Finishing",                  ar: "قيد التشطيب" },
   "state.manufacturing":        { en: "Manufacturing",                ar: "التصنيع" },
   "state.finishing":            { en: "Finishing",                     ar: "التشطيب" },
-  "state.packaging":            { en: "Packaging",                    ar: "التعبئة" },
+  "state.packaging":            { en: "Packaging",                    ar: "التغليف" },
   "state.boxing":               { en: "Boxing",                       ar: "التعليب" },
 
   // ══════════════════════════════════════════
@@ -586,7 +586,7 @@ export const translations: Record<string, TranslationEntry> = {
   "catalog.manage_categories":{ en: "Manage Categories",    ar: "إدارة الفئات" },
   "catalog.download_template":{ en: "Download Template",    ar: "تحميل النموذج" },
 
-  "order.packaging_reference":{ en: "Packaging Reference",  ar: "مرجع التعبئة" },
+  "order.packaging_reference":{ en: "Packaging Reference",  ar: "مرجع التغليف" },
   "order.raw_material_images":{ en: "Raw Material Images",  ar: "صور المواد الخام" },
   "order.create_kartona":     { en: "Create Kartona",       ar: "إنشاء كرتونة" },
   "order.add_item":           { en: "Add Item",             ar: "إضافة عنصر" },
@@ -662,10 +662,10 @@ export const translations: Record<string, TranslationEntry> = {
   // ══════════════════════════════════════════
   //  PACKAGING PHASE
   // ══════════════════════════════════════════
-  "packaging.ready_for_packaging":   { en: "Ready for Packaging", ar: "جاهز للتعبئة" },
-  "packaging.products_in_packaging": { en: "Products in Packaging", ar: "المنتجات قيد التعبئة" },
+  "packaging.ready_for_packaging":   { en: "Ready for Packaging", ar: "جاهز للتغليف" },
+  "packaging.products_in_packaging": { en: "Products in Packaging", ar: "المنتجات قيد التغليف" },
   "packaging.send_to_boxing":        { en: "Send to Boxing", ar: "إرسال للتعليب" },
-  "packaging.machine_optional":      { en: "Packaging Machine (Optional)", ar: "ماكينة التعبئة (اختياري)" },
+  "packaging.machine_optional":      { en: "Packaging Machine (Optional)", ar: "ماكينة التغليف (اختياري)" },
   "packaging.box_directly":          { en: "Box Directly", ar: "تعليب مباشر" },
 
   // ══════════════════════════════════════════
@@ -703,8 +703,8 @@ export const translations: Record<string, TranslationEntry> = {
   "queue.no_completed_orders":  { en: "No completed orders with history", ar: "لا توجد طلبات مكتملة مع سجل" },
   "queue.in_finishing":         { en: "In Finishing",   ar: "قيد التشطيب" },
   "queue.ready_finishing":      { en: "Ready for Finishing", ar: "جاهز للتشطيب" },
-  "queue.in_packaging":         { en: "In Packaging",   ar: "قيد التعبئة" },
-  "queue.ready_packaging":      { en: "Ready for Packaging", ar: "جاهز للتعبئة" },
+  "queue.in_packaging":         { en: "In Packaging",   ar: "قيد التغليف" },
+  "queue.ready_packaging":      { en: "Ready for Packaging", ar: "جاهز للتغليف" },
   "queue.in_boxing":            { en: "In Boxing",      ar: "قيد التعليب" },
   "queue.ready_boxing":         { en: "Ready for Boxing", ar: "جاهز للتعليب" },
   "queue.ready_shipment":       { en: "Ready for Shipment", ar: "جاهز للشحن" },
@@ -835,12 +835,12 @@ export const translations: Record<string, TranslationEntry> = {
 
   // Queue page descriptions
   "queue.finishing_desc":       { en: "Orders awaiting finishing or in finishing", ar: "طلبات في انتظار التشطيب أو قيد التشطيب" },
-  "queue.packaging_desc":       { en: "Orders awaiting packaging materials or in packaging", ar: "طلبات في انتظار مواد التعبئة أو قيد التعبئة" },
+  "queue.packaging_desc":       { en: "Orders awaiting packaging materials or in packaging", ar: "طلبات في انتظار مواد التغليف أو قيد التغليف" },
   "queue.boxing_desc":          { en: "Orders awaiting boxing materials or in boxing", ar: "طلبات في انتظار مواد التعليب أو قيد التعليب" },
   "queue.no_active_finishing":  { en: "No active orders in finishing queue", ar: "لا توجد طلبات نشطة في طابور التشطيب" },
   "queue.no_completed_finishing": { en: "No completed orders with finishing history", ar: "لا توجد طلبات مكتملة مع سجل التشطيب" },
-  "queue.no_active_packaging":  { en: "No active orders in packaging queue", ar: "لا توجد طلبات نشطة في طابور التعبئة" },
-  "queue.no_completed_packaging": { en: "No completed orders with packaging history", ar: "لا توجد طلبات مكتملة مع سجل التعبئة" },
+  "queue.no_active_packaging":  { en: "No active orders in packaging queue", ar: "لا توجد طلبات نشطة في طابور التغليف" },
+  "queue.no_completed_packaging": { en: "No completed orders with packaging history", ar: "لا توجد طلبات مكتملة مع سجل التغليف" },
   "queue.no_active_boxing":     { en: "No active orders in boxing queue", ar: "لا توجد طلبات نشطة في طابور التعليب" },
 
   // ══════════════════════════════════════════
@@ -881,7 +881,7 @@ export const translations: Record<string, TranslationEntry> = {
   "phase.no_machines_found":    { en: "No machines found", ar: "لم يتم العثور على ماكينات" },
   "phase.route_items":          { en: "Route Items",       ar: "توجيه العناصر" },
   "phase.no_items_ready_shipment": { en: "No items ready for shipment", ar: "لا توجد عناصر جاهزة للشحن" },
-  "phase.packaging_reference":  { en: "Packaging Reference", ar: "مرجع التعبئة" },
+  "phase.packaging_reference":  { en: "Packaging Reference", ar: "مرجع التغليف" },
   "phase.move_to_ready_shipment": { en: "Move to Ready for Shipment", ar: "نقل لجاهز للشحن" },
   "phase.no_items_boxing":      { en: "No items in boxing", ar: "لا توجد عناصر في التعليب" },
   "queue.no_completed_boxing":  { en: "No completed orders with boxing history", ar: "لا توجد طلبات مكتملة مع سجل التعليب" },

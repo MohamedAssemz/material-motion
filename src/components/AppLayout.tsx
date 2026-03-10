@@ -168,16 +168,28 @@ export function AppLayout({ children }: AppLayoutProps) {
           </nav>
         </ScrollArea>
 
-        {/* Collapse button */}
-        <div className="hidden lg:flex justify-end p-2 border-t border-sidebar-border">
+        {/* Language toggle + Collapse button */}
+        <div className="flex flex-col gap-2 p-2 border-t border-sidebar-border">
           <Button
             variant="ghost"
-            size="icon"
-            onClick={() => setCollapsed(!collapsed)}
-            className="h-8 w-8"
+            size={collapsed ? "icon" : "default"}
+            onClick={toggleLanguage}
+            className={cn("gap-2 font-medium", collapsed ? "h-8 w-8" : "w-full justify-start")}
+            title={language === 'en' ? 'التبديل إلى العربية' : 'Switch to English'}
           >
-            <CollapseIcon className="h-4 w-4" />
+            <Globe className="h-4 w-4 shrink-0" />
+            {!collapsed && (language === 'en' ? 'Arabic' : 'English')}
           </Button>
+          <div className="hidden lg:flex justify-end">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setCollapsed(!collapsed)}
+              className="h-8 w-8"
+            >
+              <CollapseIcon className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </aside>
 
@@ -202,17 +214,6 @@ export function AppLayout({ children }: AppLayoutProps) {
 
           {/* Right-side controls — always on "end" side */}
           <div className={cn("flex items-center gap-4", isRTL && "flex-row-reverse")}>
-            {/* Language toggle */}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={toggleLanguage}
-              className="gap-2 font-medium"
-            >
-              <Globe className="h-4 w-4" />
-              {language === 'en' ? 'AR' : 'EN'}
-            </Button>
-            
             <div className={cn("hidden sm:block", isRTL ? "text-left" : "text-right")}>
               <p className="text-sm font-medium truncate max-w-[200px]">{user?.email}</p>
             </div>
