@@ -88,7 +88,7 @@ function getTimeRangeStart(range: TimeRange): Date {
 /* ─── component ─── */
 export default function Dashboard() {
   const { user, hasRole, primaryRole } = useAuth();
-  const { t } = useLanguage();
+  const { t, isRTL } = useLanguage();
   const navigate = useNavigate();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
