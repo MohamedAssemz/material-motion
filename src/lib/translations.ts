@@ -255,9 +255,9 @@ export const translations: Record<string, TranslationEntry> = {
   // ══════════════════════════════════════════
   //  PACKAGING
   // ══════════════════════════════════════════
-  "packaging.title":          { en: "Packaging",            ar: "التعبئة" },
-  "packaging.queue":          { en: "Packaging Queue",      ar: "طابور التعبئة" },
-  "packaging.in_progress":    { en: "In Packaging",         ar: "قيد التعبئة" },
+  "packaging.title":          { en: "Packaging",            ar: "التغليف" },
+  "packaging.queue":          { en: "Packaging Queue",      ar: "طابور التغليف" },
+  "packaging.in_progress":    { en: "In Packaging",         ar: "قيد التغليف" },
 
   // ══════════════════════════════════════════
   //  BOXING
