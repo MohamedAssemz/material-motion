@@ -170,27 +170,25 @@ export function AppLayout({ children }: AppLayoutProps) {
         </ScrollArea>
 
         {/* Language toggle + Collapse button */}
-        <div className="flex flex-col gap-2 p-2 border-t border-sidebar-border">
+        <div className={cn("flex items-center gap-2 p-2 border-t border-sidebar-border", isRTL && "flex-row-reverse")}>
           <Button
             variant="ghost"
             size={collapsed ? "icon" : "default"}
             onClick={toggleLanguage}
-            className={cn("gap-2 font-medium", collapsed ? "h-8 w-8" : "w-full justify-start")}
+            className={cn("gap-2 font-medium flex-1", collapsed ? "h-8 w-8 flex-none" : "justify-start", isRTL && !collapsed && "flex-row-reverse justify-end")}
             title={language === 'en' ? 'التبديل إلى العربية' : 'Switch to English'}
           >
             <Globe className="h-4 w-4 shrink-0" />
             {!collapsed && (language === 'en' ? 'Arabic' : 'English')}
           </Button>
-          <div className="hidden lg:flex justify-end">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setCollapsed(!collapsed)}
-              className="h-8 w-8"
-            >
-              <CollapseIcon className="h-4 w-4" />
-            </Button>
-          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setCollapsed(!collapsed)}
+            className="h-8 w-8 shrink-0 hidden lg:flex"
+          >
+            <CollapseIcon className="h-4 w-4" />
+          </Button>
         </div>
       </aside>
 
