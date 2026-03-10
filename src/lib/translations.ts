@@ -662,10 +662,10 @@ export const translations: Record<string, TranslationEntry> = {
   // ══════════════════════════════════════════
   //  PACKAGING PHASE
   // ══════════════════════════════════════════
-  "packaging.ready_for_packaging":   { en: "Ready for Packaging", ar: "جاهز للتعبئة" },
-  "packaging.products_in_packaging": { en: "Products in Packaging", ar: "المنتجات قيد التعبئة" },
+  "packaging.ready_for_packaging":   { en: "Ready for Packaging", ar: "جاهز للتغليف" },
+  "packaging.products_in_packaging": { en: "Products in Packaging", ar: "المنتجات قيد التغليف" },
   "packaging.send_to_boxing":        { en: "Send to Boxing", ar: "إرسال للتعليب" },
-  "packaging.machine_optional":      { en: "Packaging Machine (Optional)", ar: "ماكينة التعبئة (اختياري)" },
+  "packaging.machine_optional":      { en: "Packaging Machine (Optional)", ar: "ماكينة التغليف (اختياري)" },
   "packaging.box_directly":          { en: "Box Directly", ar: "تعليب مباشر" },
 
   // ══════════════════════════════════════════
