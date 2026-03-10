@@ -108,7 +108,7 @@ export const translations: Record<string, TranslationEntry> = {
   "role.admin":                   { en: "Administrator",          ar: "مدير النظام" },
   "role.manufacturing_manager":   { en: "Manufacturing Manager",  ar: "مدير التصنيع" },
   "role.finishing_manager":       { en: "Finishing Manager",      ar: "مدير التشطيب" },
-  "role.packaging_manager":       { en: "Packaging Manager",     ar: "مدير التعبئة" },
+  "role.packaging_manager":       { en: "Packaging Manager",     ar: "مدير التغليف" },
   "role.boxing_manager":          { en: "Boxing Manager",        ar: "مدير التعليب" },
 
   // ══════════════════════════════════════════
