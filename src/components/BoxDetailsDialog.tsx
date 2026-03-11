@@ -357,7 +357,7 @@ export function BoxDetailsDialog({
                       <TableRow key={`${group.sku}-${group.inventory_state}`}>
                         <TableCell className="font-mono text-sm">{group.sku}</TableCell>
                         <TableCell>{group.name}</TableCell>
-                        <TableCell className="text-right font-medium">{group.totalQty}</TableCell>
+                        <TableCell className="text-end font-medium">{group.totalQty}</TableCell>
                         <TableCell>
                           <Badge
                             variant={group.inventory_state === 'RESERVED' ? 'default' : 'outline'}
