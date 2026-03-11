@@ -414,9 +414,9 @@ export function BoxDetailsDialog({
       <AlertDialog open={forceEmptyConfirmOpen} onOpenChange={setForceEmptyConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Force Empty Box</AlertDialogTitle>
+            <AlertDialogTitle>{t('box_details.force_empty_title')}</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to force empty box {boxCode}? All batches will be reverted to their previous state. This action cannot be undone.
+              {t('box_details.force_empty_desc')} {boxCode}? {t('box_details.force_empty_warning')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
