@@ -346,10 +346,10 @@ export function BoxDetailsDialog({
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Product SKU</TableHead>
-                      <TableHead>Product Name</TableHead>
-                      <TableHead className="text-right">Total Qty</TableHead>
-                      <TableHead>Inv State</TableHead>
+                      <TableHead>{t('box_details.product_sku')}</TableHead>
+                      <TableHead>{t('box_details.product_name')}</TableHead>
+                      <TableHead className="text-end">{t('box_details.total_qty')}</TableHead>
+                      <TableHead>{t('box_details.inv_state')}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
