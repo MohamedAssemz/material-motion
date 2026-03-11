@@ -383,7 +383,7 @@ export function BoxDetailsDialog({
                 className="sm:mr-auto"
               >
                 {forceEmptying ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RotateCcw className="h-4 w-4 mr-2" />}
-                Force Empty
+                {t('box_details.force_empty')}
               </Button>
             )}
             <Button 
