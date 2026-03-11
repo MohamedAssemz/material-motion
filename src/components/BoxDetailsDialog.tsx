@@ -256,7 +256,9 @@ export function BoxDetailsDialog({
   };
 
   const formatState = (state: string) => {
-    return state?.replace(/_/g, ' ').toUpperCase() || 'UNKNOWN';
+    const key = `state.${state}`;
+    const translated = t(key);
+    return translated !== key ? translated : (state?.replace(/_/g, ' ').toUpperCase() || 'UNKNOWN');
   };
 
   const getStatusBadge = () => {
