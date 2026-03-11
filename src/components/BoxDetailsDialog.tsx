@@ -226,7 +226,7 @@ export function BoxDetailsDialog({
       const table = boxType === 'order' ? 'boxes' : 'extra_boxes';
       await supabase.from(table).update({ items_list: [] }).eq('id', boxId);
 
-      toast({ title: 'Success', description: 'Box emptied successfully. Batches reverted.' });
+      toast({ title: t('toast.success'), description: t('box_details.box_emptied') });
       fetchBatchDetails();
       onRefresh?.();
     } catch (error: any) {
