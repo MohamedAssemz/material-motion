@@ -194,7 +194,7 @@ export default function Analytics() {
       const distribution: StateDistribution[] = Array.from(stateMap.entries()).map(([state, count]) => ({
         state,
         count,
-        label: state.replace(/_/g, ' ').toUpperCase(),
+        label: t(`state.${state}`) !== `state.${state}` ? t(`state.${state}`) : state.replace(/_/g, ' ').toUpperCase(),
       }));
       setStateDistribution(distribution);
 
