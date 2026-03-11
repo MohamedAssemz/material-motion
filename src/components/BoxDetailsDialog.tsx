@@ -321,7 +321,7 @@ export function BoxDetailsDialog({
                 </div>
               ) : isEmpty ? (
                 <div className="text-center py-8 text-muted-foreground">
-                  <p>No batches in this box</p>
+                  <p>{t('box_details.no_batches')}</p>
                 </div>
               ) : boxType === 'order' ? (
                 <Table>
