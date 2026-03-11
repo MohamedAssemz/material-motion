@@ -70,7 +70,7 @@ const STATE_COLORS: Record<string, string> = {
 
 export default function Analytics() {
   const navigate = useNavigate();
-  const { t } = useLanguage();
+  const { t, isRTL } = useLanguage();
   const [batchETAs, setBatchETAs] = useState<BatchETA[]>([]);
   const [machineStats, setMachineStats] = useState<MachineStats[]>([]);
   const [stateDistribution, setStateDistribution] = useState<StateDistribution[]>([]);
