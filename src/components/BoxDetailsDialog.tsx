@@ -84,6 +84,7 @@ export function BoxDetailsDialog({
 }: BoxDetailsDialogProps) {
   const { hasRole } = useAuth();
   const { toast } = useToast();
+  const { t } = useLanguage();
   const [loading, setLoading] = useState(false);
   const [forceEmptying, setForceEmptying] = useState(false);
   const [forceEmptyConfirmOpen, setForceEmptyConfirmOpen] = useState(false);
