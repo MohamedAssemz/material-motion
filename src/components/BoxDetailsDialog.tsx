@@ -337,7 +337,7 @@ export function BoxDetailsDialog({
                       <TableRow key={group.sku}>
                         <TableCell className="font-mono text-sm">{group.sku}</TableCell>
                         <TableCell>{group.name}</TableCell>
-                        <TableCell className="text-right font-medium">{group.totalQty}</TableCell>
+                        <TableCell className="text-end font-medium">{group.totalQty}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
