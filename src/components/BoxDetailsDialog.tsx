@@ -265,7 +265,7 @@ export function BoxDetailsDialog({
     if (isEmpty && !loading) {
       return (
         <Badge variant="outline" className="text-green-600 border-green-600">
-          Empty
+          {t('box_details.empty')}
         </Badge>
       );
     }
