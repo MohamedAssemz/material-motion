@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import {
   Dialog,
   DialogContent,
@@ -83,6 +84,7 @@ export function BoxDetailsDialog({
 }: BoxDetailsDialogProps) {
   const { hasRole } = useAuth();
   const { toast } = useToast();
+  const { t } = useLanguage();
   const [loading, setLoading] = useState(false);
   const [forceEmptying, setForceEmptying] = useState(false);
   const [forceEmptyConfirmOpen, setForceEmptyConfirmOpen] = useState(false);
@@ -224,7 +226,7 @@ export function BoxDetailsDialog({
       const table = boxType === 'order' ? 'boxes' : 'extra_boxes';
       await supabase.from(table).update({ items_list: [] }).eq('id', boxId);
 
-      toast({ title: 'Success', description: 'Box emptied successfully. Batches reverted.' });
+      toast({ title: t('toast.success'), description: t('box_details.box_emptied') });
       fetchBatchDetails();
       onRefresh?.();
     } catch (error: any) {
@@ -254,14 +256,16 @@ export function BoxDetailsDialog({
   };
 
   const formatState = (state: string) => {
-    return state?.replace(/_/g, ' ').toUpperCase() || 'UNKNOWN';
+    const key = `state.${state}`;
+    const translated = t(key);
+    return translated !== key ? translated : (state?.replace(/_/g, ' ').toUpperCase() || 'UNKNOWN');
   };
 
   const getStatusBadge = () => {
     if (isEmpty && !loading) {
       return (
         <Badge variant="outline" className="text-green-600 border-green-600">
-          Empty
+          {t('box_details.empty')}
         </Badge>
       );
     }
@@ -290,16 +294,16 @@ export function BoxDetailsDialog({
             {/* Box Info */}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
               <div>
-                <p className="text-muted-foreground">Created</p>
+                <p className="text-muted-foreground">{t('box_details.created')}</p>
                 <p className="font-medium">{format(new Date(createdAt), 'PPP')}</p>
               </div>
               <div>
-                <p className="text-muted-foreground">Active</p>
-                <p className="font-medium">{isActive ? 'Yes' : 'No'}</p>
+                <p className="text-muted-foreground">{t('box_details.active')}</p>
+                <p className="font-medium">{isActive ? t('common.yes') : t('common.no')}</p>
               </div>
               {boxType === 'order' && orderNumbers.length > 0 && (
                 <div>
-                  <p className="text-muted-foreground">Order</p>
+                  <p className="text-muted-foreground">{t('box_details.order')}</p>
                   <p className="font-medium font-mono">{orderNumbers.join(', ')}</p>
                 </div>
               )}
@@ -308,7 +312,7 @@ export function BoxDetailsDialog({
             {/* Batches Section */}
             <div>
               <h3 className="font-semibold mb-2">
-                Products ({loading ? '...' : boxType === 'order' ? groupedOrderBatches.length : groupedExtraBatches.length})
+                {t('box_details.products')} ({loading ? '...' : boxType === 'order' ? groupedOrderBatches.length : groupedExtraBatches.length})
               </h3>
 
               {loading ? (
@@ -317,15 +321,15 @@ export function BoxDetailsDialog({
                 </div>
               ) : isEmpty ? (
                 <div className="text-center py-8 text-muted-foreground">
-                  <p>No batches in this box</p>
+                  <p>{t('box_details.no_batches')}</p>
                 </div>
               ) : boxType === 'order' ? (
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Product SKU</TableHead>
-                      <TableHead>Product Name</TableHead>
-                      <TableHead className="text-right">Total Qty</TableHead>
+                      <TableHead>{t('box_details.product_sku')}</TableHead>
+                      <TableHead>{t('box_details.product_name')}</TableHead>
+                      <TableHead className="text-end">{t('box_details.total_qty')}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -333,7 +337,7 @@ export function BoxDetailsDialog({
                       <TableRow key={group.sku}>
                         <TableCell className="font-mono text-sm">{group.sku}</TableCell>
                         <TableCell>{group.name}</TableCell>
-                        <TableCell className="text-right font-medium">{group.totalQty}</TableCell>
+                        <TableCell className="text-end font-medium">{group.totalQty}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -342,10 +346,10 @@ export function BoxDetailsDialog({
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Product SKU</TableHead>
-                      <TableHead>Product Name</TableHead>
-                      <TableHead className="text-right">Total Qty</TableHead>
-                      <TableHead>Inv State</TableHead>
+                      <TableHead>{t('box_details.product_sku')}</TableHead>
+                      <TableHead>{t('box_details.product_name')}</TableHead>
+                      <TableHead className="text-end">{t('box_details.total_qty')}</TableHead>
+                      <TableHead>{t('box_details.inv_state')}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -353,7 +357,7 @@ export function BoxDetailsDialog({
                       <TableRow key={`${group.sku}-${group.inventory_state}`}>
                         <TableCell className="font-mono text-sm">{group.sku}</TableCell>
                         <TableCell>{group.name}</TableCell>
-                        <TableCell className="text-right font-medium">{group.totalQty}</TableCell>
+                        <TableCell className="text-end font-medium">{group.totalQty}</TableCell>
                         <TableCell>
                           <Badge
                             variant={group.inventory_state === 'RESERVED' ? 'default' : 'outline'}
@@ -379,7 +383,7 @@ export function BoxDetailsDialog({
                 className="sm:mr-auto"
               >
                 {forceEmptying ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RotateCcw className="h-4 w-4 mr-2" />}
-                Force Empty
+                {t('box_details.force_empty')}
               </Button>
             )}
             <Button 
@@ -396,11 +400,9 @@ export function BoxDetailsDialog({
                 setTimeout(() => URL.revokeObjectURL(url), 1000);
               }}
             >
-              <Printer className="h-4 w-4 mr-2" />
-              Print Label
+              <Printer className="h-4 w-4 mr-2" />{t('box_details.print_label')}
             </Button>
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
-              Close
+            <Button variant="outline" onClick={() => onOpenChange(false)}>{t('common.close')}</Button>
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -410,18 +412,18 @@ export function BoxDetailsDialog({
       <AlertDialog open={forceEmptyConfirmOpen} onOpenChange={setForceEmptyConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Force Empty Box</AlertDialogTitle>
+            <AlertDialogTitle>{t('box_details.force_empty_title')}</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to force empty box {boxCode}? All batches will be reverted to their previous state. This action cannot be undone.
+              {t('box_details.force_empty_desc')} {boxCode}? {t('box_details.force_empty_warning')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => { setForceEmptyConfirmOpen(false); handleForceEmpty(); }}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Force Empty
+              {t('box_details.force_empty')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

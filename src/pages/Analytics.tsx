@@ -70,7 +70,7 @@ const STATE_COLORS: Record<string, string> = {
 
 export default function Analytics() {
   const navigate = useNavigate();
-  const { t } = useLanguage();
+  const { t, isRTL } = useLanguage();
   const [batchETAs, setBatchETAs] = useState<BatchETA[]>([]);
   const [machineStats, setMachineStats] = useState<MachineStats[]>([]);
   const [stateDistribution, setStateDistribution] = useState<StateDistribution[]>([]);
@@ -194,7 +194,7 @@ export default function Analytics() {
       const distribution: StateDistribution[] = Array.from(stateMap.entries()).map(([state, count]) => ({
         state,
         count,
-        label: state.replace(/_/g, ' ').toUpperCase(),
+        label: t(`state.${state}`) !== `state.${state}` ? t(`state.${state}`) : state.replace(/_/g, ' ').toUpperCase(),
       }));
       setStateDistribution(distribution);
 
@@ -323,8 +323,8 @@ export default function Analytics() {
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={machineStats} layout="vertical">
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis type="number" />
-                    <YAxis dataKey="machine_name" type="category" width={100} />
+                    <XAxis type="number" reversed={isRTL} />
+                    <YAxis dataKey="machine_name" type="category" width={isRTL ? 120 : 100} orientation={isRTL ? 'right' : 'left'} tickMargin={8} />
                     <Tooltip 
                       contentStyle={{ 
                         backgroundColor: 'hsl(var(--card))', 
@@ -381,7 +381,7 @@ export default function Analytics() {
                       <div className="flex items-center gap-2">
                         <span className="font-medium">{batch.qr_code_data}</span>
                         <Badge variant="outline" className="text-xs">
-                          {batch.current_state.replace(/_/g, ' ')}
+                          {t(`state.${batch.current_state}`) !== `state.${batch.current_state}` ? t(`state.${batch.current_state}`) : batch.current_state.replace(/_/g, ' ')}
                         </Badge>
                       </div>
                       <p className="text-sm text-muted-foreground">
@@ -391,7 +391,7 @@ export default function Analytics() {
                   </div>
                   <div className="text-right">
                     <p className="text-sm font-medium">
-                      ETA: {format(new Date(batch.eta), 'MMM d, yyyy')}
+                      {t('analytics.eta_label')}: {format(new Date(batch.eta), 'MMM d, yyyy')}
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {formatDistanceToNow(new Date(batch.eta), { addSuffix: true })}

@@ -329,7 +329,11 @@ export default function Boxes() {
     return colors[state] || 'bg-amber-500';
   };
 
-  const formatState = (state: string) => state?.replace(/_/g, ' ').toUpperCase() || 'UNKNOWN';
+  const formatState = (state: string) => {
+    const key = `state.${state}`;
+    const translated = t(key);
+    return translated !== key ? translated : (state?.replace(/_/g, ' ').toUpperCase() || 'UNKNOWN');
+  };
 
   const emptyOrderBoxes = orderBoxes.filter(b => b.batch_count === 0 && b.is_active);
   const occupiedOrderBoxes = orderBoxes.filter(b => b.batch_count > 0);

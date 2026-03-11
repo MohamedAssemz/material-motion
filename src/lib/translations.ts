@@ -888,5 +888,102 @@ export const translations: Record<string, TranslationEntry> = {
   "queue.all_statuses":         { en: "All Statuses",   ar: "جميع الحالات" },
   "queue.has_shipped":          { en: "Has Shipped Items", ar: "يحتوي عناصر مشحونة" },
   "queue.has_extra":            { en: "Has Extra Items", ar: "يحتوي عناصر إضافية" },
+
+  // ══════════════════════════════════════════
+  //  MACHINES PAGE (additional)
+  // ══════════════════════════════════════════
+  "machines.manage_desc":       { en: "Manage production equipment", ar: "إدارة معدات الإنتاج" },
+  "machines.add_new":           { en: "Add New Machine",    ar: "إضافة ماكينة جديدة" },
+  "machines.machine_placeholder": { en: "e.g., Machine A",  ar: "مثال: ماكينة أ" },
+  "machines.no_machines":       { en: "No machines yet",    ar: "لا توجد ماكينات بعد" },
+  "machines.active_count":      { en: "active",             ar: "نشط" },
+  "machines.delete_title":      { en: "Delete Machine",     ar: "حذف ماكينة" },
+  "machines.delete_desc":       { en: "Are you sure you want to delete", ar: "هل أنت متأكد من حذف" },
+  "machines.delete_warning":    { en: "This cannot be undone. If this machine has production records linked to it, deletion may fail.", ar: "لا يمكن التراجع عن هذا. إذا كانت هذه الماكينة مرتبطة بسجلات إنتاج، قد يفشل الحذف." },
+  "machines.type.manufacturing": { en: "Manufacturing",     ar: "التصنيع" },
+  "machines.type.finishing":    { en: "Finishing",           ar: "التشطيب" },
+  "machines.type.packaging":    { en: "Packaging",          ar: "التغليف" },
+  "machines.type.boxing":       { en: "Boxing",             ar: "التعليب" },
+
+  // ══════════════════════════════════════════
+  //  ADMIN PAGE (additional)
+  // ══════════════════════════════════════════
+  "admin.user_management":      { en: "User Management",    ar: "إدارة المستخدمين" },
+  "admin.users_count":          { en: "users",              ar: "مستخدمين" },
+  "admin.access_denied":        { en: "Access Denied",      ar: "الوصول مرفوض" },
+  "admin.no_permission":        { en: "You don't have permission to access this page.", ar: "ليس لديك صلاحية للوصول لهذه الصفحة." },
+  "admin.last_admin":           { en: "Last admin",         ar: "آخر مدير" },
+  "admin.you":                  { en: "You",                ar: "أنت" },
+  "admin.user_col":             { en: "User",               ar: "المستخدم" },
+  "admin.actions_col":          { en: "Actions",            ar: "إجراءات" },
+  "admin.role_updated":         { en: "Primary role updated", ar: "تم تحديث الدور الرئيسي" },
+  "admin.role_added":           { en: "Role added",         ar: "تم إضافة الدور" },
+  "admin.role_removed":         { en: "Role removed",       ar: "تم إزالة الدور" },
+  "admin.cannot_remove_primary": { en: "This is the primary role", ar: "هذا هو الدور الرئيسي" },
+  "admin.cannot_remove":        { en: "Cannot remove",      ar: "لا يمكن إزالة" },
+  "admin.create_desc":          { en: "Create a new user account with credentials and primary role.", ar: "إنشاء حساب مستخدم جديد بالبيانات والدور الرئيسي." },
+  "admin.edit_credentials":     { en: "Edit User Credentials", ar: "تعديل بيانات المستخدم" },
+  "admin.update_credentials":   { en: "Update credentials for", ar: "تحديث بيانات" },
+  "admin.new_email":            { en: "New Email",          ar: "البريد الإلكتروني الجديد" },
+  "admin.new_password":         { en: "New Password",       ar: "كلمة المرور الجديدة" },
+  "admin.update_email":         { en: "Update Email",       ar: "تحديث البريد" },
+  "admin.update_password":      { en: "Update Password",    ar: "تحديث كلمة المرور" },
+  "admin.email_updated":        { en: "Email updated successfully", ar: "تم تحديث البريد بنجاح" },
+  "admin.password_updated":     { en: "Password updated successfully", ar: "تم تحديث كلمة المرور بنجاح" },
+  "admin.password_resign":      { en: "Please sign in again with your new password.", ar: "يرجى تسجيل الدخول مجدداً بكلمة المرور الجديدة." },
+  "admin.delete_title":         { en: "Delete User",        ar: "حذف المستخدم" },
+  "admin.delete_desc":          { en: "Are you sure you want to delete", ar: "هل أنت متأكد من حذف" },
+  "admin.delete_warning":       { en: "This action cannot be undone and will remove all associated data.", ar: "لا يمكن التراجع عن هذا الإجراء وسيتم حذف جميع البيانات المرتبطة." },
+  "admin.deleting":             { en: "Deleting...",        ar: "جاري الحذف..." },
+  "admin.creating":             { en: "Creating...",        ar: "جاري الإنشاء..." },
+  "admin.user_created":         { en: "User created successfully", ar: "تم إنشاء المستخدم بنجاح" },
+  "admin.user_deleted":         { en: "User deleted successfully", ar: "تم حذف المستخدم بنجاح" },
+  "admin.cannot_delete_last":   { en: "Cannot delete the last admin", ar: "لا يمكن حذف آخر مدير" },
+
+  // ══════════════════════════════════════════
+  //  BOX DETAILS DIALOG
+  // ══════════════════════════════════════════
+  "box_details.created":        { en: "Created",            ar: "تاريخ الإنشاء" },
+  "box_details.active":         { en: "Active",             ar: "نشط" },
+  "box_details.order":          { en: "Order",              ar: "الطلب" },
+  "box_details.products":       { en: "Products",           ar: "المنتجات" },
+  "box_details.no_batches":     { en: "No batches in this box", ar: "لا توجد دفعات في هذا الصندوق" },
+  "box_details.product_sku":    { en: "Product SKU",        ar: "رمز المنتج" },
+  "box_details.product_name":   { en: "Product Name",       ar: "اسم المنتج" },
+  "box_details.total_qty":      { en: "Total Qty",          ar: "إجمالي الكمية" },
+  "box_details.inv_state":      { en: "Inv State",          ar: "حالة المخزون" },
+  "box_details.force_empty":    { en: "Force Empty",        ar: "تفريغ إجباري" },
+  "box_details.print_label":    { en: "Print Label",        ar: "طباعة الملصق" },
+  "box_details.force_empty_title": { en: "Force Empty Box", ar: "تفريغ الصندوق إجبارياً" },
+  "box_details.force_empty_desc": { en: "Are you sure you want to force empty box", ar: "هل أنت متأكد من تفريغ الصندوق إجبارياً" },
+  "box_details.force_empty_warning": { en: "All batches will be reverted to their previous state. This action cannot be undone.", ar: "ستتم إعادة جميع الدفعات لحالتها السابقة. لا يمكن التراجع عن هذا الإجراء." },
+  "box_details.box_emptied":    { en: "Box emptied successfully. Batches reverted.", ar: "تم تفريغ الصندوق بنجاح. تمت إعادة الدفعات." },
+  "box_details.empty":          { en: "Empty",              ar: "فارغ" },
+
+  // ══════════════════════════════════════════
+  //  ANALYTICS (additional)  
+  // ══════════════════════════════════════════
+  "analytics.eta_label":        { en: "ETA",                ar: "الموعد المتوقع" },
+
+  // ══════════════════════════════════════════
+  //  REPORTS (additional)
+  // ══════════════════════════════════════════
+  "reports.no_country_data":    { en: "No country data for this period", ar: "لا توجد بيانات دول لهذه الفترة" },
+  "reports.no_customer_data":   { en: "No customer data for this period", ar: "لا توجد بيانات عملاء لهذه الفترة" },
+  "reports.no_product_data":    { en: "No product data for this period", ar: "لا توجد بيانات منتجات لهذه الفترة" },
+  "reports.no_completed_dates": { en: "No completed orders with dates", ar: "لا توجد طلبات مكتملة بتواريخ" },
+  "reports.no_completed_range": { en: "No completed orders in range", ar: "لا توجد طلبات مكتملة في النطاق" },
+  "reports.no_orders_range":    { en: "No orders in range", ar: "لا توجد طلبات في النطاق" },
+  "reports.no_shipments_range": { en: "No shipments in range", ar: "لا توجد شحنات في النطاق" },
+  "reports.no_box_data":        { en: "No box data in range", ar: "لا توجد بيانات صناديق في النطاق" },
+  "reports.all":                { en: "All",                ar: "الكل" },
+  "reports.low":                { en: "Low",                ar: "منخفض" },
+  "reports.normal":             { en: "Normal",             ar: "عادي" },
+  "reports.high":               { en: "High",               ar: "عالي" },
+  "reports.urgent":             { en: "Urgent",             ar: "عاجل" },
+  "reports.priority":           { en: "Priority",           ar: "الأولوية" },
+  "reports.status":             { en: "Status",             ar: "الحالة" },
+  "reports.product":            { en: "Product",            ar: "المنتج" },
+  "reports.orders":             { en: "orders",             ar: "طلبات" },
 };
 

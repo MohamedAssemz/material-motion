@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,6 +15,7 @@ import { CreateUserDialog } from '@/components/CreateUserDialog';
 import { EditUserDialog } from '@/components/EditUserDialog';
 import { DeleteUserDialog } from '@/components/DeleteUserDialog';
 import type { Database } from '@/integrations/supabase/types';
+import { cn } from '@/lib/utils';
 
 type AppRole = Database['public']['Enums']['app_role'];
 
@@ -25,23 +27,31 @@ interface UserWithRoles {
   roles: string[];
 }
 
-const AVAILABLE_ROLES: { value: AppRole; label: string }[] = [
-  { value: 'manufacturing_manager', label: 'Mfg Manager' },
-  { value: 'finishing_manager', label: 'Finishing Manager' },
-  { value: 'packaging_manager', label: 'Pkg Manager' },
-  { value: 'boxing_manager', label: 'Box Manager' },
-  { value: 'admin', label: 'Admin' },
+const ROLE_KEYS: Record<string, string> = {
+  manufacturing_manager: 'role.manufacturing_manager',
+  finishing_manager: 'role.finishing_manager',
+  packaging_manager: 'role.packaging_manager',
+  boxing_manager: 'role.boxing_manager',
+  admin: 'role.admin',
+};
+
+const AVAILABLE_ROLES: { value: AppRole; labelKey: string }[] = [
+  { value: 'manufacturing_manager', labelKey: 'role.manufacturing_manager' },
+  { value: 'finishing_manager', labelKey: 'role.finishing_manager' },
+  { value: 'packaging_manager', labelKey: 'role.packaging_manager' },
+  { value: 'boxing_manager', labelKey: 'role.boxing_manager' },
+  { value: 'admin', labelKey: 'role.admin' },
 ];
 
 export default function Admin() {
   const navigate = useNavigate();
   const { hasRole, user: currentUser } = useAuth();
+  const { t, isRTL } = useLanguage();
   const { toast } = useToast();
   const [users, setUsers] = useState<UserWithRoles[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingRole, setUpdatingRole] = useState<string | null>(null);
   
-  // Dialog states
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -74,7 +84,7 @@ export default function Admin() {
 
       setUsers(usersWithRoles);
     } catch (error: any) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      toast({ title: t('toast.error'), description: error.message, variant: 'destructive' });
     } finally {
       setLoading(false);
     }
@@ -103,10 +113,10 @@ export default function Admin() {
         throw new Error(data.error || 'Failed to update primary role');
       }
 
-      toast({ title: 'Success', description: 'Primary role updated' });
+      toast({ title: t('toast.success'), description: t('admin.role_updated') });
       fetchUsers();
     } catch (error: any) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      toast({ title: t('toast.error'), description: error.message, variant: 'destructive' });
     } finally {
       setUpdatingRole(null);
     }
@@ -120,16 +130,16 @@ export default function Admin() {
 
       if (error) throw error;
 
-      toast({ title: 'Success', description: 'Role added' });
+      toast({ title: t('toast.success'), description: t('admin.role_added') });
       fetchUsers();
     } catch (error: any) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      toast({ title: t('toast.error'), description: error.message, variant: 'destructive' });
     }
   };
 
   const removeRole = async (userId: string, role: string, isPrimary: boolean) => {
     if (isPrimary) {
-      toast({ title: 'Cannot remove', description: 'This is the primary role', variant: 'destructive' });
+      toast({ title: t('admin.cannot_remove'), description: t('admin.cannot_remove_primary'), variant: 'destructive' });
       return;
     }
     try {
@@ -141,22 +151,22 @@ export default function Admin() {
 
       if (error) throw error;
 
-      toast({ title: 'Success', description: 'Role removed' });
+      toast({ title: t('toast.success'), description: t('admin.role_removed') });
       fetchUsers();
     } catch (error: any) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      toast({ title: t('toast.error'), description: error.message, variant: 'destructive' });
     }
   };
 
-  const getRoleLabel = (role: string) => AVAILABLE_ROLES.find(r => r.value === role)?.label || role;
+  const getRoleLabel = (role: string) => t(ROLE_KEYS[role] || role);
 
   if (!hasRole('admin')) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <Card className="p-8 text-center">
           <Shield className="mx-auto h-12 w-12 text-destructive mb-4" />
-          <h2 className="text-2xl font-bold mb-2">Access Denied</h2>
-          <p className="text-muted-foreground">You don't have permission to access this page.</p>
+          <h2 className="text-2xl font-bold mb-2">{t('admin.access_denied')}</h2>
+          <p className="text-muted-foreground">{t('admin.no_permission')}</p>
         </Card>
       </div>
     );
@@ -172,36 +182,34 @@ export default function Admin() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
       <header className="border-b border-border bg-card">
         <div className="container mx-auto flex items-center justify-between gap-3 px-4 py-3">
-          <div className="flex items-center gap-3">
+          <div className={cn("flex items-center gap-3", isRTL && "flex-row-reverse")}>
             <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
-              <ArrowLeft className="h-5 w-5" />
+              <ArrowLeft className={cn("h-5 w-5", isRTL && "rotate-180")} />
             </Button>
             <UserCog className="h-5 w-5 text-primary" />
-            <div>
-              <h1 className="text-lg font-semibold">User Management</h1>
-              <p className="text-xs text-muted-foreground">{users.length} users</p>
+            <div className={isRTL ? "text-right" : ""}>
+              <h1 className="text-lg font-semibold">{t('admin.user_management')}</h1>
+              <p className="text-xs text-muted-foreground">{users.length} {t('admin.users_count')}</p>
             </div>
           </div>
           <Button size="sm" onClick={() => setCreateDialogOpen(true)}>
             <Plus className="mr-1 h-4 w-4" />
-            Create User
+            {t('admin.create_user')}
           </Button>
         </div>
       </header>
 
-      {/* Table */}
       <div className="container mx-auto p-4">
         <Card>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[250px]">User</TableHead>
-                <TableHead className="w-[150px]">Primary Role</TableHead>
-                <TableHead>Additional Roles</TableHead>
-                <TableHead className="w-[80px] text-right">Actions</TableHead>
+                <TableHead className="w-[250px]">{t('admin.user_col')}</TableHead>
+                <TableHead className="w-[150px]">{t('admin.primary_role')}</TableHead>
+                <TableHead>{t('admin.additional_roles')}</TableHead>
+                <TableHead className="w-[80px] text-end">{t('admin.actions_col')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -214,14 +222,13 @@ export default function Admin() {
 
                 return (
                   <TableRow key={user.id}>
-                    {/* User Info */}
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <div>
                           <div className="font-medium text-sm flex items-center gap-1.5">
                             {user.full_name || 'Unknown'}
                             {isCurrentUser && (
-                              <Badge variant="outline" className="text-[10px] px-1 py-0">You</Badge>
+                              <Badge variant="outline" className="text-[10px] px-1 py-0">{t('admin.you')}</Badge>
                             )}
                           </div>
                           <div className="text-xs text-muted-foreground">{user.email}</div>
@@ -229,7 +236,6 @@ export default function Admin() {
                       </div>
                     </TableCell>
 
-                    {/* Primary Role */}
                     <TableCell>
                       <div className="flex items-center gap-1.5">
                         <Select
@@ -247,18 +253,17 @@ export default function Admin() {
                           <SelectContent>
                             {AVAILABLE_ROLES.map(role => (
                               <SelectItem key={role.value} value={role.value} className="text-xs">
-                                {role.label}
+                                {t(role.labelKey)}
                               </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
                         {isLastAdmin && (
-                          <span className="text-[10px] text-muted-foreground whitespace-nowrap">Last admin</span>
+                          <span className="text-[10px] text-muted-foreground whitespace-nowrap">{t('admin.last_admin')}</span>
                         )}
                       </div>
                     </TableCell>
 
-                    {/* Additional Roles */}
                     <TableCell>
                       <div className="flex flex-wrap items-center gap-1">
                         {additionalRoles.map(role => (
@@ -289,7 +294,7 @@ export default function Admin() {
                                     className="justify-start text-xs h-7"
                                     onClick={() => addRole(user.id, role.value)}
                                   >
-                                    {role.label}
+                                    {t(role.labelKey)}
                                   </Button>
                                 ))}
                               </div>
@@ -302,8 +307,7 @@ export default function Admin() {
                       </div>
                     </TableCell>
 
-                    {/* Actions */}
-                    <TableCell className="text-right">
+                    <TableCell className="text-end">
                       <div className="flex justify-end gap-1">
                         <Button
                           variant="ghost"
@@ -319,7 +323,7 @@ export default function Admin() {
                           className="h-7 w-7 p-0 text-destructive hover:text-destructive"
                           onClick={() => { setSelectedUser(user); setDeleteDialogOpen(true); }}
                           disabled={isCurrentUser || isLastAdmin}
-                          title={isLastAdmin ? 'Cannot delete the last admin' : undefined}
+                          title={isLastAdmin ? t('admin.cannot_delete_last') : undefined}
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
