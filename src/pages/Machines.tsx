@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,30 +23,30 @@ interface Machine {
   created_at: string;
 }
 
-const TYPE_CONFIG: Record<string, { label: string; icon: React.ElementType; accent: string; bg: string; iconBg: string }> = {
+const TYPE_CONFIG: Record<string, { labelKey: string; icon: React.ElementType; accent: string; bg: string; iconBg: string }> = {
   manufacturing: {
-    label: 'Manufacturing',
+    labelKey: 'machines.type.manufacturing',
     icon: Hammer,
     accent: 'text-blue-600',
     bg: 'bg-blue-50 dark:bg-blue-950/30',
     iconBg: 'bg-blue-100 dark:bg-blue-900/50',
   },
   finishing: {
-    label: 'Finishing',
+    labelKey: 'machines.type.finishing',
     icon: Sparkles,
     accent: 'text-purple-600',
     bg: 'bg-purple-50 dark:bg-purple-950/30',
     iconBg: 'bg-purple-100 dark:bg-purple-900/50',
   },
   packaging: {
-    label: 'Packaging',
+    labelKey: 'machines.type.packaging',
     icon: Package,
     accent: 'text-orange-600',
     bg: 'bg-orange-50 dark:bg-orange-950/30',
     iconBg: 'bg-orange-100 dark:bg-orange-900/50',
   },
   boxing: {
-    label: 'Boxing',
+    labelKey: 'machines.type.boxing',
     icon: Box,
     accent: 'text-cyan-600',
     bg: 'bg-cyan-50 dark:bg-cyan-950/30',
@@ -56,6 +57,7 @@ const TYPE_CONFIG: Record<string, { label: string; icon: React.ElementType; acce
 export default function Machines() {
   const navigate = useNavigate();
   const { hasRole } = useAuth();
+  const { t, isRTL } = useLanguage();
   const isAdmin = hasRole('admin');
   const [machines, setMachines] = useState<Machine[]>([]);
   const [loading, setLoading] = useState(true);
@@ -80,24 +82,24 @@ export default function Machines() {
       if (error) throw error;
       setMachines(data as Machine[] || []);
     } catch {
-      toast.error('Failed to load machines');
+      toast.error(t('toast.action_failed'));
     } finally {
       setLoading(false);
     }
   };
 
   const handleAddMachine = async () => {
-    if (!newMachine.name.trim()) { toast.error('Machine name is required'); return; }
+    if (!newMachine.name.trim()) { toast.error(t('toast.invalid_input')); return; }
     setSubmitting(true);
     try {
       const { error } = await supabase.from('machines').insert({ name: newMachine.name.trim(), type: newMachine.type });
       if (error) throw error;
-      toast.success('Machine added');
+      toast.success(t('toast.created_successfully'));
       setDialogOpen(false);
       setNewMachine({ name: '', type: 'manufacturing' });
       fetchMachines();
     } catch {
-      toast.error('Failed to add machine');
+      toast.error(t('toast.action_failed'));
     } finally {
       setSubmitting(false);
     }
@@ -108,9 +110,9 @@ export default function Machines() {
       const { error } = await supabase.from('machines').update({ is_active: !machine.is_active }).eq('id', machine.id);
       if (error) throw error;
       setMachines(prev => prev.map(m => m.id === machine.id ? { ...m, is_active: !m.is_active } : m));
-      toast.success(`Machine ${machine.is_active ? 'deactivated' : 'activated'}`);
+      toast.success(t('toast.updated_successfully'));
     } catch {
-      toast.error('Failed to update machine');
+      toast.error(t('toast.action_failed'));
     }
   };
 
@@ -120,9 +122,9 @@ export default function Machines() {
       const { error } = await supabase.from('machines').delete().eq('id', machineToDelete.id);
       if (error) throw error;
       setMachines(prev => prev.filter(m => m.id !== machineToDelete.id));
-      toast.success('Machine deleted');
+      toast.success(t('toast.deleted_successfully'));
     } catch {
-      toast.error('Failed to delete machine. It may be linked to production records.');
+      toast.error(t('toast.action_failed'));
     } finally {
       setMachineToDelete(null);
     }
@@ -139,14 +141,14 @@ export default function Machines() {
   };
 
   const saveEdit = async (machine: Machine) => {
-    if (!editingName.trim()) { toast.error('Name cannot be empty'); return; }
+    if (!editingName.trim()) { toast.error(t('toast.invalid_input')); return; }
     try {
       const { error } = await supabase.from('machines').update({ name: editingName.trim() }).eq('id', machine.id);
       if (error) throw error;
       setMachines(prev => prev.map(m => m.id === machine.id ? { ...m, name: editingName.trim() } : m));
-      toast.success('Machine renamed');
+      toast.success(t('toast.updated_successfully'));
     } catch {
-      toast.error('Failed to rename machine');
+      toast.error(t('toast.action_failed'));
     } finally {
       cancelEdit();
     }
@@ -169,14 +171,14 @@ export default function Machines() {
     <div className="min-h-screen bg-background">
       <header className="border-b border-border bg-card">
         <div className="container mx-auto flex items-center justify-between px-4 py-4">
-          <div className="flex items-center gap-3">
+          <div className={cn("flex items-center gap-3", isRTL && "flex-row-reverse")}>
             <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
-              <ArrowLeft className="h-5 w-5" />
+              <ArrowLeft className={cn("h-5 w-5", isRTL && "rotate-180")} />
             </Button>
             <Cog className="h-6 w-6 text-primary" />
-            <div>
-              <h1 className="text-xl font-bold">Machines</h1>
-              <p className="text-sm text-muted-foreground">Manage production equipment</p>
+            <div className={isRTL ? "text-right" : ""}>
+              <h1 className="text-xl font-bold">{t('machines.title')}</h1>
+              <p className="text-sm text-muted-foreground">{t('machines.manage_desc')}</p>
             </div>
           </div>
           {isAdmin && (
@@ -184,40 +186,40 @@ export default function Machines() {
               <DialogTrigger asChild>
                 <Button>
                   <Plus className="h-4 w-4 mr-2" />
-                  Add Machine
+                  {t('machines.add_machine')}
                 </Button>
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Add New Machine</DialogTitle>
+                  <DialogTitle>{t('machines.add_new')}</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
                   <div className="space-y-2">
-                    <Label htmlFor="name">Machine Name</Label>
+                    <Label htmlFor="name">{t('machines.machine_name')}</Label>
                     <Input
                       id="name"
                       value={newMachine.name}
                       onChange={(e) => setNewMachine(prev => ({ ...prev, name: e.target.value }))}
-                      placeholder="e.g., Machine A"
+                      placeholder={t('machines.machine_placeholder')}
                       onKeyDown={(e) => e.key === 'Enter' && handleAddMachine()}
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Type</Label>
+                    <Label>{t('form.type')}</Label>
                     <Select value={newMachine.type} onValueChange={(v) => setNewMachine(prev => ({ ...prev, type: v as typeof newMachine.type }))}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
                         {Object.entries(TYPE_CONFIG).map(([key, cfg]) => (
-                          <SelectItem key={key} value={key}>{cfg.label}</SelectItem>
+                          <SelectItem key={key} value={key}>{t(cfg.labelKey)}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
                 </div>
                 <DialogFooter>
-                  <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
+                  <Button variant="outline" onClick={() => setDialogOpen(false)}>{t('common.cancel')}</Button>
                   <Button onClick={handleAddMachine} disabled={submitting}>
-                    {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Add Machine'}
+                    {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : t('machines.add_machine')}
                   </Button>
                 </DialogFooter>
               </DialogContent>
@@ -235,13 +237,13 @@ export default function Machines() {
             return (
               <div key={type} className={cn('rounded-2xl border border-border overflow-hidden', cfg.bg)}>
                 {/* Section header */}
-                <div className="px-5 pt-5 pb-4 flex items-center gap-3">
+                <div className={cn("px-5 pt-5 pb-4 flex items-center gap-3", isRTL && "flex-row-reverse")}>
                   <div className={cn('p-2 rounded-xl', cfg.iconBg)}>
                     <Icon className={cn('h-5 w-5', cfg.accent)} />
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-foreground">{cfg.label}</p>
-                    <p className="text-xs text-muted-foreground">{activeCount}/{list.length} active</p>
+                  <div className={cn("flex-1 min-w-0", isRTL && "text-right")}>
+                    <p className="font-semibold text-foreground">{t(cfg.labelKey)}</p>
+                    <p className="text-xs text-muted-foreground">{activeCount}/{list.length} {t('machines.active_count')}</p>
                   </div>
                   <Badge variant="outline" className="text-xs shrink-0">
                     {list.length}
@@ -252,13 +254,13 @@ export default function Machines() {
                 <div className="px-3 pb-4 space-y-2">
                   {list.length === 0 ? (
                     <div className="text-center py-6 text-muted-foreground text-sm">
-                      No machines yet
+                      {t('machines.no_machines')}
                     </div>
                   ) : (
                     list.map(machine => (
                       <div
                         key={machine.id}
-                        className="bg-card rounded-xl border border-border px-4 py-3 flex items-center gap-3 group"
+                        className={cn("bg-card rounded-xl border border-border px-4 py-3 flex items-center gap-3 group", isRTL && "flex-row-reverse")}
                       >
                         {/* Status dot */}
                         <span className={cn(
@@ -267,7 +269,7 @@ export default function Machines() {
                         )} />
 
                         {/* Name / inline edit */}
-                        <div className="flex-1 min-w-0">
+                        <div className={cn("flex-1 min-w-0", isRTL && "text-right")}>
                           {editingId === machine.id ? (
                             <Input
                               autoFocus
@@ -285,7 +287,7 @@ export default function Machines() {
 
                         {/* Actions */}
                         {isAdmin && (
-                          <div className="flex items-center gap-1 shrink-0">
+                          <div className={cn("flex items-center gap-1 shrink-0", isRTL && "flex-row-reverse")}>
                             {editingId === machine.id ? (
                               <>
                                 <Button variant="ghost" size="icon" className="h-7 w-7 text-green-600 hover:text-green-700" onClick={() => saveEdit(machine)}>
@@ -324,7 +326,7 @@ export default function Machines() {
                         )}
                         {!isAdmin && (
                           <span className={cn('text-xs font-medium px-2 py-0.5 rounded-full', machine.is_active ? 'bg-green-100 text-green-700' : 'bg-muted text-muted-foreground')}>
-                            {machine.is_active ? 'Active' : 'Inactive'}
+                            {machine.is_active ? t('common.active') : t('common.inactive')}
                           </span>
                         )}
                       </div>
@@ -340,15 +342,15 @@ export default function Machines() {
       <AlertDialog open={!!machineToDelete} onOpenChange={(open) => !open && setMachineToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Machine</AlertDialogTitle>
+            <AlertDialogTitle>{t('machines.delete_title')}</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete "{machineToDelete?.name}"? This cannot be undone. If this machine has production records linked to it, deletion may fail.
+              {t('machines.delete_desc')} "{machineToDelete?.name}"? {t('machines.delete_warning')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction onClick={handleDeleteMachine} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Delete
+              {t('common.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
