@@ -312,7 +312,7 @@ export function BoxDetailsDialog({
             {/* Batches Section */}
             <div>
               <h3 className="font-semibold mb-2">
-                Products ({loading ? '...' : boxType === 'order' ? groupedOrderBatches.length : groupedExtraBatches.length})
+                {t('box_details.products')} ({loading ? '...' : boxType === 'order' ? groupedOrderBatches.length : groupedExtraBatches.length})
               </h3>
 
               {loading ? (
