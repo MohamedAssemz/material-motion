@@ -381,7 +381,7 @@ export default function Analytics() {
                       <div className="flex items-center gap-2">
                         <span className="font-medium">{batch.qr_code_data}</span>
                         <Badge variant="outline" className="text-xs">
-                          {batch.current_state.replace(/_/g, ' ')}
+                          {t(`state.${batch.current_state}`) !== `state.${batch.current_state}` ? t(`state.${batch.current_state}`) : batch.current_state.replace(/_/g, ' ')}
                         </Badge>
                       </div>
                       <p className="text-sm text-muted-foreground">
@@ -391,7 +391,7 @@ export default function Analytics() {
                   </div>
                   <div className="text-right">
                     <p className="text-sm font-medium">
-                      ETA: {format(new Date(batch.eta), 'MMM d, yyyy')}
+                      {t('analytics.eta_label')}: {format(new Date(batch.eta), 'MMM d, yyyy')}
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {formatDistanceToNow(new Date(batch.eta), { addSuffix: true })}
