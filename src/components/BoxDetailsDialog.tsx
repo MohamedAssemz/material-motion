@@ -400,11 +400,9 @@ export function BoxDetailsDialog({
                 setTimeout(() => URL.revokeObjectURL(url), 1000);
               }}
             >
-              <Printer className="h-4 w-4 mr-2" />
-              Print Label
+              <Printer className="h-4 w-4 mr-2" />{t('box_details.print_label')}
             </Button>
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
-              Close
+            <Button variant="outline" onClick={() => onOpenChange(false)}>{t('common.close')}</Button>
             </Button>
           </DialogFooter>
         </DialogContent>
