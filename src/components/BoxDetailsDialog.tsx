@@ -294,16 +294,16 @@ export function BoxDetailsDialog({
             {/* Box Info */}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
               <div>
-                <p className="text-muted-foreground">Created</p>
+                <p className="text-muted-foreground">{t('box_details.created')}</p>
                 <p className="font-medium">{format(new Date(createdAt), 'PPP')}</p>
               </div>
               <div>
-                <p className="text-muted-foreground">Active</p>
-                <p className="font-medium">{isActive ? 'Yes' : 'No'}</p>
+                <p className="text-muted-foreground">{t('box_details.active')}</p>
+                <p className="font-medium">{isActive ? t('common.yes') : t('common.no')}</p>
               </div>
               {boxType === 'order' && orderNumbers.length > 0 && (
                 <div>
-                  <p className="text-muted-foreground">Order</p>
+                  <p className="text-muted-foreground">{t('box_details.order')}</p>
                   <p className="font-medium font-mono">{orderNumbers.join(', ')}</p>
                 </div>
               )}
