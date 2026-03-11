@@ -420,12 +420,12 @@ export function BoxDetailsDialog({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => { setForceEmptyConfirmOpen(false); handleForceEmpty(); }}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Force Empty
+              {t('box_details.force_empty')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
