@@ -323,8 +323,8 @@ export default function Analytics() {
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={machineStats} layout="vertical">
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis type="number" />
-                    <YAxis dataKey="machine_name" type="category" width={100} />
+                    <XAxis type="number" reversed={isRTL} />
+                    <YAxis dataKey="machine_name" type="category" width={isRTL ? 120 : 100} orientation={isRTL ? 'right' : 'left'} tickMargin={8} />
                     <Tooltip 
                       contentStyle={{ 
                         backgroundColor: 'hsl(var(--card))', 
