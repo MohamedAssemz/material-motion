@@ -148,6 +148,7 @@ export function ProductFormDialog({
 }: ProductFormDialogProps) {
   const { toast } = useToast();
   const { t } = useLanguage();
+  const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState<ProductFormData>(initialFormData);
   const [categories, setCategories] = useState<Category[]>([]);
