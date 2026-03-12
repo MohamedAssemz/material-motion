@@ -526,15 +526,37 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent className="h-72">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={pipelineData} layout="vertical" margin={{ left: 20, right: 10, top: 5, bottom: 5 }}>
+              <BarChart
+                data={pipelineData}
+                layout="vertical"
+                margin={{ left: isRTL ? 150 : 20, right: isRTL ? 10 : 10, top: 5, bottom: 5 }}
+              >
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                 <XAxis type="number" tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} reversed={isRTL} />
                 <YAxis
                   dataKey="name"
                   type="category"
-                  width={140}
-                  tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-                  orientation="left"
+                  width={isRTL ? 140 : 110}
+                  tick={
+                    isRTL
+                      ? (props) => {
+                          const { x, y, payload } = props;
+                          return (
+                            <text
+                              x={x + 148}
+                              y={y}
+                              textAnchor="start"
+                              dominantBaseline="middle"
+                              fontSize={11}
+                              fill="hsl(var(--muted-foreground))"
+                            >
+                              {payload.value}
+                            </text>
+                          );
+                        }
+                      : { fontSize: 11, fill: "hsl(var(--muted-foreground))" }
+                  }
+                  orientation={isRTL ? "right" : "left"}
                   tickMargin={8}
                 />
                 <Tooltip
@@ -545,7 +567,7 @@ export default function Dashboard() {
                     fontSize: 12,
                   }}
                 />
-                <Bar dataKey="value" radius={[0, 4, 4, 0]} maxBarSize={24}>
+                <Bar dataKey="value" radius={isRTL ? [4, 0, 0, 4] : [0, 4, 4, 0]} maxBarSize={24}>
                   {pipelineData.map((entry, i) => (
                     <Cell key={i} fill={entry.fill} />
                   ))}
