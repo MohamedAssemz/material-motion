@@ -37,7 +37,7 @@ function CategoriesSelector({
 
   return (
     <div>
-      <Label className="mb-2 block">Categories</Label>
+      <Label className="mb-2 block">{t('catalog.categories')}</Label>
       <div className="border rounded-lg">
         <div className="p-2 border-b">
           <div className="relative">
