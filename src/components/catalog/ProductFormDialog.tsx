@@ -529,11 +529,11 @@ export function ProductFormDialog({
 
             <div className="flex-shrink-0 flex gap-2 pt-4 border-t mt-4">
               <Button type="submit" className="flex-1" disabled={saving}>
-                {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {isDuplicating ? 'Create Duplicate' : product?.id ? 'Update Product' : 'Create Product'}
+                {saving && <Loader2 className="me-2 h-4 w-4 animate-spin" />}
+                {isDuplicating ? t('catalog.create_duplicate') : product?.id ? t('catalog.update_product') : t('catalog.create_product')}
               </Button>
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-                Cancel
+                {t('common.cancel')}
               </Button>
             </div>
           </form>
