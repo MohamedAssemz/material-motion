@@ -10,6 +10,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2, Search } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { SIZE_OPTIONS } from '@/lib/catalogConstants';
 import { ProductImageUpload } from './ProductImageUpload';
 import { CountrySelect } from './CountrySelect';
@@ -19,11 +20,13 @@ import { SearchableSelect } from '@/components/ui/searchable-select';
 function CategoriesSelector({ 
   categories, 
   selectedIds, 
-  onToggle 
+  onToggle,
+  t,
 }: { 
   categories: { id: string; name: string }[]; 
   selectedIds: string[]; 
   onToggle: (id: string) => void;
+  t: (key: string) => string;
 }) {
   const [search, setSearch] = useState('');
   
@@ -36,13 +39,13 @@ function CategoriesSelector({
 
   return (
     <div>
-      <Label className="mb-2 block">Categories</Label>
+      <Label className="mb-2 block">{t('catalog.categories')}</Label>
       <div className="border rounded-lg">
         <div className="p-2 border-b">
           <div className="relative">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search categories..."
+              placeholder={t('catalog.search_categories')}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-8 h-8"
@@ -52,7 +55,7 @@ function CategoriesSelector({
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-32 overflow-y-auto p-2">
           {filtered.length === 0 ? (
             <p className="col-span-full text-sm text-muted-foreground text-center py-2">
-              {search ? 'No categories match your search' : 'No categories available'}
+              {search ? t('catalog.no_categories_match') : t('catalog.no_categories_available')}
             </p>
           ) : (
             filtered.map(category => (
@@ -144,6 +147,7 @@ export function ProductFormDialog({
   originalProduct = null,
 }: ProductFormDialogProps) {
   const { toast } = useToast();
+  const { t } = useLanguage();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState<ProductFormData>(initialFormData);
@@ -224,8 +228,8 @@ export function ProductFormDialog({
     
     if (!formData.name.trim()) {
       toast({
-        title: 'Validation Error',
-        description: 'Product name is required',
+        title: t('toast.error'),
+        description: t('catalog.name_required'),
         variant: 'destructive',
       });
       return;
@@ -234,8 +238,8 @@ export function ProductFormDialog({
     // Check for duplicate validation
     if (isDuplicating && !hasChangesFromOriginal()) {
       toast({
-        title: 'No Changes Made',
-        description: 'You must modify at least one field before duplicating. Identical products are not allowed.',
+        title: t('catalog.no_changes'),
+        description: t('catalog.no_changes_desc'),
         variant: 'destructive',
       });
       return;
@@ -329,8 +333,8 @@ export function ProductFormDialog({
       }
 
       toast({
-        title: 'Success',
-        description: product?.id ? 'Product updated successfully' : 'Product created successfully',
+        title: t('toast.success'),
+        description: product?.id ? t('catalog.product_updated') : t('catalog.product_created'),
       });
 
       onSuccess();
@@ -370,7 +374,7 @@ export function ProductFormDialog({
       <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
         <DialogHeader className="flex-shrink-0">
           <DialogTitle>
-            {isDuplicating ? 'Duplicate Product' : product?.id ? 'Edit Product' : 'Add New Product'}
+            {isDuplicating ? t('catalog.duplicate_product') : product?.id ? t('catalog.edit_product') : t('catalog.add_new_product')}
           </DialogTitle>
           {/* SKU Display */}
           <div className="flex items-center gap-2 pt-2">
@@ -379,7 +383,7 @@ export function ProductFormDialog({
               {product?.id ? formData.sku : previewSku}
             </code>
             {!product?.id && (
-              <span className="text-xs text-muted-foreground">(auto-generated)</span>
+              <span className="text-xs text-muted-foreground">{t('catalog.auto_generated')}</span>
             )}
           </div>
         </DialogHeader>
@@ -394,35 +398,35 @@ export function ProductFormDialog({
                 {/* Basic Info */}
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="sm:col-span-2">
-                    <Label htmlFor="name">Product Name *</Label>
+                    <Label htmlFor="name">{t('catalog.product_name')} *</Label>
                     <Input
                       id="name"
                       value={formData.name}
                       onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                      placeholder="Enter product name"
+                      placeholder={t('catalog.enter_name')}
                       required
                     />
                   </div>
                   
                   <div className="sm:col-span-2">
-                    <Label htmlFor="description">Description</Label>
+                    <Label htmlFor="description">{t('catalog.description')}</Label>
                     <Textarea
                       id="description"
                       value={formData.description}
                       onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                      placeholder="Product description"
+                      placeholder={t('catalog.product_desc')}
                       rows={3}
                     />
                   </div>
 
                   <div>
-                    <Label htmlFor="size">Size</Label>
+                    <Label htmlFor="size">{t('catalog.size')}</Label>
                     <Select
                       value={formData.size}
                       onValueChange={(value) => setFormData(prev => ({ ...prev, size: value }))}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="Select size" />
+                        <SelectValue placeholder={t('catalog.select_size')} />
                       </SelectTrigger>
                       <SelectContent>
                         {SIZE_OPTIONS.map(size => (
@@ -433,33 +437,32 @@ export function ProductFormDialog({
                   </div>
 
                   <div>
-                    <Label htmlFor="color">Color</Label>
+                    <Label htmlFor="color">{t('catalog.color')}</Label>
                     <Input
                       id="color"
                       value={formData.color}
                       onChange={(e) => setFormData(prev => ({ ...prev, color: e.target.value }))}
-                      placeholder="e.g., Blue, Red"
                     />
                   </div>
 
                   <div>
-                    <Label htmlFor="brand">Brand</Label>
+                    <Label htmlFor="brand">{t('catalog.brands')}</Label>
                     <SearchableSelect
                       options={brands.map(b => ({ value: b.id, label: b.name }))}
                       value={formData.brand_id || null}
                       onValueChange={(value) => setFormData(prev => ({ ...prev, brand_id: value || '' }))}
-                      placeholder="Select brand"
-                      searchPlaceholder="Search brands..."
-                      emptyText="No brands found."
+                      placeholder={t('catalog.select_brand')}
+                      searchPlaceholder={t('catalog.search_brands')}
+                      emptyText={t('catalog.no_brands_found')}
                     />
                   </div>
 
                   <div>
-                    <Label htmlFor="country">Country</Label>
+                    <Label htmlFor="country">{t('catalog.country')}</Label>
                     <CountrySelect
                       value={formData.country}
                       onValueChange={(value) => setFormData(prev => ({ ...prev, country: value }))}
-                      placeholder="Select target market"
+                      placeholder={t('catalog.select_market')}
                     />
                   </div>
                 </div>
@@ -467,9 +470,9 @@ export function ProductFormDialog({
                 {/* Needs Packing Toggle */}
                 <div className="flex items-center justify-between p-3 rounded-lg border">
                   <div>
-                    <Label htmlFor="needs_packing" className="font-medium">Needs Packaging</Label>
+                    <Label htmlFor="needs_packing" className="font-medium">{t('catalog.needs_packaging')}</Label>
                     <p className="text-xs text-muted-foreground">
-                      Enable if this product requires packing phase
+                      {t('catalog.needs_packaging_desc')}
                     </p>
                   </div>
                   <Switch
@@ -484,14 +487,15 @@ export function ProductFormDialog({
                   categories={categories}
                   selectedIds={formData.category_ids}
                   onToggle={toggleCategory}
+                  t={t}
                 />
 
                 {/* Potential Customers */}
                 <div>
-                  <Label className="mb-2 block">Potential Customers</Label>
+                  <Label className="mb-2 block">{t('catalog.potential_customers')}</Label>
                   <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto p-2 border rounded-lg">
                     {customers.length === 0 ? (
-                      <p className="col-span-full text-sm text-muted-foreground">No customers available</p>
+                      <p className="col-span-full text-sm text-muted-foreground">{t('catalog.no_customers')}</p>
                     ) : (
                       customers.map(customer => (
                         <label 
@@ -514,7 +518,7 @@ export function ProductFormDialog({
 
                 {/* Images */}
                 <div>
-                  <Label className="mb-2 block">Product Images</Label>
+                  <Label className="mb-2 block">{t('catalog.product_images')}</Label>
                   <ProductImageUpload
                     images={formData.images}
                     onChange={(images) => setFormData(prev => ({ ...prev, images }))}
@@ -525,11 +529,11 @@ export function ProductFormDialog({
 
             <div className="flex-shrink-0 flex gap-2 pt-4 border-t mt-4">
               <Button type="submit" className="flex-1" disabled={saving}>
-                {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {isDuplicating ? 'Create Duplicate' : product?.id ? 'Update Product' : 'Create Product'}
+                {saving && <Loader2 className="me-2 h-4 w-4 animate-spin" />}
+                {isDuplicating ? t('catalog.create_duplicate') : product?.id ? t('catalog.update_product') : t('catalog.create_product')}
               </Button>
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-                Cancel
+                {t('common.cancel')}
               </Button>
             </div>
           </form>

@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { Download, Upload, Loader2, FileText, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { SIZE_OPTIONS } from '@/lib/catalogConstants';
@@ -73,6 +74,7 @@ function generateSKU(index: number): string {
 
 export function BulkUploadDialog({ open, onOpenChange, brands, onSuccess }: BulkUploadDialogProps) {
   const { toast } = useToast();
+  const { t } = useLanguage();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [inserting, setInserting] = useState(false);
@@ -337,11 +339,11 @@ export function BulkUploadDialog({ open, onOpenChange, brands, onSuccess }: Bulk
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Bulk Upload Products</DialogTitle>
+          <DialogTitle>{t('catalog.bulk_upload_title')}</DialogTitle>
           <DialogDescription>
             {parsedData
-              ? `Review the ${parsedData.productsToInsert.length} product(s) below before confirming.`
-              : 'Download the Excel template, fill in your products, then upload the file.'}
+              ? `${t('catalog.bulk_review_desc')} (${parsedData.productsToInsert.length})`
+              : t('catalog.bulk_upload_desc')}
           </DialogDescription>
         </DialogHeader>
 
@@ -365,12 +367,12 @@ export function BulkUploadDialog({ open, onOpenChange, brands, onSuccess }: Bulk
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="text-xs">Name</TableHead>
-                    <TableHead className="text-xs">Size</TableHead>
-                    <TableHead className="text-xs">Color</TableHead>
-                    <TableHead className="text-xs">Brand</TableHead>
-                    <TableHead className="text-xs">Packing</TableHead>
-                    <TableHead className="text-xs">Image</TableHead>
+                    <TableHead className="text-xs">{t('catalog.name')}</TableHead>
+                    <TableHead className="text-xs">{t('catalog.size')}</TableHead>
+                    <TableHead className="text-xs">{t('catalog.color')}</TableHead>
+                    <TableHead className="text-xs">{t('catalog.brands')}</TableHead>
+                    <TableHead className="text-xs">{t('catalog.packing')}</TableHead>
+                    <TableHead className="text-xs">{t('catalog.image')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -380,7 +382,7 @@ export function BulkUploadDialog({ open, onOpenChange, brands, onSuccess }: Bulk
                       <TableCell className="text-xs">{p.size || '—'}</TableCell>
                       <TableCell className="text-xs">{p.color || '—'}</TableCell>
                       <TableCell className="text-xs">{p.brand_name || '—'}</TableCell>
-                      <TableCell className="text-xs">{p.needs_packing ? 'Yes' : 'No'}</TableCell>
+                      <TableCell className="text-xs">{p.needs_packing ? t('common.yes') : t('common.no')}</TableCell>
                       <TableCell className="text-xs truncate max-w-[120px]">{p.image_url || '—'}</TableCell>
                     </TableRow>
                   ))}
@@ -390,16 +392,16 @@ export function BulkUploadDialog({ open, onOpenChange, brands, onSuccess }: Bulk
 
             <DialogFooter>
               <Button variant="outline" size="sm" onClick={handleCancelInsert} disabled={inserting}>
-                Cancel
+                {t('common.cancel')}
               </Button>
               <Button size="sm" onClick={handleConfirmInsert} disabled={inserting}>
                 {inserting ? (
                   <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Inserting...
+                    <Loader2 className="me-2 h-4 w-4 animate-spin" />
+                    {t('catalog.inserting')}
                   </>
                 ) : (
-                  `Confirm & Create ${parsedData.productsToInsert.length} Product(s)`
+                  `${t('catalog.confirm_create')} ${parsedData.productsToInsert.length} ${t('catalog.product_s')}`
                 )}
               </Button>
             </DialogFooter>
@@ -410,18 +412,18 @@ export function BulkUploadDialog({ open, onOpenChange, brands, onSuccess }: Bulk
         {!parsedData && (
           <div className="space-y-6 py-2">
             <div className="space-y-2">
-              <h4 className="text-sm font-medium">1. Download Template</h4>
+              <h4 className="text-sm font-medium">{t('catalog.download_step')}</h4>
               <p className="text-xs text-muted-foreground">
-                The template includes columns: name (required), description, size, color, brand, needs_packing. Size, brand, and needs_packing have dropdown lists.
+                {t('catalog.template_desc')}
               </p>
               <Button variant="outline" size="sm" onClick={handleDownloadTemplate}>
-                <Download className="mr-2 h-4 w-4" />
-                Download Excel Template
+                <Download className="me-2 h-4 w-4" />
+                {t('catalog.download_excel')}
               </Button>
             </div>
 
             <div className="space-y-2">
-              <h4 className="text-sm font-medium">2. Upload Completed File</h4>
+              <h4 className="text-sm font-medium">{t('catalog.upload_step')}</h4>
               <div className="flex items-center gap-3">
                 <Button
                   variant="outline"
@@ -430,11 +432,11 @@ export function BulkUploadDialog({ open, onOpenChange, brands, onSuccess }: Bulk
                   disabled={uploading}
                 >
                   {uploading ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    <Loader2 className="me-2 h-4 w-4 animate-spin" />
                   ) : (
-                    <Upload className="mr-2 h-4 w-4" />
+                    <Upload className="me-2 h-4 w-4" />
                   )}
-                  {uploading ? 'Processing...' : 'Choose File'}
+                  {uploading ? t('catalog.processing') : t('catalog.choose_file')}
                 </Button>
                 {fileName && (
                   <span className="text-xs text-muted-foreground flex items-center gap-1">
@@ -457,12 +459,12 @@ export function BulkUploadDialog({ open, onOpenChange, brands, onSuccess }: Bulk
                 <div className="flex items-center gap-4">
                   <Badge variant="default" className="flex items-center gap-1">
                     <CheckCircle2 className="h-3 w-3" />
-                    {result.created} created
+                    {result.created} {t('catalog.created_label')}
                   </Badge>
                   {result.skipped > 0 && (
                     <Badge variant="secondary" className="flex items-center gap-1">
                       <AlertTriangle className="h-3 w-3" />
-                      {result.skipped} skipped
+                      {result.skipped} {t('catalog.skipped')}
                     </Badge>
                   )}
                 </div>

@@ -298,8 +298,8 @@ export default function Catalog() {
       if (error) throw error;
       
       toast({
-        title: 'Product Deleted',
-        description: `${productToDelete.name} has been deleted successfully.`,
+        title: t('catalog.product_deleted'),
+        description: `${productToDelete.name} ${t('catalog.deleted_success')}`,
       });
       
       fetchData();
@@ -430,7 +430,7 @@ export default function Catalog() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <Select value={selectedCategory} onValueChange={setSelectedCategory}>
               <SelectTrigger>
-                <SelectValue placeholder="Category" />
+                <SelectValue placeholder={t('catalog.all_categories')} />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">{t('catalog.all_categories')}</SelectItem>
@@ -566,7 +566,7 @@ export default function Catalog() {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {deleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Delete
+              {t('common.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

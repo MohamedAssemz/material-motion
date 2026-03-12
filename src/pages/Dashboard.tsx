@@ -382,10 +382,10 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent className="h-72">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={pipelineData} layout="vertical" margin={{ left: isRTL ? 0 : 20, right: isRTL ? 20 : 10, top: 5, bottom: 5 }}>
+              <BarChart data={pipelineData} layout="vertical" margin={{ left: isRTL ? 10 : 20, right: isRTL ? 20 : 10, top: 5, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis type="number" tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }} orientation={isRTL ? 'top' : 'bottom'} reversed={isRTL} />
-                <YAxis dataKey="name" type="category" width={isRTL ? 130 : 110} tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} orientation={isRTL ? 'right' : 'left'} tickMargin={8} />
+                <XAxis type="number" tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }} />
+                <YAxis dataKey="name" type="category" width={isRTL ? 130 : 110} tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} orientation={isRTL ? 'right' : 'left'} tickMargin={12} />
                 <Tooltip
                   contentStyle={{
                     background: 'hsl(var(--card))',
@@ -558,8 +558,8 @@ export default function Dashboard() {
             <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={throughputData} margin={{ left: isRTL ? 10 : 0, right: isRTL ? 0 : 10 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} reversed={isRTL} />
-                  <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} orientation={isRTL ? 'right' : 'left'} />
+                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} />
+                  <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} orientation={isRTL ? 'right' : 'left'} tickMargin={8} />
                   <Tooltip
                   contentStyle={{
                     background: 'hsl(var(--card))',
