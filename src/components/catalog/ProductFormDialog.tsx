@@ -55,7 +55,7 @@ function CategoriesSelector({
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-32 overflow-y-auto p-2">
           {filtered.length === 0 ? (
             <p className="col-span-full text-sm text-muted-foreground text-center py-2">
-              {search ? 'No categories match your search' : 'No categories available'}
+              {search ? t('catalog.no_categories_match') : t('catalog.no_categories_available')}
             </p>
           ) : (
             filtered.map(category => (
