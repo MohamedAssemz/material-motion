@@ -446,14 +446,14 @@ export function ProductFormDialog({
                   </div>
 
                   <div>
-                    <Label htmlFor="brand">Brand</Label>
+                    <Label htmlFor="brand">{t('catalog.brands')}</Label>
                     <SearchableSelect
                       options={brands.map(b => ({ value: b.id, label: b.name }))}
                       value={formData.brand_id || null}
                       onValueChange={(value) => setFormData(prev => ({ ...prev, brand_id: value || '' }))}
-                      placeholder="Select brand"
-                      searchPlaceholder="Search brands..."
-                      emptyText="No brands found."
+                      placeholder={t('catalog.select_brand')}
+                      searchPlaceholder={t('catalog.search_brands')}
+                      emptyText={t('catalog.no_brands_found')}
                     />
                   </div>
 
