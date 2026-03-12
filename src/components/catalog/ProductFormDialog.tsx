@@ -228,8 +228,8 @@ export function ProductFormDialog({
     
     if (!formData.name.trim()) {
       toast({
-        title: 'Validation Error',
-        description: 'Product name is required',
+        title: t('toast.error'),
+        description: t('catalog.name_required'),
         variant: 'destructive',
       });
       return;
