@@ -422,7 +422,7 @@ export function BulkUploadDialog({ open, onOpenChange, brands, onSuccess }: Bulk
             </div>
 
             <div className="space-y-2">
-              <h4 className="text-sm font-medium">2. Upload Completed File</h4>
+              <h4 className="text-sm font-medium">{t('catalog.upload_step')}</h4>
               <div className="flex items-center gap-3">
                 <Button
                   variant="outline"
@@ -431,11 +431,11 @@ export function BulkUploadDialog({ open, onOpenChange, brands, onSuccess }: Bulk
                   disabled={uploading}
                 >
                   {uploading ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    <Loader2 className="me-2 h-4 w-4 animate-spin" />
                   ) : (
-                    <Upload className="mr-2 h-4 w-4" />
+                    <Upload className="me-2 h-4 w-4" />
                   )}
-                  {uploading ? 'Processing...' : 'Choose File'}
+                  {uploading ? t('catalog.processing') : t('catalog.choose_file')}
                 </Button>
                 {fileName && (
                   <span className="text-xs text-muted-foreground flex items-center gap-1">
