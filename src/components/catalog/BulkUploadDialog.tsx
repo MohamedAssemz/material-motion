@@ -381,7 +381,7 @@ export function BulkUploadDialog({ open, onOpenChange, brands, onSuccess }: Bulk
                       <TableCell className="text-xs">{p.size || '—'}</TableCell>
                       <TableCell className="text-xs">{p.color || '—'}</TableCell>
                       <TableCell className="text-xs">{p.brand_name || '—'}</TableCell>
-                      <TableCell className="text-xs">{p.needs_packing ? 'Yes' : 'No'}</TableCell>
+                      <TableCell className="text-xs">{p.needs_packing ? t('common.yes') : t('common.no')}</TableCell>
                       <TableCell className="text-xs truncate max-w-[120px]">{p.image_url || '—'}</TableCell>
                     </TableRow>
                   ))}
