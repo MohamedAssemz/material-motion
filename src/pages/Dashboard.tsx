@@ -529,14 +529,14 @@ export default function Dashboard() {
               <BarChart
                 data={pipelineData}
                 layout="vertical"
-                margin={{ left: isRTL ? 20 : 20, right: isRTL ? 20 : 10, top: 5, bottom: 5 }}
+                margin={{ left: isRTL ? 20 : 20, right: isRTL ? 10 : 10, top: 5, bottom: 5 }}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                 <XAxis type="number" tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} reversed={isRTL} />
                 <YAxis
                   dataKey="name"
                   type="category"
-                  width={isRTL ? 140 : 110}
+                  width={isRTL ? 120 : 110}
                   interval={0}
                   tick={
                     isRTL
