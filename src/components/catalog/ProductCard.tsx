@@ -9,6 +9,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Package, MoreVertical, Eye, Trash2, Copy } from 'lucide-react';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface ProductCategory {
   category: {
@@ -60,6 +61,7 @@ export function ProductCard({
   onDuplicate,
   showMenu = false 
 }: ProductCardProps) {
+  const { t } = useLanguage();
   const mainImage = product.images?.find(img => img.is_main) || product.images?.[0];
   
   return (
@@ -68,7 +70,7 @@ export function ProductCard({
       onClick={onClick}
     >
       {showMenu && (
-        <div className="absolute top-2 right-2 z-10">
+        <div className="absolute top-2 end-2 z-10">
           <DropdownMenu>
             <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
               <Button 
@@ -81,16 +83,16 @@ export function ProductCard({
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
               <DropdownMenuItem onClick={onView}>
-                <Eye className="mr-2 h-4 w-4" />
-                View
+                <Eye className="me-2 h-4 w-4" />
+                {t('catalog.view')}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={onDuplicate}>
-                <Copy className="mr-2 h-4 w-4" />
-                Duplicate
+                <Copy className="me-2 h-4 w-4" />
+                {t('catalog.duplicate')}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={onDelete} className="text-destructive focus:text-destructive">
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete
+                <Trash2 className="me-2 h-4 w-4" />
+                {t('common.delete')}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -121,11 +123,11 @@ export function ProductCard({
         
         <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
           {product.size && (
-            <span>Size: <span className="font-medium text-foreground">{product.size}</span></span>
+            <span>{t('catalog.size')}: <span className="font-medium text-foreground">{product.size}</span></span>
           )}
           {product.size && product.color && <span className="text-border">|</span>}
           {product.color && (
-            <span>Color: <span className="font-medium text-foreground">{product.color}</span></span>
+            <span>{t('catalog.color')}: <span className="font-medium text-foreground">{product.color}</span></span>
           )}
         </div>
         
@@ -146,7 +148,7 @@ export function ProductCard({
         
         {product.brand && (
           <p className="text-xs text-muted-foreground">
-            Brand: <span className="font-medium">{product.brand.name}</span>
+            {t('catalog.brands')}: <span className="font-medium">{product.brand.name}</span>
           </p>
         )}
       </CardContent>

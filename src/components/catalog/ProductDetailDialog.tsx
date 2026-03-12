@@ -6,6 +6,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Package, Edit, Check, X } from 'lucide-react';
 import { useState } from 'react';
 import { ProductCardData } from './ProductCard';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface ProductPotentialCustomer {
   customer: {
@@ -34,6 +35,7 @@ export function ProductDetailDialog({
   product, 
   onEdit,
 }: ProductDetailDialogProps) {
+  const { t } = useLanguage();
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   
   if (!product) return null;
@@ -51,8 +53,8 @@ export function ProductDetailDialog({
           </div>
           {onEdit && (
             <Button variant="outline" size="sm" onClick={() => onEdit(product)}>
-              <Edit className="h-4 w-4 mr-2" />
-              Edit
+              <Edit className="h-4 w-4 me-2" />
+              {t('catalog.edit')}
             </Button>
           )}
         </DialogHeader>
@@ -101,68 +103,62 @@ export function ProductDetailDialog({
 
             {/* Product Details */}
             <div className="space-y-4">
-              {/* Description */}
               {product.description && (
                 <div>
-                  <h4 className="text-sm font-medium text-muted-foreground mb-1">Description</h4>
+                  <h4 className="text-sm font-medium text-muted-foreground mb-1">{t('catalog.description')}</h4>
                   <p className="text-sm">{product.description}</p>
                 </div>
               )}
 
-              {/* Size & Color */}
               <div className="grid grid-cols-2 gap-4">
                 {product.size && (
                   <div>
-                    <h4 className="text-sm font-medium text-muted-foreground mb-1">Size</h4>
+                    <h4 className="text-sm font-medium text-muted-foreground mb-1">{t('catalog.size')}</h4>
                     <Badge variant="secondary">{product.size}</Badge>
                   </div>
                 )}
                 {product.color && (
                   <div>
-                    <h4 className="text-sm font-medium text-muted-foreground mb-1">Color</h4>
+                    <h4 className="text-sm font-medium text-muted-foreground mb-1">{t('catalog.color')}</h4>
                     <span className="text-sm font-medium">{product.color}</span>
                   </div>
                 )}
               </div>
 
-              {/* Brand */}
               {product.brand && (
                 <div>
-                  <h4 className="text-sm font-medium text-muted-foreground mb-1">Brand</h4>
+                  <h4 className="text-sm font-medium text-muted-foreground mb-1">{t('catalog.brands')}</h4>
                   <span className="text-sm font-medium">{product.brand.name}</span>
                 </div>
               )}
 
-              {/* Country */}
               {product.country && (
                 <div>
-                  <h4 className="text-sm font-medium text-muted-foreground mb-1">Target Market</h4>
+                  <h4 className="text-sm font-medium text-muted-foreground mb-1">{t('catalog.target_market')}</h4>
                   <span className="text-sm">{product.country}</span>
                 </div>
               )}
 
-              {/* Needs Packing */}
               <div>
-                <h4 className="text-sm font-medium text-muted-foreground mb-1">Packaging Required</h4>
+                <h4 className="text-sm font-medium text-muted-foreground mb-1">{t('catalog.packaging_required')}</h4>
                 <div className="flex items-center gap-2">
                   {product.needs_packing ? (
                     <Badge className="bg-green-500/10 text-green-600 border-green-500/20">
-                      <Check className="h-3 w-3 mr-1" />
-                      Yes
+                      <Check className="h-3 w-3 me-1" />
+                      {t('common.yes')}
                     </Badge>
                   ) : (
                     <Badge variant="outline">
-                      <X className="h-3 w-3 mr-1" />
-                      No
+                      <X className="h-3 w-3 me-1" />
+                      {t('common.no')}
                     </Badge>
                   )}
                 </div>
               </div>
 
-              {/* Categories */}
               {product.categories && product.categories.length > 0 && (
                 <div>
-                  <h4 className="text-sm font-medium text-muted-foreground mb-2">Categories</h4>
+                  <h4 className="text-sm font-medium text-muted-foreground mb-2">{t('catalog.categories')}</h4>
                   <div className="flex flex-wrap gap-1.5">
                     {product.categories.map((pc, idx) => pc.category && (
                       <Badge key={pc.category.id || idx} variant="secondary">
@@ -173,25 +169,23 @@ export function ProductDetailDialog({
                 </div>
               )}
 
-              {/* Potential Customers */}
               {product.potential_customers && product.potential_customers.length > 0 && (
                 <div>
-                  <h4 className="text-sm font-medium text-muted-foreground mb-2">Potential Customers</h4>
+                  <h4 className="text-sm font-medium text-muted-foreground mb-2">{t('catalog.potential_customers')}</h4>
                   <div className="flex flex-wrap gap-1.5">
                     {product.potential_customers.map((pc, idx) => pc.customer && (
                       <Badge key={pc.customer.id || idx} variant="outline">
                         {pc.customer.name}
-                        {pc.customer.code && <span className="ml-1 opacity-60">({pc.customer.code})</span>}
+                        {pc.customer.code && <span className="ms-1 opacity-60">({pc.customer.code})</span>}
                       </Badge>
                     ))}
                   </div>
                 </div>
               )}
 
-              {/* Created At */}
               {product.created_at && (
                 <div>
-                  <h4 className="text-sm font-medium text-muted-foreground mb-1">Created</h4>
+                  <h4 className="text-sm font-medium text-muted-foreground mb-1">{t('catalog.created')}</h4>
                   <span className="text-sm text-muted-foreground">
                     {new Date(product.created_at).toLocaleDateString()}
                   </span>

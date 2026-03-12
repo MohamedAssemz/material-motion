@@ -8,6 +8,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Plus, Edit, Trash2, Loader2, Palette, Search } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface Brand {
   id: string;
@@ -26,6 +27,7 @@ interface BrandListDialogProps {
 
 export function BrandListDialog({ open, onOpenChange, brands, onRefresh }: BrandListDialogProps) {
   const { toast } = useToast();
+  const { t } = useLanguage();
   const [showForm, setShowForm] = useState(false);
   const [editingBrand, setEditingBrand] = useState<Brand | null>(null);
   const [form, setForm] = useState({ name: '', logo_url: '' });
@@ -57,13 +59,13 @@ export function BrandListDialog({ open, onOpenChange, brands, onRefresh }: Brand
           .update({ name: form.name.trim(), logo_url: form.logo_url.trim() || null })
           .eq('id', editingBrand.id);
         if (error) throw error;
-        toast({ title: 'Brand updated' });
+        toast({ title: t('catalog.brand_updated') });
       } else {
         const { error } = await supabase
           .from('brands')
           .insert({ name: form.name.trim(), logo_url: form.logo_url.trim() || null });
         if (error) throw error;
-        toast({ title: 'Brand created' });
+        toast({ title: t('catalog.brand_created') });
       }
       resetForm();
       onRefresh();
@@ -75,11 +77,11 @@ export function BrandListDialog({ open, onOpenChange, brands, onRefresh }: Brand
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this brand?')) return;
+    if (!confirm(t('catalog.confirm_delete_brand'))) return;
     try {
       const { error } = await supabase.from('brands').delete().eq('id', id);
       if (error) throw error;
-      toast({ title: 'Brand deleted' });
+      toast({ title: t('catalog.brand_deleted') });
       onRefresh();
     } catch (error: any) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
@@ -98,26 +100,25 @@ export function BrandListDialog({ open, onOpenChange, brands, onRefresh }: Brand
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Palette className="h-5 w-5" />
-            Manage Brands
+            {t('catalog.manage_brands')}
           </DialogTitle>
           <DialogDescription>
-            Create and manage product brands
+            {t('catalog.manage_brands_desc')}
           </DialogDescription>
         </DialogHeader>
 
         {showForm ? (
           <div className="space-y-4 py-4">
             <div>
-              <Label htmlFor="brand-name">Name *</Label>
+              <Label htmlFor="brand-name">{t('catalog.brand_name')} *</Label>
               <Input
                 id="brand-name"
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
-                placeholder="Brand name"
               />
             </div>
             <div>
-              <Label htmlFor="brand-logo">Logo URL</Label>
+              <Label htmlFor="brand-logo">{t('catalog.logo_url')}</Label>
               <Input
                 id="brand-logo"
                 value={form.logo_url}
@@ -126,10 +127,10 @@ export function BrandListDialog({ open, onOpenChange, brands, onRefresh }: Brand
               />
             </div>
             <div className="flex gap-2 justify-end">
-              <Button variant="outline" onClick={resetForm}>Cancel</Button>
+              <Button variant="outline" onClick={resetForm}>{t('common.cancel')}</Button>
               <Button onClick={handleSave} disabled={saving || !form.name.trim()}>
-                {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {editingBrand ? 'Update' : 'Create'}
+                {saving && <Loader2 className="me-2 h-4 w-4 animate-spin" />}
+                {editingBrand ? t('common.update') : t('common.create')}
               </Button>
             </div>
           </div>
@@ -137,24 +138,24 @@ export function BrandListDialog({ open, onOpenChange, brands, onRefresh }: Brand
           <>
             <div className="flex items-center gap-2">
               <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Search className="absolute start-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search brands..."
+                  placeholder={t('catalog.search_brands')}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9"
+                  className="ps-9"
                 />
               </div>
               <Button size="sm" onClick={() => setShowForm(true)}>
-                <Plus className="mr-2 h-4 w-4" />
-                Add Brand
+                <Plus className="me-2 h-4 w-4" />
+                {t('catalog.add_brand')}
               </Button>
             </div>
 
             <ScrollArea className="flex-1 -mx-6 px-6 min-h-[300px]">
               {filteredBrands.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
-                  {searchQuery ? 'No brands match your search.' : 'No brands yet. Create your first brand.'}
+                  {searchQuery ? t('catalog.no_brands_match') : t('catalog.no_brands_yet')}
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -175,12 +176,12 @@ export function BrandListDialog({ open, onOpenChange, brands, onRefresh }: Brand
                           <div className="flex items-center gap-2">
                             <span className="font-medium truncate">{brand.name}</span>
                             <Badge variant="secondary" className="shrink-0">
-                              {brand.product_count || 0} products
+                              {brand.product_count || 0} {t('catalog.products_label')}
                             </Badge>
                           </div>
                         </div>
                       </div>
-                      <div className="flex gap-1 ml-2">
+                      <div className="flex gap-1 ms-2">
                         <Button variant="ghost" size="icon" onClick={() => handleEdit(brand)}>
                           <Edit className="h-4 w-4" />
                         </Button>
