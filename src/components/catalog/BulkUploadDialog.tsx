@@ -366,12 +366,12 @@ export function BulkUploadDialog({ open, onOpenChange, brands, onSuccess }: Bulk
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="text-xs">Name</TableHead>
-                    <TableHead className="text-xs">Size</TableHead>
-                    <TableHead className="text-xs">Color</TableHead>
-                    <TableHead className="text-xs">Brand</TableHead>
-                    <TableHead className="text-xs">Packing</TableHead>
-                    <TableHead className="text-xs">Image</TableHead>
+                    <TableHead className="text-xs">{t('catalog.name')}</TableHead>
+                    <TableHead className="text-xs">{t('catalog.size')}</TableHead>
+                    <TableHead className="text-xs">{t('catalog.color')}</TableHead>
+                    <TableHead className="text-xs">{t('catalog.brands')}</TableHead>
+                    <TableHead className="text-xs">{t('catalog.packing')}</TableHead>
+                    <TableHead className="text-xs">{t('catalog.image')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
