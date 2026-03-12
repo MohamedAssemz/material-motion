@@ -430,7 +430,7 @@ export default function Catalog() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <Select value={selectedCategory} onValueChange={setSelectedCategory}>
               <SelectTrigger>
-                <SelectValue placeholder="Category" />
+                <SelectValue placeholder={t('catalog.all_categories')} />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">{t('catalog.all_categories')}</SelectItem>
