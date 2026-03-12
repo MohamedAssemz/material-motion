@@ -75,6 +75,7 @@ function generateSKU(index: number): string {
 export function BulkUploadDialog({ open, onOpenChange, brands, onSuccess }: BulkUploadDialogProps) {
   const { toast } = useToast();
   const { t } = useLanguage();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [inserting, setInserting] = useState(false);
   const [result, setResult] = useState<UploadResult | null>(null);
