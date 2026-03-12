@@ -383,7 +383,7 @@ export function ProductFormDialog({
               {product?.id ? formData.sku : previewSku}
             </code>
             {!product?.id && (
-              <span className="text-xs text-muted-foreground">(auto-generated)</span>
+              <span className="text-xs text-muted-foreground">{t('catalog.auto_generated')}</span>
             )}
           </div>
         </DialogHeader>
