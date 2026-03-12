@@ -391,16 +391,16 @@ export function BulkUploadDialog({ open, onOpenChange, brands, onSuccess }: Bulk
 
             <DialogFooter>
               <Button variant="outline" size="sm" onClick={handleCancelInsert} disabled={inserting}>
-                Cancel
+                {t('common.cancel')}
               </Button>
               <Button size="sm" onClick={handleConfirmInsert} disabled={inserting}>
                 {inserting ? (
                   <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Inserting...
+                    <Loader2 className="me-2 h-4 w-4 animate-spin" />
+                    {t('catalog.inserting')}
                   </>
                 ) : (
-                  `Confirm & Create ${parsedData.productsToInsert.length} Product(s)`
+                  `${t('catalog.confirm_create')} ${parsedData.productsToInsert.length} ${t('catalog.product_s')}`
                 )}
               </Button>
             </DialogFooter>
