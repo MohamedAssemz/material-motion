@@ -458,11 +458,11 @@ export function ProductFormDialog({
                   </div>
 
                   <div>
-                    <Label htmlFor="country">Country</Label>
+                    <Label htmlFor="country">{t('catalog.country')}</Label>
                     <CountrySelect
                       value={formData.country}
                       onValueChange={(value) => setFormData(prev => ({ ...prev, country: value }))}
-                      placeholder="Select target market"
+                      placeholder={t('catalog.select_market')}
                     />
                   </div>
                 </div>
