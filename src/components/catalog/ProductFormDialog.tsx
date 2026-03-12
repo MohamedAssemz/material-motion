@@ -470,9 +470,9 @@ export function ProductFormDialog({
                 {/* Needs Packing Toggle */}
                 <div className="flex items-center justify-between p-3 rounded-lg border">
                   <div>
-                    <Label htmlFor="needs_packing" className="font-medium">Needs Packaging</Label>
+                    <Label htmlFor="needs_packing" className="font-medium">{t('catalog.needs_packaging')}</Label>
                     <p className="text-xs text-muted-foreground">
-                      Enable if this product requires packing phase
+                      {t('catalog.needs_packaging_desc')}
                     </p>
                   </div>
                   <Switch
