@@ -374,7 +374,7 @@ export function ProductFormDialog({
       <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
         <DialogHeader className="flex-shrink-0">
           <DialogTitle>
-            {isDuplicating ? 'Duplicate Product' : product?.id ? 'Edit Product' : 'Add New Product'}
+            {isDuplicating ? t('catalog.duplicate_product') : product?.id ? t('catalog.edit_product') : t('catalog.add_new_product')}
           </DialogTitle>
           {/* SKU Display */}
           <div className="flex items-center gap-2 pt-2">
