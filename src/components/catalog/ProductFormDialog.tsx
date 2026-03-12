@@ -10,6 +10,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2, Search } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { SIZE_OPTIONS } from '@/lib/catalogConstants';
 import { ProductImageUpload } from './ProductImageUpload';
 import { CountrySelect } from './CountrySelect';
