@@ -420,13 +420,13 @@ export function ProductFormDialog({
                   </div>
 
                   <div>
-                    <Label htmlFor="size">Size</Label>
+                    <Label htmlFor="size">{t('catalog.size')}</Label>
                     <Select
                       value={formData.size}
                       onValueChange={(value) => setFormData(prev => ({ ...prev, size: value }))}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="Select size" />
+                        <SelectValue placeholder={t('catalog.select_size')} />
                       </SelectTrigger>
                       <SelectContent>
                         {SIZE_OPTIONS.map(size => (
