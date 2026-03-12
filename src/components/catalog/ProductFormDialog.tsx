@@ -518,7 +518,7 @@ export function ProductFormDialog({
 
                 {/* Images */}
                 <div>
-                  <Label className="mb-2 block">Product Images</Label>
+                  <Label className="mb-2 block">{t('catalog.product_images')}</Label>
                   <ProductImageUpload
                     images={formData.images}
                     onChange={(images) => setFormData(prev => ({ ...prev, images }))}
