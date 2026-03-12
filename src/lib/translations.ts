@@ -58,6 +58,7 @@ export const translations: Record<string, TranslationEntry> = {
   "common.delete":          { en: "Delete",           ar: "حذف" },
   "common.edit":            { en: "Edit",             ar: "تعديل" },
   "common.create":          { en: "Create",           ar: "إنشاء" },
+  "common.update":          { en: "Update",           ar: "تحديث" },
   "common.search":          { en: "Search",           ar: "بحث" },
   "common.filter":          { en: "Filter",           ar: "تصفية" },
   "common.clear_filters":   { en: "Clear Filters",   ar: "مسح الفلاتر" },
