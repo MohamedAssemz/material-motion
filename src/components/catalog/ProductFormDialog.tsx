@@ -437,12 +437,11 @@ export function ProductFormDialog({
                   </div>
 
                   <div>
-                    <Label htmlFor="color">Color</Label>
+                    <Label htmlFor="color">{t('catalog.color')}</Label>
                     <Input
                       id="color"
                       value={formData.color}
                       onChange={(e) => setFormData(prev => ({ ...prev, color: e.target.value }))}
-                      placeholder="e.g., Blue, Red"
                     />
                   </div>
 
