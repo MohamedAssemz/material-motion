@@ -537,6 +537,7 @@ export default function Dashboard() {
                   dataKey="name"
                   type="category"
                   width={isRTL ? 140 : 110}
+                  interval={0}
                   tick={
                     isRTL
                       ? (props) => {
