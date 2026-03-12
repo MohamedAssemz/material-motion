@@ -238,8 +238,8 @@ export function ProductFormDialog({
     // Check for duplicate validation
     if (isDuplicating && !hasChangesFromOriginal()) {
       toast({
-        title: 'No Changes Made',
-        description: 'You must modify at least one field before duplicating. Identical products are not allowed.',
+        title: t('catalog.no_changes'),
+        description: t('catalog.no_changes_desc'),
         variant: 'destructive',
       });
       return;
