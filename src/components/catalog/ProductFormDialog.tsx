@@ -333,8 +333,8 @@ export function ProductFormDialog({
       }
 
       toast({
-        title: 'Success',
-        description: product?.id ? 'Product updated successfully' : 'Product created successfully',
+        title: t('toast.success'),
+        description: product?.id ? t('catalog.product_updated') : t('catalog.product_created'),
       });
 
       onSuccess();
