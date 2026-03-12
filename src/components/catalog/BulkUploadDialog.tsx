@@ -458,12 +458,12 @@ export function BulkUploadDialog({ open, onOpenChange, brands, onSuccess }: Bulk
                 <div className="flex items-center gap-4">
                   <Badge variant="default" className="flex items-center gap-1">
                     <CheckCircle2 className="h-3 w-3" />
-                    {result.created} created
+                    {result.created} {t('catalog.created_label')}
                   </Badge>
                   {result.skipped > 0 && (
                     <Badge variant="secondary" className="flex items-center gap-1">
                       <AlertTriangle className="h-3 w-3" />
-                      {result.skipped} skipped
+                      {result.skipped} {t('catalog.skipped')}
                     </Badge>
                   )}
                 </div>
