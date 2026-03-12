@@ -20,11 +20,13 @@ import { SearchableSelect } from '@/components/ui/searchable-select';
 function CategoriesSelector({ 
   categories, 
   selectedIds, 
-  onToggle 
+  onToggle,
+  t,
 }: { 
   categories: { id: string; name: string }[]; 
   selectedIds: string[]; 
   onToggle: (id: string) => void;
+  t: (key: string) => string;
 }) {
   const [search, setSearch] = useState('');
   
