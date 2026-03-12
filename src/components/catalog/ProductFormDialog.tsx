@@ -398,12 +398,12 @@ export function ProductFormDialog({
                 {/* Basic Info */}
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="sm:col-span-2">
-                    <Label htmlFor="name">Product Name *</Label>
+                    <Label htmlFor="name">{t('catalog.product_name')} *</Label>
                     <Input
                       id="name"
                       value={formData.name}
                       onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                      placeholder="Enter product name"
+                      placeholder={t('catalog.enter_name')}
                       required
                     />
                   </div>
