@@ -488,6 +488,7 @@ export function ProductFormDialog({
                   categories={categories}
                   selectedIds={formData.category_ids}
                   onToggle={toggleCategory}
+                  t={t}
                 />
 
                 {/* Potential Customers */}
