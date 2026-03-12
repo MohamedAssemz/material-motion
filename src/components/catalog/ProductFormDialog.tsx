@@ -409,12 +409,12 @@ export function ProductFormDialog({
                   </div>
                   
                   <div className="sm:col-span-2">
-                    <Label htmlFor="description">Description</Label>
+                    <Label htmlFor="description">{t('catalog.description')}</Label>
                     <Textarea
                       id="description"
                       value={formData.description}
                       onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                      placeholder="Product description"
+                      placeholder={t('catalog.product_desc')}
                       rows={3}
                     />
                   </div>
