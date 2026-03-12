@@ -529,17 +529,17 @@ export default function Dashboard() {
               <BarChart
                 data={pipelineData}
                 layout="vertical"
-                margin={{ left: isRTL ? 10 : 20, right: isRTL ? 20 : 10, top: 5, bottom: 5 }}
+                margin={{ left: isRTL ? 0 : 20, right: isRTL ? 150 : 10, top: 5, bottom: 5 }}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis type="number" tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
+                <XAxis type="number" tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} reversed={isRTL} />
                 <YAxis
                   dataKey="name"
                   type="category"
-                  width={isRTL ? 130 : 110}
+                  width={isRTL ? 140 : 110}
                   tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
                   orientation={isRTL ? "right" : "left"}
-                  tickMargin={8}
+                  tickMargin={isRTL ? 12 : 8}
                 />
                 <Tooltip
                   contentStyle={{
@@ -550,7 +550,7 @@ export default function Dashboard() {
                   }}
                 />
 
-                <Bar dataKey="value" radius={[0, 4, 4, 0]} maxBarSize={24}>
+                <Bar dataKey="value" radius={isRTL ? [4, 0, 0, 4] : [0, 4, 4, 0]} maxBarSize={24}>
                   {pipelineData.map((entry, i) => (
                     <Cell key={i} fill={entry.fill} />
                   ))}
