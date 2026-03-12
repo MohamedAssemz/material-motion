@@ -492,10 +492,10 @@ export function ProductFormDialog({
 
                 {/* Potential Customers */}
                 <div>
-                  <Label className="mb-2 block">Potential Customers</Label>
+                  <Label className="mb-2 block">{t('catalog.potential_customers')}</Label>
                   <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto p-2 border rounded-lg">
                     {customers.length === 0 ? (
-                      <p className="col-span-full text-sm text-muted-foreground">No customers available</p>
+                      <p className="col-span-full text-sm text-muted-foreground">{t('catalog.no_customers')}</p>
                     ) : (
                       customers.map(customer => (
                         <label 
