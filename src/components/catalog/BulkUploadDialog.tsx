@@ -411,13 +411,13 @@ export function BulkUploadDialog({ open, onOpenChange, brands, onSuccess }: Bulk
         {!parsedData && (
           <div className="space-y-6 py-2">
             <div className="space-y-2">
-              <h4 className="text-sm font-medium">1. Download Template</h4>
+              <h4 className="text-sm font-medium">{t('catalog.download_step')}</h4>
               <p className="text-xs text-muted-foreground">
-                The template includes columns: name (required), description, size, color, brand, needs_packing. Size, brand, and needs_packing have dropdown lists.
+                {t('catalog.template_desc')}
               </p>
               <Button variant="outline" size="sm" onClick={handleDownloadTemplate}>
-                <Download className="mr-2 h-4 w-4" />
-                Download Excel Template
+                <Download className="me-2 h-4 w-4" />
+                {t('catalog.download_excel')}
               </Button>
             </div>
 
