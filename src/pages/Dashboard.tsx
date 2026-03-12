@@ -539,7 +539,7 @@ export default function Dashboard() {
                   width={isRTL ? 130 : 110}
                   tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
                   orientation={isRTL ? "right" : "left"}
-                  tickMargin={20}
+                  tickMargin={8}
                 />
                 <Tooltip
                   contentStyle={{
