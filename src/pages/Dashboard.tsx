@@ -1,87 +1,126 @@
-import { useEffect, useState, useMemo, useCallback } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
-import { useLanguage } from '@/contexts/LanguageContext';
-import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
+import { useEffect, useState, useMemo, useCallback } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
+import { supabase } from "@/integrations/supabase/client";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from
-'@/components/ui/select';
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
+} from "recharts";
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, Legend } from
-'recharts';
-import {
-  Factory, Package, Box, TrendingUp, Plus, AlertTriangle, Sparkles,
-  CheckCircle, Clock, AlertCircle, Flag, CalendarClock,
-  ArrowRight, Truck, Archive, FileText, Trophy, Activity, Wrench } from
-'lucide-react';
-import { startOfDay, subDays, format, formatDistanceToNow, differenceInDays } from 'date-fns';
+  Factory,
+  Package,
+  Box,
+  TrendingUp,
+  Plus,
+  AlertTriangle,
+  Sparkles,
+  CheckCircle,
+  Clock,
+  AlertCircle,
+  Flag,
+  CalendarClock,
+  ArrowRight,
+  Truck,
+  Archive,
+  FileText,
+  Trophy,
+  Activity,
+  Wrench,
+} from "lucide-react";
+import { startOfDay, subDays, format, formatDistanceToNow, differenceInDays } from "date-fns";
 
 /* ─── types ─── */
 interface DashboardData {
-  profile: {full_name: string | null;} | null;
+  profile: { full_name: string | null } | null;
   ordersByStatus: Record<string, number>;
   batchesByState: Record<string, number>;
   lateOrderCount: number;
   newOrdersToday: number;
   flaggedBatchCount: number;
-  lateBatches: Array<{id: string;order_id: string;product_id: string;eta: string;quantity: number;order: {order_number: string;status: string;} | null;}>;
-  flaggedBatches: Array<{id: string;order_id: string;flagged_reason: string | null;quantity: number;order: {order_number: string;status: string;} | null;}>;
-  approachingEtaOrders: Array<{id: string;order_number: string;estimated_fulfillment_time: string;}>;
-  stalledOrders: Array<{id: string;order_number: string;updated_at: string;}>;
+  lateBatches: Array<{
+    id: string;
+    order_id: string;
+    product_id: string;
+    eta: string;
+    quantity: number;
+    order: { order_number: string; status: string } | null;
+  }>;
+  flaggedBatches: Array<{
+    id: string;
+    order_id: string;
+    flagged_reason: string | null;
+    quantity: number;
+    order: { order_number: string; status: string } | null;
+  }>;
+  approachingEtaOrders: Array<{ id: string; order_number: string; estimated_fulfillment_time: string }>;
+  stalledOrders: Array<{ id: string; order_number: string; updated_at: string }>;
   todayThroughput: Record<string, number>;
   extraInventoryCount: number;
   completedOrders: number;
   shipmentsCount: number;
-  topProducts: Array<{name: string;quantity: number;}>;
+  topProducts: Array<{ name: string; quantity: number }>;
   avgFinishedPerDay: number;
-  topMachines: Array<{name: string;count: number;}>;
+  topMachines: Array<{ name: string; count: number }>;
 }
 
-type TimeRange = 'today' | 'week' | 'month';
+type TimeRange = "today" | "week" | "month";
 
 /* ─── constants ─── */
 const PHASE_COLORS: Record<string, string> = {
-  in_manufacturing: 'hsl(214, 95%, 36%)',
-  ready_for_finishing: 'hsl(214, 70%, 60%)',
-  in_finishing: 'hsl(270, 60%, 50%)',
-  ready_for_packaging: 'hsl(270, 40%, 65%)',
-  in_packaging: 'hsl(240, 50%, 55%)',
-  ready_for_boxing: 'hsl(190, 60%, 55%)',
-  in_boxing: 'hsl(190, 80%, 40%)',
-  ready_for_shipment: 'hsl(170, 55%, 45%)',
-  shipped: 'hsl(142, 76%, 36%)'
+  in_manufacturing: "hsl(214, 95%, 36%)",
+  ready_for_finishing: "hsl(214, 70%, 60%)",
+  in_finishing: "hsl(270, 60%, 50%)",
+  ready_for_packaging: "hsl(270, 40%, 65%)",
+  in_packaging: "hsl(240, 50%, 55%)",
+  ready_for_boxing: "hsl(190, 60%, 55%)",
+  in_boxing: "hsl(190, 80%, 40%)",
+  ready_for_shipment: "hsl(170, 55%, 45%)",
+  shipped: "hsl(142, 76%, 36%)",
 };
 
 const ORDER_STATUS_COLORS: Record<string, string> = {
-  pending: 'hsl(38, 92%, 50%)',
-  in_progress: 'hsl(214, 95%, 36%)',
-  completed: 'hsl(142, 76%, 36%)',
-  cancelled: 'hsl(0, 72%, 51%)'
+  pending: "hsl(38, 92%, 50%)",
+  in_progress: "hsl(214, 95%, 36%)",
+  completed: "hsl(142, 76%, 36%)",
+  cancelled: "hsl(0, 72%, 51%)",
 };
 
 const TRANSITION_COLORS = [
-'hsl(214, 95%, 36%)',
-'hsl(270, 60%, 50%)',
-'hsl(240, 50%, 55%)',
-'hsl(190, 80%, 40%)',
-'hsl(142, 76%, 36%)',
-'hsl(38, 92%, 50%)',
-'hsl(0, 72%, 51%)',
-'hsl(170, 55%, 45%)'];
-
+  "hsl(214, 95%, 36%)",
+  "hsl(270, 60%, 50%)",
+  "hsl(240, 50%, 55%)",
+  "hsl(190, 80%, 40%)",
+  "hsl(142, 76%, 36%)",
+  "hsl(38, 92%, 50%)",
+  "hsl(0, 72%, 51%)",
+  "hsl(170, 55%, 45%)",
+];
 
 /* ─── helpers ─── */
 function getTimeRangeStart(range: TimeRange): Date {
   const now = new Date();
   switch (range) {
-    case 'today':return startOfDay(now);
-    case 'week':return startOfDay(subDays(now, 7));
-    case 'month':return startOfDay(subDays(now, 30));
+    case "today":
+      return startOfDay(now);
+    case "week":
+      return startOfDay(subDays(now, 7));
+    case "month":
+      return startOfDay(subDays(now, 30));
   }
 }
 
@@ -92,39 +131,48 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [timeRange, setTimeRange] = useState<TimeRange>('today');
+  const [timeRange, setTimeRange] = useState<TimeRange>("today");
 
   const getGreeting = useCallback(() => {
     const h = new Date().getHours();
-    if (h < 12) return t('dashboard.good_morning');
-    if (h < 18) return t('dashboard.good_afternoon');
-    return t('dashboard.good_evening');
+    if (h < 12) return t("dashboard.good_morning");
+    if (h < 18) return t("dashboard.good_afternoon");
+    return t("dashboard.good_evening");
   }, [t]);
 
-  const PHASE_LABELS: Record<string, string> = useMemo(() => ({
-    in_manufacturing: t('state.in_manufacturing'),
-    ready_for_finishing: t('state.ready_for_finishing'),
-    in_finishing: t('state.in_finishing'),
-    ready_for_packaging: t('state.ready_for_packaging'),
-    in_packaging: t('state.in_packaging'),
-    ready_for_boxing: t('state.ready_for_boxing'),
-    in_boxing: t('state.in_boxing'),
-    ready_for_shipment: t('state.ready_for_shipment'),
-    shipped: t('state.shipped')
-  }), [t]);
+  const PHASE_LABELS: Record<string, string> = useMemo(
+    () => ({
+      in_manufacturing: t("state.in_manufacturing"),
+      ready_for_finishing: t("state.ready_for_finishing"),
+      in_finishing: t("state.in_finishing"),
+      ready_for_packaging: t("state.ready_for_packaging"),
+      in_packaging: t("state.in_packaging"),
+      ready_for_boxing: t("state.ready_for_boxing"),
+      in_boxing: t("state.in_boxing"),
+      ready_for_shipment: t("state.ready_for_shipment"),
+      shipped: t("state.shipped"),
+    }),
+    [t],
+  );
 
-  const ORDER_STATUS_LABELS: Record<string, string> = useMemo(() => ({
-    pending: t('status.not_started'),
-    in_progress: t('status.in_progress'),
-    completed: t('status.completed'),
-    cancelled: t('status.cancelled')
-  }), [t]);
+  const ORDER_STATUS_LABELS: Record<string, string> = useMemo(
+    () => ({
+      pending: t("status.not_started"),
+      in_progress: t("status.in_progress"),
+      completed: t("status.completed"),
+      cancelled: t("status.cancelled"),
+    }),
+    [t],
+  );
 
-  const TIME_RANGE_LABELS: Record<TimeRange, string> = useMemo(() => ({
-    today: t('dashboard.today'),
-    week: t('dashboard.this_week'),
-    month: t('dashboard.last_30_days')
-  }), [t]);
+  const TIME_RANGE_LABELS: Record<TimeRange, string> = useMemo(
+    () => ({
+      today: t("dashboard.today"),
+      week: t("dashboard.this_week"),
+      month: t("dashboard.last_30_days"),
+    }),
+    [t],
+  );
 
   const fetchAll = useCallback(async () => {
     try {
@@ -134,38 +182,72 @@ export default function Dashboard() {
       const twoDaysFromNow = new Date(Date.now() + 2 * 86400000).toISOString();
 
       const [
-      profileRes,
-      ordersRes,
-      newOrdersTodayRes,
-      batchesRes,
-      lateBatchesRes,
-      approachingRes,
-      extraRes,
-      shipmentsRes,
-      shippedBatchesRes,
-      machinesRes,
-      throughputRes,
-      stalledOrdersRes] =
-      await Promise.all([
-      user ? supabase.from('profiles').select('full_name').eq('id', user.id).single() : Promise.resolve({ data: null }),
-      supabase.from('orders').select('status').gte('created_at', rangeStart),
-      supabase.from('orders').select('id').gte('created_at', todayStart),
-      supabase.from('order_batches').select('current_state, quantity, manufacturing_machine_id, finishing_machine_id, packaging_machine_id, boxing_machine_id').gte('created_at', rangeStart),
-      supabase.from('order_batches').select('id, order_id, product_id, eta, quantity, order:orders(order_number, status)').not('current_state', 'in', '(shipped,ready_for_shipment)').not('eta', 'is', null).lt('eta', now).limit(50),
-      supabase.from('orders').select('id, order_number, estimated_fulfillment_time').not('estimated_fulfillment_time', 'is', null).gt('estimated_fulfillment_time', now).lt('estimated_fulfillment_time', twoDaysFromNow).neq('status', 'completed').neq('status', 'cancelled').limit(5),
-      supabase.from('extra_batches').select('quantity').eq('inventory_state', 'AVAILABLE'),
-      supabase.from('shipments').select('id').gte('created_at', rangeStart),
-      supabase.from('order_batches').select('product_id, quantity').in('current_state', ['shipped', 'ready_for_shipment']).gte('created_at', rangeStart),
-      supabase.from('machines').select('id, name'),
-      supabase.from('order_batches').select('current_state, quantity').gte('updated_at', rangeStart),
-      supabase.from('orders').select('id, order_number, updated_at').eq('status', 'in_progress').lt('updated_at', new Date(Date.now() - 3 * 86400000).toISOString()).limit(10)]
-      );
+        profileRes,
+        ordersRes,
+        newOrdersTodayRes,
+        batchesRes,
+        lateBatchesRes,
+        approachingRes,
+        extraRes,
+        shipmentsRes,
+        shippedBatchesRes,
+        machinesRes,
+        throughputRes,
+        stalledOrdersRes,
+      ] = await Promise.all([
+        user
+          ? supabase.from("profiles").select("full_name").eq("id", user.id).single()
+          : Promise.resolve({ data: null }),
+        supabase.from("orders").select("status").gte("created_at", rangeStart),
+        supabase.from("orders").select("id").gte("created_at", todayStart),
+        supabase
+          .from("order_batches")
+          .select(
+            "current_state, quantity, manufacturing_machine_id, finishing_machine_id, packaging_machine_id, boxing_machine_id",
+          )
+          .gte("created_at", rangeStart),
+        supabase
+          .from("order_batches")
+          .select("id, order_id, product_id, eta, quantity, order:orders(order_number, status)")
+          .not("current_state", "in", "(shipped,ready_for_shipment)")
+          .not("eta", "is", null)
+          .lt("eta", now)
+          .limit(50),
+        supabase
+          .from("orders")
+          .select("id, order_number, estimated_fulfillment_time")
+          .not("estimated_fulfillment_time", "is", null)
+          .gt("estimated_fulfillment_time", now)
+          .lt("estimated_fulfillment_time", twoDaysFromNow)
+          .neq("status", "completed")
+          .neq("status", "cancelled")
+          .limit(5),
+        supabase.from("extra_batches").select("quantity").eq("inventory_state", "AVAILABLE"),
+        supabase.from("shipments").select("id").gte("created_at", rangeStart),
+        supabase
+          .from("order_batches")
+          .select("product_id, quantity")
+          .in("current_state", ["shipped", "ready_for_shipment"])
+          .gte("created_at", rangeStart),
+        supabase.from("machines").select("id, name"),
+        supabase.from("order_batches").select("current_state, quantity").gte("updated_at", rangeStart),
+        supabase
+          .from("orders")
+          .select("id, order_number, updated_at")
+          .eq("status", "in_progress")
+          .lt("updated_at", new Date(Date.now() - 3 * 86400000).toISOString())
+          .limit(10),
+      ]);
 
       const ordersByStatus: Record<string, number> = {};
-      (ordersRes.data || []).forEach((o) => {ordersByStatus[o.status] = (ordersByStatus[o.status] || 0) + 1;});
+      (ordersRes.data || []).forEach((o) => {
+        ordersByStatus[o.status] = (ordersByStatus[o.status] || 0) + 1;
+      });
 
       const batchesByState: Record<string, number> = {};
-      (batchesRes.data || []).forEach((b: any) => {batchesByState[b.current_state] = (batchesByState[b.current_state] || 0) + b.quantity;});
+      (batchesRes.data || []).forEach((b: any) => {
+        batchesByState[b.current_state] = (batchesByState[b.current_state] || 0) + b.quantity;
+      });
 
       const todayThroughput: Record<string, number> = {};
       (throughputRes.data || []).forEach((b: any) => {
@@ -174,7 +256,7 @@ export default function Dashboard() {
 
       const extraInventoryCount = (extraRes.data || []).reduce((s, b) => s + b.quantity, 0);
 
-      const activeLate = ((lateBatchesRes.data || []) as any[]).filter((b) => b.order?.status !== 'cancelled');
+      const activeLate = ((lateBatchesRes.data || []) as any[]).filter((b) => b.order?.status !== "cancelled");
       const lateOrderIds = new Set(activeLate.map((b) => b.order_id));
 
       const productQtyMap: Record<string, number> = {};
@@ -182,33 +264,44 @@ export default function Dashboard() {
         productQtyMap[b.product_id] = (productQtyMap[b.product_id] || 0) + b.quantity;
       });
 
-      const topProductIds = Object.entries(productQtyMap).
-      sort((a, b) => b[1] - a[1]).
-      slice(0, 3);
-      let topProducts: Array<{name: string;quantity: number;}> = [];
+      const topProductIds = Object.entries(productQtyMap)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 3);
+      let topProducts: Array<{ name: string; quantity: number }> = [];
       if (topProductIds.length > 0) {
-        const prodRes = await supabase.from('products').select('id, name').in('id', topProductIds.map((p) => p[0]));
+        const prodRes = await supabase
+          .from("products")
+          .select("id, name")
+          .in(
+            "id",
+            topProductIds.map((p) => p[0]),
+          );
         const prodMap = new Map((prodRes.data || []).map((p) => [p.id, p.name]));
-        topProducts = topProductIds.map(([id, qty]) => ({ name: prodMap.get(id) || 'Unknown', quantity: qty }));
+        topProducts = topProductIds.map(([id, qty]) => ({ name: prodMap.get(id) || "Unknown", quantity: qty }));
       }
 
       const rangeStartDate = getTimeRangeStart(timeRange);
       const daysDiff = Math.max(1, Math.ceil((Date.now() - rangeStartDate.getTime()) / 86400000));
       const totalFinished = Object.values(productQtyMap).reduce((s, v) => s + v, 0);
-      const avgFinishedPerDay = Math.round(totalFinished / daysDiff * 10) / 10;
+      const avgFinishedPerDay = Math.round((totalFinished / daysDiff) * 10) / 10;
 
       const machineCountMap: Record<string, number> = {};
       ((batchesRes.data || []) as any[]).forEach((b: any) => {
-        const machineFields = [b.manufacturing_machine_id, b.finishing_machine_id, b.packaging_machine_id, b.boxing_machine_id];
+        const machineFields = [
+          b.manufacturing_machine_id,
+          b.finishing_machine_id,
+          b.packaging_machine_id,
+          b.boxing_machine_id,
+        ];
         machineFields.forEach((mid: string | null) => {
           if (mid) machineCountMap[mid] = (machineCountMap[mid] || 0) + 1;
         });
       });
       const machineNameMap = new Map((machinesRes.data || []).map((m: any) => [m.id, m.name]));
-      const topMachines = Object.entries(machineCountMap).
-      sort((a, b) => b[1] - a[1]).
-      slice(0, 3).
-      map(([id, count]) => ({ name: machineNameMap.get(id) || 'Unknown', count }));
+      const topMachines = Object.entries(machineCountMap)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 3)
+        .map(([id, count]) => ({ name: machineNameMap.get(id) || "Unknown", count }));
 
       setData({
         profile: profileRes.data as any,
@@ -227,10 +320,10 @@ export default function Dashboard() {
         shipmentsCount: (shipmentsRes.data || []).length,
         topProducts,
         avgFinishedPerDay,
-        topMachines
+        topMachines,
       });
     } catch (e) {
-      console.error('Dashboard fetch error:', e);
+      console.error("Dashboard fetch error:", e);
     } finally {
       setLoading(false);
     }
@@ -239,51 +332,62 @@ export default function Dashboard() {
   useEffect(() => {
     setLoading(true);
     fetchAll();
-    const channel = supabase.
-    channel('dashboard-realtime').
-    on('postgres_changes', { event: '*', schema: 'public', table: 'order_batches' }, fetchAll).
-    subscribe();
-    return () => {supabase.removeChannel(channel);};
+    const channel = supabase
+      .channel("dashboard-realtime")
+      .on("postgres_changes", { event: "*", schema: "public", table: "order_batches" }, fetchAll)
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [fetchAll]);
 
   /* ─── derived metrics ─── */
-  const activeOrders = useMemo(() => data ? (data.ordersByStatus.pending || 0) + (data.ordersByStatus.in_progress || 0) : 0, [data]);
+  const activeOrders = useMemo(
+    () => (data ? (data.ordersByStatus.pending || 0) + (data.ordersByStatus.in_progress || 0) : 0),
+    [data],
+  );
   const shippedTotal = useMemo(() => data?.batchesByState.shipped || 0, [data]);
-  const allBatchTotal = useMemo(() => data ? Object.values(data.batchesByState).reduce((a, b) => a + b, 0) : 0, [data]);
-  const fulfillmentRate = useMemo(() => allBatchTotal > 0 ? Math.round(shippedTotal / allBatchTotal * 100) : 0, [shippedTotal, allBatchTotal]);
-  const totalOrders = useMemo(() => data ? Object.values(data.ordersByStatus).reduce((a, b) => a + b, 0) : 0, [data]);
+  const allBatchTotal = useMemo(
+    () => (data ? Object.values(data.batchesByState).reduce((a, b) => a + b, 0) : 0),
+    [data],
+  );
+  const fulfillmentRate = useMemo(
+    () => (allBatchTotal > 0 ? Math.round((shippedTotal / allBatchTotal) * 100) : 0),
+    [shippedTotal, allBatchTotal],
+  );
+  const totalOrders = useMemo(() => (data ? Object.values(data.ordersByStatus).reduce((a, b) => a + b, 0) : 0), [data]);
 
   const pipelineData = useMemo(() => {
     if (!data) return [];
     return Object.entries(PHASE_LABELS).map(([key, label]) => ({
       name: label,
       value: data.batchesByState[key] || 0,
-      fill: PHASE_COLORS[key]
+      fill: PHASE_COLORS[key],
     }));
   }, [data, PHASE_LABELS]);
 
   const donutData = useMemo(() => {
     if (!data) return [];
-    const allStatuses = ['pending', 'in_progress', 'completed', 'cancelled'];
+    const allStatuses = ["pending", "in_progress", "completed", "cancelled"];
     return allStatuses.map((status) => ({
       name: ORDER_STATUS_LABELS[status] || status,
       value: data.ordersByStatus[status] || 0,
-      fill: ORDER_STATUS_COLORS[status] || 'hsl(216, 12%, 60%)'
+      fill: ORDER_STATUS_COLORS[status] || "hsl(216, 12%, 60%)",
     }));
   }, [data, ORDER_STATUS_LABELS]);
 
   const throughputData = useMemo(() => {
     if (!data) return [];
-    return Object.entries(data.todayThroughput).
-    filter(([key]) => PHASE_LABELS[key]).
-    map(([key, count]) => ({
-      name: PHASE_LABELS[key] || key,
-      value: count,
-      fill: PHASE_COLORS[key] || 'hsl(214, 95%, 36%)'
-    }));
+    return Object.entries(data.todayThroughput)
+      .filter(([key]) => PHASE_LABELS[key])
+      .map(([key, count]) => ({
+        name: PHASE_LABELS[key] || key,
+        value: count,
+        fill: PHASE_COLORS[key] || "hsl(214, 95%, 36%)",
+      }));
   }, [data, PHASE_LABELS]);
 
-  const canCreateOrders = hasRole('admin');
+  const canCreateOrders = hasRole("admin");
   const readyForShipment = data?.batchesByState.ready_for_shipment || 0;
 
   if (loading) {
@@ -291,31 +395,36 @@ export default function Dashboard() {
       <div className="p-6 space-y-6">
         <Skeleton className="h-16 w-full" />
         <div className="grid gap-4 md:grid-cols-5">
-          {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-28" />)}
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-28" />
+          ))}
         </div>
         <div className="grid gap-4 md:grid-cols-2">
           <Skeleton className="h-72" />
           <Skeleton className="h-72" />
         </div>
-      </div>);
-
+      </div>
+    );
   }
 
   if (!data) return null;
 
-  const alertCount = (data.lateBatches?.length || 0) + (data.flaggedBatches?.length || 0) + (data.approachingEtaOrders?.length || 0) + (data.stalledOrders?.length || 0);
+  const alertCount =
+    (data.lateBatches?.length || 0) +
+    (data.flaggedBatches?.length || 0) +
+    (data.approachingEtaOrders?.length || 0) +
+    (data.stalledOrders?.length || 0);
 
   return (
     <div className="p-4 md:p-6 space-y-6">
-
       {/* ═══════ WELCOME BAR ═══════ */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-foreground">
-            {getGreeting()}, {data.profile?.full_name || 'there'}
+            {getGreeting()}, {data.profile?.full_name || "there"}
           </h1>
           <p className="text-sm text-muted-foreground">
-            {t('dashboard.factory_overview')} — {TIME_RANGE_LABELS[timeRange]}
+            {t("dashboard.factory_overview")} — {TIME_RANGE_LABELS[timeRange]}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -324,9 +433,9 @@ export default function Dashboard() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="today">{t('dashboard.today')}</SelectItem>
-              <SelectItem value="week">{t('dashboard.this_week')}</SelectItem>
-              <SelectItem value="month">{t('dashboard.last_30_days')}</SelectItem>
+              <SelectItem value="today">{t("dashboard.today")}</SelectItem>
+              <SelectItem value="week">{t("dashboard.this_week")}</SelectItem>
+              <SelectItem value="month">{t("dashboard.last_30_days")}</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -334,70 +443,117 @@ export default function Dashboard() {
 
       {/* ═══════ KPI CARDS ═══════ */}
       <div className="grid gap-4 grid-cols-2 md:grid-cols-3">
-        <div onClick={() => navigate('/orders')} className="cursor-pointer h-full">
-          <KpiCard icon={TrendingUp} label={t('dashboard.active_orders')} value={activeOrders} sub={TIME_RANGE_LABELS[timeRange]} color="text-primary" />
+        <div onClick={() => navigate("/orders")} className="cursor-pointer h-full">
+          <KpiCard
+            icon={TrendingUp}
+            label={t("dashboard.active_orders")}
+            value={activeOrders}
+            sub={TIME_RANGE_LABELS[timeRange]}
+            color="text-primary"
+          />
         </div>
-        <div onClick={() => navigate('/orders')} className="cursor-pointer h-full">
-          <KpiCard icon={FileText} label={t('dashboard.new_orders')} value={data.newOrdersToday} sub={t('dashboard.today')} color="text-primary" />
+        <div onClick={() => navigate("/orders")} className="cursor-pointer h-full">
+          <KpiCard
+            icon={FileText}
+            label={t("dashboard.new_orders")}
+            value={data.newOrdersToday}
+            sub={t("dashboard.today")}
+            color="text-primary"
+          />
         </div>
-        <div onClick={() => navigate('/orders')} className="cursor-pointer h-full">
-          <KpiCard icon={CheckCircle} label={t('dashboard.completed')} value={data.completedOrders} sub={`${data.shipmentsCount} ${t('dashboard.shipments')}`} color="text-success" />
+        <div onClick={() => navigate("/orders")} className="cursor-pointer h-full">
+          <KpiCard
+            icon={CheckCircle}
+            label={t("dashboard.completed")}
+            value={data.completedOrders}
+            sub={`${data.shipmentsCount} ${t("dashboard.shipments")}`}
+            color="text-success"
+          />
         </div>
-        <div onClick={() => navigate('/orders')} className="cursor-pointer h-full">
-          <KpiCard icon={AlertTriangle} label={t('dashboard.late_orders')} value={data.lateOrderCount} sub={t('dashboard.with_late_batches')} color="text-destructive" highlight={data.lateOrderCount > 0} />
+        <div onClick={() => navigate("/orders")} className="cursor-pointer h-full">
+          <KpiCard
+            icon={AlertTriangle}
+            label={t("dashboard.late_orders")}
+            value={data.lateOrderCount}
+            sub={t("dashboard.with_late_batches")}
+            color="text-destructive"
+            highlight={data.lateOrderCount > 0}
+          />
         </div>
-        
-        <div onClick={() => navigate('/extra-inventory')} className="cursor-pointer h-full">
-          <KpiCard icon={Archive} label={t('dashboard.extra_inventory')} value={data.extraInventoryCount} sub={t('dashboard.available_items')} color="text-primary" />
+
+        <div onClick={() => navigate("/extra-inventory")} className="cursor-pointer h-full">
+          <KpiCard
+            icon={Archive}
+            label={t("dashboard.extra_inventory")}
+            value={data.extraInventoryCount}
+            sub={t("dashboard.available_items")}
+            color="text-primary"
+          />
         </div>
       </div>
 
       {/* ═══════ SHIPMENT READY BANNER ═══════ */}
-      {readyForShipment > 0 &&
-      <Card className="border-success/30 bg-success/5">
+      {readyForShipment > 0 && (
+        <Card className="border-success/30 bg-success/5">
           <CardContent className="flex items-center justify-between py-4">
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-success/10">
                 <Truck className="h-5 w-5 text-success" />
               </div>
               <div>
-                <p className="font-semibold text-sm">{readyForShipment} {t('dashboard.items_ready_shipment')}</p>
-                <p className="text-xs text-muted-foreground">{t('dashboard.ready_to_kartona')}</p>
+                <p className="font-semibold text-sm">
+                  {readyForShipment} {t("dashboard.items_ready_shipment")}
+                </p>
+                <p className="text-xs text-muted-foreground">{t("dashboard.ready_to_kartona")}</p>
               </div>
             </div>
             <Button variant="outline" size="sm" asChild>
-              <Link to="/queues/boxing">{t('common.view')} <ArrowRight className="ml-1 h-3 w-3" /></Link>
+              <Link to="/queues/boxing">
+                {t("common.view")} <ArrowRight className="ml-1 h-3 w-3" />
+              </Link>
             </Button>
           </CardContent>
         </Card>
-      }
+      )}
 
       {/* ═══════ CHARTS ROW ═══════ */}
       <div className="grid gap-4 lg:grid-cols-5">
         {/* Production Pipeline */}
         <Card className="lg:col-span-3">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">{t('dashboard.production_pipeline')}</CardTitle>
-            <CardDescription>{t('dashboard.item_distribution')}</CardDescription>
+            <CardTitle className="text-base">{t("dashboard.production_pipeline")}</CardTitle>
+            <CardDescription>{t("dashboard.item_distribution")}</CardDescription>
           </CardHeader>
           <CardContent className="h-72">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={pipelineData} layout="vertical" margin={{ left: isRTL ? 10 : 20, right: isRTL ? 20 : 10, top: 5, bottom: 5 }}>
+              <BarChart
+                data={pipelineData}
+                layout="vertical"
+                margin={{ left: isRTL ? 10 : 20, right: isRTL ? 20 : 10, top: 5, bottom: 5 }}
+              >
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis type="number" tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }} />
-                <YAxis dataKey="name" type="category" width={isRTL ? 130 : 110} tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} orientation={isRTL ? 'right' : 'left'} tickMargin={12} />
+                <XAxis type="number" tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
+                <YAxis
+                  dataKey="name"
+                  type="category"
+                  width={isRTL ? 130 : 110}
+                  tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                  orientation={isRTL ? "right" : "left"}
+                  tickMargin={20}
+                />
                 <Tooltip
                   contentStyle={{
-                    background: 'hsl(var(--card))',
-                    border: '1px solid hsl(var(--border))',
-                    borderRadius: 'var(--radius)',
-                    fontSize: 12
-                  }} />
-                
+                    background: "hsl(var(--card))",
+                    border: "1px solid hsl(var(--border))",
+                    borderRadius: "var(--radius)",
+                    fontSize: 12,
+                  }}
+                />
+
                 <Bar dataKey="value" radius={[0, 4, 4, 0]} maxBarSize={24}>
-                  {pipelineData.map((entry, i) =>
-                  <Cell key={i} fill={entry.fill} />
-                  )}
+                  {pipelineData.map((entry, i) => (
+                    <Cell key={i} fill={entry.fill} />
+                  ))}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
@@ -407,52 +563,61 @@ export default function Dashboard() {
         {/* Order Status Donut */}
         <Card className="lg:col-span-2">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">{t('dashboard.order_status_breakdown')}</CardTitle>
-            <CardDescription>{t('dashboard.distribution_by_status')}</CardDescription>
+            <CardTitle className="text-base">{t("dashboard.order_status_breakdown")}</CardTitle>
+            <CardDescription>{t("dashboard.distribution_by_status")}</CardDescription>
           </CardHeader>
           <CardContent className="h-72 flex items-center justify-center">
-            {donutData.some((d) => d.value > 0) ?
-            <ResponsiveContainer width="100%" height="100%">
+            {donutData.some((d) => d.value > 0) ? (
+              <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                  data={donutData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={55}
-                  outerRadius={85}
-                  paddingAngle={3}
-                  dataKey="value"
-                  stroke="none">
-                  
-                    {donutData.map((entry, i) =>
-                  <Cell key={i} fill={entry.fill} />
-                  )}
+                    data={donutData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={55}
+                    outerRadius={85}
+                    paddingAngle={3}
+                    dataKey="value"
+                    stroke="none"
+                  >
+                    {donutData.map((entry, i) => (
+                      <Cell key={i} fill={entry.fill} />
+                    ))}
                   </Pie>
                   <Tooltip
-                  contentStyle={{
-                    background: 'hsl(var(--card))',
-                    border: '1px solid hsl(var(--border))',
-                    borderRadius: 'var(--radius)',
-                    fontSize: 12
-                  }} />
-                
-                  <Legend
-                  verticalAlign="bottom"
-                  iconType="circle"
-                  iconSize={8}
-                  wrapperStyle={{ fontSize: 11 }} />
-                
-                  <text x="50%" y="48%" textAnchor="middle" dominantBaseline="middle" className="fill-foreground text-2xl font-bold">
+                    contentStyle={{
+                      background: "hsl(var(--card))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "var(--radius)",
+                      fontSize: 12,
+                    }}
+                  />
+
+                  <Legend verticalAlign="bottom" iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
+
+                  <text
+                    x="50%"
+                    y="48%"
+                    textAnchor="middle"
+                    dominantBaseline="middle"
+                    className="fill-foreground text-2xl font-bold"
+                  >
                     {totalOrders}
                   </text>
-                  <text x="50%" y="58%" textAnchor="middle" dominantBaseline="middle" className="fill-muted-foreground text-xs">
-                    {t('dashboard.orders_label')}
+                  <text
+                    x="50%"
+                    y="58%"
+                    textAnchor="middle"
+                    dominantBaseline="middle"
+                    className="fill-muted-foreground text-xs"
+                  >
+                    {t("dashboard.orders_label")}
                   </text>
                 </PieChart>
-              </ResponsiveContainer> :
-
-            <p className="text-sm text-muted-foreground">{t('dashboard.no_orders_yet')}</p>
-            }
+              </ResponsiveContainer>
+            ) : (
+              <p className="text-sm text-muted-foreground">{t("dashboard.no_orders_yet")}</p>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -464,24 +629,34 @@ export default function Dashboard() {
           <CardHeader className="pb-2">
             <div className="flex items-center gap-2">
               <Trophy className="h-4 w-4 text-primary" />
-              <CardTitle className="text-base">{t('dashboard.top_products')}</CardTitle>
+              <CardTitle className="text-base">{t("dashboard.top_products")}</CardTitle>
             </div>
-            <CardDescription>{t('dashboard.most_completed_in')} {TIME_RANGE_LABELS[timeRange].toLowerCase()}</CardDescription>
+            <CardDescription>
+              {t("dashboard.most_completed_in")} {TIME_RANGE_LABELS[timeRange].toLowerCase()}
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            {data.topProducts.length > 0 ? data.topProducts.map((p, i) =>
-            <div key={i} className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className={`flex items-center justify-center h-6 w-6 rounded-full text-xs font-bold ${
-                i === 0 ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground'}`
-                }>{i + 1}</span>
-                  <span className="text-sm font-medium truncate">{p.name}</span>
+            {data.topProducts.length > 0 ? (
+              data.topProducts.map((p, i) => (
+                <div key={i} className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span
+                      className={`flex items-center justify-center h-6 w-6 rounded-full text-xs font-bold ${
+                        i === 0 ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"
+                      }`}
+                    >
+                      {i + 1}
+                    </span>
+                    <span className="text-sm font-medium truncate">{p.name}</span>
+                  </div>
+                  <Badge variant="secondary" className="text-xs shrink-0">
+                    {p.quantity} {t("common.units")}
+                  </Badge>
                 </div>
-                <Badge variant="secondary" className="text-xs shrink-0">{p.quantity} {t('common.units')}</Badge>
-              </div>
-            ) :
-            <p className="text-sm text-muted-foreground text-center py-4">{t('dashboard.no_completed_yet')}</p>
-            }
+              ))
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-4">{t("dashboard.no_completed_yet")}</p>
+            )}
           </CardContent>
         </Card>
 
@@ -490,13 +665,15 @@ export default function Dashboard() {
           <CardHeader className="pb-2">
             <div className="flex items-center gap-2">
               <Activity className="h-4 w-4 text-primary" />
-              <CardTitle className="text-base">{t('dashboard.avg_finished_day')}</CardTitle>
+              <CardTitle className="text-base">{t("dashboard.avg_finished_day")}</CardTitle>
             </div>
-            <CardDescription>{t('dashboard.daily_average_in')} {TIME_RANGE_LABELS[timeRange].toLowerCase()}</CardDescription>
+            <CardDescription>
+              {t("dashboard.daily_average_in")} {TIME_RANGE_LABELS[timeRange].toLowerCase()}
+            </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col items-center justify-center py-6">
             <p className="text-4xl font-bold text-primary">{data.avgFinishedPerDay}</p>
-            <p className="text-sm text-muted-foreground mt-1">{t('dashboard.items_per_day')}</p>
+            <p className="text-sm text-muted-foreground mt-1">{t("dashboard.items_per_day")}</p>
           </CardContent>
         </Card>
 
@@ -505,44 +682,86 @@ export default function Dashboard() {
           <CardHeader className="pb-2">
             <div className="flex items-center gap-2">
               <Wrench className="h-4 w-4 text-primary" />
-              <CardTitle className="text-base">{t('dashboard.most_used_machines')}</CardTitle>
+              <CardTitle className="text-base">{t("dashboard.most_used_machines")}</CardTitle>
             </div>
-            <CardDescription>{t('dashboard.by_production_records')} {TIME_RANGE_LABELS[timeRange].toLowerCase()}</CardDescription>
+            <CardDescription>
+              {t("dashboard.by_production_records")} {TIME_RANGE_LABELS[timeRange].toLowerCase()}
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            {data.topMachines.length > 0 ? data.topMachines.map((m, i) =>
-            <div key={i} className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className={`flex items-center justify-center h-6 w-6 rounded-full text-xs font-bold ${
-                i === 0 ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground'}`
-                }>{i + 1}</span>
-                  <span className="text-sm font-medium truncate">{m.name}</span>
+            {data.topMachines.length > 0 ? (
+              data.topMachines.map((m, i) => (
+                <div key={i} className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span
+                      className={`flex items-center justify-center h-6 w-6 rounded-full text-xs font-bold ${
+                        i === 0 ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"
+                      }`}
+                    >
+                      {i + 1}
+                    </span>
+                    <span className="text-sm font-medium truncate">{m.name}</span>
+                  </div>
+                  <Badge variant="secondary" className="text-xs shrink-0">
+                    {m.count} {t("dashboard.ops")}
+                  </Badge>
                 </div>
-                <Badge variant="secondary" className="text-xs shrink-0">{m.count} {t('dashboard.ops')}</Badge>
-              </div>
-            ) :
-            <p className="text-sm text-muted-foreground text-center py-4">{t('dashboard.no_machine_activity')}</p>
-            }
+              ))
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-4">{t("dashboard.no_machine_activity")}</p>
+            )}
           </CardContent>
         </Card>
       </div>
 
       {/* ═══════ QUEUE CARDS ═══════ */}
       <div>
-        <h2 className="text-base font-semibold mb-3">{t('dashboard.production_queues')}</h2>
+        <h2 className="text-base font-semibold mb-3">{t("dashboard.production_queues")}</h2>
         <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
-          <QueueCard name={t('nav.manufacturing')} href="/queues/manufacturing" icon={Factory}
-          waiting={0} inProgress={data.batchesByState.in_manufacturing || 0}
-          waitingLabel={t('dashboard.waiting')} activeLabel={t('dashboard.active_label')} bgClass="bg-blue-50 dark:bg-blue-950/30" iconClass="text-blue-600 dark:text-blue-400" />
-          <QueueCard name={t('nav.finishing')} href="/queues/finishing" icon={Sparkles}
-          waiting={data.batchesByState.ready_for_finishing || 0} inProgress={data.batchesByState.in_finishing || 0}
-          waitingLabel={t('dashboard.ready')} activeLabel={t('dashboard.active_label')} bgClass="bg-purple-50 dark:bg-purple-950/30" iconClass="text-purple-600 dark:text-purple-400" />
-          <QueueCard name={t('nav.packaging')} href="/queues/packaging" icon={Package}
-          waiting={data.batchesByState.ready_for_packaging || 0} inProgress={data.batchesByState.in_packaging || 0}
-          waitingLabel={t('dashboard.ready')} activeLabel={t('dashboard.active_label')} bgClass="bg-indigo-50 dark:bg-indigo-950/30" iconClass="text-indigo-600 dark:text-indigo-400" />
-          <QueueCard name={t('nav.boxing')} href="/queues/boxing" icon={Box}
-          waiting={data.batchesByState.ready_for_boxing || 0} inProgress={data.batchesByState.in_boxing || 0}
-          waitingLabel={t('dashboard.ready')} activeLabel={t('dashboard.active_label')} bgClass="bg-cyan-50 dark:bg-cyan-950/30" iconClass="text-cyan-600 dark:text-cyan-400" />
+          <QueueCard
+            name={t("nav.manufacturing")}
+            href="/queues/manufacturing"
+            icon={Factory}
+            waiting={0}
+            inProgress={data.batchesByState.in_manufacturing || 0}
+            waitingLabel={t("dashboard.waiting")}
+            activeLabel={t("dashboard.active_label")}
+            bgClass="bg-blue-50 dark:bg-blue-950/30"
+            iconClass="text-blue-600 dark:text-blue-400"
+          />
+          <QueueCard
+            name={t("nav.finishing")}
+            href="/queues/finishing"
+            icon={Sparkles}
+            waiting={data.batchesByState.ready_for_finishing || 0}
+            inProgress={data.batchesByState.in_finishing || 0}
+            waitingLabel={t("dashboard.ready")}
+            activeLabel={t("dashboard.active_label")}
+            bgClass="bg-purple-50 dark:bg-purple-950/30"
+            iconClass="text-purple-600 dark:text-purple-400"
+          />
+          <QueueCard
+            name={t("nav.packaging")}
+            href="/queues/packaging"
+            icon={Package}
+            waiting={data.batchesByState.ready_for_packaging || 0}
+            inProgress={data.batchesByState.in_packaging || 0}
+            waitingLabel={t("dashboard.ready")}
+            activeLabel={t("dashboard.active_label")}
+            bgClass="bg-indigo-50 dark:bg-indigo-950/30"
+            iconClass="text-indigo-600 dark:text-indigo-400"
+          />
+          <QueueCard
+            name={t("nav.boxing")}
+            href="/queues/boxing"
+            icon={Box}
+            waiting={data.batchesByState.ready_for_boxing || 0}
+            inProgress={data.batchesByState.in_boxing || 0}
+            waitingLabel={t("dashboard.ready")}
+            activeLabel={t("dashboard.active_label")}
+            bgClass="bg-cyan-50 dark:bg-cyan-950/30"
+            iconClass="text-cyan-600 dark:text-cyan-400"
+          />
         </div>
       </div>
 
@@ -550,70 +769,89 @@ export default function Dashboard() {
       <div className="grid gap-4 lg:grid-cols-5">
         <Card className="lg:col-span-3">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">{timeRange === 'today' ? t('dashboard.today') : TIME_RANGE_LABELS[timeRange]} {t('dashboard.throughput')}</CardTitle>
-            <CardDescription>{t('dashboard.items_processed_per_phase')}</CardDescription>
+            <CardTitle className="text-base">
+              {timeRange === "today" ? t("dashboard.today") : TIME_RANGE_LABELS[timeRange]} {t("dashboard.throughput")}
+            </CardTitle>
+            <CardDescription>{t("dashboard.items_processed_per_phase")}</CardDescription>
           </CardHeader>
           <CardContent className="h-64">
-            {throughputData.length > 0 ?
-            <ResponsiveContainer width="100%" height="100%">
+            {throughputData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={throughputData} margin={{ left: isRTL ? 10 : 0, right: isRTL ? 0 : 10 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} />
-                  <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} orientation={isRTL ? 'right' : 'left'} tickMargin={8} />
+                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+                  <YAxis
+                    allowDecimals={false}
+                    tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                    orientation={isRTL ? "right" : "left"}
+                    tickMargin={8}
+                  />
                   <Tooltip
-                  contentStyle={{
-                    background: 'hsl(var(--card))',
-                    border: '1px solid hsl(var(--border))',
-                    borderRadius: 'var(--radius)',
-                    fontSize: 12
-                  }} />
-                
+                    contentStyle={{
+                      background: "hsl(var(--card))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "var(--radius)",
+                      fontSize: 12,
+                    }}
+                  />
+
                   <Bar dataKey="value" radius={[4, 4, 0, 0]} maxBarSize={40}>
-                    {throughputData.map((entry, i) =>
-                  <Cell key={i} fill={entry.fill} />
-                  )}
+                    {throughputData.map((entry, i) => (
+                      <Cell key={i} fill={entry.fill} />
+                    ))}
                   </Bar>
                 </BarChart>
-              </ResponsiveContainer> :
-
-            <div className="flex items-center justify-center h-full">
-                <p className="text-sm text-muted-foreground">{t('dashboard.no_production_recorded')}</p>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-full">
+                <p className="text-sm text-muted-foreground">{t("dashboard.no_production_recorded")}</p>
               </div>
-            }
+            )}
           </CardContent>
         </Card>
 
         <Card className="lg:col-span-2">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-base">{t('dashboard.alerts_attention')}</CardTitle>
-              {alertCount > 0 &&
-              <Badge variant="destructive" className="text-xs">{alertCount}</Badge>
-              }
+              <CardTitle className="text-base">{t("dashboard.alerts_attention")}</CardTitle>
+              {alertCount > 0 && (
+                <Badge variant="destructive" className="text-xs">
+                  {alertCount}
+                </Badge>
+              )}
             </div>
-            <CardDescription>{t('dashboard.items_needing_attention')}</CardDescription>
+            <CardDescription>{t("dashboard.items_needing_attention")}</CardDescription>
           </CardHeader>
           <CardContent className="max-h-64 overflow-y-auto space-y-1">
-            {alertCount === 0 &&
-            <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+            {alertCount === 0 && (
+              <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
                 <CheckCircle className="h-10 w-10 mb-3 text-success" />
-                <p className="text-sm font-medium">{t('dashboard.all_clear')}</p>
-                <p className="text-xs text-muted-foreground mt-1">{t('dashboard.no_alerts_desc')}</p>
+                <p className="text-sm font-medium">{t("dashboard.all_clear")}</p>
+                <p className="text-xs text-muted-foreground mt-1">{t("dashboard.no_alerts_desc")}</p>
               </div>
-            }
+            )}
 
             {/* Late Batches */}
             {(data.lateBatches?.length || 0) > 0 && (
               <div className="space-y-1">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-destructive px-2 pt-1">{t('dashboard.late')}</p>
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-destructive px-2 pt-1">
+                  {t("dashboard.late")}
+                </p>
                 {(data.lateBatches || []).map((b) => {
                   const daysOverdue = differenceInDays(new Date(), new Date(b.eta));
                   return (
-                    <Link key={`late-${b.id}`} to={`/orders/${b.order_id}`} className="flex items-start gap-2 p-2 rounded-md hover:bg-muted/50 transition-colors border-l-2 border-destructive">
+                    <Link
+                      key={`late-${b.id}`}
+                      to={`/orders/${b.order_id}`}
+                      className="flex items-start gap-2 p-2 rounded-md hover:bg-muted/50 transition-colors border-l-2 border-destructive"
+                    >
                       <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium truncate">{b.order?.order_number || 'Unknown'}</p>
-                        <p className="text-xs text-muted-foreground">{b.quantity} {t('common.items')} · {daysOverdue > 0 ? `${daysOverdue}d ${t('dashboard.overdue')}` : t('dashboard.overdue')}</p>
+                        <p className="text-sm font-medium truncate">{b.order?.order_number || "Unknown"}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {b.quantity} {t("common.items")} ·{" "}
+                          {daysOverdue > 0 ? `${daysOverdue}d ${t("dashboard.overdue")}` : t("dashboard.overdue")}
+                        </p>
                       </div>
                     </Link>
                   );
@@ -624,15 +862,23 @@ export default function Dashboard() {
             {/* Stalled Orders */}
             {(data.stalledOrders?.length || 0) > 0 && (
               <div className="space-y-1">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-warning px-2 pt-2">{t('dashboard.stalled')}</p>
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-warning px-2 pt-2">
+                  {t("dashboard.stalled")}
+                </p>
                 {(data.stalledOrders || []).map((o) => {
                   const stalledDays = differenceInDays(new Date(), new Date(o.updated_at));
                   return (
-                    <Link key={`stall-${o.id}`} to={`/orders/${o.id}`} className="flex items-start gap-2 p-2 rounded-md hover:bg-muted/50 transition-colors border-l-2 border-warning">
+                    <Link
+                      key={`stall-${o.id}`}
+                      to={`/orders/${o.id}`}
+                      className="flex items-start gap-2 p-2 rounded-md hover:bg-muted/50 transition-colors border-l-2 border-warning"
+                    >
                       <Clock className="h-4 w-4 text-warning mt-0.5 shrink-0" />
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium truncate">{o.order_number}</p>
-                        <p className="text-xs text-muted-foreground">{t('dashboard.no_updates_for')} {stalledDays}d</p>
+                        <p className="text-xs text-muted-foreground">
+                          {t("dashboard.no_updates_for")} {stalledDays}d
+                        </p>
                       </div>
                     </Link>
                   );
@@ -643,15 +889,23 @@ export default function Dashboard() {
             {/* Approaching ETA */}
             {(data.approachingEtaOrders?.length || 0) > 0 && (
               <div className="space-y-1">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-primary px-2 pt-2">{t('dashboard.approaching_deadline')}</p>
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-primary px-2 pt-2">
+                  {t("dashboard.approaching_deadline")}
+                </p>
                 {(data.approachingEtaOrders || []).map((o) => {
                   const timeLeft = formatDistanceToNow(new Date(o.estimated_fulfillment_time), { addSuffix: true });
                   return (
-                    <Link key={`eta-${o.id}`} to={`/orders/${o.id}`} className="flex items-start gap-2 p-2 rounded-md hover:bg-muted/50 transition-colors border-l-2 border-primary">
+                    <Link
+                      key={`eta-${o.id}`}
+                      to={`/orders/${o.id}`}
+                      className="flex items-start gap-2 p-2 rounded-md hover:bg-muted/50 transition-colors border-l-2 border-primary"
+                    >
                       <CalendarClock className="h-4 w-4 text-primary mt-0.5 shrink-0" />
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium truncate">{o.order_number}</p>
-                        <p className="text-xs text-muted-foreground">{t('dashboard.due')} {timeLeft}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {t("dashboard.due")} {timeLeft}
+                        </p>
                       </div>
                     </Link>
                   );
@@ -661,17 +915,29 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
-    </div>);
-
+    </div>
+  );
 }
 
 /* ─── sub-components ─── */
 
-function KpiCard({ icon: Icon, label, value, sub, color, highlight
-
-}: {icon: React.ElementType;label: string;value: string | number;sub: string;color: string;highlight?: boolean;}) {
+function KpiCard({
+  icon: Icon,
+  label,
+  value,
+  sub,
+  color,
+  highlight,
+}: {
+  icon: React.ElementType;
+  label: string;
+  value: string | number;
+  sub: string;
+  color: string;
+  highlight?: boolean;
+}) {
   return (
-    <Card className={`h-full ${highlight ? 'border-destructive/40 bg-destructive/5' : ''}`}>
+    <Card className={`h-full ${highlight ? "border-destructive/40 bg-destructive/5" : ""}`}>
       <CardContent className="pt-5 pb-4 px-5">
         <div className="flex items-center justify-between mb-2">
           <span className="text-xs font-medium text-muted-foreground">{label}</span>
@@ -680,14 +946,31 @@ function KpiCard({ icon: Icon, label, value, sub, color, highlight
         <p className="text-2xl font-bold">{value}</p>
         <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>
       </CardContent>
-    </Card>);
-
+    </Card>
+  );
 }
 
-function QueueCard({ name, href, icon: Icon, waiting, inProgress, waitingLabel, activeLabel, bgClass, iconClass
-
-
-}: {name: string;href: string;icon: React.ElementType;waiting: number;inProgress: number;waitingLabel: string;activeLabel: string;bgClass: string;iconClass: string;}) {
+function QueueCard({
+  name,
+  href,
+  icon: Icon,
+  waiting,
+  inProgress,
+  waitingLabel,
+  activeLabel,
+  bgClass,
+  iconClass,
+}: {
+  name: string;
+  href: string;
+  icon: React.ElementType;
+  waiting: number;
+  inProgress: number;
+  waitingLabel: string;
+  activeLabel: string;
+  bgClass: string;
+  iconClass: string;
+}) {
   const total = waiting + inProgress;
   return (
     <Link to={href}>
@@ -697,7 +980,11 @@ function QueueCard({ name, href, icon: Icon, waiting, inProgress, waitingLabel, 
             <div className={`p-2 rounded-lg ${bgClass}`}>
               <Icon className={`h-4 w-4 ${iconClass}`} />
             </div>
-            {total > 0 && <Badge variant="secondary" className="text-xs">{total}</Badge>}
+            {total > 0 && (
+              <Badge variant="secondary" className="text-xs">
+                {total}
+              </Badge>
+            )}
           </div>
           <p className="text-sm font-semibold mb-2">{name}</p>
           <div className="grid grid-cols-2 gap-2">
@@ -712,6 +999,6 @@ function QueueCard({ name, href, icon: Icon, waiting, inProgress, waitingLabel, 
           </div>
         </CardContent>
       </Card>
-    </Link>);
-
+    </Link>
+  );
 }
