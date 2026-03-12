@@ -298,8 +298,8 @@ export default function Catalog() {
       if (error) throw error;
       
       toast({
-        title: 'Product Deleted',
-        description: `${productToDelete.name} has been deleted successfully.`,
+        title: t('catalog.product_deleted'),
+        description: `${productToDelete.name} ${t('catalog.deleted_success')}`,
       });
       
       fetchData();
