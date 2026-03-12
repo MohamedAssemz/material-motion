@@ -529,7 +529,7 @@ export default function Dashboard() {
               <BarChart
                 data={pipelineData}
                 layout="vertical"
-                margin={{ left: isRTL ? 20 : 20, right: isRTL ? 100 : 10, top: 5, bottom: 5 }}
+                margin={{ left: isRTL ? 20 : 20, right: isRTL ? 40 : 10, top: 5, bottom: 5 }}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                 <XAxis type="number" tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} reversed={isRTL} />
@@ -544,7 +544,7 @@ export default function Dashboard() {
                           const { x, y, payload } = props;
                           return (
                             <text
-                              x={x + 148}
+                              x={x + 100}
                               y={y}
                               textAnchor="start"
                               dominantBaseline="middle"
