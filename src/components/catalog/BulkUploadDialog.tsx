@@ -338,11 +338,11 @@ export function BulkUploadDialog({ open, onOpenChange, brands, onSuccess }: Bulk
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Bulk Upload Products</DialogTitle>
+          <DialogTitle>{t('catalog.bulk_upload_title')}</DialogTitle>
           <DialogDescription>
             {parsedData
-              ? `Review the ${parsedData.productsToInsert.length} product(s) below before confirming.`
-              : 'Download the Excel template, fill in your products, then upload the file.'}
+              ? `${t('catalog.bulk_review_desc')} (${parsedData.productsToInsert.length})`
+              : t('catalog.bulk_upload_desc')}
           </DialogDescription>
         </DialogHeader>
 
