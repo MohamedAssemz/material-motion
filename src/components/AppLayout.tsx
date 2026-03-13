@@ -167,8 +167,9 @@ export function AppLayout({ children }: AppLayoutProps) {
         {/* Language toggle + Collapse button */}
         <div
           className={cn(
-            "flex items-center gap-2 p-2 border-t border-sidebar-border overflow-hidden min-w-0",
-            isRTL && "flex-row-reverse",
+            "flex p-2 border-t border-sidebar-border",
+            collapsed ? "flex-col items-center gap-1" : "flex-row items-center gap-2",
+            isRTL && !collapsed && "flex-row-reverse",
           )}
         >
           <Button
@@ -176,8 +177,8 @@ export function AppLayout({ children }: AppLayoutProps) {
             size={collapsed ? "icon" : "default"}
             onClick={toggleLanguage}
             className={cn(
-              "gap-2 font-medium flex-1 min-w-0 overflow-hidden",
-              collapsed ? "h-8 w-8 flex-none" : "justify-start",
+              "gap-2 font-medium min-w-0 overflow-hidden",
+              collapsed ? "h-8 w-8" : "flex-1 justify-start",
               isRTL && !collapsed && "flex-row-reverse justify-end",
             )}
             title={language === "en" ? "التبديل إلى العربية" : "Switch to English"}
