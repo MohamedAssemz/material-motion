@@ -1,36 +1,41 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { toast } from 'sonner';
-import { Factory, Loader2 } from 'lucide-react';
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { toast } from "sonner";
+import { Factory, Loader2 } from "lucide-react";
 
 export default function Auth() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
     const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
       if (session) {
         // Verify token is still valid on server (not just cached)
-        const { data: { user }, error } = await supabase.auth.getUser();
-        
+        const {
+          data: { user },
+          error,
+        } = await supabase.auth.getUser();
+
         if (user && !error) {
-          navigate('/');
+          navigate("/");
         } else {
           // Session invalid - clear local storage
-          await supabase.auth.signOut({ scope: 'local' });
+          await supabase.auth.signOut({ scope: "local" });
         }
       }
     };
-    
+
     checkSession();
   }, [navigate]);
 
@@ -46,17 +51,20 @@ export default function Auth() {
 
       if (error) throw error;
 
-      toast.success('Signed in successfully!');
-      navigate('/');
+      toast.success("Signed in successfully!");
+      navigate("/");
     } catch (error: any) {
-      toast.error(error.message || 'Failed to sign in');
+      toast.error(error.message || "Failed to sign in");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background via-background to-secondary/20 p-4">
+    <div
+      dir="ltr"
+      className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background via-background to-secondary/20 p-4"
+    >
       <Card className="w-full max-w-md border-border/50 shadow-xl">
         <CardHeader className="space-y-2 text-center">
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
@@ -98,7 +106,7 @@ export default function Auth() {
                   Signing in...
                 </>
               ) : (
-                'Sign In'
+                "Sign In"
               )}
             </Button>
           </form>
