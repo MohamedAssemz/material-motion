@@ -404,7 +404,7 @@ export default function Orders() {
                 />
                 <Input
                   placeholder={t("orders.search_orders")}
-                  className={cn(isRTL ? "pr-8 text-right" : "pl-8")}
+                  className={cn(isRTL ? "pr-8 pl-3 text-right" : "pl-8 pr-3")}
                   dir={isRTL ? "rtl" : "ltr"}
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
