@@ -436,8 +436,7 @@ export default function Catalog() {
                 placeholder={t("catalog.search_placeholder")}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 h-11"
-                style={{ lineHeight: "2", direction: "rtl" }}
+                className="pl-10 h-11 py-3"
               />
             </div>
             {hasActiveFilters && (
