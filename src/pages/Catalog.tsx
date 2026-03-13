@@ -1,18 +1,18 @@
-import { useState, useEffect, useMemo } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
-import { useLanguage } from '@/contexts/LanguageContext';
-import { supabase } from '@/integrations/supabase/client';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useState, useEffect, useMemo } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
+import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+} from "@/components/ui/dropdown-menu";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,18 +22,18 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import { useToast } from '@/hooks/use-toast';
-import { Package, Plus, Search, Loader2, Tag, Palette, X, Upload, BarChart3, Settings2, Users } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-import { ProductCard } from '@/components/catalog/ProductCard';
-import { ProductDetailDialog } from '@/components/catalog/ProductDetailDialog';
-import { ProductFormDialog, ProductFormData } from '@/components/catalog/ProductFormDialog';
-import { CategoryListDialog } from '@/components/catalog/CategoryListDialog';
-import { BrandListDialog } from '@/components/catalog/BrandListDialog';
-import { BulkUploadDialog } from '@/components/catalog/BulkUploadDialog';
-import { CountrySelect } from '@/components/catalog/CountrySelect';
-import { SIZE_OPTIONS } from '@/lib/catalogConstants';
+} from "@/components/ui/alert-dialog";
+import { useToast } from "@/hooks/use-toast";
+import { Package, Plus, Search, Loader2, Tag, Palette, X, Upload, BarChart3, Settings2, Users } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { ProductCard } from "@/components/catalog/ProductCard";
+import { ProductDetailDialog } from "@/components/catalog/ProductDetailDialog";
+import { ProductFormDialog, ProductFormData } from "@/components/catalog/ProductFormDialog";
+import { CategoryListDialog } from "@/components/catalog/CategoryListDialog";
+import { BrandListDialog } from "@/components/catalog/BrandListDialog";
+import { BulkUploadDialog } from "@/components/catalog/BulkUploadDialog";
+import { CountrySelect } from "@/components/catalog/CountrySelect";
+import { SIZE_OPTIONS } from "@/lib/catalogConstants";
 
 interface Category {
   id: string;
@@ -77,35 +77,35 @@ export default function Catalog() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
   const [loading, setLoading] = useState(true);
-  
+
   // Filters
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [selectedBrand, setSelectedBrand] = useState<string>('all');
-  const [selectedSize, setSelectedSize] = useState<string>('all');
-  const [selectedCountry, setSelectedCountry] = useState<string>('all');
-  
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [selectedBrand, setSelectedBrand] = useState<string>("all");
+  const [selectedSize, setSelectedSize] = useState<string>("all");
+  const [selectedCountry, setSelectedCountry] = useState<string>("all");
+
   // Dialogs
   const [productFormOpen, setProductFormOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<ProductFormData | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
-  
+
   // Duplicate mode
   const [isDuplicating, setIsDuplicating] = useState(false);
   const [originalProductForDuplicate, setOriginalProductForDuplicate] = useState<ProductFormData | null>(null);
-  
+
   // Delete dialog
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
   const [deleting, setDeleting] = useState(false);
-  
+
   // Category/Brand list dialogs
   const [categoryListOpen, setCategoryListOpen] = useState(false);
   const [brandListOpen, setBrandListOpen] = useState(false);
   const [bulkUploadOpen, setBulkUploadOpen] = useState(false);
 
-  const canManage = hasRole('admin');
+  const canManage = hasRole("admin");
 
   useEffect(() => {
     fetchData();
@@ -115,15 +115,20 @@ export default function Catalog() {
     setLoading(true);
     try {
       const [productsRes, categoriesRes, brandsRes] = await Promise.all([
-        supabase.from('products').select(`
+        supabase
+          .from("products")
+          .select(
+            `
           *,
           brand:brands(id, name),
           categories:product_categories(category:categories(id, name)),
           images:product_images(id, image_url, is_main, sort_order),
           product_customers:product_customers(customer:customers(id, name, code))
-        `).order('created_at', { ascending: false }),
-        supabase.from('categories').select('*').order('name'),
-        supabase.from('brands').select('*').order('name'),
+        `,
+          )
+          .order("created_at", { ascending: false }),
+        supabase.from("categories").select("*").order("name"),
+        supabase.from("brands").select("*").order("name"),
       ]);
 
       if (productsRes.error) throw productsRes.error;
@@ -133,8 +138,8 @@ export default function Catalog() {
       // Get product counts for categories and brands
       const productCategoryCount = new Map<string, number>();
       const productBrandCount = new Map<string, number>();
-      
-      (productsRes.data || []).forEach(p => {
+
+      (productsRes.data || []).forEach((p) => {
         if (p.brand_id) {
           productBrandCount.set(p.brand_id, (productBrandCount.get(p.brand_id) || 0) + 1);
         }
@@ -146,19 +151,23 @@ export default function Catalog() {
       });
 
       setProducts(productsRes.data || []);
-      setCategories((categoriesRes.data || []).map(c => ({
-        ...c,
-        product_count: productCategoryCount.get(c.id) || 0,
-      })));
-      setBrands((brandsRes.data || []).map(b => ({
-        ...b,
-        product_count: productBrandCount.get(b.id) || 0,
-      })));
+      setCategories(
+        (categoriesRes.data || []).map((c) => ({
+          ...c,
+          product_count: productCategoryCount.get(c.id) || 0,
+        })),
+      );
+      setBrands(
+        (brandsRes.data || []).map((b) => ({
+          ...b,
+          product_count: productBrandCount.get(b.id) || 0,
+        })),
+      );
     } catch (error: any) {
       toast({
-        title: 'Error',
+        title: "Error",
         description: error.message,
-        variant: 'destructive',
+        variant: "destructive",
       });
     } finally {
       setLoading(false);
@@ -168,7 +177,7 @@ export default function Catalog() {
   // Get unique country codes from products
   const uniqueCountryCodes = useMemo(() => {
     const countries = new Set<string>();
-    products.forEach(p => {
+    products.forEach((p) => {
       if (p.country) countries.add(p.country);
     });
     return Array.from(countries).sort();
@@ -176,11 +185,11 @@ export default function Catalog() {
 
   // Filter products
   const filteredProducts = useMemo(() => {
-    return products.filter(product => {
+    return products.filter((product) => {
       // Search filter
       if (searchTerm) {
         const term = searchTerm.toLowerCase();
-        const matchesSearch = 
+        const matchesSearch =
           product.name.toLowerCase().includes(term) ||
           product.sku.toLowerCase().includes(term) ||
           (product.description?.toLowerCase().includes(term) ?? false);
@@ -188,23 +197,23 @@ export default function Catalog() {
       }
 
       // Category filter
-      if (selectedCategory !== 'all') {
-        const hasCategory = product.categories?.some(c => c.category?.id === selectedCategory);
+      if (selectedCategory !== "all") {
+        const hasCategory = product.categories?.some((c) => c.category?.id === selectedCategory);
         if (!hasCategory) return false;
       }
 
       // Brand filter
-      if (selectedBrand !== 'all') {
+      if (selectedBrand !== "all") {
         if (product.brand_id !== selectedBrand) return false;
       }
 
       // Size filter
-      if (selectedSize !== 'all') {
+      if (selectedSize !== "all") {
         if (product.size !== selectedSize) return false;
       }
 
       // Country filter
-      if (selectedCountry !== 'all') {
+      if (selectedCountry !== "all") {
         if (product.country !== selectedCountry) return false;
       }
 
@@ -218,24 +227,25 @@ export default function Catalog() {
   };
 
   const prepareProductFormData = (product: Product): ProductFormData => {
-    const categoryIds = product.categories?.map(c => c.category?.id).filter(Boolean) as string[] || [];
-    const customerIds = product.potential_customers?.map(c => c.customer?.id).filter(Boolean) as string[] || [];
-    const images = product.images?.map(img => ({
-      id: img.id,
-      image_url: img.image_url,
-      is_main: img.is_main ?? false,
-      sort_order: img.sort_order ?? 0,
-    })) || [];
+    const categoryIds = (product.categories?.map((c) => c.category?.id).filter(Boolean) as string[]) || [];
+    const customerIds = (product.potential_customers?.map((c) => c.customer?.id).filter(Boolean) as string[]) || [];
+    const images =
+      product.images?.map((img) => ({
+        id: img.id,
+        image_url: img.image_url,
+        is_main: img.is_main ?? false,
+        sort_order: img.sort_order ?? 0,
+      })) || [];
 
     return {
       id: product.id,
       sku: product.sku,
       name: product.name,
-      description: product.description || '',
-      size: product.size || '',
-      color: product.color || '',
-      brand_id: product.brand_id || '',
-      country: product.country || '',
+      description: product.description || "",
+      size: product.size || "",
+      color: product.color || "",
+      brand_id: product.brand_id || "",
+      country: product.country || "",
       needs_packing: product.needs_packing ?? true,
       category_ids: categoryIds,
       customer_ids: customerIds,
@@ -262,9 +272,9 @@ export default function Catalog() {
     const duplicateData: ProductFormData = {
       ...formData,
       id: undefined,
-      sku: '', // Will be auto-generated
+      sku: "", // Will be auto-generated
     };
-    
+
     // Store original for comparison
     setOriginalProductForDuplicate(formData);
     setEditingProduct(duplicateData);
@@ -279,35 +289,32 @@ export default function Catalog() {
 
   const handleConfirmDelete = async () => {
     if (!productToDelete) return;
-    
+
     setDeleting(true);
     try {
       // Delete related data first
       await Promise.all([
-        supabase.from('product_categories').delete().eq('product_id', productToDelete.id),
-        supabase.from('product_customers').delete().eq('product_id', productToDelete.id),
-        supabase.from('product_images').delete().eq('product_id', productToDelete.id),
+        supabase.from("product_categories").delete().eq("product_id", productToDelete.id),
+        supabase.from("product_customers").delete().eq("product_id", productToDelete.id),
+        supabase.from("product_images").delete().eq("product_id", productToDelete.id),
       ]);
 
       // Delete the product
-      const { error } = await supabase
-        .from('products')
-        .delete()
-        .eq('id', productToDelete.id);
-      
+      const { error } = await supabase.from("products").delete().eq("id", productToDelete.id);
+
       if (error) throw error;
-      
+
       toast({
-        title: t('catalog.product_deleted'),
-        description: `${productToDelete.name} ${t('catalog.deleted_success')}`,
+        title: t("catalog.product_deleted"),
+        description: `${productToDelete.name} ${t("catalog.deleted_success")}`,
       });
-      
+
       fetchData();
     } catch (error: any) {
       toast({
-        title: 'Error',
+        title: "Error",
         description: error.message,
-        variant: 'destructive',
+        variant: "destructive",
       });
     } finally {
       setDeleting(false);
@@ -326,14 +333,19 @@ export default function Catalog() {
   };
 
   const clearFilters = () => {
-    setSearchTerm('');
-    setSelectedCategory('all');
-    setSelectedBrand('all');
-    setSelectedSize('all');
-    setSelectedCountry('all');
+    setSearchTerm("");
+    setSelectedCategory("all");
+    setSelectedBrand("all");
+    setSelectedSize("all");
+    setSelectedCountry("all");
   };
 
-  const hasActiveFilters = searchTerm || selectedCategory !== 'all' || selectedBrand !== 'all' || selectedSize !== 'all' || selectedCountry !== 'all';
+  const hasActiveFilters =
+    searchTerm ||
+    selectedCategory !== "all" ||
+    selectedBrand !== "all" ||
+    selectedSize !== "all" ||
+    selectedCountry !== "all";
 
   if (loading) {
     return (
@@ -352,15 +364,17 @@ export default function Catalog() {
             <Package className="h-6 w-6 text-primary" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold">{t('catalog.title')}</h1>
-            <p className="text-muted-foreground text-sm">{products.length} {t('catalog.products_count')}</p>
+            <h1 className="text-2xl font-bold">{t("catalog.title")}</h1>
+            <p className="text-muted-foreground text-sm">
+              {products.length} {t("catalog.products_count")}
+            </p>
           </div>
         </div>
-        
+
         <div className="flex items-center gap-2 flex-wrap">
-          <Button variant="outline" size="sm" onClick={() => navigate('/reports?tab=catalog-insights')}>
+          <Button variant="outline" size="sm" onClick={() => navigate("/reports?tab=catalog-insights")}>
             <BarChart3 className="mr-2 h-4 w-4" />
-            {t('catalog.catalog_insights')}
+            {t("catalog.catalog_insights")}
           </Button>
           {canManage && (
             <>
@@ -368,38 +382,44 @@ export default function Catalog() {
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="sm">
                     <Settings2 className="mr-2 h-4 w-4" />
-                    {t('catalog.manage')}
+                    {t("catalog.manage")}
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48">
                   <DropdownMenuItem onClick={() => setCategoryListOpen(true)}>
                     <Tag className="mr-2 h-4 w-4" />
-                    {t('catalog.categories')}
-                    <Badge variant="secondary" className="ml-auto">{categories.length}</Badge>
+                    {t("catalog.categories")}
+                    <Badge variant="secondary" className="ml-auto">
+                      {categories.length}
+                    </Badge>
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => setBrandListOpen(true)}>
                     <Palette className="mr-2 h-4 w-4" />
-                    {t('catalog.brands')}
-                    <Badge variant="secondary" className="ml-auto">{brands.length}</Badge>
+                    {t("catalog.brands")}
+                    <Badge variant="secondary" className="ml-auto">
+                      {brands.length}
+                    </Badge>
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate('/customers')}>
+                  <DropdownMenuItem onClick={() => navigate("/customers")}>
                     <Users className="mr-2 h-4 w-4" />
-                    {t('catalog.customers')}
+                    {t("catalog.customers")}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
               <Button variant="outline" size="sm" onClick={() => setBulkUploadOpen(true)}>
                 <Upload className="mr-2 h-4 w-4" />
-                {t('catalog.bulk_upload')}
+                {t("catalog.bulk_upload")}
               </Button>
-              <Button onClick={() => { 
-                setEditingProduct(null); 
-                setIsDuplicating(false);
-                setOriginalProductForDuplicate(null);
-                setProductFormOpen(true); 
-              }}>
+              <Button
+                onClick={() => {
+                  setEditingProduct(null);
+                  setIsDuplicating(false);
+                  setOriginalProductForDuplicate(null);
+                  setProductFormOpen(true);
+                }}
+              >
                 <Plus className="mr-2 h-4 w-4" />
-                {t('catalog.add_product')}
+                {t("catalog.add_product")}
               </Button>
             </>
           )}
@@ -413,53 +433,59 @@ export default function Catalog() {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder={t('catalog.search_placeholder')}
+                placeholder={t("catalog.search_placeholder")}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
+                className="pl-10 leading-normal py-2 h-10"
               />
             </div>
             {hasActiveFilters && (
               <Button variant="ghost" onClick={clearFilters} size="sm">
                 <X className="mr-1 h-4 w-4" />
-                {t('catalog.clear_filters')}
+                {t("catalog.clear_filters")}
               </Button>
             )}
           </div>
-          
+
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <Select value={selectedCategory} onValueChange={setSelectedCategory}>
               <SelectTrigger>
-                <SelectValue placeholder={t('catalog.all_categories')} />
+                <SelectValue placeholder={t("catalog.all_categories")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">{t('catalog.all_categories')}</SelectItem>
-                {categories.map(c => (
-                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                <SelectItem value="all">{t("catalog.all_categories")}</SelectItem>
+                {categories.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.name}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
 
             <Select value={selectedBrand} onValueChange={setSelectedBrand}>
               <SelectTrigger>
-                <SelectValue placeholder={t('catalog.brands')} />
+                <SelectValue placeholder={t("catalog.brands")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">{t('catalog.all_brands')}</SelectItem>
-                {brands.map(b => (
-                  <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                <SelectItem value="all">{t("catalog.all_brands")}</SelectItem>
+                {brands.map((b) => (
+                  <SelectItem key={b.id} value={b.id}>
+                    {b.name}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
 
             <Select value={selectedSize} onValueChange={setSelectedSize}>
               <SelectTrigger>
-                <SelectValue placeholder={t('catalog.all_sizes')} />
+                <SelectValue placeholder={t("catalog.all_sizes")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">{t('catalog.all_sizes')}</SelectItem>
-                {SIZE_OPTIONS.map(s => (
-                  <SelectItem key={s} value={s}>{s}</SelectItem>
+                <SelectItem value="all">{t("catalog.all_sizes")}</SelectItem>
+                {SIZE_OPTIONS.map((s) => (
+                  <SelectItem key={s} value={s}>
+                    {s}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -467,10 +493,10 @@ export default function Catalog() {
             <CountrySelect
               value={selectedCountry}
               onValueChange={setSelectedCountry}
-              placeholder={t('catalog.all_countries')}
+              placeholder={t("catalog.all_countries")}
               availableCountryCodes={uniqueCountryCodes}
               showAllOption
-              allOptionLabel={t('catalog.all_countries')}
+              allOptionLabel={t("catalog.all_countries")}
             />
           </div>
         </div>
@@ -481,14 +507,14 @@ export default function Catalog() {
         <Card className="p-12 text-center">
           <Package className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
           <h3 className="text-lg font-semibold mb-2">
-            {products.length === 0 ? t('catalog.no_products_yet') : t('catalog.no_match')}
+            {products.length === 0 ? t("catalog.no_products_yet") : t("catalog.no_match")}
           </h3>
           <p className="text-muted-foreground">
-            {products.length === 0 && canManage 
-              ? t('catalog.get_started') 
-              : hasActiveFilters 
-                ? t('catalog.try_adjusting') 
-                : t('catalog.products_appear')}
+            {products.length === 0 && canManage
+              ? t("catalog.get_started")
+              : hasActiveFilters
+                ? t("catalog.try_adjusting")
+                : t("catalog.products_appear")}
           </p>
         </Card>
       ) : (
@@ -516,12 +542,7 @@ export default function Catalog() {
       />
 
       {/* Brand List Dialog */}
-      <BrandListDialog
-        open={brandListOpen}
-        onOpenChange={setBrandListOpen}
-        brands={brands}
-        onRefresh={fetchData}
-      />
+      <BrandListDialog open={brandListOpen} onOpenChange={setBrandListOpen} brands={brands} onRefresh={fetchData} />
 
       {/* Product Form Dialog */}
       <ProductFormDialog
@@ -542,31 +563,26 @@ export default function Catalog() {
       />
 
       {/* Bulk Upload Dialog */}
-      <BulkUploadDialog
-        open={bulkUploadOpen}
-        onOpenChange={setBulkUploadOpen}
-        brands={brands}
-        onSuccess={fetchData}
-      />
+      <BulkUploadDialog open={bulkUploadOpen} onOpenChange={setBulkUploadOpen} brands={brands} onSuccess={fetchData} />
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{t('catalog.delete_product')}</AlertDialogTitle>
+            <AlertDialogTitle>{t("catalog.delete_product")}</AlertDialogTitle>
             <AlertDialogDescription>
-              {t('catalog.delete_confirm')} "{productToDelete?.name}"? {t('catalog.cannot_undone')}
+              {t("catalog.delete_confirm")} "{productToDelete?.name}"? {t("catalog.cannot_undone")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>{t('common.cancel')}</AlertDialogCancel>
+            <AlertDialogCancel disabled={deleting}>{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleConfirmDelete}
               disabled={deleting}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {deleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              {t('common.delete')}
+              {t("common.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
