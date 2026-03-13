@@ -436,8 +436,8 @@ export default function Catalog() {
                 placeholder={t("catalog.search_placeholder")}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 leading-normal py-2 h-10 [&]:leading-normal"
-                style={{ lineHeight: "normal" }}
+                className="pl-10 h-11"
+                style={{ lineHeight: "2", direction: "rtl" }}
               />
             </div>
             {hasActiveFilters && (
