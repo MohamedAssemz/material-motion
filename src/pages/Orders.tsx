@@ -61,7 +61,7 @@ interface DateRange {
 
 export default function Orders() {
   const { hasRole } = useAuth();
-  const { t } = useLanguage();
+  const { t, isRTL } = useLanguage();
   const navigate = useNavigate();
   const [orders, setOrders] = useState<Order[]>([]);
   const [orderItems, setOrderItems] = useState<Map<string, OrderItem[]>>(new Map());
@@ -399,12 +399,10 @@ export default function Orders() {
 
             <div className="flex items-center gap-2">
               <div className="relative w-64">
-                <Search
-                  className={cn("absolute top-2.5 h-4 w-4 text-muted-foreground", isRTL ? "right-2.5" : "left-2.5")}
-                />
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder={t("orders.search_orders")}
-                  className={cn(isRTL ? "pr-8" : "pl-8")}
+                  className="pl-8"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
