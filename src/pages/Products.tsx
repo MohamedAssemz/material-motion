@@ -1,17 +1,17 @@
-import { useState, useEffect } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Switch } from '@/components/ui/switch';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { useToast } from '@/hooks/use-toast';
-import { Package, Plus, Edit, ArrowLeft, Loader2 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-import { Badge } from '@/components/ui/badge';
+import { useState, useEffect } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
+import { Package, Plus, Edit, ArrowLeft, Loader2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Badge } from "@/components/ui/badge";
 
 interface Product {
   id: string;
@@ -30,13 +30,13 @@ export default function Products() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [formData, setFormData] = useState({
-    sku: '',
-    name: '',
-    description: '',
+    sku: "",
+    name: "",
+    description: "",
     needs_packing: true,
   });
 
-  const canManage = hasRole('admin');
+  const canManage = hasRole("admin");
 
   useEffect(() => {
     fetchProducts();
@@ -44,18 +44,15 @@ export default function Products() {
 
   const fetchProducts = async () => {
     try {
-      const { data, error } = await supabase
-        .from('products')
-        .select('*')
-        .order('sku');
+      const { data, error } = await supabase.from("products").select("*").order("sku");
 
       if (error) throw error;
       setProducts(data || []);
     } catch (error: any) {
       toast({
-        title: 'Error',
+        title: "Error",
         description: error.message,
-        variant: 'destructive',
+        variant: "destructive",
       });
     } finally {
       setLoading(false);
@@ -67,27 +64,22 @@ export default function Products() {
 
     try {
       if (editingProduct) {
-        const { error } = await supabase
-          .from('products')
-          .update(formData)
-          .eq('id', editingProduct.id);
+        const { error } = await supabase.from("products").update(formData).eq("id", editingProduct.id);
 
         if (error) throw error;
 
         toast({
-          title: 'Success',
-          description: 'Product updated successfully',
+          title: "Success",
+          description: "Product updated successfully",
         });
       } else {
-        const { error } = await supabase
-          .from('products')
-          .insert(formData);
+        const { error } = await supabase.from("products").insert(formData);
 
         if (error) throw error;
 
         toast({
-          title: 'Success',
-          description: 'Product created successfully',
+          title: "Success",
+          description: "Product created successfully",
         });
       }
 
@@ -96,18 +88,18 @@ export default function Products() {
       fetchProducts();
     } catch (error: any) {
       toast({
-        title: 'Error',
+        title: "Error",
         description: error.message,
-        variant: 'destructive',
+        variant: "destructive",
       });
     }
   };
 
   const resetForm = () => {
     setFormData({
-      sku: '',
-      name: '',
-      description: '',
+      sku: "",
+      name: "",
+      description: "",
       needs_packing: true,
     });
     setEditingProduct(null);
@@ -118,7 +110,7 @@ export default function Products() {
     setFormData({
       sku: product.sku,
       name: product.name,
-      description: product.description || '',
+      description: product.description || "",
       needs_packing: product.needs_packing ?? true,
     });
     setDialogOpen(true);
@@ -137,21 +129,21 @@ export default function Products() {
       <header className="border-b border-border bg-card">
         <div className="container mx-auto flex items-center justify-between px-4 py-4">
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
             <Package className="h-6 w-6 text-primary" />
             <div>
               <h1 className="text-xl font-bold">Products</h1>
               <p className="text-sm text-muted-foreground">Manage product catalog</p>
             </div>
           </div>
-          
+
           {canManage && (
-            <Dialog open={dialogOpen} onOpenChange={(open) => {
-              setDialogOpen(open);
-              if (!open) resetForm();
-            }}>
+            <Dialog
+              open={dialogOpen}
+              onOpenChange={(open) => {
+                setDialogOpen(open);
+                if (!open) resetForm();
+              }}
+            >
               <DialogTrigger asChild>
                 <Button>
                   <Plus className="mr-2 h-4 w-4" />
@@ -160,9 +152,7 @@ export default function Products() {
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>
-                    {editingProduct ? 'Edit Product' : 'Add New Product'}
-                  </DialogTitle>
+                  <DialogTitle>{editingProduct ? "Edit Product" : "Add New Product"}</DialogTitle>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div>
@@ -194,10 +184,10 @@ export default function Products() {
                   </div>
                   <div className="flex items-center justify-between p-3 rounded-lg border">
                     <div>
-                      <Label htmlFor="needs_packing" className="font-medium">Needs Packing</Label>
-                      <p className="text-xs text-muted-foreground">
-                        Enable if this product requires packing phase
-                      </p>
+                      <Label htmlFor="needs_packing" className="font-medium">
+                        Needs Packing
+                      </Label>
+                      <p className="text-xs text-muted-foreground">Enable if this product requires packing phase</p>
                     </div>
                     <Switch
                       id="needs_packing"
@@ -207,12 +197,16 @@ export default function Products() {
                   </div>
                   <div className="flex gap-2">
                     <Button type="submit" className="flex-1">
-                      {editingProduct ? 'Update' : 'Create'}
+                      {editingProduct ? "Update" : "Create"}
                     </Button>
-                    <Button type="button" variant="outline" onClick={() => {
-                      setDialogOpen(false);
-                      resetForm();
-                    }}>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        setDialogOpen(false);
+                        resetForm();
+                      }}
+                    >
                       Cancel
                     </Button>
                   </div>
@@ -234,11 +228,7 @@ export default function Products() {
                     <CardDescription>{product.sku}</CardDescription>
                   </div>
                   {canManage && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => openEditDialog(product)}
-                    >
+                    <Button variant="ghost" size="icon" onClick={() => openEditDialog(product)}>
                       <Edit className="h-4 w-4" />
                     </Button>
                   )}
@@ -247,12 +237,16 @@ export default function Products() {
               <CardContent>
                 <div className="flex items-center justify-between">
                   <p className="text-sm text-muted-foreground flex-1">
-                    {product.description || 'No description available'}
+                    {product.description || "No description available"}
                   </p>
                   {product.needs_packing ? (
-                    <Badge variant="secondary" className="ml-2">Packing</Badge>
+                    <Badge variant="secondary" className="ml-2">
+                      Packing
+                    </Badge>
                   ) : (
-                    <Badge variant="outline" className="ml-2">No Packing</Badge>
+                    <Badge variant="outline" className="ml-2">
+                      No Packing
+                    </Badge>
                   )}
                 </div>
               </CardContent>
@@ -265,9 +259,9 @@ export default function Products() {
             <Package className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
             <h3 className="text-lg font-semibold mb-2">No products yet</h3>
             <p className="text-muted-foreground mb-4">
-              {canManage 
-                ? 'Get started by adding your first product'
-                : 'Products will appear here once added by administrators'}
+              {canManage
+                ? "Get started by adding your first product"
+                : "Products will appear here once added by administrators"}
             </p>
           </Card>
         )}
