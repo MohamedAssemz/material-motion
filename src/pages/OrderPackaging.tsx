@@ -939,7 +939,7 @@ export default function OrderPackaging() {
             <Card>
               <CardContent className="p-4 flex items-center justify-between flex-wrap gap-3">
                 <Badge variant="secondary" className="text-lg px-3 py-1">
-                  {totalSelected} selected
+                  {t('phase.selected_count').replace('{n}', String(totalSelected))}
                 </Badge>
                 <div className="flex gap-2">
                   <Button
@@ -947,16 +947,16 @@ export default function OrderPackaging() {
                     onClick={() => setMoveToExtraDialogOpen(true)}
                     disabled={totalSelected === 0}
                   >
-                    <Package className="h-4 w-4 mr-2" />
-                    Assign to Extra
+                    <Package className="h-4 w-4 me-2" />
+                    {t('phase.assign_to_extra')}
                   </Button>
                   <Button variant="outline" onClick={handleOpenAssignDialog} disabled={totalSelected === 0}>
-                    <Box className="h-4 w-4 mr-2" />
-                    Assign to Box
+                    <Box className="h-4 w-4 me-2" />
+                    {t('phase.assign_to_box')}
                   </Button>
                   <Button onClick={() => setBoxDirectlyDialogOpen(true)} disabled={totalSelected === 0}>
-                    <Zap className="h-4 w-4 mr-2" />
-                    Box Directly
+                    <Zap className="h-4 w-4 me-2" />
+                    {t('phase.box_directly')}
                   </Button>
                 </div>
               </CardContent>
