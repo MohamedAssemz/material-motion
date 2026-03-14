@@ -1374,7 +1374,7 @@ export default function OrderBoxing() {
             <div className="space-y-3">
               <div className="flex items-center gap-2 pb-2 border-b border-orange-200 dark:border-orange-900">
                 <Package className="h-4 w-4 text-orange-600" />
-                <h3 className="text-sm font-semibold text-orange-700 dark:text-orange-400">Added to Extra from this Order</h3>
+                <h3 className="text-sm font-semibold text-orange-700 dark:text-orange-400">{t('phase.added_to_extra_from_order')}</h3>
               </div>
               {addedToExtraItems.map((item) => (
                 <Card
