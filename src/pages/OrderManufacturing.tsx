@@ -884,9 +884,9 @@ export default function OrderManufacturing() {
                   options={machines.map((m) => ({ value: m.id, label: m.name }))}
                   value={selectedMachine}
                   onValueChange={setSelectedMachine}
-                  placeholder="Select a machine..."
-                  searchPlaceholder="Search machines..."
-                  emptyText="No manufacturing machines found"
+                  placeholder={t('phase.select_machine_placeholder')}
+                  searchPlaceholder={t('phase.search_machines')}
+                  emptyText={t('phase.no_mfg_machines')}
                   loading={loadingMachines}
                 />
               </div>
