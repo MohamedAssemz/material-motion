@@ -1065,14 +1065,14 @@ export default function OrderFinishing() {
       <Dialog open={acceptDialogOpen} onOpenChange={setAcceptDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Accept Boxes into Finishing</DialogTitle>
+            <DialogTitle>{t('phase.accept_into_finishing')}</DialogTitle>
           </DialogHeader>
           <div className="py-4 space-y-4">
             <p className="text-sm text-muted-foreground">
-              You are about to accept {selectedBoxes.size} box(es) into the finishing phase.
+              {t('phase.accept_msg').replace('{n}', String(selectedBoxes.size)).replace('{phase}', t('finishing.in_finishing'))}
             </p>
             <div>
-              <Label>Lead Time (days) *</Label>
+              <Label>{t('phase.lead_time')} *</Label>
               <Select value={etaDays} onValueChange={setEtaDays}>
                 <SelectTrigger className="w-full mt-1">
                   <SelectValue />
@@ -1080,7 +1080,7 @@ export default function OrderFinishing() {
                 <SelectContent>
                   {[1, 2, 3, 5, 7, 10, 14, 21, 30].map((d) => (
                     <SelectItem key={d} value={d.toString()}>
-                      {d} day{d !== 1 ? "s" : ""}
+                      {d} {d !== 1 ? t('phase.days') : t('phase.day')}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -1088,18 +1088,18 @@ export default function OrderFinishing() {
             </div>
             <div className="p-3 rounded-lg bg-muted">
               <p className="text-sm text-muted-foreground">
-                Items will be expected to complete by{" "}
+                {t('phase.expected_complete_by')}{" "}
                 <strong>{new Date(Date.now() + parseInt(etaDays) * 24 * 60 * 60 * 1000).toLocaleDateString()}</strong>
               </p>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAcceptDialogOpen(false)}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button onClick={handleAcceptBoxes} disabled={submitting}>
-              {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Accept
+              {submitting ? <Loader2 className="h-4 w-4 animate-spin me-2" /> : null}
+              {t('phase.accept')}
             </Button>
           </DialogFooter>
         </DialogContent>
