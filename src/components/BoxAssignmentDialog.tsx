@@ -473,7 +473,7 @@ export function BoxAssignmentDialog({
 
         {/* Search/Scan Input */}
         <div className="space-y-2">
-          <Label>Scan or Enter Box Code</Label>
+          <Label>{t('box.scan_enter_code')}</Label>
           <div className="flex gap-2">
             <div className="flex-1 relative">
               <QrCode className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -481,7 +481,7 @@ export function BoxAssignmentDialog({
                 value={searchCode}
                 onChange={(e) => setSearchCode(e.target.value.toUpperCase())}
                 readOnly={searching}
-                placeholder="Box number (e.g., 42)"
+                placeholder={t('box.box_number_placeholder')}
                 className="pl-10"
                 onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
               />
