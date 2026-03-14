@@ -966,7 +966,7 @@ export default function OrderPackaging() {
           <div className="space-y-3">
             {inPackagingGroups.length === 0 ? (
               <Card>
-                <CardContent className="p-8 text-center text-muted-foreground">No items in packaging</CardContent>
+                <CardContent className="p-8 text-center text-muted-foreground">{t('phase.no_items_packaging')}</CardContent>
               </Card>
             ) : (
               inPackagingGroups.map((group) => (
@@ -978,21 +978,21 @@ export default function OrderPackaging() {
                           <p className="font-medium">{group.product_name}</p>
                           {group.needs_boxing ? (
                             <Badge variant="outline" className="text-xs bg-primary/10">
-                              Boxing
+                              {t('phase.needs_boxing')}
                             </Badge>
                           ) : (
                             <Badge variant="secondary" className="text-xs">
-                              No Boxing
+                              {t('phase.no_boxing')}
                             </Badge>
                           )}
                         </div>
                         <p className="text-sm text-muted-foreground">{group.product_sku}</p>
                       </div>
                       <div className="flex items-center gap-4">
-                        <Badge variant="secondary">{group.quantity} available</Badge>
+                        <Badge variant="secondary">{group.quantity} {t('phase.available')}</Badge>
                         {canManage && !isCancelled && (
                           <div className="flex items-center gap-2">
-                            <Label className="text-xs text-muted-foreground">Select</Label>
+                            <Label className="text-xs text-muted-foreground">{t('phase.select')}</Label>
                             <NumericInput
                               min={0}
                               max={group.quantity}
