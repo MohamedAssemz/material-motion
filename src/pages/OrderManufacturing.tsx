@@ -936,9 +936,9 @@ export default function OrderManufacturing() {
                     const box = availableBoxes.find((b) => b.id === val);
                     setSelectedBox(box || null);
                   }}
-                  placeholder={loadingBoxes ? "Loading..." : "Select a box..."}
-                  searchPlaceholder="Search boxes..."
-                  emptyText="No boxes available"
+                  placeholder={loadingBoxes ? t('phase.loading') : t('phase.select_box_placeholder')}
+                  searchPlaceholder={t('phase.search_boxes')}
+                  emptyText={t('phase.no_boxes_available')}
                   loading={loadingBoxes}
                   allowClear={false}
                 />
