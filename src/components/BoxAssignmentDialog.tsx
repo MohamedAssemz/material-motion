@@ -549,13 +549,13 @@ export function BoxAssignmentDialog({
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button 
             onClick={handleConfirm} 
             disabled={!selectedBox || !!validationError}
           >
-            {selectedBox?.items_list.length ? 'Add to' : 'Assign to'} {selectedBox?.box_code || 'Box'}
+            {selectedBox?.items_list.length ? t('box.add_to') : t('box.assign_to_box')} {selectedBox?.box_code || ''}
           </Button>
         </DialogFooter>
       </DialogContent>
