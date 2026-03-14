@@ -916,7 +916,7 @@ export default function OrderManufacturing() {
             {selectedBox && (
               <div className="p-3 border rounded-lg bg-primary/5">
                 <p className="font-medium">{selectedBox.box_code}</p>
-                <p className="text-sm text-muted-foreground">Selected</p>
+                <p className="text-sm text-muted-foreground">{t('phase.selected')}</p>
               </div>
             )}
 
