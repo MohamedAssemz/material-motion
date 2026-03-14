@@ -995,10 +995,6 @@ export const translations: Record<string, TranslationEntry> = {
   "phase.move_to_ready":        { en: "Move to Ready for Shipment", ar: "نقل إلى جاهز للشحن" },
   "phase.no_items_finishing":   { en: "No items in finishing", ar: "لا توجد عناصر في التشطيب" },
   "phase.no_items_packaging":   { en: "No items in packaging", ar: "لا توجد عناصر في التغليف" },
-  "phase.no_items_boxing":      { en: "No items in boxing", ar: "لا توجد عناصر في التعبئة" },
-  "phase.available":            { en: "available",         ar: "متاح" },
-  "phase.needs_boxing":         { en: "Needs Boxing",      ar: "يحتاج تعبئة" },
-  "phase.no_boxing":            { en: "No Boxing",         ar: "بدون تعبئة" },
   "phase.no_completed_items":   { en: "No completed items yet", ar: "لا توجد عناصر مكتملة بعد" },
 
   // Accept dialog strings
