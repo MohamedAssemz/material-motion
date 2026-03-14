@@ -574,7 +574,7 @@ function BoxGrid({ boxes, onSelect, showContents }: BoxGridProps) {
     return (
       <div className="text-center py-4 text-muted-foreground">
         <Box className="mx-auto h-8 w-8 opacity-50 mb-2" />
-        <p className="text-sm">No boxes available</p>
+        <p className="text-sm">{t('box.no_boxes_available')}</p>
       </div>
     );
   }
