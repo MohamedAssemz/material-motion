@@ -502,11 +502,11 @@ export function BoxAssignmentDialog({
                   <Box className="h-5 w-5 text-primary" />
                   <span className="font-mono font-bold text-lg">{selectedBox.box_code}</span>
                 </div>
-                <Badge className="bg-primary">Selected</Badge>
+                <Badge className="bg-primary">{t('box.selected')}</Badge>
               </div>
               {selectedBox.items_list.length > 0 && (
                 <div className="mt-2 pt-2 border-t border-border/50">
-                  <p className="text-xs text-muted-foreground mb-1">Current contents:</p>
+                  <p className="text-xs text-muted-foreground mb-1">{t('box.current_contents')}</p>
                   <div className="space-y-1">
                     {selectedBox.items_list.map((item, idx) => (
                       <div key={idx} className="flex items-center justify-between text-sm">
