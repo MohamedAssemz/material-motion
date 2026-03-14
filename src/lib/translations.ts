@@ -978,36 +978,27 @@ export const translations: Record<string, TranslationEntry> = {
   "phase.in_manufacturing":     { en: "In Manufacturing",  ar: "قيد التصنيع" },
   "phase.products_label":       { en: "Products",          ar: "المنتجات" },
 
-  // Receive tab strings
-  "phase.select_all":           { en: "Select All",        ar: "تحديد الكل" },
-  "phase.deselect_all":         { en: "Deselect All",      ar: "إلغاء تحديد الكل" },
-  "phase.accept_boxes":         { en: "Accept {n} Box(es)", ar: "قبول {n} صندوق(صناديق)" },
+  // Receive tab additional strings
+  "phase.accept_n_boxes":       { en: "Accept {n} Box(es)", ar: "قبول {n} صندوق(صناديق)" },
   "phase.search_box_product":   { en: "Search by Box Code, Product SKU, or Name", ar: "بحث برقم الصندوق أو رمز المنتج أو الاسم" },
   "phase.type_to_filter":       { en: "Type to filter boxes...", ar: "اكتب لتصفية الصناديق..." },
   "phase.clear":                { en: "Clear",             ar: "مسح" },
-  "phase.scan":                 { en: "Scan",              ar: "مسح ضوئي" },
   "phase.no_boxes_matching":    { en: "No boxes matching", ar: "لا توجد صناديق مطابقة لـ" },
   "phase.no_boxes_ready_finishing": { en: "No boxes ready for finishing", ar: "لا توجد صناديق جاهزة للتشطيب" },
   "phase.no_boxes_ready_packaging": { en: "No boxes ready for packaging", ar: "لا توجد صناديق جاهزة للتغليف" },
   "phase.no_boxes_ready_boxing": { en: "No boxes ready for boxing", ar: "لا توجد صناديق جاهزة للتعبئة" },
   "phase.items":                { en: "items",             ar: "عناصر" },
 
-  // Process tab strings
+  // Process tab additional strings
   "phase.selected_count":       { en: "{n} selected",      ar: "{n} محدد" },
-  "phase.assign_to_extra":      { en: "Assign to Extra",   ar: "تعيين للإضافي" },
-  "phase.assign_to_box":        { en: "Assign to Box",     ar: "تعيين لصندوق" },
   "phase.box_directly":         { en: "Box Directly",      ar: "تعبئة مباشرة" },
   "phase.move_to_ready":        { en: "Move to Ready for Shipment", ar: "نقل إلى جاهز للشحن" },
   "phase.no_items_finishing":   { en: "No items in finishing", ar: "لا توجد عناصر في التشطيب" },
   "phase.no_items_packaging":   { en: "No items in packaging", ar: "لا توجد عناصر في التغليف" },
   "phase.no_items_boxing":      { en: "No items in boxing", ar: "لا توجد عناصر في التعبئة" },
   "phase.available":            { en: "available",         ar: "متاح" },
-  "phase.needs_packing":        { en: "Needs Packing",    ar: "يحتاج تغليف" },
-  "phase.no_packing":           { en: "No Packing",       ar: "بدون تغليف" },
   "phase.needs_boxing":         { en: "Needs Boxing",      ar: "يحتاج تعبئة" },
   "phase.no_boxing":            { en: "No Boxing",         ar: "بدون تعبئة" },
-  "phase.added_to_extra_from_order": { en: "Added to Extra from this Order", ar: "أُضيف للإضافي من هذا الطلب" },
-  "phase.to_extra":             { en: "to extra",          ar: "للإضافي" },
   "phase.no_completed_items":   { en: "No completed items yet", ar: "لا توجد عناصر مكتملة بعد" },
 
   // Accept dialog strings
@@ -1021,12 +1012,10 @@ export const translations: Record<string, TranslationEntry> = {
   "phase.expected_complete_by":   { en: "Items will be expected to complete by", ar: "من المتوقع اكتمال العناصر بحلول" },
   "phase.accept":                 { en: "Accept",            ar: "قبول" },
 
-  // Box assign dialog strings
+  // Box assign dialog strings (for finishing/packaging inline dialogs)
   "phase.finishing_machine":      { en: "Finishing Machine (Optional)", ar: "آلة التشطيب (اختياري)" },
   "phase.packaging_machine":      { en: "Packaging Machine (Optional)", ar: "آلة التغليف (اختياري)" },
-  "phase.box_selection":          { en: "Box Selection",     ar: "اختيار الصندوق" },
   "phase.search_box_code":        { en: "Search Box by Code", ar: "بحث عن صندوق بالرمز" },
-  "phase.enter_box_number":       { en: "Enter box number (e.g., 42)", ar: "أدخل رقم الصندوق (مثال: 42)" },
   "phase.or_divider":             { en: "OR",                ar: "أو" },
   "phase.select_available_box":   { en: "Select Available Box", ar: "اختر صندوق متاح" },
   "phase.select_machine":         { en: "Select a machine...", ar: "اختر آلة..." },
