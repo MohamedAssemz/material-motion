@@ -927,7 +927,7 @@ export default function OrderManufacturing() {
             </div>
 
             <div>
-              <Label>Select Available Box</Label>
+              <Label>{t('phase.select_available_box')}</Label>
               <div className="mt-2">
                 <SearchableSelect
                   options={availableBoxes.map((b) => ({ value: b.id, label: b.box_code }))}
