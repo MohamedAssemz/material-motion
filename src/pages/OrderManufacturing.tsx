@@ -755,11 +755,11 @@ export default function OrderManufacturing() {
                           <p className="font-medium">{group.product_name}</p>
                           {group.needs_boxing ? (
                             <Badge variant="outline" className="text-xs bg-primary/10">
-                              Boxing
+                              {t('phase.needs_boxing')}
                             </Badge>
                           ) : (
                             <Badge variant="secondary" className="text-xs">
-                              No Boxing
+                              {t('phase.no_boxing')}
                             </Badge>
                           )}
                         </div>
@@ -884,9 +884,9 @@ export default function OrderManufacturing() {
                   options={machines.map((m) => ({ value: m.id, label: m.name }))}
                   value={selectedMachine}
                   onValueChange={setSelectedMachine}
-                  placeholder="Select a machine..."
-                  searchPlaceholder="Search machines..."
-                  emptyText="No manufacturing machines found"
+                  placeholder={t('phase.select_machine_placeholder')}
+                  searchPlaceholder={t('phase.search_machines')}
+                  emptyText={t('phase.no_mfg_machines')}
                   loading={loadingMachines}
                 />
               </div>
@@ -894,17 +894,17 @@ export default function OrderManufacturing() {
 
             <div className="flex items-center gap-2">
               <div className="flex-1 h-px bg-border" />
-              <span className="text-xs text-muted-foreground">Box Selection</span>
+              <span className="text-xs text-muted-foreground">{t('phase.box_selection')}</span>
               <div className="flex-1 h-px bg-border" />
             </div>
 
             <div>
-              <Label>Search Box by Code</Label>
+              <Label>{t('phase.search_box_by_code')}</Label>
               <div className="flex gap-2 mt-2">
                 <Input
                   value={boxSearchCode}
                   onChange={(e) => setBoxSearchCode(e.target.value)}
-                  placeholder="Enter box number (e.g., 42)"
+                  placeholder={t('phase.enter_box_number')}
                   onKeyDown={(e) => e.key === "Enter" && searchBox()}
                 />
                 <Button variant="outline" onClick={searchBox}>
@@ -916,18 +916,18 @@ export default function OrderManufacturing() {
             {selectedBox && (
               <div className="p-3 border rounded-lg bg-primary/5">
                 <p className="font-medium">{selectedBox.box_code}</p>
-                <p className="text-sm text-muted-foreground">Selected</p>
+                <p className="text-sm text-muted-foreground">{t('phase.selected')}</p>
               </div>
             )}
 
             <div className="flex items-center gap-2">
               <div className="flex-1 h-px bg-border" />
-              <span className="text-xs text-muted-foreground">OR</span>
+              <span className="text-xs text-muted-foreground">{t('phase.or_divider')}</span>
               <div className="flex-1 h-px bg-border" />
             </div>
 
             <div>
-              <Label>Select Available Box</Label>
+              <Label>{t('phase.select_available_box')}</Label>
               <div className="mt-2">
                 <SearchableSelect
                   options={availableBoxes.map((b) => ({ value: b.id, label: b.box_code }))}
@@ -936,9 +936,9 @@ export default function OrderManufacturing() {
                     const box = availableBoxes.find((b) => b.id === val);
                     setSelectedBox(box || null);
                   }}
-                  placeholder={loadingBoxes ? "Loading..." : "Select a box..."}
-                  searchPlaceholder="Search boxes..."
-                  emptyText="No boxes available"
+                  placeholder={loadingBoxes ? t('phase.loading') : t('phase.select_box_placeholder')}
+                  searchPlaceholder={t('phase.search_boxes')}
+                  emptyText={t('phase.no_boxes_available')}
                   loading={loadingBoxes}
                   allowClear={false}
                 />
@@ -947,11 +947,11 @@ export default function OrderManufacturing() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setBoxDialogOpen(false)}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button onClick={handleAssignToBox} disabled={!selectedBox || submitting}>
               {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Assign {totalSelected} Items
+              {t('phase.assign_items')} {totalSelected}
             </Button>
           </DialogFooter>
         </DialogContent>

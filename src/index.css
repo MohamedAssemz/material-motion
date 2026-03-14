@@ -201,6 +201,7 @@ All colors MUST be HSL.
 
 /* ── Absolute / fixed positioning ── */
 [dir="rtl"] .left-0   { left: unset;  right: 0;    }
+[dir="rtl"] .left-3   { left: unset;  right: 0.75rem; }
 [dir="rtl"] .left-4   { left: unset;  right: 1rem; }
 [dir="rtl"] .left-6   { left: unset;  right: 1.5rem; }
 [dir="rtl"] .right-0  { right: unset; left: 0;     }
