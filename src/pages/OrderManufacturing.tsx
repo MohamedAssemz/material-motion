@@ -899,7 +899,7 @@ export default function OrderManufacturing() {
             </div>
 
             <div>
-              <Label>Search Box by Code</Label>
+              <Label>{t('phase.search_box_by_code')}</Label>
               <div className="flex gap-2 mt-2">
                 <Input
                   value={boxSearchCode}
