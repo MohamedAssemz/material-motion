@@ -388,9 +388,9 @@ export function BoxAssignmentDialog({
   };
 
   const totalQuantity = products.reduce((sum, p) => sum + p.quantity, 0);
-  const machineTypeLabel = machineType === 'manufacturing' ? 'Manufacturing' : 
-                           machineType === 'finishing' ? 'Finishing' : 
-                           machineType === 'packaging' ? 'Packaging' : '';
+  const machineTypeLabel = machineType === 'manufacturing' ? t('box.manufacturing') : 
+                            machineType === 'finishing' ? t('box.finishing') : 
+                            machineType === 'packaging' ? t('box.packaging') : '';
   const currentBoxes = selectedTab === 'empty' ? emptyBoxes : compatibleBoxes;
 
   return (
