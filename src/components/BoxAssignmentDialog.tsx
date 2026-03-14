@@ -434,18 +434,18 @@ export function BoxAssignmentDialog({
 
         {isPackagingState && !validationError && (
           <div className="space-y-3 p-3 border rounded-lg">
-            <Label>Boxing Requirement</Label>
+            <Label>{t('box.boxing_requirement')}</Label>
             <RadioGroup value={boxingOption} onValueChange={(v) => setBoxingOption(v as any)}>
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="needs_boxing" id="needs_boxing" />
                 <Label htmlFor="needs_boxing" className="font-normal cursor-pointer">
-                  Needs Boxing - Will go through boxing phase
+                  {t('box.needs_boxing_desc')}
                 </Label>
               </div>
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="skip_boxing" id="skip_boxing" />
                 <Label htmlFor="skip_boxing" className="font-normal cursor-pointer">
-                  Skip Boxing - Ready for receiving directly
+                  {t('box.skip_boxing_desc')}
                 </Label>
               </div>
             </RadioGroup>
