@@ -1081,7 +1081,7 @@ export default function OrderPackaging() {
 
           {completedGroups.length === 0 && completedBatches.length === 0 && retrievedFromExtraBatches.length === 0 && (
             <Card>
-              <CardContent className="p-8 text-center text-muted-foreground">No completed items yet</CardContent>
+              <CardContent className="p-8 text-center text-muted-foreground">{t('phase.no_completed_items')}</CardContent>
             </Card>
           )}
         </TabsContent>
