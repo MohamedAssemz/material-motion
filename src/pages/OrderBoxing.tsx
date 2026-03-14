@@ -1292,16 +1292,16 @@ export default function OrderBoxing() {
             <Card>
               <CardContent className="p-4 flex items-center justify-between flex-wrap gap-3">
                 <Badge variant="secondary" className="text-lg px-3 py-1">
-                  {totalSelected} selected
+                  {t('phase.selected_count').replace('{n}', String(totalSelected))}
                 </Badge>
                 <div className="flex gap-2">
                   <Button variant="secondary" onClick={() => setMoveToExtraDialogOpen(true)} disabled={totalSelected === 0}>
-                    <Package className="h-4 w-4 mr-2" />
-                    Assign to Extra
+                    <Package className="h-4 w-4 me-2" />
+                    {t('phase.assign_to_extra')}
                   </Button>
                   <Button onClick={() => setMoveToReadyDialogOpen(true)} disabled={totalSelected === 0}>
-                    <Package className="h-4 w-4 mr-2" />
-                    Move to Ready for Shipment
+                    <Package className="h-4 w-4 me-2" />
+                    {t('phase.move_to_ready')}
                   </Button>
                 </div>
               </CardContent>
@@ -1311,7 +1311,7 @@ export default function OrderBoxing() {
           <div className="space-y-3">
             {inBoxingGroups.length === 0 ? (
               <Card>
-                <CardContent className="p-8 text-center text-muted-foreground">No items in boxing</CardContent>
+                <CardContent className="p-8 text-center text-muted-foreground">{t('phase.no_items_boxing')}</CardContent>
               </Card>
             ) : (
               inBoxingGroups.map((group) => {
