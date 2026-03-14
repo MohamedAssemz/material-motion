@@ -1008,7 +1008,7 @@ export default function OrderFinishing() {
                         <p className="font-medium">{item.product_name}</p>
                         <p className="text-sm text-muted-foreground">{item.product_sku}</p>
                       </div>
-                      <Badge className="bg-orange-500 hover:bg-orange-600 text-white">{item.quantity} to extra</Badge>
+                      <Badge className="bg-orange-500 hover:bg-orange-600 text-white">{item.quantity} {t('phase.to_extra')}</Badge>
                     </div>
                   </CardContent>
                 </Card>
