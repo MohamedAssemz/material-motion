@@ -457,15 +457,15 @@ export function BoxAssignmentDialog({
           <div className="space-y-2 p-3 border rounded-lg">
             <div className="flex items-center gap-2">
               <Settings className="h-4 w-4 text-muted-foreground" />
-              <Label>{machineTypeLabel} Machine (Optional)</Label>
+              <Label>{t('box.machine_optional').replace('{type}', machineTypeLabel)}</Label>
             </div>
             <SearchableSelect
               options={machines.map(m => ({ value: m.id, label: m.name }))}
               value={selectedMachine}
               onValueChange={setSelectedMachine}
-              placeholder="Select a machine..."
-              searchPlaceholder="Search machines..."
-              emptyText={`No ${machineTypeLabel.toLowerCase()} machines found`}
+              placeholder={t('phase.select_machine_ph')}
+              searchPlaceholder={t('phase.search_machines')}
+              emptyText={`${t('phase.no_machines_found')}`}
               loading={loadingMachines}
             />
           </div>
