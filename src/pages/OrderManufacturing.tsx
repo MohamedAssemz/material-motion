@@ -755,11 +755,11 @@ export default function OrderManufacturing() {
                           <p className="font-medium">{group.product_name}</p>
                           {group.needs_boxing ? (
                             <Badge variant="outline" className="text-xs bg-primary/10">
-                              Boxing
+                              {t('phase.needs_boxing')}
                             </Badge>
                           ) : (
                             <Badge variant="secondary" className="text-xs">
-                              No Boxing
+                              {t('phase.no_boxing')}
                             </Badge>
                           )}
                         </div>
