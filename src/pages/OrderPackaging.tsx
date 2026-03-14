@@ -857,11 +857,11 @@ export default function OrderPackaging() {
             <Card>
               <CardContent className="p-4 flex items-center justify-between">
                 <Button variant="outline" size="sm" onClick={handleSelectAllBoxes}>
-                  <CheckSquare className="h-4 w-4 mr-2" />
-                  {selectedBoxes.size === filteredReadyBoxGroups.length ? "Deselect All" : "Select All"}
+                  <CheckSquare className="h-4 w-4 me-2" />
+                  {selectedBoxes.size === filteredReadyBoxGroups.length ? t('phase.deselect_all') : t('phase.select_all')}
                 </Button>
                 <Button onClick={() => setAcceptDialogOpen(true)} disabled={selectedBoxes.size === 0}>
-                  Accept {selectedBoxes.size} Box(es)
+                  {t('phase.accept_n_boxes').replace('{n}', String(selectedBoxes.size))}
                 </Button>
               </CardContent>
             </Card>
@@ -869,25 +869,25 @@ export default function OrderPackaging() {
 
           <Card>
             <CardContent className="p-4">
-              <Label>Search by Box Code, Product SKU, or Name</Label>
+              <Label>{t('phase.search_box_product')}</Label>
               <div className="flex gap-2 mt-2">
                 <div className="flex-1 relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     value={receiveSearchQuery}
                     onChange={(e) => setReceiveSearchQuery(e.target.value)}
-                    placeholder="Type to filter boxes..."
+                    placeholder={t('phase.type_to_filter')}
                     className="pl-10"
                   />
                 </div>
                 {receiveSearchQuery && (
                   <Button variant="ghost" size="sm" onClick={() => setReceiveSearchQuery("")}>
-                    Clear
+                    {t('phase.clear')}
                   </Button>
                 )}
                 <Button variant="outline" size="sm" onClick={() => setScanPopupOpen(true)}>
-                  <QrCode className="h-4 w-4 mr-2" />
-                  Scan
+                  <QrCode className="h-4 w-4 me-2" />
+                  {t('phase.scan')}
                 </Button>
               </div>
             </CardContent>
@@ -898,8 +898,8 @@ export default function OrderPackaging() {
               <Card>
                 <CardContent className="p-8 text-center text-muted-foreground">
                   {receiveSearchQuery.trim()
-                    ? `No boxes matching "${receiveSearchQuery}"`
-                    : "No boxes ready for packaging"}
+                    ? `${t('phase.no_boxes_matching')} "${receiveSearchQuery}"`
+                    : t('phase.no_boxes_ready_packaging')}
                 </CardContent>
               </Card>
             ) : (
