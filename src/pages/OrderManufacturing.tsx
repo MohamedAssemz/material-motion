@@ -904,7 +904,7 @@ export default function OrderManufacturing() {
                 <Input
                   value={boxSearchCode}
                   onChange={(e) => setBoxSearchCode(e.target.value)}
-                  placeholder="Enter box number (e.g., 42)"
+                  placeholder={t('phase.enter_box_number')}
                   onKeyDown={(e) => e.key === "Enter" && searchBox()}
                 />
                 <Button variant="outline" onClick={searchBox}>
