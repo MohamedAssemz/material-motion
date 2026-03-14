@@ -405,15 +405,15 @@ export function BoxAssignmentDialog({
 
         {/* Selected Products Summary */}
         <div className="space-y-2 p-3 bg-muted/50 rounded-lg">
-          <Label>Items to Assign ({totalQuantity} total)</Label>
+          <Label>{t('box.items_to_assign').replace('{n}', String(totalQuantity))}</Label>
           <div className="space-y-1">
             {products.map((product) => (
               <div key={product.product_id} className="flex items-center justify-between text-sm">
                 <span>
                   {product.product_sku} - {product.product_name}
                   {isFinishingState && (
-                    <Badge variant="outline" className="ml-2 text-xs">
-                      {product.needs_packing ? 'Needs Packing' : 'No Packing'}
+                    <Badge variant="outline" className="ms-2 text-xs">
+                      {product.needs_packing ? t('phase.needs_packing') : t('phase.no_packing')}
                     </Badge>
                   )}
                 </span>
