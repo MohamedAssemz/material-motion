@@ -73,6 +73,7 @@ export function BoxAssignmentDialog({
   machineType,
 }: BoxAssignmentDialogProps) {
   const { toast } = useToast();
+  const { t } = useLanguage();
   const [searchCode, setSearchCode] = useState('');
   const [selectedBox, setSelectedBox] = useState<BoxData | null>(null);
   const [emptyBoxes, setEmptyBoxes] = useState<BoxData[]>([]);
