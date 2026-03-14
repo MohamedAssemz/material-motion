@@ -399,7 +399,7 @@ export function BoxAssignmentDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Box className="h-5 w-5" />
-            {title || 'Assign to Box'}
+            {title || t('box.assign_to_box')}
           </DialogTitle>
         </DialogHeader>
 
