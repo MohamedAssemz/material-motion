@@ -907,7 +907,7 @@ export default function OrderFinishing() {
                         <Box className="h-5 w-5 text-muted-foreground" />
                         <span className="font-mono font-bold">{group.box_code}</span>
                       </div>
-                      <Badge variant="secondary">{group.totalQty} items</Badge>
+                      <Badge variant="secondary">{group.totalQty} {t('phase.items')}</Badge>
                       <div className="flex-1 text-sm text-muted-foreground">
                         {group.batches.map((b) => `${b.product?.sku} - ${b.product?.name} (${b.quantity})`).join(", ")}
                       </div>
