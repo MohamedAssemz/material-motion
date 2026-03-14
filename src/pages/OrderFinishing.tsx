@@ -846,14 +846,14 @@ export default function OrderFinishing() {
           {/* Search Box */}
           <Card>
             <CardContent className="p-4">
-              <Label>Search by Box Code, Product SKU, or Name</Label>
+              <Label>{t('phase.search_box_product')}</Label>
               <div className="flex gap-2 mt-2">
                 <div className="flex-1 relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     value={receiveSearchQuery}
                     onChange={(e) => setReceiveSearchQuery(e.target.value)}
-                    placeholder="Type to filter boxes..."
+                    placeholder={t('phase.type_to_filter')}
                     className="pl-10"
                     onBlur={() => {
                       if (!receiveSearchQuery.trim()) {
@@ -864,7 +864,7 @@ export default function OrderFinishing() {
                 </div>
                 {receiveSearchQuery && (
                   <Button variant="ghost" size="sm" onClick={() => setReceiveSearchQuery("")}>
-                    Clear
+                    {t('phase.clear')}
                   </Button>
                 )}
                 <Button variant="outline" size="sm" onClick={() => setScanPopupOpen(true)}>
