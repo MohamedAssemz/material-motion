@@ -1109,20 +1109,20 @@ export default function OrderFinishing() {
       <Dialog open={boxAssignDialogOpen} onOpenChange={setBoxAssignDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Assign to Box</DialogTitle>
+            <DialogTitle>{t('phase.assign_to_box')}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             {/* Machine Selection */}
             <div>
-              <Label>Finishing Machine (Optional)</Label>
+              <Label>{t('phase.finishing_machine')}</Label>
               <div className="mt-2">
                 <SearchableSelect
                   options={machines.map((m) => ({ value: m.id, label: m.name }))}
                   value={selectedMachine}
                   onValueChange={setSelectedMachine}
-                  placeholder="Select a machine..."
-                  searchPlaceholder="Search machines..."
-                  emptyText="No finishing machines found"
+                  placeholder={t('phase.select_machine_ph')}
+                  searchPlaceholder={t('phase.search_machines')}
+                  emptyText={t('phase.no_finishing_machines')}
                   loading={loadingMachines}
                 />
               </div>
@@ -1130,17 +1130,17 @@ export default function OrderFinishing() {
 
             <div className="flex items-center gap-2">
               <div className="flex-1 h-px bg-border" />
-              <span className="text-xs text-muted-foreground">Box Selection</span>
+              <span className="text-xs text-muted-foreground">{t('phase.box_selection')}</span>
               <div className="flex-1 h-px bg-border" />
             </div>
 
             <div>
-              <Label>Search Box by Code</Label>
+              <Label>{t('phase.search_box_code')}</Label>
               <div className="flex gap-2 mt-2">
                 <Input
                   value={boxSearchCode}
                   onChange={(e) => setBoxSearchCode(e.target.value)}
-                  placeholder="Enter box number (e.g., 42)"
+                  placeholder={t('phase.enter_box_number')}
                   onKeyDown={(e) => e.key === "Enter" && searchBox()}
                 />
                 <Button variant="outline" onClick={searchBox}>
@@ -1152,18 +1152,18 @@ export default function OrderFinishing() {
             {selectedBox && (
               <div className="p-3 border rounded-lg bg-primary/5">
                 <p className="font-medium">{selectedBox.box_code}</p>
-                <p className="text-sm text-muted-foreground">Selected</p>
+                <p className="text-sm text-muted-foreground">{t('phase.selected')}</p>
               </div>
             )}
 
             <div className="flex items-center gap-2">
               <div className="flex-1 h-px bg-border" />
-              <span className="text-xs text-muted-foreground">OR</span>
+              <span className="text-xs text-muted-foreground">{t('phase.or_divider')}</span>
               <div className="flex-1 h-px bg-border" />
             </div>
 
             <div>
-              <Label>Select Available Box</Label>
+              <Label>{t('phase.select_available_box')}</Label>
               <div className="mt-2">
                 <SearchableSelect
                   options={availableBoxes.map((b) => ({ value: b.id, label: b.box_code }))}
@@ -1172,9 +1172,9 @@ export default function OrderFinishing() {
                     const box = availableBoxes.find((b) => b.id === val);
                     setSelectedBox(box || null);
                   }}
-                  placeholder={loadingBoxes ? "Loading..." : "Select a box..."}
-                  searchPlaceholder="Search boxes..."
-                  emptyText="No boxes available"
+                  placeholder={loadingBoxes ? t('phase.loading') : t('phase.select_box')}
+                  searchPlaceholder={t('phase.search_boxes')}
+                  emptyText={t('phase.no_boxes_available')}
                   loading={loadingBoxes}
                   allowClear={false}
                 />
@@ -1183,11 +1183,11 @@ export default function OrderFinishing() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setBoxAssignDialogOpen(false)}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button onClick={handleAssignToBox} disabled={!selectedBox || submitting}>
-              {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Assign {totalSelected} Items
+              {submitting ? <Loader2 className="h-4 w-4 animate-spin me-2" /> : null}
+              {t('phase.assign_n_items').replace('{n}', String(totalSelected))}
             </Button>
           </DialogFooter>
         </DialogContent>
