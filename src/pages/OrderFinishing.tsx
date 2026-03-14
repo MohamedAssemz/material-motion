@@ -868,8 +868,8 @@ export default function OrderFinishing() {
                   </Button>
                 )}
                 <Button variant="outline" size="sm" onClick={() => setScanPopupOpen(true)}>
-                  <QrCode className="h-4 w-4 mr-2" />
-                  Scan
+                  <QrCode className="h-4 w-4 me-2" />
+                  {t('phase.scan')}
                 </Button>
               </div>
             </CardContent>
@@ -881,8 +881,8 @@ export default function OrderFinishing() {
               <Card>
                 <CardContent className="p-8 text-center text-muted-foreground">
                   {receiveSearchQuery.trim()
-                    ? `No boxes matching "${receiveSearchQuery}"`
-                    : "No boxes ready for finishing"}
+                    ? `${t('phase.no_boxes_matching')} "${receiveSearchQuery}"`
+                    : t('phase.no_boxes_ready_finishing')}
                 </CardContent>
               </Card>
             ) : (
