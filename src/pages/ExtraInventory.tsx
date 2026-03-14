@@ -548,7 +548,7 @@ export default function ExtraInventory() {
                     placeholder={t("extra.search_product_sku")}
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-9"
+                    className="pl-10"
                   />
                 </div>
               </div>
