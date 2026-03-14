@@ -833,11 +833,11 @@ export default function OrderFinishing() {
             <Card>
               <CardContent className="p-4 flex items-center justify-between">
                 <Button variant="outline" size="sm" onClick={handleSelectAllBoxes}>
-                  <CheckSquare className="h-4 w-4 mr-2" />
-                  {selectedBoxes.size === filteredReadyBoxGroups.length ? "Deselect All" : "Select All"}
+                  <CheckSquare className="h-4 w-4 me-2" />
+                  {selectedBoxes.size === filteredReadyBoxGroups.length ? t('phase.deselect_all') : t('phase.select_all')}
                 </Button>
                 <Button onClick={() => setAcceptDialogOpen(true)} disabled={selectedBoxes.size === 0}>
-                  Accept {selectedBoxes.size} Box(es)
+                  {t('phase.accept_n_boxes').replace('{n}', String(selectedBoxes.size))}
                 </Button>
               </CardContent>
             </Card>
