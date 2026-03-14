@@ -1324,22 +1324,22 @@ export default function OrderBoxing() {
                           <div className="flex items-center gap-2">
                             <p className="font-medium">{group.product_name}</p>
                             {group.needs_boxing ? (
-                              <Badge variant="outline" className="text-xs bg-primary/10">
-                                Boxing
-                              </Badge>
-                            ) : (
-                              <Badge variant="secondary" className="text-xs">
-                                No Boxing
-                              </Badge>
-                            )}
-                          </div>
-                          <p className="text-sm text-muted-foreground">{group.product_sku}</p>
+                            <Badge variant="outline" className="text-xs bg-primary/10">
+                              {t('phase.needs_boxing')}
+                            </Badge>
+                          ) : (
+                            <Badge variant="secondary" className="text-xs">
+                              {t('phase.no_boxing')}
+                            </Badge>
+                          )}
                         </div>
-                        <div className="flex items-center gap-4">
-                          <Badge variant="secondary">{group.quantity} available</Badge>
-                          {canManage && !isCancelled && (
-                            <div className="flex items-center gap-2">
-                              <Label className="text-xs text-muted-foreground">Select</Label>
+                        <p className="text-sm text-muted-foreground">{group.product_sku}</p>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <Badge variant="secondary">{group.quantity} {t('phase.available')}</Badge>
+                        {canManage && !isCancelled && (
+                          <div className="flex items-center gap-2">
+                            <Label className="text-xs text-muted-foreground">{t('phase.select')}</Label>
                               <NumericInput
                                 min={0}
                                 max={group.quantity}
