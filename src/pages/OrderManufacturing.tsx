@@ -894,7 +894,7 @@ export default function OrderManufacturing() {
 
             <div className="flex items-center gap-2">
               <div className="flex-1 h-px bg-border" />
-              <span className="text-xs text-muted-foreground">Box Selection</span>
+              <span className="text-xs text-muted-foreground">{t('phase.box_selection')}</span>
               <div className="flex-1 h-px bg-border" />
             </div>
 
