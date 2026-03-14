@@ -992,7 +992,7 @@ export const translations: Record<string, TranslationEntry> = {
   "phase.no_items_finishing":   { en: "No items in finishing", ar: "لا توجد عناصر في التشطيب" },
   "phase.no_items_packaging":   { en: "No items in packaging", ar: "لا توجد عناصر في التغليف" },
   "phase.no_completed_items":   { en: "No completed items yet", ar: "لا توجد عناصر مكتملة بعد" },
-  "phase.needs_boxing":         { en: "Needs Boxing",      ar: "يحتاج تعبئة" },
+  
 
   // Accept dialog strings
   "phase.accept_into_finishing":  { en: "Accept Boxes into Finishing", ar: "قبول الصناديق في التشطيب" },
