@@ -948,7 +948,7 @@ export default function OrderFinishing() {
           <div className="space-y-3">
             {inFinishingGroups.length === 0 ? (
               <Card>
-                <CardContent className="p-8 text-center text-muted-foreground">No items in finishing</CardContent>
+                <CardContent className="p-8 text-center text-muted-foreground">{t('phase.no_items_finishing')}</CardContent>
               </Card>
             ) : (
               inFinishingGroups.map((group) => (
@@ -958,15 +958,15 @@ export default function OrderFinishing() {
                       <div>
                         <p className="font-medium">{group.product_name}</p>
                         <p className="text-sm text-muted-foreground">
-                          {group.product_sku} · {group.needs_packing ? "Needs Packing" : "No Packing"} ·{" "}
-                          {group.needs_boxing ? "Needs Boxing" : "No Boxing"}
+                          {group.product_sku} · {group.needs_packing ? t('phase.needs_packing') : t('phase.no_packing')} ·{" "}
+                          {group.needs_boxing ? t('phase.needs_boxing') : t('phase.no_boxing')}
                         </p>
                       </div>
                       <div className="flex items-center gap-4">
-                        <Badge variant="secondary">{group.quantity} available</Badge>
+                        <Badge variant="secondary">{group.quantity} {t('phase.available')}</Badge>
                         {canManage && !isCancelled && (
                           <div className="flex items-center gap-2">
-                            <Label className="text-xs text-muted-foreground">Select</Label>
+                            <Label className="text-xs text-muted-foreground">{t('phase.select')}</Label>
                             <NumericInput
                               min={0}
                               max={group.quantity}
