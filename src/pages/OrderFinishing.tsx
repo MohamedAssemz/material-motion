@@ -924,21 +924,21 @@ export default function OrderFinishing() {
             <Card>
               <CardContent className="p-4 flex items-center justify-between">
                 <Badge variant="secondary" className="text-lg px-3 py-1">
-                  {totalSelected} selected
+                  {t('phase.selected_count').replace('{n}', String(totalSelected))}
                 </Badge>
                 <div className="flex gap-2">
                   <Button
                     variant="secondary"
                     onClick={() => setMoveToExtraDialogOpen(true)}
                     disabled={totalSelected === 0}
-                    title="Move selected items to Extra Inventory"
+                    title={t('phase.assign_to_extra')}
                   >
-                    <Package className="h-4 w-4 mr-2" />
-                    Assign to Extra
+                    <Package className="h-4 w-4 me-2" />
+                    {t('phase.assign_to_extra')}
                   </Button>
                   <Button onClick={handleOpenAssignDialog} disabled={totalSelected === 0}>
-                    <Box className="h-4 w-4 mr-2" />
-                    Assign to Box
+                    <Box className="h-4 w-4 me-2" />
+                    {t('phase.assign_to_box')}
                   </Button>
                 </div>
               </CardContent>
