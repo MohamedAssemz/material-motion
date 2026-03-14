@@ -980,10 +980,6 @@ export const translations: Record<string, TranslationEntry> = {
 
   // Receive tab additional strings
   "phase.accept_n_boxes":       { en: "Accept {n} Box(es)", ar: "قبول {n} صندوق(صناديق)" },
-  "phase.search_box_product":   { en: "Search by Box Code, Product SKU, or Name", ar: "بحث برقم الصندوق أو رمز المنتج أو الاسم" },
-  "phase.type_to_filter":       { en: "Type to filter boxes...", ar: "اكتب لتصفية الصناديق..." },
-  "phase.clear":                { en: "Clear",             ar: "مسح" },
-  "phase.no_boxes_matching":    { en: "No boxes matching", ar: "لا توجد صناديق مطابقة لـ" },
   "phase.no_boxes_ready_finishing": { en: "No boxes ready for finishing", ar: "لا توجد صناديق جاهزة للتشطيب" },
   "phase.no_boxes_ready_packaging": { en: "No boxes ready for packaging", ar: "لا توجد صناديق جاهزة للتغليف" },
   "phase.no_boxes_ready_boxing": { en: "No boxes ready for boxing", ar: "لا توجد صناديق جاهزة للتعبئة" },
@@ -996,16 +992,15 @@ export const translations: Record<string, TranslationEntry> = {
   "phase.no_items_finishing":   { en: "No items in finishing", ar: "لا توجد عناصر في التشطيب" },
   "phase.no_items_packaging":   { en: "No items in packaging", ar: "لا توجد عناصر في التغليف" },
   "phase.no_completed_items":   { en: "No completed items yet", ar: "لا توجد عناصر مكتملة بعد" },
+  "phase.needs_boxing":         { en: "Needs Boxing",      ar: "يحتاج تعبئة" },
 
   // Accept dialog strings
   "phase.accept_into_finishing":  { en: "Accept Boxes into Finishing", ar: "قبول الصناديق في التشطيب" },
   "phase.accept_into_packaging":  { en: "Accept Boxes into Packaging", ar: "قبول الصناديق في التغليف" },
   "phase.accept_into_boxing":     { en: "Accept Boxes into Boxing", ar: "قبول الصناديق في التعبئة" },
   "phase.accept_msg":             { en: "You are about to accept {n} box(es) into the {phase} phase.", ar: "أنت على وشك قبول {n} صندوق(صناديق) في مرحلة {phase}." },
-  "phase.lead_time":              { en: "Lead Time (days)",  ar: "المهلة الزمنية (أيام)" },
   "phase.day":                    { en: "day",               ar: "يوم" },
   "phase.days":                   { en: "days",              ar: "أيام" },
-  "phase.expected_complete_by":   { en: "Items will be expected to complete by", ar: "من المتوقع اكتمال العناصر بحلول" },
   "phase.accept":                 { en: "Accept",            ar: "قبول" },
 
   // Box assign dialog strings (for finishing/packaging inline dialogs)
@@ -1013,8 +1008,6 @@ export const translations: Record<string, TranslationEntry> = {
   "phase.packaging_machine":      { en: "Packaging Machine (Optional)", ar: "آلة التغليف (اختياري)" },
   "phase.search_box_code":        { en: "Search Box by Code", ar: "بحث عن صندوق بالرمز" },
   "phase.or_divider":             { en: "OR",                ar: "أو" },
-  "phase.select_available_box":   { en: "Select Available Box", ar: "اختر صندوق متاح" },
-  "phase.select_machine":         { en: "Select a machine...", ar: "اختر آلة..." },
   "phase.search_machines":        { en: "Search machines...", ar: "بحث عن آلات..." },
   "phase.no_finishing_machines":  { en: "No finishing machines found", ar: "لم يتم العثور على آلات تشطيب" },
   "phase.no_packaging_machines":  { en: "No packaging machines found", ar: "لم يتم العثور على آلات تغليف" },
@@ -1023,13 +1016,13 @@ export const translations: Record<string, TranslationEntry> = {
   "phase.search_boxes":           { en: "Search boxes...",   ar: "بحث عن صناديق..." },
   "phase.no_boxes_available":     { en: "No boxes available", ar: "لا توجد صناديق متاحة" },
   "phase.assign_n_items":         { en: "Assign {n} Items",  ar: "تعيين {n} عنصر" },
+  "phase.select_machine_ph":      { en: "Select a machine...", ar: "اختر آلة..." },
 
   // Box directly dialog (packaging)
   "phase.route_items_msg":        { en: "Route {n} item(s) based on their \"needs boxing\" setting:", ar: "توجيه {n} عنصر بناءً على إعداد \"يحتاج تعبئة\":" },
   "phase.needs_boxing_yes":       { en: "Needs Boxing = Yes → In Boxing (with {n} day ETA)", ar: "يحتاج تعبئة = نعم ← في التعبئة (مع مهلة {n} يوم)" },
   "phase.needs_boxing_no":        { en: "Needs Boxing = No → Ready for Shipment", ar: "يحتاج تعبئة = لا ← جاهز للشحن" },
   "phase.eta_boxing":             { en: "ETA for Boxing (days)", ar: "المهلة المتوقعة للتعبئة (أيام)" },
-  "phase.route_items":            { en: "Route Items",       ar: "توجيه العناصر" },
 
   // Boxing-specific
   "phase.routing":                { en: "Routing:",          ar: "التوجيه:" },
