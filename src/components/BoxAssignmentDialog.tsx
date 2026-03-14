@@ -581,7 +581,7 @@ function BoxGrid({ boxes, onSelect, showContents }: BoxGridProps) {
 
   return (
     <div className="space-y-2">
-      <Label>Available Boxes ({boxes.length})</Label>
+      <Label>{t('box.available_boxes').replace('{n}', String(boxes.length))}</Label>
       <div className="grid grid-cols-3 gap-2 max-h-[150px] overflow-y-auto">
         {boxes.slice(0, 12).map((box) => (
           <Button
@@ -594,14 +594,14 @@ function BoxGrid({ boxes, onSelect, showContents }: BoxGridProps) {
             <span>{box.box_code}</span>
             {showContents && box.items_list.length > 0 && (
               <Badge variant="secondary" className="text-xs mt-1">
-                {box.items_list.length} item(s)
+                {t('box.item_count').replace('{n}', String(box.items_list.length))}
               </Badge>
             )}
           </Button>
         ))}
         {boxes.length > 12 && (
           <p className="text-xs text-muted-foreground col-span-3 text-center">
-            +{boxes.length - 12} more boxes available
+            {t('box.more_boxes').replace('{n}', String(boxes.length - 12))}
           </p>
         )}
       </div>
