@@ -525,8 +525,8 @@ export function BoxAssignmentDialog({
         {!selectedBox && !loading && (allowMultipleItems && compatibleBoxes.length > 0 ? (
           <Tabs value={selectedTab} onValueChange={(v) => setSelectedTab(v as 'empty' | 'existing')}>
             <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="empty">Empty ({emptyBoxes.length})</TabsTrigger>
-              <TabsTrigger value="existing">With {batchType} ({compatibleBoxes.length})</TabsTrigger>
+              <TabsTrigger value="empty">{t('box.empty_tab')} ({emptyBoxes.length})</TabsTrigger>
+              <TabsTrigger value="existing">{t('box.with_type').replace('{type}', batchType)} ({compatibleBoxes.length})</TabsTrigger>
             </TabsList>
 
             <TabsContent value="empty" className="mt-3">
