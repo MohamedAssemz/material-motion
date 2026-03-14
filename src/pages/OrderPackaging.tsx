@@ -857,11 +857,11 @@ export default function OrderPackaging() {
             <Card>
               <CardContent className="p-4 flex items-center justify-between">
                 <Button variant="outline" size="sm" onClick={handleSelectAllBoxes}>
-                  <CheckSquare className="h-4 w-4 mr-2" />
-                  {selectedBoxes.size === filteredReadyBoxGroups.length ? "Deselect All" : "Select All"}
+                  <CheckSquare className="h-4 w-4 me-2" />
+                  {selectedBoxes.size === filteredReadyBoxGroups.length ? t('phase.deselect_all') : t('phase.select_all')}
                 </Button>
                 <Button onClick={() => setAcceptDialogOpen(true)} disabled={selectedBoxes.size === 0}>
-                  Accept {selectedBoxes.size} Box(es)
+                  {t('phase.accept_n_boxes').replace('{n}', String(selectedBoxes.size))}
                 </Button>
               </CardContent>
             </Card>
@@ -869,25 +869,25 @@ export default function OrderPackaging() {
 
           <Card>
             <CardContent className="p-4">
-              <Label>Search by Box Code, Product SKU, or Name</Label>
+              <Label>{t('phase.search_box_product')}</Label>
               <div className="flex gap-2 mt-2">
                 <div className="flex-1 relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     value={receiveSearchQuery}
                     onChange={(e) => setReceiveSearchQuery(e.target.value)}
-                    placeholder="Type to filter boxes..."
+                    placeholder={t('phase.type_to_filter')}
                     className="pl-10"
                   />
                 </div>
                 {receiveSearchQuery && (
                   <Button variant="ghost" size="sm" onClick={() => setReceiveSearchQuery("")}>
-                    Clear
+                    {t('phase.clear')}
                   </Button>
                 )}
                 <Button variant="outline" size="sm" onClick={() => setScanPopupOpen(true)}>
-                  <QrCode className="h-4 w-4 mr-2" />
-                  Scan
+                  <QrCode className="h-4 w-4 me-2" />
+                  {t('phase.scan')}
                 </Button>
               </div>
             </CardContent>
@@ -898,8 +898,8 @@ export default function OrderPackaging() {
               <Card>
                 <CardContent className="p-8 text-center text-muted-foreground">
                   {receiveSearchQuery.trim()
-                    ? `No boxes matching "${receiveSearchQuery}"`
-                    : "No boxes ready for packaging"}
+                    ? `${t('phase.no_boxes_matching')} "${receiveSearchQuery}"`
+                    : t('phase.no_boxes_ready_packaging')}
                 </CardContent>
               </Card>
             ) : (
@@ -922,7 +922,7 @@ export default function OrderPackaging() {
                       )}
                       <Box className="h-5 w-5 text-muted-foreground" />
                       <span className="font-mono font-bold">{group.box_code}</span>
-                      <Badge variant="secondary">{group.totalQty} items</Badge>
+                      <Badge variant="secondary">{group.totalQty} {t('phase.items')}</Badge>
                       <div className="flex-1 text-sm text-muted-foreground">
                         {group.batches.map((b) => `${b.product?.sku} - ${b.product?.name} (${b.quantity})`).join(", ")}
                       </div>
@@ -939,7 +939,7 @@ export default function OrderPackaging() {
             <Card>
               <CardContent className="p-4 flex items-center justify-between flex-wrap gap-3">
                 <Badge variant="secondary" className="text-lg px-3 py-1">
-                  {totalSelected} selected
+                  {t('phase.selected_count').replace('{n}', String(totalSelected))}
                 </Badge>
                 <div className="flex gap-2">
                   <Button
@@ -947,16 +947,16 @@ export default function OrderPackaging() {
                     onClick={() => setMoveToExtraDialogOpen(true)}
                     disabled={totalSelected === 0}
                   >
-                    <Package className="h-4 w-4 mr-2" />
-                    Assign to Extra
+                    <Package className="h-4 w-4 me-2" />
+                    {t('phase.assign_to_extra')}
                   </Button>
                   <Button variant="outline" onClick={handleOpenAssignDialog} disabled={totalSelected === 0}>
-                    <Box className="h-4 w-4 mr-2" />
-                    Assign to Box
+                    <Box className="h-4 w-4 me-2" />
+                    {t('phase.assign_to_box')}
                   </Button>
                   <Button onClick={() => setBoxDirectlyDialogOpen(true)} disabled={totalSelected === 0}>
-                    <Zap className="h-4 w-4 mr-2" />
-                    Box Directly
+                    <Zap className="h-4 w-4 me-2" />
+                    {t('phase.box_directly')}
                   </Button>
                 </div>
               </CardContent>
@@ -966,7 +966,7 @@ export default function OrderPackaging() {
           <div className="space-y-3">
             {inPackagingGroups.length === 0 ? (
               <Card>
-                <CardContent className="p-8 text-center text-muted-foreground">No items in packaging</CardContent>
+                <CardContent className="p-8 text-center text-muted-foreground">{t('phase.no_items_packaging')}</CardContent>
               </Card>
             ) : (
               inPackagingGroups.map((group) => (
@@ -978,21 +978,21 @@ export default function OrderPackaging() {
                           <p className="font-medium">{group.product_name}</p>
                           {group.needs_boxing ? (
                             <Badge variant="outline" className="text-xs bg-primary/10">
-                              Boxing
+                              {t('phase.needs_boxing')}
                             </Badge>
                           ) : (
                             <Badge variant="secondary" className="text-xs">
-                              No Boxing
+                              {t('phase.no_boxing')}
                             </Badge>
                           )}
                         </div>
                         <p className="text-sm text-muted-foreground">{group.product_sku}</p>
                       </div>
                       <div className="flex items-center gap-4">
-                        <Badge variant="secondary">{group.quantity} available</Badge>
+                        <Badge variant="secondary">{group.quantity} {t('phase.available')}</Badge>
                         {canManage && !isCancelled && (
                           <div className="flex items-center gap-2">
-                            <Label className="text-xs text-muted-foreground">Select</Label>
+                            <Label className="text-xs text-muted-foreground">{t('phase.select')}</Label>
                             <NumericInput
                               min={0}
                               max={group.quantity}
@@ -1021,7 +1021,7 @@ export default function OrderPackaging() {
             <div className="space-y-3">
               <div className="flex items-center gap-2 pb-2 border-b border-orange-200 dark:border-orange-900">
                 <Package className="h-4 w-4 text-orange-600" />
-                <h3 className="text-sm font-semibold text-orange-700 dark:text-orange-400">Added to Extra from this Order</h3>
+                <h3 className="text-sm font-semibold text-orange-700 dark:text-orange-400">{t('phase.added_to_extra_from_order')}</h3>
               </div>
               {addedToExtraItems.map((item) => (
                 <Card
@@ -1081,7 +1081,7 @@ export default function OrderPackaging() {
 
           {completedGroups.length === 0 && completedBatches.length === 0 && retrievedFromExtraBatches.length === 0 && (
             <Card>
-              <CardContent className="p-8 text-center text-muted-foreground">No completed items yet</CardContent>
+              <CardContent className="p-8 text-center text-muted-foreground">{t('phase.no_completed_items')}</CardContent>
             </Card>
           )}
         </TabsContent>
@@ -1091,14 +1091,14 @@ export default function OrderPackaging() {
       <Dialog open={acceptDialogOpen} onOpenChange={setAcceptDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Accept Boxes into Packaging</DialogTitle>
+            <DialogTitle>{t('phase.accept_into_packaging')}</DialogTitle>
           </DialogHeader>
           <div className="py-4 space-y-4">
             <p className="text-sm text-muted-foreground">
-              You are about to accept {selectedBoxes.size} box(es) into the packaging phase.
+              {t('phase.accept_msg').replace('{n}', String(selectedBoxes.size)).replace('{phase}', t('packaging.ready_for_packaging'))}
             </p>
             <div>
-              <Label>Lead Time (days) *</Label>
+              <Label>{t('phase.lead_time')} *</Label>
               <Select value={etaDays} onValueChange={setEtaDays}>
                 <SelectTrigger className="w-full mt-1">
                   <SelectValue />
@@ -1106,7 +1106,7 @@ export default function OrderPackaging() {
                 <SelectContent>
                   {[1, 2, 3, 5, 7, 10, 14, 21, 30].map((d) => (
                     <SelectItem key={d} value={d.toString()}>
-                      {d} day{d !== 1 ? "s" : ""}
+                      {d} {d !== 1 ? t('phase.days') : t('phase.day')}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -1114,18 +1114,18 @@ export default function OrderPackaging() {
             </div>
             <div className="p-3 rounded-lg bg-muted">
               <p className="text-sm text-muted-foreground">
-                Items will be expected to complete by{" "}
+                {t('phase.expected_complete_by')}{" "}
                 <strong>{new Date(Date.now() + parseInt(etaDays) * 24 * 60 * 60 * 1000).toLocaleDateString()}</strong>
               </p>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAcceptDialogOpen(false)}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button onClick={handleAcceptBoxes} disabled={submitting}>
-              {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Accept
+              {submitting ? <Loader2 className="h-4 w-4 animate-spin me-2" /> : null}
+              {t('phase.accept')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1135,20 +1135,19 @@ export default function OrderPackaging() {
       <Dialog open={boxAssignDialogOpen} onOpenChange={setBoxAssignDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Assign to Box</DialogTitle>
+            <DialogTitle>{t('phase.assign_to_box')}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            {/* Machine Selection */}
             <div>
-              <Label>Packaging Machine (Optional)</Label>
+              <Label>{t('phase.packaging_machine')}</Label>
               <div className="mt-2">
                 <SearchableSelect
                   options={machines.map((m) => ({ value: m.id, label: m.name }))}
                   value={selectedMachine}
                   onValueChange={setSelectedMachine}
-                  placeholder="Select a machine..."
-                  searchPlaceholder="Search machines..."
-                  emptyText="No packaging machines found"
+                  placeholder={t('phase.select_machine_ph')}
+                  searchPlaceholder={t('phase.search_machines')}
+                  emptyText={t('phase.no_packaging_machines')}
                   loading={loadingMachines}
                 />
               </div>
@@ -1156,17 +1155,17 @@ export default function OrderPackaging() {
 
             <div className="flex items-center gap-2">
               <div className="flex-1 h-px bg-border" />
-              <span className="text-xs text-muted-foreground">Box Selection</span>
+              <span className="text-xs text-muted-foreground">{t('phase.box_selection')}</span>
               <div className="flex-1 h-px bg-border" />
             </div>
 
             <div>
-              <Label>Search Box by Code</Label>
+              <Label>{t('phase.search_box_code')}</Label>
               <div className="flex gap-2 mt-2">
                 <Input
                   value={boxSearchCode}
                   onChange={(e) => setBoxSearchCode(e.target.value)}
-                  placeholder="Enter box number (e.g., 42)"
+                  placeholder={t('phase.enter_box_number')}
                   onKeyDown={(e) => e.key === "Enter" && searchBox()}
                 />
                 <Button variant="outline" onClick={searchBox}>
@@ -1177,24 +1176,24 @@ export default function OrderPackaging() {
             {selectedBox && (
               <div className="p-3 border rounded-lg bg-primary/5">
                 <p className="font-medium">{selectedBox.box_code}</p>
-                <p className="text-sm text-muted-foreground">Selected</p>
+                <p className="text-sm text-muted-foreground">{t('phase.selected')}</p>
               </div>
             )}
             <div className="flex items-center gap-2">
               <div className="flex-1 h-px bg-border" />
-              <span className="text-xs text-muted-foreground">OR</span>
+              <span className="text-xs text-muted-foreground">{t('phase.or_divider')}</span>
               <div className="flex-1 h-px bg-border" />
             </div>
             <div>
-              <Label>Select Available Box</Label>
+              <Label>{t('phase.select_available_box')}</Label>
               <div className="mt-2">
                 <SearchableSelect
                   options={availableBoxes.map((b) => ({ value: b.id, label: b.box_code }))}
                   value={selectedBox?.id || null}
                   onValueChange={(val) => setSelectedBox(availableBoxes.find((b) => b.id === val) || null)}
-                  placeholder={loadingBoxes ? "Loading..." : "Select a box..."}
-                  searchPlaceholder="Search boxes..."
-                  emptyText="No boxes available"
+                  placeholder={loadingBoxes ? t('phase.loading') : t('phase.select_box')}
+                  searchPlaceholder={t('phase.search_boxes')}
+                  emptyText={t('phase.no_boxes_available')}
                   loading={loadingBoxes}
                   allowClear={false}
                 />
@@ -1203,11 +1202,11 @@ export default function OrderPackaging() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setBoxAssignDialogOpen(false)}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button onClick={handleAssignToBox} disabled={!selectedBox || submitting}>
-              {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Assign {totalSelected} Items
+              {submitting ? <Loader2 className="h-4 w-4 animate-spin me-2" /> : null}
+              {t('phase.assign_n_items').replace('{n}', String(totalSelected))}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1217,18 +1216,18 @@ export default function OrderPackaging() {
       <Dialog open={boxDirectlyDialogOpen} onOpenChange={setBoxDirectlyDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Box Directly</DialogTitle>
+            <DialogTitle>{t('phase.box_directly')}</DialogTitle>
           </DialogHeader>
           <div className="py-4 space-y-4">
             <p className="text-sm text-muted-foreground">
-              Route {totalSelected} item(s) based on their "needs boxing" setting:
+              {t('phase.route_items_msg').replace('{n}', String(totalSelected))}
             </p>
             <ul className="list-disc list-inside text-sm text-muted-foreground">
-              <li>Needs Boxing = Yes → In Boxing (with {etaDays} day ETA)</li>
-              <li>Needs Boxing = No → Ready for Shipment</li>
+              <li>{t('phase.needs_boxing_yes').replace('{n}', etaDays)}</li>
+              <li>{t('phase.needs_boxing_no')}</li>
             </ul>
             <div>
-              <Label className="text-xs text-muted-foreground">ETA for Boxing (days)</Label>
+              <Label className="text-xs text-muted-foreground">{t('phase.eta_boxing')}</Label>
               <Select value={etaDays} onValueChange={setEtaDays}>
                 <SelectTrigger className="w-20 h-8 mt-1">
                   <SelectValue />
@@ -1245,11 +1244,11 @@ export default function OrderPackaging() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setBoxDirectlyDialogOpen(false)}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button onClick={handleBoxDirectly} disabled={submitting}>
-              {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Route Items
+              {submitting ? <Loader2 className="h-4 w-4 animate-spin me-2" /> : null}
+              {t('phase.route_items')}
             </Button>
           </DialogFooter>
         </DialogContent>

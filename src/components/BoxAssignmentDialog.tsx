@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -72,6 +73,7 @@ export function BoxAssignmentDialog({
   machineType,
 }: BoxAssignmentDialogProps) {
   const { toast } = useToast();
+  const { t } = useLanguage();
   const [searchCode, setSearchCode] = useState('');
   const [selectedBox, setSelectedBox] = useState<BoxData | null>(null);
   const [emptyBoxes, setEmptyBoxes] = useState<BoxData[]>([]);
@@ -386,9 +388,9 @@ export function BoxAssignmentDialog({
   };
 
   const totalQuantity = products.reduce((sum, p) => sum + p.quantity, 0);
-  const machineTypeLabel = machineType === 'manufacturing' ? 'Manufacturing' : 
-                           machineType === 'finishing' ? 'Finishing' : 
-                           machineType === 'packaging' ? 'Packaging' : '';
+  const machineTypeLabel = machineType === 'manufacturing' ? t('box.manufacturing') : 
+                            machineType === 'finishing' ? t('box.finishing') : 
+                            machineType === 'packaging' ? t('box.packaging') : '';
   const currentBoxes = selectedTab === 'empty' ? emptyBoxes : compatibleBoxes;
 
   return (
@@ -397,21 +399,21 @@ export function BoxAssignmentDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Box className="h-5 w-5" />
-            {title || 'Assign to Box'}
+            {title || t('box.assign_to_box')}
           </DialogTitle>
         </DialogHeader>
 
         {/* Selected Products Summary */}
         <div className="space-y-2 p-3 bg-muted/50 rounded-lg">
-          <Label>Items to Assign ({totalQuantity} total)</Label>
+          <Label>{t('box.items_to_assign').replace('{n}', String(totalQuantity))}</Label>
           <div className="space-y-1">
             {products.map((product) => (
               <div key={product.product_id} className="flex items-center justify-between text-sm">
                 <span>
                   {product.product_sku} - {product.product_name}
                   {isFinishingState && (
-                    <Badge variant="outline" className="ml-2 text-xs">
-                      {product.needs_packing ? 'Needs Packing' : 'No Packing'}
+                    <Badge variant="outline" className="ms-2 text-xs">
+                      {product.needs_packing ? t('phase.needs_packing') : t('phase.no_packing')}
                     </Badge>
                   )}
                 </span>
@@ -432,18 +434,18 @@ export function BoxAssignmentDialog({
 
         {isPackagingState && !validationError && (
           <div className="space-y-3 p-3 border rounded-lg">
-            <Label>Boxing Requirement</Label>
+            <Label>{t('box.boxing_requirement')}</Label>
             <RadioGroup value={boxingOption} onValueChange={(v) => setBoxingOption(v as any)}>
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="needs_boxing" id="needs_boxing" />
                 <Label htmlFor="needs_boxing" className="font-normal cursor-pointer">
-                  Needs Boxing - Will go through boxing phase
+                  {t('box.needs_boxing_desc')}
                 </Label>
               </div>
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="skip_boxing" id="skip_boxing" />
                 <Label htmlFor="skip_boxing" className="font-normal cursor-pointer">
-                  Skip Boxing - Ready for receiving directly
+                  {t('box.skip_boxing_desc')}
                 </Label>
               </div>
             </RadioGroup>
@@ -455,15 +457,15 @@ export function BoxAssignmentDialog({
           <div className="space-y-2 p-3 border rounded-lg">
             <div className="flex items-center gap-2">
               <Settings className="h-4 w-4 text-muted-foreground" />
-              <Label>{machineTypeLabel} Machine (Optional)</Label>
+              <Label>{t('box.machine_optional').replace('{type}', machineTypeLabel)}</Label>
             </div>
             <SearchableSelect
               options={machines.map(m => ({ value: m.id, label: m.name }))}
               value={selectedMachine}
               onValueChange={setSelectedMachine}
-              placeholder="Select a machine..."
-              searchPlaceholder="Search machines..."
-              emptyText={`No ${machineTypeLabel.toLowerCase()} machines found`}
+              placeholder={t('phase.select_machine_ph')}
+              searchPlaceholder={t('phase.search_machines')}
+              emptyText={`${t('phase.no_machines_found')}`}
               loading={loadingMachines}
             />
           </div>
@@ -471,7 +473,7 @@ export function BoxAssignmentDialog({
 
         {/* Search/Scan Input */}
         <div className="space-y-2">
-          <Label>Scan or Enter Box Code</Label>
+          <Label>{t('box.scan_enter_code')}</Label>
           <div className="flex gap-2">
             <div className="flex-1 relative">
               <QrCode className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -479,7 +481,7 @@ export function BoxAssignmentDialog({
                 value={searchCode}
                 onChange={(e) => setSearchCode(e.target.value.toUpperCase())}
                 readOnly={searching}
-                placeholder="Box number (e.g., 42)"
+                placeholder={t('box.box_number_placeholder')}
                 className="pl-10"
                 onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
               />
@@ -500,11 +502,11 @@ export function BoxAssignmentDialog({
                   <Box className="h-5 w-5 text-primary" />
                   <span className="font-mono font-bold text-lg">{selectedBox.box_code}</span>
                 </div>
-                <Badge className="bg-primary">Selected</Badge>
+                <Badge className="bg-primary">{t('box.selected')}</Badge>
               </div>
               {selectedBox.items_list.length > 0 && (
                 <div className="mt-2 pt-2 border-t border-border/50">
-                  <p className="text-xs text-muted-foreground mb-1">Current contents:</p>
+                  <p className="text-xs text-muted-foreground mb-1">{t('box.current_contents')}</p>
                   <div className="space-y-1">
                     {selectedBox.items_list.map((item, idx) => (
                       <div key={idx} className="flex items-center justify-between text-sm">
@@ -523,8 +525,8 @@ export function BoxAssignmentDialog({
         {!selectedBox && !loading && (allowMultipleItems && compatibleBoxes.length > 0 ? (
           <Tabs value={selectedTab} onValueChange={(v) => setSelectedTab(v as 'empty' | 'existing')}>
             <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="empty">Empty ({emptyBoxes.length})</TabsTrigger>
-              <TabsTrigger value="existing">With {batchType} ({compatibleBoxes.length})</TabsTrigger>
+              <TabsTrigger value="empty">{t('box.empty_tab')} ({emptyBoxes.length})</TabsTrigger>
+              <TabsTrigger value="existing">{t('box.with_type').replace('{type}', batchType)} ({compatibleBoxes.length})</TabsTrigger>
             </TabsList>
 
             <TabsContent value="empty" className="mt-3">
@@ -547,13 +549,13 @@ export function BoxAssignmentDialog({
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button 
             onClick={handleConfirm} 
             disabled={!selectedBox || !!validationError}
           >
-            {selectedBox?.items_list.length ? 'Add to' : 'Assign to'} {selectedBox?.box_code || 'Box'}
+            {selectedBox?.items_list.length ? t('box.add_to') : t('box.assign_to_box')} {selectedBox?.box_code || ''}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -568,18 +570,19 @@ interface BoxGridProps {
 }
 
 function BoxGrid({ boxes, onSelect, showContents }: BoxGridProps) {
+  const { t } = useLanguage();
   if (boxes.length === 0) {
     return (
       <div className="text-center py-4 text-muted-foreground">
         <Box className="mx-auto h-8 w-8 opacity-50 mb-2" />
-        <p className="text-sm">No boxes available</p>
+        <p className="text-sm">{t('box.no_boxes_available')}</p>
       </div>
     );
   }
 
   return (
     <div className="space-y-2">
-      <Label>Available Boxes ({boxes.length})</Label>
+      <Label>{t('box.available_boxes').replace('{n}', String(boxes.length))}</Label>
       <div className="grid grid-cols-3 gap-2 max-h-[150px] overflow-y-auto">
         {boxes.slice(0, 12).map((box) => (
           <Button
@@ -592,14 +595,14 @@ function BoxGrid({ boxes, onSelect, showContents }: BoxGridProps) {
             <span>{box.box_code}</span>
             {showContents && box.items_list.length > 0 && (
               <Badge variant="secondary" className="text-xs mt-1">
-                {box.items_list.length} item(s)
+                {t('box.item_count').replace('{n}', String(box.items_list.length))}
               </Badge>
             )}
           </Button>
         ))}
         {boxes.length > 12 && (
           <p className="text-xs text-muted-foreground col-span-3 text-center">
-            +{boxes.length - 12} more boxes available
+            {t('box.more_boxes').replace('{n}', String(boxes.length - 12))}
           </p>
         )}
       </div>
