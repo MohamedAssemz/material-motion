@@ -947,11 +947,11 @@ export default function OrderManufacturing() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setBoxDialogOpen(false)}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button onClick={handleAssignToBox} disabled={!selectedBox || submitting}>
               {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Assign {totalSelected} Items
+              {t('phase.assign_items')} {totalSelected}
             </Button>
           </DialogFooter>
         </DialogContent>
