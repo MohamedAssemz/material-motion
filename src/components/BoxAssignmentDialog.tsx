@@ -570,7 +570,7 @@ interface BoxGridProps {
 }
 
 function BoxGrid({ boxes, onSelect, showContents }: BoxGridProps) {
-  if (boxes.length === 0) {
+  const { t } = useLanguage();
     return (
       <div className="text-center py-4 text-muted-foreground">
         <Box className="mx-auto h-8 w-8 opacity-50 mb-2" />
