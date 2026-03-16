@@ -632,8 +632,8 @@ export default function OrderCreate() {
                     }
                   }}
                 >
-                  <Package className="mr-2 h-4 w-4" />
-                  + Packaging Reference
+                  <Package className="me-2 h-4 w-4" />
+                  {t('order.add_packaging_ref')}
                 </Button>
               ) : (
                 <div className="space-y-3">
