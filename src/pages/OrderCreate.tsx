@@ -571,7 +571,7 @@ export default function OrderCreate() {
                     </Popover>
                   </div>
                   <div className="w-32">
-                    <Label>Quantity *</Label>
+                    <Label>{t('order.quantity')} *</Label>
                     <NumericInput
                       min={1}
                       value={item.quantity}
