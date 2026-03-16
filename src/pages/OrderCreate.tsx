@@ -407,7 +407,7 @@ export default function OrderCreate() {
                   </Select>
                 </div>
                 <div>
-                  <Label>Shipping Type *</Label>
+                  <Label>{t('order.shipping_type')} *</Label>
                   <Select
                     value={shippingType}
                     onValueChange={(value: "domestic" | "international") => setShippingType(value)}
