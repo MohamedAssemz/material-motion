@@ -466,7 +466,7 @@ export default function OrderCreate() {
                   id="raw_materials"
                   value={rawMaterials}
                   onChange={(e) => setRawMaterials(e.target.value)}
-                  placeholder="Enter raw material details for this order..."
+                  placeholder={t('order.raw_materials_placeholder')}
                   required
                   rows={3}
                 />
