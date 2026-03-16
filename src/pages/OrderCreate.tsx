@@ -605,7 +605,7 @@ export default function OrderCreate() {
           {/* Notes & Packaging Reference */}
           <Card className="mb-6">
             <CardHeader>
-              <CardTitle>Notes & Packaging Reference</CardTitle>
+              <CardTitle>{t('order.notes_packaging')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
