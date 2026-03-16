@@ -337,7 +337,7 @@ export default function OrderCreate() {
                 />
               </div>
               <div>
-                <Label>Customer</Label>
+                <Label>{t('order.customer')}</Label>
                 <Popover open={customerOpen} onOpenChange={setCustomerOpen}>
                   <PopoverTrigger asChild>
                     <Button
