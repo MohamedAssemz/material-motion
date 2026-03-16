@@ -395,7 +395,7 @@ export default function OrderCreate() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="priority">Priority *</Label>
+                  <Label htmlFor="priority">{t('order.priority')} *</Label>
                   <Select value={priority} onValueChange={(value: "high" | "normal") => setPriority(value)}>
                     <SelectTrigger>
                       <SelectValue />
