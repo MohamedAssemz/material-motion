@@ -64,6 +64,7 @@ const orderSchema = z.object({
 
 export default function OrderCreate() {
   const { user, hasRole } = useAuth();
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [products, setProducts] = useState<Product[]>([]);
