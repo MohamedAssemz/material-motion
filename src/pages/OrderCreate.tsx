@@ -676,7 +676,7 @@ export default function OrderCreate() {
                               }}
                             >
                               <SelectTrigger className="flex-1">
-                                <SelectValue placeholder="Select item..." />
+                                <SelectValue placeholder={t('order.select_item')} />
                               </SelectTrigger>
                               <SelectContent>
                                 {validItems.map((it) => {
