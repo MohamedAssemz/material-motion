@@ -609,7 +609,7 @@ export default function OrderCreate() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <Label htmlFor="notes">Notes</Label>
+                <Label htmlFor="notes">{t('order.notes')}</Label>
                 <Textarea
                   id="notes"
                   value={notes}
