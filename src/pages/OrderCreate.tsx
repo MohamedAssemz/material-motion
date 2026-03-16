@@ -689,7 +689,7 @@ export default function OrderCreate() {
                                   if (remaining <= 0 && row.item_index !== originalIndex) return null;
                                   return (
                                     <SelectItem key={originalIndex} value={String(originalIndex)}>
-                                      {product?.sku} - {product?.name} ({it.needs_boxing ? 'Boxing' : 'No Boxing'}) x{it.quantity}
+                                      {product?.sku} - {product?.name} ({it.needs_boxing ? t('order.boxing') : t('order.no_boxing')}) x{it.quantity}
                                     </SelectItem>
                                   );
                                 })}
