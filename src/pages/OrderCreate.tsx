@@ -720,19 +720,19 @@ export default function OrderCreate() {
                           </div>
                           <div className="grid grid-cols-4 gap-2 pl-10">
                             <div>
-                              <Label className="text-xs text-muted-foreground">L (cm)</Label>
+                              <Label className="text-xs text-muted-foreground">{t('order.length_cm')}</Label>
                               <Input type="number" min={0} step="0.1" value={row.length_cm} onChange={(e) => { const newRows = [...packagingRows]; newRows[index] = { ...newRows[index], length_cm: e.target.value }; setPackagingRows(newRows); }} placeholder="—" />
                             </div>
                             <div>
-                              <Label className="text-xs text-muted-foreground">W (cm)</Label>
+                              <Label className="text-xs text-muted-foreground">{t('order.width_cm')}</Label>
                               <Input type="number" min={0} step="0.1" value={row.width_cm} onChange={(e) => { const newRows = [...packagingRows]; newRows[index] = { ...newRows[index], width_cm: e.target.value }; setPackagingRows(newRows); }} placeholder="—" />
                             </div>
                             <div>
-                              <Label className="text-xs text-muted-foreground">H (cm)</Label>
+                              <Label className="text-xs text-muted-foreground">{t('order.height_cm')}</Label>
                               <Input type="number" min={0} step="0.1" value={row.height_cm} onChange={(e) => { const newRows = [...packagingRows]; newRows[index] = { ...newRows[index], height_cm: e.target.value }; setPackagingRows(newRows); }} placeholder="—" />
                             </div>
                             <div>
-                              <Label className="text-xs text-muted-foreground">Wt (kg)</Label>
+                              <Label className="text-xs text-muted-foreground">{t('order.weight_kg')}</Label>
                               <Input type="number" min={0} step="0.1" value={row.weight_kg} onChange={(e) => { const newRows = [...packagingRows]; newRows[index] = { ...newRows[index], weight_kg: e.target.value }; setPackagingRows(newRows); }} placeholder="—" />
                             </div>
                           </div>
