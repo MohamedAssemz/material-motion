@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -63,6 +64,7 @@ const orderSchema = z.object({
 
 export default function OrderCreate() {
   const { user, hasRole } = useAuth();
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [products, setProducts] = useState<Product[]>([]);
@@ -310,8 +312,8 @@ export default function OrderCreate() {
           </Button>
           <ClipboardList className="h-6 w-6 text-primary" />
           <div>
-            <h1 className="text-xl font-bold">Create New Order</h1>
-            <p className="text-sm text-muted-foreground">Add products and quantities</p>
+            <h1 className="text-xl font-bold">{t('order.create_new')}</h1>
+            <p className="text-sm text-muted-foreground">{t('order.add_products_quantities')}</p>
           </div>
         </div>
       </header>
@@ -320,11 +322,11 @@ export default function OrderCreate() {
         <form onSubmit={handleSubmit}>
           <Card className="mb-6">
             <CardHeader>
-              <CardTitle>Order Details</CardTitle>
+              <CardTitle>{t('order.order_details')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <Label htmlFor="order_number">Order Number *</Label>
+                <Label htmlFor="order_number">{t('order.order_number')} *</Label>
                 <Input
                   id="order_number"
                   value={orderNumber}
@@ -335,7 +337,7 @@ export default function OrderCreate() {
                 />
               </div>
               <div>
-                <Label>Customer</Label>
+                <Label>{t('order.customer')}</Label>
                 <Popover open={customerOpen} onOpenChange={setCustomerOpen}>
                   <PopoverTrigger asChild>
                     <Button
@@ -346,15 +348,15 @@ export default function OrderCreate() {
                     >
                       {selectedCustomer
                         ? `${selectedCustomer.name}${selectedCustomer.code ? ` (${selectedCustomer.code})` : ""}`
-                        : "Select customer..."}
+                        : t('order.select_customer')}
                       <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-full p-0" align="start">
                     <Command>
-                      <CommandInput placeholder="Search customers..." />
+                      <CommandInput placeholder={t('order.search_customers')} />
                       <CommandList>
-                        <CommandEmpty>No customer found.</CommandEmpty>
+                        <CommandEmpty>{t('order.no_customer_found')}</CommandEmpty>
                         <CommandGroup>
                           <CommandItem
                             value=""
@@ -363,8 +365,8 @@ export default function OrderCreate() {
                               setCustomerOpen(false);
                             }}
                           >
-                            <Check className={cn("mr-2 h-4 w-4", !selectedCustomerId ? "opacity-100" : "opacity-0")} />
-                            No customer
+                            <Check className={cn("me-2 h-4 w-4", !selectedCustomerId ? "opacity-100" : "opacity-0")} />
+                            {t('order.no_customer')}
                           </CommandItem>
                           {customers.map((customer) => (
                             <CommandItem
@@ -393,19 +395,19 @@ export default function OrderCreate() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="priority">Priority *</Label>
+                  <Label htmlFor="priority">{t('order.priority')} *</Label>
                   <Select value={priority} onValueChange={(value: "high" | "normal") => setPriority(value)}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="normal">Normal</SelectItem>
-                      <SelectItem value="high">High</SelectItem>
+                      <SelectItem value="normal">{t('order.priority_normal')}</SelectItem>
+                      <SelectItem value="high">{t('order.priority_high')}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div>
-                  <Label>Shipping Type *</Label>
+                  <Label>{t('order.shipping_type')} *</Label>
                   <Select
                     value={shippingType}
                     onValueChange={(value: "domestic" | "international") => setShippingType(value)}
@@ -417,13 +419,13 @@ export default function OrderCreate() {
                       <SelectItem value="domestic">
                         <span className="flex items-center gap-2">
                           <Truck className="h-4 w-4" />
-                          Domestic
+                          {t('order.domestic')}
                         </span>
                       </SelectItem>
                       <SelectItem value="international">
                         <span className="flex items-center gap-2">
                           <Plane className="h-4 w-4" />
-                          International
+                          {t('order.international')}
                         </span>
                       </SelectItem>
                     </SelectContent>
@@ -431,7 +433,7 @@ export default function OrderCreate() {
                 </div>
               </div>
               <div>
-                <Label>Estimated Fulfillment Time</Label>
+                <Label>{t('order.estimated_fulfillment')}</Label>
                 <Popover open={eftOpen} onOpenChange={setEftOpen}>
                   <PopoverTrigger asChild>
                     <Button
@@ -442,7 +444,7 @@ export default function OrderCreate() {
                       )}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      {estimatedFulfillment ? format(estimatedFulfillment, "PPP") : "Select date"}
+                      {estimatedFulfillment ? format(estimatedFulfillment, "PPP") : t('order.select_date')}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
@@ -459,12 +461,12 @@ export default function OrderCreate() {
                 </Popover>
               </div>
               <div>
-                <Label htmlFor="raw_materials">Raw Materials *</Label>
+                <Label htmlFor="raw_materials">{t('order.raw_materials')} *</Label>
                 <Textarea
                   id="raw_materials"
                   value={rawMaterials}
                   onChange={(e) => setRawMaterials(e.target.value)}
-                  placeholder="Enter raw material details for this order..."
+                  placeholder={t('order.raw_materials_placeholder')}
                   required
                   rows={3}
                 />
@@ -482,10 +484,10 @@ export default function OrderCreate() {
           <Card className="mb-6">
             <CardHeader>
               <div className="flex items-center justify-between">
-                <CardTitle>Order Items</CardTitle>
+                <CardTitle>{t('order.order_items')}</CardTitle>
                 <Button type="button" variant="outline" size="sm" onClick={addItem}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Item
+                  <Plus className="me-2 h-4 w-4" />
+                  {t('order.add_item')}
                 </Button>
               </div>
             </CardHeader>
@@ -493,23 +495,23 @@ export default function OrderCreate() {
               {items.map((item, index) => (
                 <div key={index} className="flex gap-4 items-end">
                   <div className="flex-1">
-                    <Label>Product *</Label>
+                    <Label>{t('order.product')} *</Label>
                     <Popover>
                       <PopoverTrigger asChild>
                         <Button variant="outline" role="combobox" className="w-full justify-between">
                           {item.product_id
                             ? products.find((p) => p.id === item.product_id)
                               ? `${products.find((p) => p.id === item.product_id)?.sku} - ${products.find((p) => p.id === item.product_id)?.name}`
-                              : "Select product..."
-                            : "Select product..."}
+                              : t('order.select_product')
+                            : t('order.select_product')}
                           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent className="w-[400px] p-0" align="start">
                         <Command>
-                          <CommandInput placeholder="Search products by SKU or name..." />
+                          <CommandInput placeholder={t('order.search_products')} />
                           <CommandList>
-                            <CommandEmpty>No product found.</CommandEmpty>
+                            <CommandEmpty>{t('order.no_product_found')}</CommandEmpty>
                             {/* Suggested products for selected customer */}
                             {selectedCustomerId &&
                               (() => {
@@ -520,7 +522,7 @@ export default function OrderCreate() {
 
                                 if (suggestedProducts.length > 0) {
                                   return (
-                                    <CommandGroup heading="Suggested for this customer">
+                                    <CommandGroup heading={t('order.suggested_for_customer')}>
                                       {suggestedProducts.map((product) => (
                                         <CommandItem
                                           key={`suggested-${product.id}`}
@@ -535,8 +537,8 @@ export default function OrderCreate() {
                                           />
                                           <span className="font-mono mr-2">{product.sku}</span>
                                           <span className="text-muted-foreground">{product.name}</span>
-                                          <Badge variant="secondary" className="ml-2 text-xs">
-                                            Suggested
+                                          <Badge variant="secondary" className="ms-2 text-xs">
+                                            {t('order.suggested')}
                                           </Badge>
                                         </CommandItem>
                                       ))}
@@ -545,7 +547,7 @@ export default function OrderCreate() {
                                 }
                                 return null;
                               })()}
-                            <CommandGroup heading={selectedCustomerId ? "All products" : undefined}>
+                            <CommandGroup heading={selectedCustomerId ? t('order.all_products') : undefined}>
                               {products.map((product) => (
                                 <CommandItem
                                   key={product.id}
@@ -569,7 +571,7 @@ export default function OrderCreate() {
                     </Popover>
                   </div>
                   <div className="w-32">
-                    <Label>Quantity *</Label>
+                    <Label>{t('order.quantity')} *</Label>
                     <NumericInput
                       min={1}
                       value={item.quantity}
@@ -583,7 +585,7 @@ export default function OrderCreate() {
                       onCheckedChange={(checked) => updateItem(index, "needs_boxing", !!checked)}
                     />
                     <Label htmlFor={`needs_boxing_${index}`} className="text-xs cursor-pointer">
-                      Boxing
+                      {t('order.boxing')}
                     </Label>
                   </div>
                   <Button
@@ -603,16 +605,16 @@ export default function OrderCreate() {
           {/* Notes & Packaging Reference */}
           <Card className="mb-6">
             <CardHeader>
-              <CardTitle>Notes & Packaging Reference</CardTitle>
+              <CardTitle>{t('order.notes_packaging')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <Label htmlFor="notes">Notes</Label>
+                <Label htmlFor="notes">{t('order.notes')}</Label>
                 <Textarea
                   id="notes"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Optional order notes..."
+                  placeholder={t('order.notes_placeholder')}
                   rows={2}
                   maxLength={500}
                 />
@@ -630,15 +632,15 @@ export default function OrderCreate() {
                     }
                   }}
                 >
-                  <Package className="mr-2 h-4 w-4" />
-                  + Packaging Reference
+                  <Package className="me-2 h-4 w-4" />
+                  {t('order.add_packaging_ref')}
                 </Button>
               ) : (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Package className="h-4 w-4 text-primary" />
-                      <p className="text-sm font-medium">Packaging Reference</p>
+                      <p className="text-sm font-medium">{t('order.packaging_reference')}</p>
                     </div>
                     <Button
                       type="button"
@@ -649,7 +651,7 @@ export default function OrderCreate() {
                         setPackagingRows([]);
                       }}
                     >
-                      Remove
+                      {t('order.remove')}
                     </Button>
                   </div>
                   <div className="space-y-4">
@@ -674,7 +676,7 @@ export default function OrderCreate() {
                               }}
                             >
                               <SelectTrigger className="flex-1">
-                                <SelectValue placeholder="Select item..." />
+                                <SelectValue placeholder={t('order.select_item')} />
                               </SelectTrigger>
                               <SelectContent>
                                 {validItems.map((it) => {
@@ -687,7 +689,7 @@ export default function OrderCreate() {
                                   if (remaining <= 0 && row.item_index !== originalIndex) return null;
                                   return (
                                     <SelectItem key={originalIndex} value={String(originalIndex)}>
-                                      {product?.sku} - {product?.name} ({it.needs_boxing ? 'Boxing' : 'No Boxing'}) x{it.quantity}
+                                      {product?.sku} - {product?.name} ({it.needs_boxing ? t('order.boxing') : t('order.no_boxing')}) x{it.quantity}
                                     </SelectItem>
                                   );
                                 })}
@@ -718,19 +720,19 @@ export default function OrderCreate() {
                           </div>
                           <div className="grid grid-cols-4 gap-2 pl-10">
                             <div>
-                              <Label className="text-xs text-muted-foreground">L (cm)</Label>
+                              <Label className="text-xs text-muted-foreground">{t('order.length_cm')}</Label>
                               <Input type="number" min={0} step="0.1" value={row.length_cm} onChange={(e) => { const newRows = [...packagingRows]; newRows[index] = { ...newRows[index], length_cm: e.target.value }; setPackagingRows(newRows); }} placeholder="—" />
                             </div>
                             <div>
-                              <Label className="text-xs text-muted-foreground">W (cm)</Label>
+                              <Label className="text-xs text-muted-foreground">{t('order.width_cm')}</Label>
                               <Input type="number" min={0} step="0.1" value={row.width_cm} onChange={(e) => { const newRows = [...packagingRows]; newRows[index] = { ...newRows[index], width_cm: e.target.value }; setPackagingRows(newRows); }} placeholder="—" />
                             </div>
                             <div>
-                              <Label className="text-xs text-muted-foreground">H (cm)</Label>
+                              <Label className="text-xs text-muted-foreground">{t('order.height_cm')}</Label>
                               <Input type="number" min={0} step="0.1" value={row.height_cm} onChange={(e) => { const newRows = [...packagingRows]; newRows[index] = { ...newRows[index], height_cm: e.target.value }; setPackagingRows(newRows); }} placeholder="—" />
                             </div>
                             <div>
-                              <Label className="text-xs text-muted-foreground">Wt (kg)</Label>
+                              <Label className="text-xs text-muted-foreground">{t('order.weight_kg')}</Label>
                               <Input type="number" min={0} step="0.1" value={row.weight_kg} onChange={(e) => { const newRows = [...packagingRows]; newRows[index] = { ...newRows[index], weight_kg: e.target.value }; setPackagingRows(newRows); }} placeholder="—" />
                             </div>
                           </div>
@@ -744,8 +746,8 @@ export default function OrderCreate() {
                     size="sm"
                     onClick={() => setPackagingRows([...packagingRows, { item_index: -1, quantity: 1, length_cm: '', width_cm: '', height_cm: '', weight_kg: '' }])}
                   >
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Shipment
+                    <Plus className="me-2 h-4 w-4" />
+                    {t('order.add_shipment')}
                   </Button>
                 </div>
               )}
@@ -755,15 +757,15 @@ export default function OrderCreate() {
             <Button type="submit" disabled={submitting} className="flex-1">
               {submitting ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Creating Order...
+                  <Loader2 className="me-2 h-4 w-4 animate-spin" />
+                  {t('order.creating_order')}
                 </>
               ) : (
-                "Create Order"
+                t('order.create_order')
               )}
             </Button>
             <Button type="button" variant="outline" onClick={() => navigate("/orders")}>
-              Cancel
+              {t('common.cancel')}
             </Button>
           </div>
         </form>
