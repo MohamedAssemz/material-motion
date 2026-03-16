@@ -495,7 +495,7 @@ export default function OrderCreate() {
               {items.map((item, index) => (
                 <div key={index} className="flex gap-4 items-end">
                   <div className="flex-1">
-                    <Label>Product *</Label>
+                    <Label>{t('order.product')} *</Label>
                     <Popover>
                       <PopoverTrigger asChild>
                         <Button variant="outline" role="combobox" className="w-full justify-between">
