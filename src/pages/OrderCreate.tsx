@@ -547,7 +547,7 @@ export default function OrderCreate() {
                                 }
                                 return null;
                               })()}
-                            <CommandGroup heading={selectedCustomerId ? "All products" : undefined}>
+                            <CommandGroup heading={selectedCustomerId ? t('order.all_products') : undefined}>
                               {products.map((product) => (
                                 <CommandItem
                                   key={product.id}
