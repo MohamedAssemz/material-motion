@@ -419,7 +419,7 @@ export default function OrderCreate() {
                       <SelectItem value="domestic">
                         <span className="flex items-center gap-2">
                           <Truck className="h-4 w-4" />
-                          Domestic
+                          {t('order.domestic')}
                         </span>
                       </SelectItem>
                       <SelectItem value="international">
