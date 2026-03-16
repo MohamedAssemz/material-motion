@@ -757,15 +757,15 @@ export default function OrderCreate() {
             <Button type="submit" disabled={submitting} className="flex-1">
               {submitting ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Creating Order...
+                  <Loader2 className="me-2 h-4 w-4 animate-spin" />
+                  {t('order.creating_order')}
                 </>
               ) : (
-                "Create Order"
+                t('order.create_order')
               )}
             </Button>
             <Button type="button" variant="outline" onClick={() => navigate("/orders")}>
-              Cancel
+              {t('common.cancel')}
             </Button>
           </div>
         </form>
