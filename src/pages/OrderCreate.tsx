@@ -746,8 +746,8 @@ export default function OrderCreate() {
                     size="sm"
                     onClick={() => setPackagingRows([...packagingRows, { item_index: -1, quantity: 1, length_cm: '', width_cm: '', height_cm: '', weight_kg: '' }])}
                   >
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Shipment
+                    <Plus className="me-2 h-4 w-4" />
+                    {t('order.add_shipment')}
                   </Button>
                 </div>
               )}
