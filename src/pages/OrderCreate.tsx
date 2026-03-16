@@ -433,7 +433,7 @@ export default function OrderCreate() {
                 </div>
               </div>
               <div>
-                <Label>Estimated Fulfillment Time</Label>
+                <Label>{t('order.estimated_fulfillment')}</Label>
                 <Popover open={eftOpen} onOpenChange={setEftOpen}>
                   <PopoverTrigger asChild>
                     <Button
