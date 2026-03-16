@@ -312,8 +312,8 @@ export default function OrderCreate() {
           </Button>
           <ClipboardList className="h-6 w-6 text-primary" />
           <div>
-            <h1 className="text-xl font-bold">Create New Order</h1>
-            <p className="text-sm text-muted-foreground">Add products and quantities</p>
+            <h1 className="text-xl font-bold">{t('order.create_new')}</h1>
+            <p className="text-sm text-muted-foreground">{t('order.add_products_quantities')}</p>
           </div>
         </div>
       </header>
