@@ -326,7 +326,7 @@ export default function OrderCreate() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <Label htmlFor="order_number">Order Number *</Label>
+                <Label htmlFor="order_number">{t('order.order_number')} *</Label>
                 <Input
                   id="order_number"
                   value={orderNumber}
