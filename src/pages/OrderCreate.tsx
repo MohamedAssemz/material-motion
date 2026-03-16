@@ -614,7 +614,7 @@ export default function OrderCreate() {
                   id="notes"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Optional order notes..."
+                  placeholder={t('order.notes_placeholder')}
                   rows={2}
                   maxLength={500}
                 />
