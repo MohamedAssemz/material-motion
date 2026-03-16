@@ -322,7 +322,7 @@ export default function OrderCreate() {
         <form onSubmit={handleSubmit}>
           <Card className="mb-6">
             <CardHeader>
-              <CardTitle>Order Details</CardTitle>
+              <CardTitle>{t('order.order_details')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
