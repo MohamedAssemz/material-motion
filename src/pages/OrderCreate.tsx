@@ -401,8 +401,8 @@ export default function OrderCreate() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="normal">Normal</SelectItem>
-                      <SelectItem value="high">High</SelectItem>
+                      <SelectItem value="normal">{t('order.priority_normal')}</SelectItem>
+                      <SelectItem value="high">{t('order.priority_high')}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
