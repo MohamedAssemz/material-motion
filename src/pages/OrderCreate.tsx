@@ -522,7 +522,7 @@ export default function OrderCreate() {
 
                                 if (suggestedProducts.length > 0) {
                                   return (
-                                    <CommandGroup heading="Suggested for this customer">
+                                    <CommandGroup heading={t('order.suggested_for_customer')}>
                                       {suggestedProducts.map((product) => (
                                         <CommandItem
                                           key={`suggested-${product.id}`}
