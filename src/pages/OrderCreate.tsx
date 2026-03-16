@@ -509,9 +509,9 @@ export default function OrderCreate() {
                       </PopoverTrigger>
                       <PopoverContent className="w-[400px] p-0" align="start">
                         <Command>
-                          <CommandInput placeholder="Search products by SKU or name..." />
+                          <CommandInput placeholder={t('order.search_products')} />
                           <CommandList>
-                            <CommandEmpty>No product found.</CommandEmpty>
+                            <CommandEmpty>{t('order.no_product_found')}</CommandEmpty>
                             {/* Suggested products for selected customer */}
                             {selectedCustomerId &&
                               (() => {
