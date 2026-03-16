@@ -502,8 +502,8 @@ export default function OrderCreate() {
                           {item.product_id
                             ? products.find((p) => p.id === item.product_id)
                               ? `${products.find((p) => p.id === item.product_id)?.sku} - ${products.find((p) => p.id === item.product_id)?.name}`
-                              : "Select product..."
-                            : "Select product..."}
+                              : t('order.select_product')
+                            : t('order.select_product')}
                           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                         </Button>
                       </PopoverTrigger>
