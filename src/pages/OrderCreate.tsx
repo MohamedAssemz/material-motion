@@ -484,10 +484,10 @@ export default function OrderCreate() {
           <Card className="mb-6">
             <CardHeader>
               <div className="flex items-center justify-between">
-                <CardTitle>Order Items</CardTitle>
+                <CardTitle>{t('order.order_items')}</CardTitle>
                 <Button type="button" variant="outline" size="sm" onClick={addItem}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Item
+                  <Plus className="me-2 h-4 w-4" />
+                  {t('order.add_item')}
                 </Button>
               </div>
             </CardHeader>
