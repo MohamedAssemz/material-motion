@@ -444,7 +444,7 @@ export default function OrderCreate() {
                       )}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      {estimatedFulfillment ? format(estimatedFulfillment, "PPP") : "Select date"}
+                      {estimatedFulfillment ? format(estimatedFulfillment, "PPP") : t('order.select_date')}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
