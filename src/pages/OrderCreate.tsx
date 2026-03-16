@@ -365,8 +365,8 @@ export default function OrderCreate() {
                               setCustomerOpen(false);
                             }}
                           >
-                            <Check className={cn("mr-2 h-4 w-4", !selectedCustomerId ? "opacity-100" : "opacity-0")} />
-                            No customer
+                            <Check className={cn("me-2 h-4 w-4", !selectedCustomerId ? "opacity-100" : "opacity-0")} />
+                            {t('order.no_customer')}
                           </CommandItem>
                           {customers.map((customer) => (
                             <CommandItem
