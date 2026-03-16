@@ -354,9 +354,9 @@ export default function OrderCreate() {
                   </PopoverTrigger>
                   <PopoverContent className="w-full p-0" align="start">
                     <Command>
-                      <CommandInput placeholder="Search customers..." />
+                      <CommandInput placeholder={t('order.search_customers')} />
                       <CommandList>
-                        <CommandEmpty>No customer found.</CommandEmpty>
+                        <CommandEmpty>{t('order.no_customer_found')}</CommandEmpty>
                         <CommandGroup>
                           <CommandItem
                             value=""
