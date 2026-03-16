@@ -585,7 +585,7 @@ export default function OrderCreate() {
                       onCheckedChange={(checked) => updateItem(index, "needs_boxing", !!checked)}
                     />
                     <Label htmlFor={`needs_boxing_${index}`} className="text-xs cursor-pointer">
-                      Boxing
+                      {t('order.boxing')}
                     </Label>
                   </div>
                   <Button
