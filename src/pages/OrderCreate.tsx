@@ -640,7 +640,7 @@ export default function OrderCreate() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Package className="h-4 w-4 text-primary" />
-                      <p className="text-sm font-medium">Packaging Reference</p>
+                      <p className="text-sm font-medium">{t('order.packaging_reference')}</p>
                     </div>
                     <Button
                       type="button"
