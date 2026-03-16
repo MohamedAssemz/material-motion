@@ -425,7 +425,7 @@ export default function OrderCreate() {
                       <SelectItem value="international">
                         <span className="flex items-center gap-2">
                           <Plane className="h-4 w-4" />
-                          International
+                          {t('order.international')}
                         </span>
                       </SelectItem>
                     </SelectContent>
