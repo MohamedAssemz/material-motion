@@ -461,7 +461,7 @@ export default function OrderCreate() {
                 </Popover>
               </div>
               <div>
-                <Label htmlFor="raw_materials">Raw Materials *</Label>
+                <Label htmlFor="raw_materials">{t('order.raw_materials')} *</Label>
                 <Textarea
                   id="raw_materials"
                   value={rawMaterials}
