@@ -537,8 +537,8 @@ export default function OrderCreate() {
                                           />
                                           <span className="font-mono mr-2">{product.sku}</span>
                                           <span className="text-muted-foreground">{product.name}</span>
-                                          <Badge variant="secondary" className="ml-2 text-xs">
-                                            Suggested
+                                          <Badge variant="secondary" className="ms-2 text-xs">
+                                            {t('order.suggested')}
                                           </Badge>
                                         </CommandItem>
                                       ))}
