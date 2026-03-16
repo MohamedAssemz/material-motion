@@ -651,7 +651,7 @@ export default function OrderCreate() {
                         setPackagingRows([]);
                       }}
                     >
-                      Remove
+                      {t('order.remove')}
                     </Button>
                   </div>
                   <div className="space-y-4">
