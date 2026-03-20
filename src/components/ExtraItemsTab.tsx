@@ -138,11 +138,33 @@ export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true, onC
     return () => { supabase.removeChannel(channel); };
   }, [orderId, phase]);
 
+  const fetchRetrievedCounts = async () => {
+    try {
+      const targetState = PHASE_CURRENT_STATE_MAP[phase];
+      const { data, error } = await supabase
+        .from('extra_batch_history')
+        .select('product_id, quantity')
+        .eq('event_type', 'CONSUMED')
+        .eq('consuming_order_id', orderId)
+        .eq('from_state', targetState);
+      
+      if (error) throw error;
+      
+      const counts = new Map<string, number>();
+      data?.forEach(row => {
+        if (row.product_id) {
+          counts.set(row.product_id, (counts.get(row.product_id) || 0) + row.quantity);
+        }
+      });
+      setRetrievedCounts(counts);
+    } catch (error: any) {
+      console.error('Error fetching retrieved counts:', error);
+    }
+  };
+
   const fetchExtraBatches = async () => {
     setLoading(true);
     try {
-      // Extra items keep their current_state when assigned to order
-      // Filter by order_id AND the current_state that matches this phase
       const targetState = PHASE_CURRENT_STATE_MAP[phase];
       
       const { data, error } = await supabase
@@ -180,6 +202,10 @@ export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true, onC
       }));
       
       setExtraBatches(batchesWithBox);
+      
+      // Report count to parent
+      const totalCount = batchesWithBox.reduce((sum, b) => sum + b.quantity, 0);
+      onCountChange?.(totalCount);
     } catch (error: any) {
       toast.error(error.message);
     } finally {
