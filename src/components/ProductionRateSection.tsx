@@ -299,7 +299,7 @@ export function ProductionRateSection({
                 {/* Header row */}
                 <div className="flex items-center gap-3 flex-wrap">
                   <CollapsibleTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 hover:bg-primary/10">
+                    <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 hover:bg-primary/30">
                       {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                     </Button>
                   </CollapsibleTrigger>
