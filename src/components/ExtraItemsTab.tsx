@@ -69,6 +69,7 @@ interface ExtraItemsTabProps {
   phase: 'manufacturing' | 'finishing' | 'packaging' | 'boxing';
   onRefresh?: () => void;
   canManage?: boolean;
+  onCountChange?: (count: number) => void;
 }
 
 // Map phase to the current_state for extra items assigned to this order
