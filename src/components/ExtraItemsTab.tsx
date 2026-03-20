@@ -120,6 +120,7 @@ export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true, onC
 
   useEffect(() => {
     fetchExtraBatches();
+    fetchRetrievedCounts();
     
     const channel = supabase
       .channel(`extra-batches-${orderId}-${phase}`)
@@ -130,6 +131,7 @@ export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true, onC
         filter: `order_id=eq.${orderId}` 
       }, () => {
         fetchExtraBatches();
+        fetchRetrievedCounts();
       })
       .subscribe();
     
