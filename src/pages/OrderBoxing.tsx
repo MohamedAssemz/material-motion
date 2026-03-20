@@ -110,6 +110,7 @@ export default function OrderBoxing() {
   const [retrievedFromExtraBatches, setRetrievedFromExtraBatches] = useState<
     Array<{ id: string; product_id: string; product_name: string; product_sku: string; quantity: number; order_item_id?: string | null }>
   >([]);
+  const [extraCount, setExtraCount] = useState(0);
   const [loading, setLoading] = useState(true);
   
   // Get default tab from URL query params
