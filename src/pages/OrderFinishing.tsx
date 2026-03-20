@@ -93,6 +93,7 @@ export default function OrderFinishing() {
     Array<{ id: string; product_id: string; product_name: string; product_sku: string; quantity: number; finishing_machine_id: string | null }>
   >([]);
   
+  const [extraCount, setExtraCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
 
