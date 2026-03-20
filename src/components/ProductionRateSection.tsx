@@ -1,23 +1,13 @@
-import { useState, useEffect, useMemo } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { NumericInput } from '@/components/ui/numeric-input';
-import { Settings, Loader2, PackageX, ChevronDown, ChevronRight } from 'lucide-react';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible';
-import { toast } from 'sonner';
+import { useState, useEffect, useMemo } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { NumericInput } from "@/components/ui/numeric-input";
+import { Settings, Loader2, PackageX, ChevronDown, ChevronRight } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { toast } from "sonner";
 
 interface Machine {
   id: string;
@@ -58,8 +48,8 @@ interface OrderItemGroup {
 
 interface ProductionRateSectionProps {
   batches: BatchData[];
-  machineType: 'manufacturing' | 'finishing' | 'packaging' | 'boxing';
-  machineColumnName: 'manufacturing_machine_id' | 'finishing_machine_id' | 'packaging_machine_id' | 'boxing_machine_id';
+  machineType: "manufacturing" | "finishing" | "packaging" | "boxing";
+  machineColumnName: "manufacturing_machine_id" | "finishing_machine_id" | "packaging_machine_id" | "boxing_machine_id";
   onAssigned: () => void;
   canManage?: boolean;
 }
@@ -81,15 +71,15 @@ export function ProductionRateSection({
     const fetchMachines = async () => {
       try {
         const { data, error } = await supabase
-          .from('machines')
-          .select('*')
-          .eq('type', machineType)
-          .eq('is_active', true)
-          .order('name');
+          .from("machines")
+          .select("*")
+          .eq("type", machineType)
+          .eq("is_active", true)
+          .order("name");
         if (error) throw error;
         setMachines(data || []);
       } catch (error) {
-        console.error('Error fetching machines:', error);
+        console.error("Error fetching machines:", error);
       }
     };
     fetchMachines();
@@ -99,7 +89,7 @@ export function ProductionRateSection({
   const groups: OrderItemGroup[] = useMemo(() => {
     const groupMap = new Map<string, OrderItemGroup>();
 
-    batches.forEach(batch => {
+    batches.forEach((batch) => {
       const needsBoxing = batch.needs_boxing ?? true;
       const groupKey = batch.order_item_id || batch.product_id;
 
@@ -132,8 +122,8 @@ export function ProductionRateSection({
     groupMap.forEach((group) => {
       const machineMap = new Map<string, { qty: number }>();
       batches
-        .filter(b => (b.order_item_id || b.product_id) === group.groupKey && b.machine_id)
-        .forEach(b => {
+        .filter((b) => (b.order_item_id || b.product_id) === group.groupKey && b.machine_id)
+        .forEach((b) => {
           const existing = machineMap.get(b.machine_id!) || { qty: 0 };
           existing.qty += b.quantity;
           machineMap.set(b.machine_id!, existing);
@@ -141,7 +131,7 @@ export function ProductionRateSection({
 
       group.assignedByMachine = Array.from(machineMap.entries()).map(([machineId, data]) => ({
         machineId,
-        machineName: machines.find(m => m.id === machineId)?.name || 'Unknown',
+        machineName: machines.find((m) => m.id === machineId)?.name || "Unknown",
         qty: data.qty,
       }));
     });
@@ -157,12 +147,12 @@ export function ProductionRateSection({
   // Auto-expand groups with unassigned items
   useEffect(() => {
     const newOpen = new Set<string>();
-    groups.forEach(g => {
+    groups.forEach((g) => {
       if (g.unassignedQty > 0) newOpen.add(g.groupKey);
     });
-    setOpenGroups(prev => {
+    setOpenGroups((prev) => {
       const merged = new Set(prev);
-      newOpen.forEach(k => merged.add(k));
+      newOpen.forEach((k) => merged.add(k));
       return merged;
     });
   }, [groups]);
@@ -170,7 +160,7 @@ export function ProductionRateSection({
   const handleAssign = async (group: OrderItemGroup) => {
     const machineId = selectedMachines.get(group.groupKey);
     if (!machineId) {
-      toast.error('Please select a machine');
+      toast.error("Please select a machine");
       return;
     }
 
@@ -185,8 +175,8 @@ export function ProductionRateSection({
       // Separate extra batch IDs from order batch IDs
       const extraBatchIds: string[] = [];
       const orderBatchIds: string[] = [];
-      group.unassignedBatchIds.forEach(batchId => {
-        const batch = batches.find(b => b.id === batchId);
+      group.unassignedBatchIds.forEach((batchId) => {
+        const batch = batches.find((b) => b.id === batchId);
         if (batch?.isExtraBatch) {
           extraBatchIds.push(batchId);
         } else {
@@ -198,11 +188,14 @@ export function ProductionRateSection({
 
       // Assign order batches via RPC
       if (orderBatchIds.length > 0 && remainingQty > 0) {
-        const orderQty = Math.min(remainingQty, orderBatchIds.reduce((sum, bid) => {
-          const b = batches.find(x => x.id === bid);
-          return sum + (b?.quantity || 0);
-        }, 0));
-        const { error } = await supabase.rpc('assign_machine_to_batches', {
+        const orderQty = Math.min(
+          remainingQty,
+          orderBatchIds.reduce((sum, bid) => {
+            const b = batches.find((x) => x.id === bid);
+            return sum + (b?.quantity || 0);
+          }, 0),
+        );
+        const { error } = await supabase.rpc("assign_machine_to_batches", {
           p_batch_ids: orderBatchIds,
           p_machine_id: machineId,
           p_machine_column: machineColumnName,
@@ -217,22 +210,22 @@ export function ProductionRateSection({
         for (const ebId of extraBatchIds) {
           if (remainingQty <= 0) break;
           const { error } = await supabase
-            .from('extra_batches')
+            .from("extra_batches")
             .update({ [machineColumnName]: machineId })
-            .eq('id', ebId);
+            .eq("id", ebId);
           if (error) throw error;
-          const b = batches.find(x => x.id === ebId);
-          remainingQty -= (b?.quantity || 0);
+          const b = batches.find((x) => x.id === ebId);
+          remainingQty -= b?.quantity || 0;
         }
       }
 
-      toast.success('Machine assigned successfully');
-      setSelectedMachines(prev => {
+      toast.success("Machine assigned successfully");
+      setSelectedMachines((prev) => {
         const m = new Map(prev);
         m.delete(group.groupKey);
         return m;
       });
-      setQtyInputs(prev => {
+      setQtyInputs((prev) => {
         const m = new Map(prev);
         m.delete(group.groupKey);
         return m;
@@ -245,7 +238,7 @@ export function ProductionRateSection({
     }
   };
 
-  const hasNoBoxingItems = machineType === 'boxing' && groups.some(g => !g.needs_boxing);
+  const hasNoBoxingItems = machineType === "boxing" && groups.some((g) => !g.needs_boxing);
   if (batches.length === 0 || (machines.length === 0 && !hasNoBoxingItems)) {
     return null;
   }
@@ -255,14 +248,12 @@ export function ProductionRateSection({
       <div className="flex items-center gap-2 pb-2 border-b border-primary/20">
         <Settings className="h-4 w-4 text-primary" />
         <h3 className="text-sm font-semibold text-primary">Production Rate</h3>
-        <span className="text-xs text-muted-foreground ml-auto">
-          Assign machines to track production
-        </span>
+        <span className="text-xs text-muted-foreground ml-auto">Assign machines to track production</span>
       </div>
 
-      {groups.map(group => {
+      {groups.map((group) => {
         // Static "No Boxing" card
-        if (machineType === 'boxing' && !group.needs_boxing) {
+        if (machineType === "boxing" && !group.needs_boxing) {
           return (
             <Card key={group.groupKey} className="border-muted bg-muted/30">
               <CardContent className="p-4">
@@ -275,7 +266,9 @@ export function ProductionRateSection({
                         No Boxing
                       </Badge>
                     </div>
-                    <p className="text-sm text-muted-foreground">{group.product_sku} · Qty: {group.totalQty}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {group.product_sku} · Qty: {group.totalQty}
+                    </p>
                   </div>
                 </div>
               </CardContent>
@@ -285,7 +278,7 @@ export function ProductionRateSection({
 
         const isOpen = openGroups.has(group.groupKey);
         const hasAssignments = group.assignedByMachine.length > 0;
-        const selectedMachine = selectedMachines.get(group.groupKey) || '';
+        const selectedMachine = selectedMachines.get(group.groupKey) || "";
         const qtyValue = qtyInputs.get(group.groupKey) ?? group.unassignedQty;
 
         return (
@@ -293,7 +286,7 @@ export function ProductionRateSection({
             key={group.groupKey}
             open={isOpen}
             onOpenChange={(open) => {
-              setOpenGroups(prev => {
+              setOpenGroups((prev) => {
                 const next = new Set(prev);
                 if (open) next.add(group.groupKey);
                 else next.delete(group.groupKey);
@@ -306,7 +299,7 @@ export function ProductionRateSection({
                 {/* Header row */}
                 <div className="flex items-center gap-3 flex-wrap">
                   <CollapsibleTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0">
+                    <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 hover:bg-primary/20">
                       {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                     </Button>
                   </CollapsibleTrigger>
@@ -331,20 +324,22 @@ export function ProductionRateSection({
                         max={group.unassignedQty}
                         value={qtyValue || undefined}
                         onValueChange={(val) => {
-                          setQtyInputs(prev => new Map(prev).set(group.groupKey, val ?? 0));
+                          setQtyInputs((prev) => new Map(prev).set(group.groupKey, val ?? 0));
                         }}
                         className="w-20 h-9"
                       />
                       <Select
                         value={selectedMachine}
-                        onValueChange={(val) => setSelectedMachines(prev => new Map(prev).set(group.groupKey, val))}
+                        onValueChange={(val) => setSelectedMachines((prev) => new Map(prev).set(group.groupKey, val))}
                       >
                         <SelectTrigger className="w-40 h-9">
                           <SelectValue placeholder="Select machine" />
                         </SelectTrigger>
                         <SelectContent>
-                          {machines.map(m => (
-                            <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
+                          {machines.map((m) => (
+                            <SelectItem key={m.id} value={m.id}>
+                              {m.name}
+                            </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -353,11 +348,7 @@ export function ProductionRateSection({
                         onClick={() => handleAssign(group)}
                         disabled={!selectedMachine || assigning === group.groupKey}
                       >
-                        {assigning === group.groupKey ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          'Assign'
-                        )}
+                        {assigning === group.groupKey ? <Loader2 className="h-4 w-4 animate-spin" /> : "Assign"}
                       </Button>
                     </div>
                   )}
@@ -379,7 +370,7 @@ export function ProductionRateSection({
                 <CollapsibleContent>
                   {hasAssignments ? (
                     <div className="ml-8 space-y-1 pt-1 border-t border-primary/10">
-                      {group.assignedByMachine.map(mg => (
+                      {group.assignedByMachine.map((mg) => (
                         <div key={mg.machineId} className="flex items-center justify-between py-1.5 text-sm">
                           <span className="text-muted-foreground">{mg.machineName}</span>
                           <Badge variant="outline">{mg.qty}</Badge>
