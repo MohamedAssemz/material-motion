@@ -94,6 +94,7 @@ export default function OrderManufacturing() {
     Array<{ id: string; product_id: string; product_name: string; product_sku: string; quantity: number; manufacturing_machine_id: string | null }>
   >([]);
   
+  const [extraCount, setExtraCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
   // Selection & action states
