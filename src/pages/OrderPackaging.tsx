@@ -90,6 +90,7 @@ export default function OrderPackaging() {
     Array<{ id: string; product_id: string; product_name: string; product_sku: string; quantity: number; packaging_machine_id: string | null }>
   >([]);
   
+  const [extraCount, setExtraCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
   const [selectedBoxes, setSelectedBoxes] = useState<Set<string>>(new Set());
@@ -848,7 +849,7 @@ export default function OrderPackaging() {
         <TabsList className="grid grid-cols-4 w-full max-w-2xl">
           <TabsTrigger value="receive">{t('phase.receive')} ({readyBoxGroups.length})</TabsTrigger>
           <TabsTrigger value="process">{t('phase.process')} ({totalInPackaging})</TabsTrigger>
-          <TabsTrigger value="extra">{t('phase.extra')}</TabsTrigger>
+          <TabsTrigger value="extra">{t('phase.extra')} ({extraCount})</TabsTrigger>
           <TabsTrigger value="completed">{t('phase.completed')} ({totalCompleted})</TabsTrigger>
         </TabsList>
 
@@ -1014,7 +1015,7 @@ export default function OrderPackaging() {
         </TabsContent>
 
         <TabsContent value="extra" className="space-y-6">
-          <ExtraItemsTab orderId={id!} phase="packaging" onRefresh={() => fetchData()} canManage={canManage && !isCancelled} />
+          <ExtraItemsTab orderId={id!} phase="packaging" onRefresh={() => fetchData()} canManage={canManage && !isCancelled} onCountChange={setExtraCount} />
 
           {/* Added to Extra Inventory from this Order */}
           {addedToExtraItems.length > 0 && (

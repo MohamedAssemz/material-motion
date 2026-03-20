@@ -69,6 +69,7 @@ interface ExtraItemsTabProps {
   phase: 'manufacturing' | 'finishing' | 'packaging' | 'boxing';
   onRefresh?: () => void;
   canManage?: boolean;
+  onCountChange?: (count: number) => void;
 }
 
 // Map phase to the current_state for extra items assigned to this order
@@ -101,10 +102,11 @@ const PHASE_LABELS: Record<string, string> = {
   boxing: 'Extra Boxing',
 };
 
-export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true }: ExtraItemsTabProps) {
+export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true, onCountChange }: ExtraItemsTabProps) {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [extraBatches, setExtraBatches] = useState<ExtraBatch[]>([]);
+  const [retrievedCounts, setRetrievedCounts] = useState<Map<string, number>>(new Map());
   const [productSelections, setProductSelections] = useState<Map<string, number>>(new Map());
   
   // Box assignment dialog
@@ -118,6 +120,7 @@ export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true }: E
 
   useEffect(() => {
     fetchExtraBatches();
+    fetchRetrievedCounts();
     
     const channel = supabase
       .channel(`extra-batches-${orderId}-${phase}`)
@@ -128,17 +131,40 @@ export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true }: E
         filter: `order_id=eq.${orderId}` 
       }, () => {
         fetchExtraBatches();
+        fetchRetrievedCounts();
       })
       .subscribe();
     
     return () => { supabase.removeChannel(channel); };
   }, [orderId, phase]);
 
+  const fetchRetrievedCounts = async () => {
+    try {
+      const targetState = PHASE_CURRENT_STATE_MAP[phase];
+      const { data, error } = await supabase
+        .from('extra_batch_history')
+        .select('product_id, quantity')
+        .eq('event_type', 'CONSUMED')
+        .eq('consuming_order_id', orderId)
+        .eq('from_state', targetState);
+      
+      if (error) throw error;
+      
+      const counts = new Map<string, number>();
+      data?.forEach(row => {
+        if (row.product_id) {
+          counts.set(row.product_id, (counts.get(row.product_id) || 0) + row.quantity);
+        }
+      });
+      setRetrievedCounts(counts);
+    } catch (error: any) {
+      console.error('Error fetching retrieved counts:', error);
+    }
+  };
+
   const fetchExtraBatches = async () => {
     setLoading(true);
     try {
-      // Extra items keep their current_state when assigned to order
-      // Filter by order_id AND the current_state that matches this phase
       const targetState = PHASE_CURRENT_STATE_MAP[phase];
       
       const { data, error } = await supabase
@@ -176,6 +202,10 @@ export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true }: E
       }));
       
       setExtraBatches(batchesWithBox);
+      
+      // Report count to parent
+      const totalCount = batchesWithBox.reduce((sum, b) => sum + b.quantity, 0);
+      onCountChange?.(totalCount);
     } catch (error: any) {
       toast.error(error.message);
     } finally {
@@ -770,11 +800,16 @@ export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true }: E
                       <span>{group.source_box_code}</span>
                     </div>
                   </div>
-                  <div className="flex items-center gap-4">
-                    <div className="text-right">
-                      <p className="text-lg font-semibold">{group.quantity}</p>
-                      <p className="text-xs text-muted-foreground">available</p>
-                    </div>
+                    <div className="flex items-center gap-4">
+                      <div className="text-right space-y-0.5">
+                        <p className="text-lg font-semibold">{group.quantity}</p>
+                        <p className="text-xs text-muted-foreground">available</p>
+                        {(retrievedCounts.get(group.product_id) || 0) > 0 && (
+                          <p className="text-xs text-green-600 dark:text-green-400">
+                            {retrievedCounts.get(group.product_id)} retrieved
+                          </p>
+                        )}
+                      </div>
                     {canManage && <div className="flex items-center gap-2">
                       <Label className="text-xs">Select:</Label>
                       <NumericInput

@@ -93,6 +93,7 @@ export default function OrderFinishing() {
     Array<{ id: string; product_id: string; product_name: string; product_sku: string; quantity: number; finishing_machine_id: string | null }>
   >([]);
   
+  const [extraCount, setExtraCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
 
@@ -824,7 +825,7 @@ export default function OrderFinishing() {
         <TabsList className="grid grid-cols-4 w-full max-w-2xl">
           <TabsTrigger value="receive">{t('phase.receive')} ({readyBoxGroups.length})</TabsTrigger>
           <TabsTrigger value="process">{t('phase.process')} ({totalInFinishing})</TabsTrigger>
-          <TabsTrigger value="extra">{t('phase.extra')}</TabsTrigger>
+          <TabsTrigger value="extra">{t('phase.extra')} ({extraCount})</TabsTrigger>
           <TabsTrigger value="completed">{t('phase.completed')} ({totalCompleted})</TabsTrigger>
         </TabsList>
 
@@ -988,7 +989,7 @@ export default function OrderFinishing() {
         </TabsContent>
 
         <TabsContent value="extra" className="space-y-6">
-          <ExtraItemsTab orderId={id!} phase="finishing" onRefresh={() => fetchData()} canManage={canManage && !isCancelled} />
+          <ExtraItemsTab orderId={id!} phase="finishing" onRefresh={() => fetchData()} canManage={canManage && !isCancelled} onCountChange={setExtraCount} />
 
           {/* Added to Extra Inventory from this Order */}
           {addedToExtraItems.length > 0 && (

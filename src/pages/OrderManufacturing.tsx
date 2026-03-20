@@ -94,6 +94,7 @@ export default function OrderManufacturing() {
     Array<{ id: string; product_id: string; product_name: string; product_sku: string; quantity: number; manufacturing_machine_id: string | null }>
   >([]);
   
+  const [extraCount, setExtraCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
   // Selection & action states
@@ -706,7 +707,7 @@ export default function OrderManufacturing() {
       <Tabs defaultValue="active" className="space-y-4">
         <TabsList className="grid grid-cols-3 w-full max-w-xl">
           <TabsTrigger value="active">{t('phase.active_tab')} ({totalInManufacturing})</TabsTrigger>
-          <TabsTrigger value="extra">{t('phase.extra_tab')}</TabsTrigger>
+          <TabsTrigger value="extra">{t('phase.extra_tab')} ({extraCount})</TabsTrigger>
           <TabsTrigger value="completed">{t('phase.processed_tab')} ({totalCompleted})</TabsTrigger>
         </TabsList>
 
@@ -796,7 +797,7 @@ export default function OrderManufacturing() {
         </TabsContent>
 
         <TabsContent value="extra" className="space-y-6">
-          <ExtraItemsTab orderId={id!} phase="manufacturing" onRefresh={() => fetchData()} canManage={canManage && !isCancelled} />
+          <ExtraItemsTab orderId={id!} phase="manufacturing" onRefresh={() => fetchData()} canManage={canManage && !isCancelled} onCountChange={setExtraCount} />
 
           {/* Added to Extra Inventory from this Order */}
           {addedToExtraItems.length > 0 && (

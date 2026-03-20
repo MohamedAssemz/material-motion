@@ -110,6 +110,7 @@ export default function OrderBoxing() {
   const [retrievedFromExtraBatches, setRetrievedFromExtraBatches] = useState<
     Array<{ id: string; product_id: string; product_name: string; product_sku: string; quantity: number; order_item_id?: string | null }>
   >([]);
+  const [extraCount, setExtraCount] = useState(0);
   const [loading, setLoading] = useState(true);
   
   // Get default tab from URL query params
@@ -1197,7 +1198,7 @@ export default function OrderBoxing() {
         <TabsList className="grid grid-cols-5 w-full max-w-3xl">
           <TabsTrigger value="receive">{t('phase.receive')} ({readyBoxGroups.length})</TabsTrigger>
           <TabsTrigger value="process">{t('phase.process')} ({totalInBoxing})</TabsTrigger>
-          <TabsTrigger value="extra">{t('phase.extra')}</TabsTrigger>
+          <TabsTrigger value="extra">{t('phase.extra')} ({extraCount})</TabsTrigger>
           <TabsTrigger value="ready">{t('phase.ready')} ({totalReadyForShipment})</TabsTrigger>
           <TabsTrigger value="shipments">{t('phase.shipments')} ({shipments.length})</TabsTrigger>
         </TabsList>
@@ -1367,6 +1368,7 @@ export default function OrderBoxing() {
             phase="boxing" 
             onRefresh={() => fetchData()}
             canManage={canManage && !isCancelled}
+            onCountChange={setExtraCount}
           />
 
           {/* Added to Extra Inventory from this Order */}
