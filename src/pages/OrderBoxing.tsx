@@ -1198,7 +1198,7 @@ export default function OrderBoxing() {
         <TabsList className="grid grid-cols-5 w-full max-w-3xl">
           <TabsTrigger value="receive">{t('phase.receive')} ({readyBoxGroups.length})</TabsTrigger>
           <TabsTrigger value="process">{t('phase.process')} ({totalInBoxing})</TabsTrigger>
-          <TabsTrigger value="extra">{t('phase.extra')}</TabsTrigger>
+          <TabsTrigger value="extra">{t('phase.extra')} ({extraCount})</TabsTrigger>
           <TabsTrigger value="ready">{t('phase.ready')} ({totalReadyForShipment})</TabsTrigger>
           <TabsTrigger value="shipments">{t('phase.shipments')} ({shipments.length})</TabsTrigger>
         </TabsList>
