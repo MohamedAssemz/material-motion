@@ -124,6 +124,7 @@ export default function OrderPackaging() {
     fetchData();
     fetchAddedToExtra();
     fetchRetrievedFromExtra();
+    fetchExtraCount();
     const channel = supabase
       .channel(`order-packaging-${id}`)
       .on(
@@ -133,6 +134,13 @@ export default function OrderPackaging() {
           fetchData();
           fetchAddedToExtra();
           fetchRetrievedFromExtra();
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "extra_batches", filter: `order_id=eq.${id}` },
+        () => {
+          fetchExtraCount();
         },
       )
       .subscribe();

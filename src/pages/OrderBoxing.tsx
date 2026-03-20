@@ -139,10 +139,25 @@ export default function OrderBoxing() {
   const canManage = hasRole("boxing_manager") || hasRole("admin");
   const isCancelled = order?.status === 'cancelled';
 
+  const fetchExtraCount = async () => {
+    if (!id) return;
+    try {
+      const { data, error } = await supabase
+        .from('extra_batches')
+        .select('quantity')
+        .eq('order_id', id)
+        .eq('current_state', 'extra_boxing');
+      if (!error && data) {
+        setExtraCount(data.reduce((sum, b) => sum + b.quantity, 0));
+      }
+    } catch {}
+  };
+
   useEffect(() => {
     fetchData();
     fetchAddedToExtra();
     fetchRetrievedFromExtra();
+    fetchExtraCount();
     const channel = supabase
       .channel(`order-boxing-${id}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "order_batches", filter: `order_id=eq.${id}` }, () => {
@@ -150,6 +165,13 @@ export default function OrderBoxing() {
         fetchAddedToExtra();
         fetchRetrievedFromExtra();
       })
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "extra_batches", filter: `order_id=eq.${id}` },
+        () => {
+          fetchExtraCount();
+        },
+      )
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
