@@ -797,14 +797,14 @@ export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true, onC
                     </div>
                   </div>
                   <div className="flex items-center gap-4">
-                    <div className="flex gap-3 text-right">
-                      <div className="space-y-0.5">
-                        <p className="text-lg font-semibold">{group.quantity}</p>
+                    <div className="flex gap-3">
+                      <div className="flex flex-col items-center min-w-0">
+                        <p className="text-lg font-semibold truncate max-w-[60px]">{group.quantity}</p>
                         <p className="text-xs text-muted-foreground">available</p>
                       </div>
                       {(retrievedCounts.get(group.product_id) || 0) > 0 && (
-                        <div className="space-y-0.5">
-                          <p className="text-lg font-semibold text-green-600 dark:text-green-400">
+                        <div className="flex flex-col items-center min-w-0">
+                          <p className="text-lg font-semibold text-green-600 dark:text-green-400 truncate max-w-[60px]">
                             {retrievedCounts.get(group.product_id)}
                           </p>
                           <p className="text-xs text-green-600 dark:text-green-400">retrieved</p>
