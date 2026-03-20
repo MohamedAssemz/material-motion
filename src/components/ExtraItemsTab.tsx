@@ -102,10 +102,11 @@ const PHASE_LABELS: Record<string, string> = {
   boxing: 'Extra Boxing',
 };
 
-export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true }: ExtraItemsTabProps) {
+export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true, onCountChange }: ExtraItemsTabProps) {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [extraBatches, setExtraBatches] = useState<ExtraBatch[]>([]);
+  const [retrievedCounts, setRetrievedCounts] = useState<Map<string, number>>(new Map());
   const [productSelections, setProductSelections] = useState<Map<string, number>>(new Map());
   
   // Box assignment dialog
