@@ -849,7 +849,7 @@ export default function OrderPackaging() {
         <TabsList className="grid grid-cols-4 w-full max-w-2xl">
           <TabsTrigger value="receive">{t('phase.receive')} ({readyBoxGroups.length})</TabsTrigger>
           <TabsTrigger value="process">{t('phase.process')} ({totalInPackaging})</TabsTrigger>
-          <TabsTrigger value="extra">{t('phase.extra')}</TabsTrigger>
+          <TabsTrigger value="extra">{t('phase.extra')} ({extraCount})</TabsTrigger>
           <TabsTrigger value="completed">{t('phase.completed')} ({totalCompleted})</TabsTrigger>
         </TabsList>
 
