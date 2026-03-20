@@ -1,21 +1,15 @@
-import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { NumericInput } from '@/components/ui/numeric-input';
-import { Label } from '@/components/ui/label';
-import { toast } from 'sonner';
-import { Box, Loader2, Search, Printer, ArrowRight } from 'lucide-react';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog';
+import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { NumericInput } from "@/components/ui/numeric-input";
+import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
+import { Box, Loader2, Search, Printer, ArrowRight } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,16 +19,10 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { updateExtraBoxItemsList } from '@/lib/extraInventoryOperations';
-import { normalizeBoxCode } from '@/lib/boxUtils';
+} from "@/components/ui/alert-dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { updateExtraBoxItemsList } from "@/lib/extraInventoryOperations";
+import { normalizeBoxCode } from "@/lib/boxUtils";
 
 interface ExtraBatch {
   id: string;
@@ -66,7 +54,7 @@ interface ProductGroup {
 
 interface ExtraItemsTabProps {
   orderId: string;
-  phase: 'manufacturing' | 'finishing' | 'packaging' | 'boxing';
+  phase: "manufacturing" | "finishing" | "packaging" | "boxing";
   onRefresh?: () => void;
   canManage?: boolean;
   onCountChange?: (count: number) => void;
@@ -75,31 +63,31 @@ interface ExtraItemsTabProps {
 // Map phase to the current_state for extra items assigned to this order
 // Extra batches in state X are usable when order is in phase X
 const PHASE_CURRENT_STATE_MAP: Record<string, string> = {
-  manufacturing: 'extra_manufacturing',
-  finishing: 'extra_finishing',
-  packaging: 'extra_packaging',
-  boxing: 'extra_boxing',
+  manufacturing: "extra_manufacturing",
+  finishing: "extra_finishing",
+  packaging: "extra_packaging",
+  boxing: "extra_boxing",
 };
 
 const PHASE_NEXT_STATE_MAP: Record<string, string> = {
-  manufacturing: 'extra_finishing',
-  finishing: 'extra_packaging',
-  packaging: 'extra_boxing',
-  boxing: 'extra_boxing',
+  manufacturing: "extra_finishing",
+  finishing: "extra_packaging",
+  packaging: "extra_boxing",
+  boxing: "extra_boxing",
 };
 
 // Map phase to the "in" state of the next phase for direct moves (skipping box + receive)
 const PHASE_DIRECT_MOVE_STATE: Record<string, string> = {
-  manufacturing: 'in_finishing',
-  finishing: 'in_packaging',
-  packaging: 'in_boxing',
+  manufacturing: "in_finishing",
+  finishing: "in_packaging",
+  packaging: "in_boxing",
 };
 
 const PHASE_LABELS: Record<string, string> = {
-  manufacturing: 'Extra Manufacturing',
-  finishing: 'Extra Finishing',
-  packaging: 'Extra Packaging',
-  boxing: 'Extra Boxing',
+  manufacturing: "Extra Manufacturing",
+  finishing: "Extra Finishing",
+  packaging: "Extra Packaging",
+  boxing: "Extra Boxing",
 };
 
 export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true, onCountChange }: ExtraItemsTabProps) {
@@ -108,10 +96,10 @@ export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true, onC
   const [extraBatches, setExtraBatches] = useState<ExtraBatch[]>([]);
   const [retrievedCounts, setRetrievedCounts] = useState<Map<string, number>>(new Map());
   const [productSelections, setProductSelections] = useState<Map<string, number>>(new Map());
-  
+
   // Box assignment dialog
   const [boxDialogOpen, setBoxDialogOpen] = useState(false);
-  const [boxSearchCode, setBoxSearchCode] = useState('');
+  const [boxSearchCode, setBoxSearchCode] = useState("");
   const [selectedBox, setSelectedBox] = useState<{ id: string; box_code: string } | null>(null);
   const [availableBoxes, setAvailableBoxes] = useState<Array<{ id: string; box_code: string }>>([]);
   const [loadingBoxes, setLoadingBoxes] = useState(false);
@@ -121,44 +109,50 @@ export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true, onC
   useEffect(() => {
     fetchExtraBatches();
     fetchRetrievedCounts();
-    
+
     const channel = supabase
       .channel(`extra-batches-${orderId}-${phase}`)
-      .on('postgres_changes', { 
-        event: '*', 
-        schema: 'public', 
-        table: 'extra_batches', 
-        filter: `order_id=eq.${orderId}` 
-      }, () => {
-        fetchExtraBatches();
-        fetchRetrievedCounts();
-      })
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "extra_batches",
+          filter: `order_id=eq.${orderId}`,
+        },
+        () => {
+          fetchExtraBatches();
+          fetchRetrievedCounts();
+        },
+      )
       .subscribe();
-    
-    return () => { supabase.removeChannel(channel); };
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [orderId, phase]);
 
   const fetchRetrievedCounts = async () => {
     try {
       const targetState = PHASE_CURRENT_STATE_MAP[phase];
       const { data, error } = await supabase
-        .from('extra_batch_history')
-        .select('product_id, quantity')
-        .eq('event_type', 'CONSUMED')
-        .eq('consuming_order_id', orderId)
-        .eq('from_state', targetState);
-      
+        .from("extra_batch_history")
+        .select("product_id, quantity")
+        .eq("event_type", "CONSUMED")
+        .eq("consuming_order_id", orderId)
+        .eq("from_state", targetState);
+
       if (error) throw error;
-      
+
       const counts = new Map<string, number>();
-      data?.forEach(row => {
+      data?.forEach((row) => {
         if (row.product_id) {
           counts.set(row.product_id, (counts.get(row.product_id) || 0) + row.quantity);
         }
       });
       setRetrievedCounts(counts);
     } catch (error: any) {
-      console.error('Error fetching retrieved counts:', error);
+      console.error("Error fetching retrieved counts:", error);
     }
   };
 
@@ -166,30 +160,32 @@ export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true, onC
     setLoading(true);
     try {
       const targetState = PHASE_CURRENT_STATE_MAP[phase];
-      
+
       const { data, error } = await supabase
-        .from('extra_batches')
-        .select(`
+        .from("extra_batches")
+        .select(
+          `
           id, qr_code_data, product_id, quantity, current_state, box_id, order_item_id,
           product:products(id, name, sku)
-        `)
-        .eq('order_id', orderId)
-        .eq('current_state', targetState);
-      
+        `,
+        )
+        .eq("order_id", orderId)
+        .eq("current_state", targetState);
+
       if (error) throw error;
-      
+
       // Fetch box info from extra_boxes
-      const boxIds = data?.filter(b => b.box_id).map(b => b.box_id) || [];
+      const boxIds = data?.filter((b) => b.box_id).map((b) => b.box_id) || [];
       let boxMap = new Map<string, { id: string; box_code: string }>();
       if (boxIds.length > 0) {
         const { data: boxesData } = await supabase
-          .from('extra_boxes')
-          .select('id, box_code')
-          .in('id', [...new Set(boxIds)]);
-        boxesData?.forEach(box => boxMap.set(box.id, box));
+          .from("extra_boxes")
+          .select("id, box_code")
+          .in("id", [...new Set(boxIds)]);
+        boxesData?.forEach((box) => boxMap.set(box.id, box));
       }
-      
-      const batchesWithBox: ExtraBatch[] = (data || []).map(batch => ({
+
+      const batchesWithBox: ExtraBatch[] = (data || []).map((batch) => ({
         id: batch.id,
         qr_code_data: batch.qr_code_data,
         product_id: batch.product_id,
@@ -197,12 +193,12 @@ export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true, onC
         current_state: batch.current_state,
         box_id: batch.box_id,
         order_item_id: batch.order_item_id,
-        product: batch.product as ExtraBatch['product'],
+        product: batch.product as ExtraBatch["product"],
         box: batch.box_id ? boxMap.get(batch.box_id) : null,
       }));
-      
+
       setExtraBatches(batchesWithBox);
-      
+
       // Report count to parent
       const totalCount = batchesWithBox.reduce((sum, b) => sum + b.quantity, 0);
       onCountChange?.(totalCount);
@@ -218,19 +214,16 @@ export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true, onC
     try {
       // Fetch ORDER boxes (not extra_boxes) for assigning extra items during order processing
       const { data: allBoxes } = await supabase
-        .from('boxes')
-        .select('id, box_code')
-        .eq('is_active', true)
-        .order('box_code');
-      
+        .from("boxes")
+        .select("id, box_code")
+        .eq("is_active", true)
+        .order("box_code");
+
       // Check which boxes already have order batches assigned
-      const { data: occupiedBatches } = await supabase
-        .from('order_batches')
-        .select('box_id')
-        .not('box_id', 'is', null);
-      
-      const occupiedIds = new Set(occupiedBatches?.map(b => b.box_id) || []);
-      setAvailableBoxes(allBoxes?.filter(box => !occupiedIds.has(box.id)) || []);
+      const { data: occupiedBatches } = await supabase.from("order_batches").select("box_id").not("box_id", "is", null);
+
+      const occupiedIds = new Set(occupiedBatches?.map((b) => b.box_id) || []);
+      setAvailableBoxes(allBoxes?.filter((box) => !occupiedIds.has(box.id)) || []);
     } catch (error: any) {
       toast.error(error.message);
     } finally {
@@ -244,31 +237,31 @@ export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true, onC
     try {
       // Search in ORDER boxes (not extra_boxes)
       const { data: box } = await supabase
-        .from('boxes')
-        .select('id, box_code')
-        .eq('box_code', normalizedCode)
-        .eq('is_active', true)
+        .from("boxes")
+        .select("id, box_code")
+        .eq("box_code", normalizedCode)
+        .eq("is_active", true)
         .single();
-      
+
       if (!box) {
         toast.error(`Box ${boxSearchCode} not found`);
         return;
       }
-      
+
       // Check if box is occupied by any order_batches
       const { data: existingBatch } = await supabase
-        .from('order_batches')
-        .select('id')
-        .eq('box_id', box.id)
+        .from("order_batches")
+        .select("id")
+        .eq("box_id", box.id)
         .maybeSingle();
-      
+
       if (existingBatch) {
         toast.error(`Box ${box.box_code} is already occupied`);
         return;
       }
-      
+
       setSelectedBox(box);
-      setBoxSearchCode('');
+      setBoxSearchCode("");
     } catch (error: any) {
       toast.error(error.message);
     }
@@ -277,15 +270,15 @@ export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true, onC
   // Group batches by product
   const productGroups: ProductGroup[] = [];
   const groupMap = new Map<string, ProductGroup>();
-  
-  extraBatches.forEach(batch => {
+
+  extraBatches.forEach((batch) => {
     const key = batch.product_id;
     if (!groupMap.has(key)) {
       groupMap.set(key, {
         product_id: batch.product_id,
-        product_name: batch.product?.name || 'Unknown',
-        product_sku: batch.product?.sku || 'N/A',
-        source_box_code: batch.box?.box_code || 'No Box',
+        product_name: batch.product?.name || "Unknown",
+        product_sku: batch.product?.sku || "N/A",
+        source_box_code: batch.box?.box_code || "No Box",
         quantity: 0,
         batches: [],
       });
@@ -294,23 +287,23 @@ export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true, onC
     group.batches.push(batch);
     group.quantity += batch.quantity;
   });
-  groupMap.forEach(g => productGroups.push(g));
+  groupMap.forEach((g) => productGroups.push(g));
 
   const totalSelected = Array.from(productSelections.values()).reduce((a, b) => a + b, 0);
   const totalItems = extraBatches.reduce((sum, b) => sum + b.quantity, 0);
 
   const handleOpenBoxDialog = () => {
     if (totalSelected === 0) {
-      toast.error('Please select items first');
+      toast.error("Please select items first");
       return;
     }
     // For boxing phase, skip box dialog and move directly
-    if (phase === 'boxing') {
+    if (phase === "boxing") {
       handleMoveToReady();
       return;
     }
     setSelectedBox(null);
-    setBoxSearchCode('');
+    setBoxSearchCode("");
     fetchEmptyBoxes();
     setBoxDialogOpen(true);
   };
@@ -319,56 +312,54 @@ export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true, onC
   const handleMoveToReady = async () => {
     if (totalSelected === 0) return;
     setSubmitting(true);
-    
+
     try {
       // Collect all operations to perform
       const operations: Array<{
         batch: ExtraBatch;
         useQty: number;
       }> = [];
-      
+
       // First pass: determine which batches to process and how much from each
       for (const [productId, quantity] of productSelections.entries()) {
         if (quantity <= 0) continue;
-        
-        const group = productGroups.find(g => g.product_id === productId);
+
+        const group = productGroups.find((g) => g.product_id === productId);
         if (!group) continue;
-        
+
         let remainingQty = quantity;
         for (const batch of group.batches) {
           if (remainingQty <= 0) break;
-          
+
           const useQty = Math.min(batch.quantity, remainingQty);
           remainingQty -= useQty;
-          
+
           operations.push({ batch, useQty });
         }
       }
-      
+
       // Second pass: execute all operations
       for (const { batch, useQty } of operations) {
         // Create an order_batch in ready_for_shipment state (no box_id needed)
-        const { data: batchCode } = await supabase.rpc('generate_extra_batch_code');
-        const { error: insertError } = await supabase
-          .from('order_batches')
-          .insert({
-            qr_code_data: batchCode || `OB-${Date.now()}`,
-            order_id: orderId,
-            order_item_id: batch.order_item_id,
-            product_id: batch.product_id,
-            current_state: 'ready_for_shipment',
-            quantity: useQty,
-            box_id: null,
-            created_by: user?.id,
-            from_extra_state: batch.current_state,
-          });
-        
+        const { data: batchCode } = await supabase.rpc("generate_extra_batch_code");
+        const { error: insertError } = await supabase.from("order_batches").insert({
+          qr_code_data: batchCode || `OB-${Date.now()}`,
+          order_id: orderId,
+          order_item_id: batch.order_item_id,
+          product_id: batch.product_id,
+          current_state: "ready_for_shipment",
+          quantity: useQty,
+          box_id: null,
+          created_by: user?.id,
+          from_extra_state: batch.current_state,
+        });
+
         if (insertError) throw insertError;
 
         // Log CONSUMED event in extra_batch_history
-        await supabase.from('extra_batch_history').insert({
+        await supabase.from("extra_batch_history").insert({
           extra_batch_id: batch.id,
-          event_type: 'CONSUMED',
+          event_type: "CONSUMED",
           quantity: useQty,
           from_state: batch.current_state,
           consuming_order_id: orderId,
@@ -376,29 +367,26 @@ export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true, onC
           product_id: batch.product_id,
           performed_by: user?.id,
         });
-        
+
         // Delete or reduce the extra_batch
         const extraBoxId = batch.box_id;
         if (useQty >= batch.quantity) {
-          const { error: deleteError } = await supabase
-            .from('extra_batches')
-            .delete()
-            .eq('id', batch.id);
+          const { error: deleteError } = await supabase.from("extra_batches").delete().eq("id", batch.id);
           if (deleteError) throw deleteError;
         } else {
           const { error: updateError } = await supabase
-            .from('extra_batches')
+            .from("extra_batches")
             .update({ quantity: batch.quantity - useQty })
-            .eq('id', batch.id);
+            .eq("id", batch.id);
           if (updateError) throw updateError;
         }
-        
+
         // Update the source EBox's items_list
         if (extraBoxId) {
           await updateExtraBoxItemsList(extraBoxId);
         }
       }
-      
+
       toast.success(`Moved ${totalSelected} items to Ready for Shipment`);
       setProductSelections(new Map());
       fetchExtraBatches();
@@ -416,15 +404,15 @@ export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true, onC
     const directState = PHASE_DIRECT_MOVE_STATE[phase];
     if (!directState) return;
     setSubmitting(true);
-    
+
     try {
       const operations: Array<{ batch: ExtraBatch; useQty: number }> = [];
-      
+
       for (const [productId, quantity] of productSelections.entries()) {
         if (quantity <= 0) continue;
-        const group = productGroups.find(g => g.product_id === productId);
+        const group = productGroups.find((g) => g.product_id === productId);
         if (!group) continue;
-        
+
         let remainingQty = quantity;
         for (const batch of group.batches) {
           if (remainingQty <= 0) break;
@@ -433,28 +421,26 @@ export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true, onC
           operations.push({ batch, useQty });
         }
       }
-      
+
       for (const { batch, useQty } of operations) {
-        const { data: batchCode } = await supabase.rpc('generate_extra_batch_code');
-        const { error: insertError } = await supabase
-          .from('order_batches')
-          .insert({
-            qr_code_data: batchCode || `OB-${Date.now()}`,
-            order_id: orderId,
-            order_item_id: batch.order_item_id,
-            product_id: batch.product_id,
-            current_state: directState,
-            quantity: useQty,
-            box_id: null,
-            created_by: user?.id,
-            from_extra_state: batch.current_state,
-          });
-        
+        const { data: batchCode } = await supabase.rpc("generate_extra_batch_code");
+        const { error: insertError } = await supabase.from("order_batches").insert({
+          qr_code_data: batchCode || `OB-${Date.now()}`,
+          order_id: orderId,
+          order_item_id: batch.order_item_id,
+          product_id: batch.product_id,
+          current_state: directState,
+          quantity: useQty,
+          box_id: null,
+          created_by: user?.id,
+          from_extra_state: batch.current_state,
+        });
+
         if (insertError) throw insertError;
 
-        await supabase.from('extra_batch_history').insert({
+        await supabase.from("extra_batch_history").insert({
           extra_batch_id: batch.id,
-          event_type: 'CONSUMED',
+          event_type: "CONSUMED",
           quantity: useQty,
           from_state: batch.current_state,
           consuming_order_id: orderId,
@@ -462,28 +448,25 @@ export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true, onC
           product_id: batch.product_id,
           performed_by: user?.id,
         });
-        
+
         const extraBoxId = batch.box_id;
         if (useQty >= batch.quantity) {
-          const { error: deleteError } = await supabase
-            .from('extra_batches')
-            .delete()
-            .eq('id', batch.id);
+          const { error: deleteError } = await supabase.from("extra_batches").delete().eq("id", batch.id);
           if (deleteError) throw deleteError;
         } else {
           const { error: updateError } = await supabase
-            .from('extra_batches')
+            .from("extra_batches")
             .update({ quantity: batch.quantity - useQty })
-            .eq('id', batch.id);
+            .eq("id", batch.id);
           if (updateError) throw updateError;
         }
-        
+
         if (extraBoxId) {
           await updateExtraBoxItemsList(extraBoxId);
         }
       }
-      
-      const stateLabel = directState.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+
+      const stateLabel = directState.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
       toast.success(`Moved ${totalSelected} items directly to ${stateLabel}`);
       setProductSelections(new Map());
       fetchExtraBatches();
@@ -498,25 +481,21 @@ export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true, onC
   const handleAssignToBox = async () => {
     if (!selectedBox || totalSelected === 0) return;
     setSubmitting(true);
-    
+
     try {
       // Get the next order_batch state based on the phase
       const PHASE_TO_ORDER_STATE: Record<string, string> = {
-        manufacturing: 'ready_for_finishing',
-        finishing: 'ready_for_packaging',
-        packaging: 'ready_for_boxing',
-        boxing: 'ready_for_shipment',
+        manufacturing: "ready_for_finishing",
+        finishing: "ready_for_packaging",
+        packaging: "ready_for_boxing",
+        boxing: "ready_for_shipment",
       };
-      
+
       const nextOrderState = PHASE_TO_ORDER_STATE[phase];
-      
+
       // Fetch current box items_list
-      const { data: boxData } = await supabase
-        .from('boxes')
-        .select('items_list')
-        .eq('id', selectedBox.id)
-        .single();
-      
+      const { data: boxData } = await supabase.from("boxes").select("items_list").eq("id", selectedBox.id).single();
+
       const currentItems = Array.isArray(boxData?.items_list) ? boxData.items_list : [];
       const newItems: Array<{
         product_id: string;
@@ -525,37 +504,37 @@ export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true, onC
         quantity: number;
         batch_id: string;
       }> = [];
-      
+
       // Collect all operations first
       const operations: Array<{
         batch: ExtraBatch;
         useQty: number;
         group: ProductGroup;
       }> = [];
-      
+
       for (const [productId, quantity] of productSelections.entries()) {
         if (quantity <= 0) continue;
-        
-        const group = productGroups.find(g => g.product_id === productId);
+
+        const group = productGroups.find((g) => g.product_id === productId);
         if (!group) continue;
-        
+
         let remainingQty = quantity;
         for (const batch of group.batches) {
           if (remainingQty <= 0) break;
-          
+
           const useQty = Math.min(batch.quantity, remainingQty);
           remainingQty -= useQty;
-          
+
           operations.push({ batch, useQty, group });
         }
       }
-      
+
       // Execute all operations
       for (const { batch, useQty, group } of operations) {
         // Create an order_batch from the extra batch
-        const { data: batchCode } = await supabase.rpc('generate_extra_batch_code');
+        const { data: batchCode } = await supabase.rpc("generate_extra_batch_code");
         const { data: newOrderBatch, error: insertError } = await supabase
-          .from('order_batches')
+          .from("order_batches")
           .insert({
             qr_code_data: batchCode || `OB-${Date.now()}`,
             order_id: orderId,
@@ -567,23 +546,23 @@ export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true, onC
             created_by: user?.id,
             from_extra_state: batch.current_state,
           })
-          .select('id')
+          .select("id")
           .single();
-        
+
         if (insertError) throw insertError;
-        
+
         newItems.push({
           product_id: group.product_id,
           product_name: group.product_name,
           product_sku: group.product_sku,
           quantity: useQty,
-          batch_id: newOrderBatch?.id || '',
+          batch_id: newOrderBatch?.id || "",
         });
 
         // Log CONSUMED event in extra_batch_history
-        await supabase.from('extra_batch_history').insert({
+        await supabase.from("extra_batch_history").insert({
           extra_batch_id: batch.id,
-          event_type: 'CONSUMED',
+          event_type: "CONSUMED",
           quantity: useQty,
           from_state: batch.current_state,
           consuming_order_id: orderId,
@@ -591,36 +570,36 @@ export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true, onC
           product_id: batch.product_id,
           performed_by: user?.id,
         });
-        
+
         // Delete or reduce the extra_batch
         const extraBoxId = batch.box_id;
         if (useQty >= batch.quantity) {
-          const { error: deleteError } = await supabase
-            .from('extra_batches')
-            .delete()
-            .eq('id', batch.id);
+          const { error: deleteError } = await supabase.from("extra_batches").delete().eq("id", batch.id);
           if (deleteError) throw deleteError;
         } else {
           const { error: updateError } = await supabase
-            .from('extra_batches')
+            .from("extra_batches")
             .update({ quantity: batch.quantity - useQty })
-            .eq('id', batch.id);
+            .eq("id", batch.id);
           if (updateError) throw updateError;
         }
-        
+
         // Update the source EBox's items_list
         if (extraBoxId) {
           await updateExtraBoxItemsList(extraBoxId);
         }
       }
-      
+
       // Update the order box's items_list
       const updatedItems = [...currentItems, ...newItems];
-      await supabase.from('boxes').update({
-        items_list: updatedItems,
-        content_type: 'ORDER',
-      }).eq('id', selectedBox.id);
-      
+      await supabase
+        .from("boxes")
+        .update({
+          items_list: updatedItems,
+          content_type: "ORDER",
+        })
+        .eq("id", selectedBox.id);
+
       toast.success(`Assigned ${totalSelected} extra items to ${selectedBox.box_code}`);
       setBoxDialogOpen(false);
       setProductSelections(new Map());
@@ -635,34 +614,34 @@ export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true, onC
 
   const handlePrintGuide = () => {
     if (extraBatches.length === 0) {
-      toast.error('No extra items to print');
+      toast.error("No extra items to print");
       return;
     }
 
     // Group items by box for the guide
     const boxGroups = new Map<string, { box_code: string; items: Array<{ sku: string; name: string; qty: number }> }>();
-    
-    extraBatches.forEach(batch => {
-      const boxCode = batch.box?.box_code || 'No Box';
+
+    extraBatches.forEach((batch) => {
+      const boxCode = batch.box?.box_code || "No Box";
       if (!boxGroups.has(boxCode)) {
         boxGroups.set(boxCode, { box_code: boxCode, items: [] });
       }
       const group = boxGroups.get(boxCode)!;
-      const existing = group.items.find(i => i.sku === batch.product?.sku);
+      const existing = group.items.find((i) => i.sku === batch.product?.sku);
       if (existing) {
         existing.qty += batch.quantity;
       } else {
         group.items.push({
-          sku: batch.product?.sku || 'N/A',
-          name: batch.product?.name || 'Unknown',
+          sku: batch.product?.sku || "N/A",
+          name: batch.product?.name || "Unknown",
           qty: batch.quantity,
         });
       }
     });
 
-    const printWindow = window.open('', '_blank');
+    const printWindow = window.open("", "_blank");
     if (!printWindow) {
-      toast.error('Could not open print window');
+      toast.error("Could not open print window");
       return;
     }
 
@@ -684,7 +663,9 @@ export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true, onC
       </head>
       <body>
         <h1>${PHASE_LABELS[phase]} - Picking Guide</h1>
-        ${Array.from(boxGroups.values()).map(group => `
+        ${Array.from(boxGroups.values())
+          .map(
+            (group) => `
           <div class="box-section">
             <div class="box-header">📦 ${group.box_code}</div>
             <table>
@@ -692,13 +673,19 @@ export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true, onC
                 <tr><th>SKU</th><th>Product</th><th>Quantity</th></tr>
               </thead>
               <tbody>
-                ${group.items.map(item => `
+                ${group.items
+                  .map(
+                    (item) => `
                   <tr><td>${item.sku}</td><td>${item.name}</td><td>${item.qty}</td></tr>
-                `).join('')}
+                `,
+                  )
+                  .join("")}
               </tbody>
             </table>
           </div>
-        `).join('')}
+        `,
+          )
+          .join("")}
         <div class="total">Total Items: ${totalItems}</div>
       </body>
       </html>
@@ -745,21 +732,29 @@ export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true, onC
               <Printer className="h-4 w-4 mr-2" />
               Print Guide
             </Button>
-            {canManage && phase !== 'boxing' && (
-              <Button 
+            {canManage && phase !== "boxing" && (
+              <Button
                 variant="secondary"
-                onClick={() => setMoveDirectlyConfirmOpen(true)} 
+                onClick={() => setMoveDirectlyConfirmOpen(true)}
                 disabled={totalSelected === 0 || submitting}
               >
-                {submitting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ArrowRight className="h-4 w-4 mr-2" />}
+                {submitting ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <ArrowRight className="h-4 w-4 mr-2" />
+                )}
                 Move Directly
               </Button>
             )}
             {canManage && (
               <Button onClick={handleOpenBoxDialog} disabled={totalSelected === 0 || submitting}>
-                {phase === 'boxing' ? (
+                {phase === "boxing" ? (
                   <>
-                    {submitting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ArrowRight className="h-4 w-4 mr-2" />}
+                    {submitting ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <ArrowRight className="h-4 w-4 mr-2" />
+                    )}
                     Move to Ready
                   </>
                 ) : (
@@ -778,19 +773,20 @@ export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true, onC
       <div className="space-y-3">
         {productGroups.length === 0 ? (
           <Card>
-            <CardContent className="p-8 text-center text-muted-foreground">
-              No extra items in this phase
-            </CardContent>
+            <CardContent className="p-8 text-center text-muted-foreground">No extra items in this phase</CardContent>
           </Card>
         ) : (
-          productGroups.map(group => (
+          productGroups.map((group) => (
             <Card key={group.product_id}>
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
                       <p className="font-medium">{group.product_name}</p>
-                      <Badge variant="outline" className="text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400">
+                      <Badge
+                        variant="outline"
+                        className="text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400"
+                      >
                         EXTRA
                       </Badge>
                     </div>
@@ -800,37 +796,44 @@ export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true, onC
                       <span>{group.source_box_code}</span>
                     </div>
                   </div>
-                    <div className="flex items-center gap-4">
-                      <div className="text-right space-y-0.5">
+                  <div className="flex items-center gap-4">
+                    <div className="flex gap-3 text-right">
+                      <div className="space-y-0.5">
                         <p className="text-lg font-semibold">{group.quantity}</p>
                         <p className="text-xs text-muted-foreground">available</p>
-                        {(retrievedCounts.get(group.product_id) || 0) > 0 && (
-                          <p className="text-xs text-green-600 dark:text-green-400">
-                            {retrievedCounts.get(group.product_id)} retrieved
-                          </p>
-                        )}
                       </div>
-                    {canManage && <div className="flex items-center gap-2">
-                      <Label className="text-xs">Select:</Label>
-                      <NumericInput
-                        min={0}
-                        max={group.quantity}
-                        value={productSelections.get(group.product_id) || undefined}
-                        onValueChange={val => {
-                          setProductSelections(prev => {
-                            const newMap = new Map(prev);
-                            if (val && val > 0) {
-                              newMap.set(group.product_id, val);
-                            } else {
-                              newMap.delete(group.product_id);
-                            }
-                            return newMap;
-                          });
-                        }}
-                        className="w-20 h-8"
-                        placeholder="0"
-                      />
-                    </div>}
+                      {(retrievedCounts.get(group.product_id) || 0) > 0 && (
+                        <div className="space-y-0.5">
+                          <p className="text-lg font-semibold text-green-600 dark:text-green-400">
+                            {retrievedCounts.get(group.product_id)}
+                          </p>
+                          <p className="text-xs text-green-600 dark:text-green-400">retrieved</p>
+                        </div>
+                      )}
+                    </div>
+                    {canManage && (
+                      <div className="flex items-center gap-2">
+                        <Label className="text-xs">Select:</Label>
+                        <NumericInput
+                          min={0}
+                          max={group.quantity}
+                          value={productSelections.get(group.product_id) || undefined}
+                          onValueChange={(val) => {
+                            setProductSelections((prev) => {
+                              const newMap = new Map(prev);
+                              if (val && val > 0) {
+                                newMap.set(group.product_id, val);
+                              } else {
+                                newMap.delete(group.product_id);
+                              }
+                              return newMap;
+                            });
+                          }}
+                          className="w-20 h-8"
+                          placeholder="0"
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
               </CardContent>
@@ -845,15 +848,15 @@ export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true, onC
           <DialogHeader>
             <DialogTitle>Assign to Box</DialogTitle>
           </DialogHeader>
-          
+
           <div className="space-y-4">
             {/* Search Box */}
             <div className="flex gap-2">
               <Input
                 placeholder="Box number (e.g., 42)"
                 value={boxSearchCode}
-                onChange={e => setBoxSearchCode(e.target.value.toUpperCase())}
-                onKeyDown={e => e.key === 'Enter' && searchBox()}
+                onChange={(e) => setBoxSearchCode(e.target.value.toUpperCase())}
+                onKeyDown={(e) => e.key === "Enter" && searchBox()}
               />
               <Button variant="outline" onClick={searchBox}>
                 <Search className="h-4 w-4" />
@@ -875,10 +878,10 @@ export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true, onC
             ) : (
               <div className="space-y-2">
                 <Label>Or select an available box:</Label>
-                <Select 
-                  value={selectedBox?.id || ''} 
-                  onValueChange={val => {
-                    const box = availableBoxes.find(b => b.id === val);
+                <Select
+                  value={selectedBox?.id || ""}
+                  onValueChange={(val) => {
+                    const box = availableBoxes.find((b) => b.id === val);
                     if (box) setSelectedBox(box);
                   }}
                 >
@@ -886,7 +889,7 @@ export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true, onC
                     <SelectValue placeholder="Select a box" />
                   </SelectTrigger>
                   <SelectContent>
-                    {availableBoxes.map(box => (
+                    {availableBoxes.map((box) => (
                       <SelectItem key={box.id} value={box.id}>
                         {box.box_code}
                       </SelectItem>
@@ -901,10 +904,7 @@ export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true, onC
             <Button variant="outline" onClick={() => setBoxDialogOpen(false)}>
               Cancel
             </Button>
-            <Button 
-              onClick={handleAssignToBox} 
-              disabled={!selectedBox || submitting}
-            >
+            <Button onClick={handleAssignToBox} disabled={!selectedBox || submitting}>
               {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Assign ({totalSelected})
             </Button>
@@ -918,12 +918,18 @@ export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true, onC
           <AlertDialogHeader>
             <AlertDialogTitle>Move Directly to Next Phase?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will move {totalSelected} item(s) directly into the next phase without assigning them to a box or requiring a receive step. This action cannot be undone.
+              This will move {totalSelected} item(s) directly into the next phase without assigning them to a box or
+              requiring a receive step. This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => { setMoveDirectlyConfirmOpen(false); handleMoveDirectly(); }}>
+            <AlertDialogAction
+              onClick={() => {
+                setMoveDirectlyConfirmOpen(false);
+                handleMoveDirectly();
+              }}
+            >
               Confirm Move
             </AlertDialogAction>
           </AlertDialogFooter>
