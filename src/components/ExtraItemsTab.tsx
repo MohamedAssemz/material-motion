@@ -800,11 +800,16 @@ export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true, onC
                       <span>{group.source_box_code}</span>
                     </div>
                   </div>
-                  <div className="flex items-center gap-4">
-                    <div className="text-right">
-                      <p className="text-lg font-semibold">{group.quantity}</p>
-                      <p className="text-xs text-muted-foreground">available</p>
-                    </div>
+                    <div className="flex items-center gap-4">
+                      <div className="text-right space-y-0.5">
+                        <p className="text-lg font-semibold">{group.quantity}</p>
+                        <p className="text-xs text-muted-foreground">available</p>
+                        {(retrievedCounts.get(group.product_id) || 0) > 0 && (
+                          <p className="text-xs text-green-600 dark:text-green-400">
+                            {retrievedCounts.get(group.product_id)} retrieved
+                          </p>
+                        )}
+                      </div>
                     {canManage && <div className="flex items-center gap-2">
                       <Label className="text-xs">Select:</Label>
                       <NumericInput
