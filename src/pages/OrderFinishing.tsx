@@ -989,7 +989,7 @@ export default function OrderFinishing() {
         </TabsContent>
 
         <TabsContent value="extra" className="space-y-6">
-          <ExtraItemsTab orderId={id!} phase="finishing" onRefresh={() => fetchData()} canManage={canManage && !isCancelled} />
+          <ExtraItemsTab orderId={id!} phase="finishing" onRefresh={() => fetchData()} canManage={canManage && !isCancelled} onCountChange={setExtraCount} />
 
           {/* Added to Extra Inventory from this Order */}
           {addedToExtraItems.length > 0 && (

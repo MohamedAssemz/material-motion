@@ -1368,6 +1368,7 @@ export default function OrderBoxing() {
             phase="boxing" 
             onRefresh={() => fetchData()}
             canManage={canManage && !isCancelled}
+            onCountChange={setExtraCount}
           />
 
           {/* Added to Extra Inventory from this Order */}

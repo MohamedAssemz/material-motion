@@ -797,7 +797,7 @@ export default function OrderManufacturing() {
         </TabsContent>
 
         <TabsContent value="extra" className="space-y-6">
-          <ExtraItemsTab orderId={id!} phase="manufacturing" onRefresh={() => fetchData()} canManage={canManage && !isCancelled} />
+          <ExtraItemsTab orderId={id!} phase="manufacturing" onRefresh={() => fetchData()} canManage={canManage && !isCancelled} onCountChange={setExtraCount} />
 
           {/* Added to Extra Inventory from this Order */}
           {addedToExtraItems.length > 0 && (
