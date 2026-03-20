@@ -707,7 +707,7 @@ export default function OrderManufacturing() {
       <Tabs defaultValue="active" className="space-y-4">
         <TabsList className="grid grid-cols-3 w-full max-w-xl">
           <TabsTrigger value="active">{t('phase.active_tab')} ({totalInManufacturing})</TabsTrigger>
-          <TabsTrigger value="extra">{t('phase.extra_tab')}</TabsTrigger>
+          <TabsTrigger value="extra">{t('phase.extra_tab')} ({extraCount})</TabsTrigger>
           <TabsTrigger value="completed">{t('phase.processed_tab')} ({totalCompleted})</TabsTrigger>
         </TabsList>
 
