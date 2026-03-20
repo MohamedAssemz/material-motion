@@ -90,6 +90,7 @@ export default function OrderPackaging() {
     Array<{ id: string; product_id: string; product_name: string; product_sku: string; quantity: number; packaging_machine_id: string | null }>
   >([]);
   
+  const [extraCount, setExtraCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
   const [selectedBoxes, setSelectedBoxes] = useState<Set<string>>(new Set());
