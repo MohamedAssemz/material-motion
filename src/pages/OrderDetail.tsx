@@ -143,18 +143,19 @@ export default function OrderDetail() {
 
   // Dialog states
   const [rawMaterialsOpen, setRawMaterialsOpen] = useState(false);
-  
+
   const [shipmentDialogOpen, setShipmentDialogOpen] = useState(false);
   const [extraInventoryOpen, setExtraInventoryOpen] = useState(false);
   const [startOrderOpen, setStartOrderOpen] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [packagingRefOpen, setPackagingRefOpen] = useState(false);
-  const [selectedExtraPhase, setSelectedExtraPhase] = useState<'manufacturing' | 'finishing' | 'packaging' | 'boxing'>('manufacturing');
+  const [selectedExtraPhase, setSelectedExtraPhase] = useState<"manufacturing" | "finishing" | "packaging" | "boxing">(
+    "manufacturing",
+  );
   const [extraInventoryCounts, setExtraInventoryCounts] = useState<Record<string, number>>({});
   const [reservedExtraCounts, setReservedExtraCounts] = useState<Record<string, number>>({});
   const [addedToExtraCounts, setAddedToExtraCounts] = useState<Record<string, number>>({});
   const [retrievedFromExtraCounts, setRetrievedFromExtraCounts] = useState<Record<string, number>>({});
-  
 
   // Selection states for inline actions
   const [productSelections, setProductSelections] = useState<Map<string, number>>(new Map());
@@ -168,13 +169,17 @@ export default function OrderDetail() {
     fetchRetrievedFromExtraCounts();
     const channel = supabase
       .channel(`order-${id}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "order_batches", filter: `order_id=eq.${id}` }, () => {
-        fetchOrder();
-      })
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "order_batches", filter: `order_id=eq.${id}` },
+        () => {
+          fetchOrder();
+        },
+      )
       .subscribe();
 
     const extraChannel = supabase
-      .channel('extra-inventory-counts')
+      .channel("extra-inventory-counts")
       .on("postgres_changes", { event: "*", schema: "public", table: "extra_batches" }, () => {
         fetchExtraInventoryCounts();
         fetchReservedExtraCounts();
@@ -200,11 +205,7 @@ export default function OrderDetail() {
   const fetchOrder = async () => {
     try {
       const [orderRes, orderItemsRes] = await Promise.all([
-        supabase
-          .from("orders")
-          .select(`*, customer:customers(name, code)`)
-          .eq("id", id)
-          .maybeSingle(),
+        supabase.from("orders").select(`*, customer:customers(name, code)`).eq("id", id).maybeSingle(),
         supabase
           .from("order_items")
           .select("id, product_id, quantity, needs_boxing, product:products(id, name, sku, needs_packing)")
@@ -220,7 +221,9 @@ export default function OrderDetail() {
 
       const { data: batchesData, error: batchesError } = await supabase
         .from("order_batches")
-        .select("id, qr_code_data, current_state, quantity, product_id, order_item_id, eta, lead_time_days, box_id, from_extra_state, product:products(id, name, sku, needs_packing)")
+        .select(
+          "id, qr_code_data, current_state, quantity, product_id, order_item_id, eta, lead_time_days, box_id, from_extra_state, product:products(id, name, sku, needs_packing)",
+        )
         .eq("order_id", id);
 
       if (batchesError) throw batchesError;
@@ -263,16 +266,14 @@ export default function OrderDetail() {
   const fetchExtraInventoryCounts = async () => {
     try {
       const states = [
-        { phase: 'manufacturing', state: 'extra_manufacturing' },
-        { phase: 'finishing', state: 'extra_finishing' },
-        { phase: 'packaging', state: 'extra_packaging' },
-        { phase: 'boxing', state: 'extra_boxing' },
+        { phase: "manufacturing", state: "extra_manufacturing" },
+        { phase: "finishing", state: "extra_finishing" },
+        { phase: "packaging", state: "extra_packaging" },
+        { phase: "boxing", state: "extra_boxing" },
       ];
 
-      const orderProductIds = orderItems.map(oi => oi.product_id);
-      const boxingEligibleProductIds = orderItems
-        .filter(oi => oi.needs_boxing)
-        .map(oi => oi.product_id);
+      const orderProductIds = orderItems.map((oi) => oi.product_id);
+      const boxingEligibleProductIds = orderItems.filter((oi) => oi.needs_boxing).map((oi) => oi.product_id);
 
       if (orderProductIds.length === 0) {
         setExtraInventoryCounts({});
@@ -282,21 +283,19 @@ export default function OrderDetail() {
       const counts: Record<string, number> = {};
 
       for (const { phase, state } of states) {
-        const productIds = state === 'extra_boxing' 
-          ? boxingEligibleProductIds 
-          : orderProductIds;
-        
+        const productIds = state === "extra_boxing" ? boxingEligibleProductIds : orderProductIds;
+
         if (productIds.length === 0) {
           counts[phase] = 0;
           continue;
         }
-        
+
         const { data, error } = await supabase
-          .from('extra_batches')
-          .select('quantity')
-          .eq('inventory_state', 'AVAILABLE')
-          .eq('current_state', state)
-          .in('product_id', productIds);
+          .from("extra_batches")
+          .select("quantity")
+          .eq("inventory_state", "AVAILABLE")
+          .eq("current_state", state)
+          .in("product_id", productIds);
 
         if (!error && data) {
           counts[phase] = data.reduce((sum, b) => sum + b.quantity, 0);
@@ -305,7 +304,7 @@ export default function OrderDetail() {
 
       setExtraInventoryCounts(counts);
     } catch (error) {
-      console.error('Error fetching extra inventory counts:', error);
+      console.error("Error fetching extra inventory counts:", error);
     }
   };
 
@@ -313,18 +312,18 @@ export default function OrderDetail() {
     if (!id) return;
     try {
       const { data, error } = await supabase
-        .from('extra_batches')
-        .select('current_state, quantity')
-        .eq('order_id', id)
-        .eq('inventory_state', 'RESERVED');
+        .from("extra_batches")
+        .select("current_state, quantity")
+        .eq("order_id", id)
+        .eq("inventory_state", "RESERVED");
 
       if (error) throw error;
 
       const phaseMap: Record<string, string> = {
-        'extra_manufacturing': 'manufacturing',
-        'extra_finishing': 'finishing',
-        'extra_packaging': 'packaging',
-        'extra_boxing': 'boxing',
+        extra_manufacturing: "manufacturing",
+        extra_finishing: "finishing",
+        extra_packaging: "packaging",
+        extra_boxing: "boxing",
       };
 
       const counts: Record<string, number> = { manufacturing: 0, finishing: 0, packaging: 0, boxing: 0 };
@@ -335,7 +334,7 @@ export default function OrderDetail() {
 
       setReservedExtraCounts(counts);
     } catch (error) {
-      console.error('Error fetching reserved extra counts:', error);
+      console.error("Error fetching reserved extra counts:", error);
     }
   };
 
@@ -343,29 +342,29 @@ export default function OrderDetail() {
     if (!id) return;
     try {
       const { data, error } = await supabase
-        .from('extra_batch_history')
-        .select('from_state, quantity')
-        .eq('event_type', 'CREATED')
-        .eq('source_order_id', id);
+        .from("extra_batch_history")
+        .select("from_state, quantity")
+        .eq("event_type", "CREATED")
+        .eq("source_order_id", id);
 
       if (error) throw error;
 
       const phaseMap: Record<string, string> = {
-        'in_manufacturing': 'manufacturing',
-        'in_finishing': 'finishing',
-        'in_packaging': 'packaging',
-        'in_boxing': 'boxing',
+        in_manufacturing: "manufacturing",
+        in_finishing: "finishing",
+        in_packaging: "packaging",
+        in_boxing: "boxing",
       };
 
       const counts: Record<string, number> = { manufacturing: 0, finishing: 0, packaging: 0, boxing: 0 };
       (data || []).forEach((record) => {
-        const phase = phaseMap[record.from_state || ''];
+        const phase = phaseMap[record.from_state || ""];
         if (phase) counts[phase] += record.quantity;
       });
 
       setAddedToExtraCounts(counts);
     } catch (error) {
-      console.error('Error fetching added to extra counts:', error);
+      console.error("Error fetching added to extra counts:", error);
     }
   };
 
@@ -373,56 +372,52 @@ export default function OrderDetail() {
     if (!id) return;
     try {
       const { data, error } = await supabase
-        .from('extra_batch_history')
-        .select('from_state, quantity')
-        .eq('event_type', 'CONSUMED')
-        .eq('consuming_order_id', id);
+        .from("extra_batch_history")
+        .select("from_state, quantity")
+        .eq("event_type", "CONSUMED")
+        .eq("consuming_order_id", id);
 
       if (error) throw error;
 
       const phaseMap: Record<string, string> = {
-        'extra_manufacturing': 'manufacturing',
-        'extra_finishing': 'finishing',
-        'extra_packaging': 'packaging',
-        'extra_boxing': 'boxing',
+        extra_manufacturing: "manufacturing",
+        extra_finishing: "finishing",
+        extra_packaging: "packaging",
+        extra_boxing: "boxing",
       };
 
       const counts: Record<string, number> = { manufacturing: 0, finishing: 0, packaging: 0, boxing: 0 };
       (data || []).forEach((record) => {
-        const phase = phaseMap[record.from_state || ''];
+        const phase = phaseMap[record.from_state || ""];
         if (phase) counts[phase] += record.quantity;
       });
 
       setRetrievedFromExtraCounts(counts);
     } catch (error) {
-      console.error('Error fetching retrieved from extra counts:', error);
+      console.error("Error fetching retrieved from extra counts:", error);
     }
   };
-
 
   const handleCancelOrder = async () => {
     try {
       await supabase
         .from("extra_batches")
-        .update({ 
-          inventory_state: "AVAILABLE", 
-          order_id: null, 
-          order_item_id: null 
+        .update({
+          inventory_state: "AVAILABLE",
+          order_id: null,
+          order_item_id: null,
         })
         .eq("order_id", id)
         .eq("inventory_state", "RESERVED");
 
-      const { error } = await supabase
-        .from("orders")
-        .update({ status: "cancelled" })
-        .eq("id", id);
+      const { error } = await supabase.from("orders").update({ status: "cancelled" }).eq("id", id);
       if (error) throw error;
 
-      toast.success(t('toast.success'));
+      toast.success(t("toast.success"));
       navigate("/orders");
     } catch (error) {
       console.error("Error cancelling order:", error);
-      toast.error(t('toast.action_failed'));
+      toast.error(t("toast.action_failed"));
     }
   };
 
@@ -431,9 +426,9 @@ export default function OrderDetail() {
     const printWindow = window.open("", "_blank");
     if (!printWindow) return;
 
-    const itemsList = orderItems.map(item => ({
-      name: item.product?.name || 'Unknown',
-      sku: item.product?.sku || 'N/A',
+    const itemsList = orderItems.map((item) => ({
+      name: item.product?.name || "Unknown",
+      sku: item.product?.sku || "N/A",
       quantity: item.quantity,
     }));
 
@@ -462,7 +457,7 @@ export default function OrderDetail() {
             <div class="order-number">${escapeHtml(order.order_number)}</div>
             <div class="meta">
               Customer: ${escapeHtml(order.customer?.name || "N/A")} | 
-              Priority: <span class="badge ${escapeHtml(order.priority || 'normal')}">${escapeHtml(order.priority || 'normal')}</span> |
+              Priority: <span class="badge ${escapeHtml(order.priority || "normal")}">${escapeHtml(order.priority || "normal")}</span> |
               Shipping: ${order.shipping_type === "international" ? "International" : "Domestic"}
             </div>
             <div class="meta">Created: ${format(new Date(order.created_at), "PPP")}</div>
@@ -513,9 +508,9 @@ export default function OrderDetail() {
       <div className="p-6">
         <Button variant="ghost" onClick={() => navigate("/orders")}>
           <ArrowLeft className="h-4 w-4 mr-2" />
-          {t('orders.back_to_orders')}
+          {t("orders.back_to_orders")}
         </Button>
-        <p className="text-center text-muted-foreground mt-8">{t('orders.not_found')}</p>
+        <p className="text-center text-muted-foreground mt-8">{t("orders.not_found")}</p>
       </div>
     );
   }
@@ -529,36 +524,38 @@ export default function OrderDetail() {
   const isPendingOrder = order.status === "pending" || order.status === "waiting_for_rm";
 
   const getPhaseStats = (
-    inState: string, 
-    readyState: string | undefined, 
+    inState: string,
+    readyState: string | undefined,
     phaseName: string,
-    phaseFilter?: (batch: Batch) => boolean
+    phaseFilter?: (batch: Batch) => boolean,
   ): PhaseStats => {
     const relevantBatches = phaseFilter ? activeBatches.filter(phaseFilter) : activeBatches;
-    
+
     const waiting = readyState
       ? relevantBatches.filter((b) => b.current_state === readyState).reduce((sum, b) => sum + b.quantity, 0)
       : 0;
-    const inProgress = relevantBatches.filter((b) => b.current_state === inState).reduce((sum, b) => sum + b.quantity, 0);
+    const inProgress = relevantBatches
+      .filter((b) => b.current_state === inState)
+      .reduce((sum, b) => sum + b.quantity, 0);
     const stateIndex = getAllStates().indexOf(inState as UnitState);
-    
+
     const laterExtraStates: Record<string, string[]> = {
-      manufacturing: ['extra_finishing', 'extra_packaging', 'extra_boxing'],
-      finishing: ['extra_packaging', 'extra_boxing'],
-      packaging: ['extra_boxing'],
+      manufacturing: ["extra_finishing", "extra_packaging", "extra_boxing"],
+      finishing: ["extra_packaging", "extra_boxing"],
+      packaging: ["extra_boxing"],
       boxing: [],
     };
     const excludeStates = laterExtraStates[phaseName] || [];
-    
+
     const pastStateBatches = relevantBatches.filter((b) => {
       if (getAllStates().indexOf(b.current_state as UnitState) <= stateIndex) return false;
       if (excludeStates.includes((b as any).from_extra_state)) return false;
       return true;
     });
-    
+
     const retrieved = retrievedFromExtraCounts[phaseName] || 0;
     const totalPast = pastStateBatches.reduce((sum, b) => sum + b.quantity, 0);
-    
+
     const phaseExtraState = `extra_${phaseName}`;
     const processedByLabels = pastStateBatches
       .filter((b) => (b as any).from_extra_state !== phaseExtraState)
@@ -566,7 +563,7 @@ export default function OrderDetail() {
     const processedByDiff = Math.max(0, totalPast - retrieved);
     const processed = Math.max(processedByLabels, processedByDiff);
     const completed = processed + retrieved;
-    
+
     const addedToExtra = addedToExtraCounts[phaseName] || 0;
     const extraToRetrieve = reservedExtraCounts[phaseName] || 0;
     return { waiting, inProgress, processed, retrieved, completed, addedToExtra, extraToRetrieve };
@@ -574,9 +571,14 @@ export default function OrderDetail() {
 
   const manufacturingStats = getPhaseStats("in_manufacturing", undefined, "manufacturing");
   const finishingStats = getPhaseStats("in_finishing", "ready_for_finishing", "finishing");
-  const packagingStats = getPhaseStats("in_packaging", "ready_for_packaging", "packaging", (b) => b.product?.needs_packing !== false);
+  const packagingStats = getPhaseStats(
+    "in_packaging",
+    "ready_for_packaging",
+    "packaging",
+    (b) => b.product?.needs_packing !== false,
+  );
   const boxingStats = getPhaseStats("in_boxing", "ready_for_boxing", "boxing", (b) => {
-    const orderItem = orderItems.find(oi => oi.id === b.order_item_id);
+    const orderItem = orderItems.find((oi) => oi.id === b.order_item_id);
     return orderItem?.needs_boxing !== false;
   });
 
@@ -635,47 +637,47 @@ export default function OrderDetail() {
     }));
 
   const orderState = (() => {
-    if (order.status === 'cancelled') return t('status.cancelled');
-    if (order.status === 'completed' || (shippedItems === totalItems && totalItems > 0)) return t('status.fulfilled');
-    if (order.status === 'in_progress') return t('status.in_progress');
-    return t('status.pending');
+    if (order.status === "cancelled") return t("status.cancelled");
+    if (order.status === "completed" || (shippedItems === totalItems && totalItems > 0)) return t("status.fulfilled");
+    if (order.status === "in_progress") return t("status.in_progress");
+    return t("status.pending");
   })();
 
   // Helper to render phase stats card
   const renderPhaseStats = (stats: PhaseStats) => (
     <div className="space-y-1 text-sm">
       <div className="flex justify-between">
-        <span className="text-muted-foreground">{t('orders.waiting')}</span>
+        <span className="text-muted-foreground">{t("orders.waiting")}</span>
         <span className="font-medium text-warning">{stats.waiting}</span>
       </div>
       <div className="flex justify-between">
-        <span className="text-muted-foreground">{t('orders.in_progress_label')}</span>
+        <span className="text-muted-foreground">{t("orders.in_progress_label")}</span>
         <span className="font-medium text-primary">{stats.inProgress}</span>
       </div>
       <div className="flex justify-between">
-        <span className="text-muted-foreground">{t('orders.processed')}</span>
+        <span className="text-muted-foreground">{t("orders.processed")}</span>
         <span className="font-medium text-green-600">{stats.processed}</span>
       </div>
       {stats.retrieved > 0 && (
         <div className="flex justify-between">
-          <span className="text-muted-foreground">{t('orders.retrieved')}</span>
+          <span className="text-muted-foreground">{t("orders.retrieved")}</span>
           <span className="font-medium text-purple-600">{stats.retrieved}</span>
         </div>
       )}
       {stats.addedToExtra > 0 && (
         <div className="flex justify-between">
-          <span className="text-muted-foreground">{t('orders.added_to_extra_label')}</span>
+          <span className="text-muted-foreground">{t("orders.added_to_extra_label")}</span>
           <span className="font-medium text-orange-600">{stats.addedToExtra}</span>
         </div>
       )}
       {stats.extraToRetrieve > 0 && (
         <div className="flex justify-between">
-          <span className="text-muted-foreground">{t('orders.extra_to_retrieve')}</span>
+          <span className="text-muted-foreground">{t("orders.extra_to_retrieve")}</span>
           <span className="font-medium text-amber-600">{stats.extraToRetrieve}</span>
         </div>
       )}
       <div className="flex justify-between border-t pt-1 mt-1">
-        <span className="font-medium text-muted-foreground">{t('orders.completed_label')}</span>
+        <span className="font-medium text-muted-foreground">{t("orders.completed_label")}</span>
         <span className="font-bold">{stats.completed}</span>
       </div>
     </div>
@@ -692,12 +694,13 @@ export default function OrderDetail() {
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-3xl font-bold">{order.order_number}</h1>
-              {order.status === 'cancelled' && <Badge variant="destructive">{t('status.cancelled')}</Badge>}
-              {order.priority === "high" && <Badge variant="destructive">{t('orders.high_priority')}</Badge>}
-              <Badge variant={orderState === t('status.fulfilled') ? "default" : "secondary"}>{orderState}</Badge>
+              {order.status === "cancelled" && <Badge variant="destructive">{t("status.cancelled")}</Badge>}
+              {order.priority === "high" && <Badge variant="destructive">{t("orders.high_priority")}</Badge>}
+              <Badge variant={orderState === t("status.fulfilled") ? "default" : "secondary"}>{orderState}</Badge>
             </div>
             <p className="text-muted-foreground">
-              {order.customer?.name || t('orders.no_customer')} · {t('table.created')} {format(new Date(order.created_at), "PPP")}
+              {order.customer?.name || t("orders.no_customer")} · {t("table.created")}{" "}
+              {format(new Date(order.created_at), "PPP")}
             </p>
           </div>
         </div>
@@ -705,55 +708,56 @@ export default function OrderDetail() {
           {isPendingOrder && canUpdate && (
             <Button onClick={() => setStartOrderOpen(true)}>
               <Play className="h-4 w-4 mr-1" />
-              {t('orders.start_order')}
+              {t("orders.start_order")}
             </Button>
           )}
           <Button variant="outline" size="sm" onClick={handlePrintOrder}>
             <Printer className="h-4 w-4 mr-1" />
-            {t('common.print')}
+            {t("common.print")}
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm">
                 <StickyNote className="h-4 w-4 mr-1" />
-                {t('common.notes')}
+                {t("common.notes")}
                 <ChevronDown className="h-3 w-3 ml-1" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={() => setRawMaterialsOpen(true)}>
                 <FileText className="h-4 w-4 mr-2" />
-                {t('orders.raw_materials')}
+                {t("orders.raw_materials")}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setPackagingRefOpen(true)}>
                 <Package className="h-4 w-4 mr-2" />
-                {t('orders.packaging_reference')}
+                {t("orders.packaging_reference")}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setCommentsOpen(true)}>
                 <MessageSquare className="h-4 w-4 mr-2" />
-                {t('orders.comments')}
+                {t("orders.comments")}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          {canDelete && order?.status !== 'cancelled' && (
+          {canDelete && order?.status !== "cancelled" && (
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button variant="destructive" size="sm">
                   <Trash2 className="h-4 w-4 mr-1" />
-                  {t('orders.cancel_order')}
+                  {t("orders.cancel_order")}
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>{t('orders.cancel_order')}</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    {t('orders.cancel_confirm_desc')}
-                  </AlertDialogDescription>
+                  <AlertDialogTitle>{t("orders.cancel_order")}</AlertDialogTitle>
+                  <AlertDialogDescription>{t("orders.cancel_confirm_desc")}</AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel>{t('orders.go_back')}</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleCancelOrder} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                    {t('orders.cancel_order')}
+                  <AlertDialogCancel>{t("orders.go_back")}</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleCancelOrder}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    {t("orders.cancel_order")}
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
@@ -766,23 +770,23 @@ export default function OrderDetail() {
       {(() => {
         const totalAddedToExtra = Object.values(addedToExtraCounts).reduce((sum, count) => sum + count, 0);
         return (
-          <div className={`grid grid-cols-1 gap-4 ${totalAddedToExtra > 0 ? 'md:grid-cols-5' : 'md:grid-cols-4'}`}>
+          <div className={`grid grid-cols-1 gap-4 ${totalAddedToExtra > 0 ? "md:grid-cols-5" : "md:grid-cols-4"}`}>
             <Card>
               <CardContent className="p-4">
-                <p className="text-sm text-muted-foreground">{t('orders.total_items')}</p>
+                <p className="text-sm text-muted-foreground">{t("orders.total_items")}</p>
                 <p className="text-2xl font-bold">{totalItems}</p>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="p-4">
-                <p className="text-sm text-muted-foreground">{t('orders.shipped')}</p>
+                <p className="text-sm text-muted-foreground">{t("orders.shipped")}</p>
                 <p className="text-2xl font-bold text-green-600">{shippedItems}</p>
               </CardContent>
             </Card>
             {totalAddedToExtra > 0 && (
               <Card>
                 <CardContent className="p-4">
-                  <p className="text-sm text-muted-foreground">{t('orders.added_to_extra')}</p>
+                  <p className="text-sm text-muted-foreground">{t("orders.added_to_extra")}</p>
                   <p className="text-2xl font-bold text-orange-500 flex items-center gap-2">
                     <Package className="h-5 w-5" />
                     {totalAddedToExtra}
@@ -792,15 +796,15 @@ export default function OrderDetail() {
             )}
             <Card>
               <CardContent className="p-4">
-                <p className="text-sm text-muted-foreground">{t('orders.shipping')}</p>
+                <p className="text-sm text-muted-foreground">{t("orders.shipping")}</p>
                 <p className="text-2xl font-bold flex items-center gap-2">
                   {order.shipping_type === "international" ? (
                     <>
-                      <Plane className="h-5 w-5" /> {t('orders.international')}
+                      <Plane className="h-5 w-5" /> {t("orders.international")}
                     </>
                   ) : (
                     <>
-                      <Truck className="h-5 w-5" /> {t('orders.domestic')}
+                      <Truck className="h-5 w-5" /> {t("orders.domestic")}
                     </>
                   )}
                 </p>
@@ -808,11 +812,11 @@ export default function OrderDetail() {
             </Card>
             <Card>
               <CardContent className="p-4">
-                <p className="text-sm text-muted-foreground">{t('orders.eft')}</p>
+                <p className="text-sm text-muted-foreground">{t("orders.eft")}</p>
                 <p className="text-2xl font-bold">
                   {order.estimated_fulfillment_time
                     ? format(new Date(order.estimated_fulfillment_time), "MMM d")
-                    : t('orders.not_set')}
+                    : t("orders.not_set")}
                 </p>
               </CardContent>
             </Card>
@@ -823,38 +827,36 @@ export default function OrderDetail() {
       {/* Notes */}
       {order.notes && (
         <div className="space-y-2">
-           {(() => {
-              const notes = order.notes || '';
-              const startTag = "---PACKAGING_REFERENCE---";
-              const endTag = "---END_PACKAGING_REFERENCE---";
-              const startIdx = notes.indexOf(startTag);
-              const endIdx = notes.indexOf(endTag);
-              let displayNotes = notes;
-              if (startIdx !== -1 && endIdx !== -1) {
-                displayNotes = (notes.substring(0, startIdx) + notes.substring(endIdx + endTag.length)).trim();
-              }
-              if (!displayNotes) return null;
-              return (
-                <Card>
-                  <CardContent className="p-4">
-                    <p className="text-sm font-medium mb-1">{t('common.notes')}</p>
-                    <p className="text-sm text-muted-foreground whitespace-pre-wrap">{displayNotes}</p>
-                  </CardContent>
-                </Card>
-              );
-           })()}
+          {(() => {
+            const notes = order.notes || "";
+            const startTag = "---PACKAGING_REFERENCE---";
+            const endTag = "---END_PACKAGING_REFERENCE---";
+            const startIdx = notes.indexOf(startTag);
+            const endIdx = notes.indexOf(endTag);
+            let displayNotes = notes;
+            if (startIdx !== -1 && endIdx !== -1) {
+              displayNotes = (notes.substring(0, startIdx) + notes.substring(endIdx + endTag.length)).trim();
+            }
+            if (!displayNotes) return null;
+            return (
+              <Card>
+                <CardContent className="p-4">
+                  <p className="text-sm font-medium mb-1">{t("common.notes")}</p>
+                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">{displayNotes}</p>
+                </CardContent>
+              </Card>
+            );
+          })()}
         </div>
       )}
 
       {/* Production Timeline */}
       <Card>
         <CardHeader>
-          <CardTitle className={isPendingOrder ? 'text-muted-foreground' : ''}>
-            {t('orders.production_timeline')}
+          <CardTitle className={isPendingOrder ? "text-muted-foreground" : ""}>
+            {t("orders.production_timeline")}
           </CardTitle>
-          <CardDescription>
-            {isPendingOrder ? t('orders.start_to_track') : t('orders.track_progress')}
-          </CardDescription>
+          <CardDescription>{isPendingOrder ? t("orders.start_to_track") : t("orders.track_progress")}</CardDescription>
         </CardHeader>
         <CardContent>
           {isPendingOrder ? (
@@ -862,13 +864,11 @@ export default function OrderDetail() {
               <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-4">
                 <Clock className="h-6 w-6 text-muted-foreground" />
               </div>
-              <p className="text-muted-foreground font-medium">{t('orders.timeline_inactive')}</p>
-              <p className="text-sm text-muted-foreground mt-1">
-                {t('orders.click_start')}
-              </p>
+              <p className="text-muted-foreground font-medium">{t("orders.timeline_inactive")}</p>
+              <p className="text-sm text-muted-foreground mt-1">{t("orders.click_start")}</p>
               <div className="mt-4 text-sm">
                 <span className="font-medium">{totalItems}</span>
-                <span className="text-muted-foreground"> {t('orders.items_planned')}</span>
+                <span className="text-muted-foreground"> {t("orders.items_planned")}</span>
               </div>
             </div>
           ) : (
@@ -880,7 +880,7 @@ export default function OrderDetail() {
                       <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/30">
                         <Factory className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                       </div>
-                      <p className="font-medium">{t('state.manufacturing')}</p>
+                      <p className="font-medium">{t("state.manufacturing")}</p>
                     </div>
                     {renderPhaseStats(manufacturingStats)}
                   </CardContent>
@@ -894,7 +894,7 @@ export default function OrderDetail() {
                       <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-900/30">
                         <Sparkles className="h-5 w-5 text-purple-600 dark:text-purple-400" />
                       </div>
-                      <p className="font-medium">{t('state.finishing')}</p>
+                      <p className="font-medium">{t("state.finishing")}</p>
                     </div>
                     {renderPhaseStats(finishingStats)}
                   </CardContent>
@@ -908,7 +908,7 @@ export default function OrderDetail() {
                       <div className="p-2 rounded-lg bg-indigo-100 dark:bg-indigo-900/30">
                         <Package className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
                       </div>
-                      <p className="font-medium">{t('state.packaging')}</p>
+                      <p className="font-medium">{t("state.packaging")}</p>
                     </div>
                     {renderPhaseStats(packagingStats)}
                   </CardContent>
@@ -922,7 +922,7 @@ export default function OrderDetail() {
                       <div className="p-2 rounded-lg bg-cyan-100 dark:bg-cyan-900/30">
                         <Box className="h-5 w-5 text-cyan-600 dark:text-cyan-400" />
                       </div>
-                      <p className="font-medium">{t('state.boxing')}</p>
+                      <p className="font-medium">{t("state.boxing")}</p>
                     </div>
                     {renderPhaseStats(boxingStats)}
                   </CardContent>
@@ -937,12 +937,12 @@ export default function OrderDetail() {
       {isPendingOrder && canUpdate && (
         <Card>
           <CardHeader>
-            <CardTitle>{t('orders.extra_inventory')}</CardTitle>
-            <CardDescription>{t('orders.available_extra')}</CardDescription>
+            <CardTitle>{t("orders.extra_inventory")}</CardTitle>
+            <CardDescription>{t("orders.available_extra")}</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {(['manufacturing', 'finishing', 'packaging', 'boxing'] as const).map((phase) => (
+              {(["manufacturing", "finishing", "packaging", "boxing"] as const).map((phase) => (
                 <Button
                   key={phase}
                   variant="outline"
@@ -952,8 +952,12 @@ export default function OrderDetail() {
                     setExtraInventoryOpen(true);
                   }}
                 >
-                  <span className="text-2xl font-bold text-primary hover:text-primary">{extraInventoryCounts[phase] || 0}</span>
-                  <span className="text-xs text-muted-foreground hover:text-muted-foreground">{t(`state.${phase}`)}</span>
+                  <span className="text-2xl font-bold text-primary hover:text-primary">
+                    {extraInventoryCounts[phase] || 0}
+                  </span>
+                  <span className="text-xs text-muted-foreground hover:text-muted-foreground">
+                    {t(`state.${phase}`)}
+                  </span>
                 </Button>
               ))}
             </div>
@@ -966,11 +970,11 @@ export default function OrderDetail() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
-              <CardTitle>{t('orders.shipments')}</CardTitle>
-              <CardDescription>{t('orders.view_manage_shipments')}</CardDescription>
+              <CardTitle>{t("orders.shipments")}</CardTitle>
+              <CardDescription>{t("orders.view_manage_shipments")}</CardDescription>
             </div>
             <Button variant="outline" onClick={() => navigate(`/orders/${id}/boxing?tab=shipments`)}>
-              {t('orders.view_shipments')}
+              {t("orders.view_shipments")}
             </Button>
           </CardHeader>
           <CardContent>
@@ -978,7 +982,7 @@ export default function OrderDetail() {
               <div className="flex items-center gap-2">
                 <CheckCircle className="h-5 w-5 text-green-600" />
                 <span className="text-sm">
-                  {shippedItems} / {totalItems} {t('orders.items_shipped')}
+                  {shippedItems} / {totalItems} {t("orders.items_shipped")}
                 </span>
               </div>
             </div>
@@ -989,63 +993,62 @@ export default function OrderDetail() {
       {/* Order Items Table */}
       <Card>
         <CardHeader>
-          <CardTitle>{t('orders.order_items')}</CardTitle>
-          <CardDescription>{t('orders.products_in_order')}</CardDescription>
+          <CardTitle>{t("orders.order_items")}</CardTitle>
+          <CardDescription>{t("orders.products_in_order")}</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className="border-b">
-                  <th className="text-left p-3 font-medium">{t('common.product')}</th>
-                  <th className="text-left p-3 font-medium">{t('catalog.sku')}</th>
-                  <th className="text-center p-3 font-medium">{t('common.quantity')}</th>
-                  <th className="text-center p-3 font-medium">{t('orders.packing')}</th>
-                  <th className="text-center p-3 font-medium">{t('orders.boxing_col')}</th>
-                  <th className="text-center p-3 font-medium">{t('orders.progress')}</th>
+                  <th className="text-left p-3 font-medium">{t("common.product")}</th>
+                  <th className="text-center p-3 font-medium">{t("common.quantity")}</th>
+                  <th className="text-center p-3 font-medium">{t("orders.packing")}</th>
+                  <th className="text-center p-3 font-medium">{t("orders.boxing_col")}</th>
+                  <th className="text-center p-3 font-medium">{t("orders.progress")}</th>
                 </tr>
               </thead>
               <tbody>
                 {orderItems.map((item) => {
-                  const itemBatches = activeBatches.filter((b) => 
-                    b.order_item_id === item.id || 
-                    (b.order_item_id === null && b.product_id === item.product_id)
+                  const itemBatches = activeBatches.filter(
+                    (b) =>
+                      b.order_item_id === item.id || (b.order_item_id === null && b.product_id === item.product_id),
                   );
                   const itemShipped = itemBatches
                     .filter((b) => b.current_state === "shipped")
                     .reduce((sum, b) => sum + b.quantity, 0);
                   const progress = item.quantity > 0 ? Math.round((itemShipped / item.quantity) * 100) : 0;
-
                   return (
                     <tr key={item.id} className="border-b hover:bg-muted/50">
-                      <td className="p-3">{item.product?.name || "Unknown"}</td>
-                      <td className="p-3 font-mono text-sm">{item.product?.sku || "N/A"}</td>
+                      <td className="p-3">
+                        <p className="font-medium">{item.product?.name || "Unknown"}</p>
+                        {item.product?.sku && (
+                          <p className="text-xs text-muted-foreground font-mono mt-0.5">{item.product.sku}</p>
+                        )}
+                      </td>
                       <td className="p-3 text-center">{item.quantity}</td>
                       <td className="p-3 text-center">
                         {item.product?.needs_packing ? (
                           <Badge variant="outline" className="bg-primary/10">
-                            {t('common.yes')}
+                            {t("common.yes")}
                           </Badge>
                         ) : (
-                          <Badge variant="secondary">{t('common.no')}</Badge>
+                          <Badge variant="secondary">{t("common.no")}</Badge>
                         )}
                       </td>
                       <td className="p-3 text-center">
                         {item.needs_boxing ? (
                           <Badge variant="outline" className="bg-primary/10">
-                            {t('common.yes')}
+                            {t("common.yes")}
                           </Badge>
                         ) : (
-                          <Badge variant="secondary">{t('common.no')}</Badge>
+                          <Badge variant="secondary">{t("common.no")}</Badge>
                         )}
                       </td>
                       <td className="p-3">
                         <div className="flex items-center gap-2 justify-center">
                           <div className="w-24 h-2 bg-muted rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-green-600 transition-all"
-                              style={{ width: `${progress}%` }}
-                            />
+                            <div className="h-full bg-green-600 transition-all" style={{ width: `${progress}%` }} />
                           </div>
                           <span className="text-xs text-muted-foreground">{progress}%</span>
                         </div>
@@ -1060,28 +1063,35 @@ export default function OrderDetail() {
       </Card>
 
       {/* Dialogs */}
-      <RawMaterialsDrawer open={rawMaterialsOpen} onOpenChange={setRawMaterialsOpen} orderId={id!} orderNumber={order?.order_number || ""} />
-      <ShipmentDialog 
-        open={shipmentDialogOpen} 
-        onOpenChange={setShipmentDialogOpen} 
+      <RawMaterialsDrawer
+        open={rawMaterialsOpen}
+        onOpenChange={setRawMaterialsOpen}
         orderId={id!}
-        orderNumber={order?.order_number || ''}
-        receivedBatches={(order?.batches || []).filter(b => b.current_state === 'shipped').map(b => ({
-          id: b.id,
-          batch_code: b.qr_code_data,
-          product_id: b.product_id,
-          product_name: b.product?.name || 'Unknown',
-          product_sku: b.product?.sku || 'N/A',
-          quantity: b.quantity,
-        }))}
+        orderNumber={order?.order_number || ""}
+      />
+      <ShipmentDialog
+        open={shipmentDialogOpen}
+        onOpenChange={setShipmentDialogOpen}
+        orderId={id!}
+        orderNumber={order?.order_number || ""}
+        receivedBatches={(order?.batches || [])
+          .filter((b) => b.current_state === "shipped")
+          .map((b) => ({
+            id: b.id,
+            batch_code: b.qr_code_data,
+            product_id: b.product_id,
+            product_name: b.product?.name || "Unknown",
+            product_sku: b.product?.sku || "N/A",
+            quantity: b.quantity,
+          }))}
         onRefresh={fetchOrder}
       />
-      <ExtraInventoryDialog 
-        open={extraInventoryOpen} 
-        onOpenChange={setExtraInventoryOpen} 
+      <ExtraInventoryDialog
+        open={extraInventoryOpen}
+        onOpenChange={setExtraInventoryOpen}
         phase={selectedExtraPhase}
         orderId={id!}
-        orderItems={orderItems.map(oi => ({
+        orderItems={orderItems.map((oi) => ({
           id: oi.id,
           product_id: oi.product_id,
           quantity: oi.quantity,
@@ -1093,8 +1103,8 @@ export default function OrderDetail() {
           fetchExtraInventoryCounts();
         }}
       />
-      <StartOrderDialog 
-        open={startOrderOpen} 
+      <StartOrderDialog
+        open={startOrderOpen}
         onOpenChange={setStartOrderOpen}
         orderId={id!}
         orderItems={orderItems}
@@ -1102,16 +1112,16 @@ export default function OrderDetail() {
           fetchOrder();
         }}
       />
-      <OrderCommentsDrawer 
+      <OrderCommentsDrawer
         orderId={id!}
-        orderNumber={order?.order_number || ''}
+        orderNumber={order?.order_number || ""}
         open={commentsOpen}
         onOpenChange={setCommentsOpen}
       />
       <Dialog open={packagingRefOpen} onOpenChange={setPackagingRefOpen}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{t('orders.packaging_reference')}</DialogTitle>
+            <DialogTitle>{t("orders.packaging_reference")}</DialogTitle>
           </DialogHeader>
           <PackagingReferenceDisplay notes={order?.notes || null} />
         </DialogContent>
