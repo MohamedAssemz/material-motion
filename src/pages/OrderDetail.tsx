@@ -484,6 +484,7 @@ export default function OrderDetail() {
     }
   };
 
+  const handleCancelOrder = async () => {
     try {
       await supabase
         .from("extra_batches")
