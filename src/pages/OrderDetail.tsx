@@ -823,6 +823,12 @@ export default function OrderDetail() {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          {canUpdate && order?.status === "in_progress" && Object.values(reservedExtraCounts).reduce((s, c) => s + c, 0) > 0 && (
+            <Button variant="outline" size="sm" onClick={prepareCommitSummary}>
+              <CheckCircle className="h-4 w-4 mr-1" />
+              {t("orders.commit_extra")}
+            </Button>
+          )}
           {canDelete && order?.status !== "cancelled" && (
             <AlertDialog>
               <AlertDialogTrigger asChild>
@@ -1211,6 +1217,47 @@ export default function OrderDetail() {
           <PackagingReferenceDisplay notes={order?.notes || null} />
         </DialogContent>
       </Dialog>
+
+      {/* Commit Extra Inventory Dialog */}
+      <AlertDialog open={commitDialogOpen} onOpenChange={setCommitDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("orders.commit_extra")}</AlertDialogTitle>
+            <AlertDialogDescription>{t("orders.commit_extra_desc")}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-2 my-4">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b">
+                  <th className="text-start p-2 font-medium">{t("common.product")}</th>
+                  <th className="text-center p-2 font-medium">{t("orders.commit_reserved")}</th>
+                  <th className="text-center p-2 font-medium">{t("orders.commit_retrieved")}</th>
+                  <th className="text-center p-2 font-medium">{t("orders.commit_unretrieved")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {commitSummary.map((item, i) => (
+                  <tr key={i} className="border-b">
+                    <td className="p-2">
+                      <p className="font-medium">{item.productName}</p>
+                      <p className="text-xs text-muted-foreground font-mono">{item.productSku}</p>
+                    </td>
+                    <td className="p-2 text-center">{item.reserved}</td>
+                    <td className="p-2 text-center text-green-600">{item.consumed}</td>
+                    <td className="p-2 text-center text-amber-600 font-medium">{item.unretrieved}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={commitLoading}>{t("orders.go_back")}</AlertDialogCancel>
+            <AlertDialogAction onClick={handleCommitExtra} disabled={commitLoading}>
+              {commitLoading ? t("common.loading") : t("orders.commit_extra")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
