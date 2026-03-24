@@ -153,6 +153,9 @@ export default function OrderDetail() {
     "manufacturing",
   );
   const [extraInventoryCounts, setExtraInventoryCounts] = useState<Record<string, number>>({});
+  const [commitSummary, setCommitSummary] = useState<Array<{ product_id: string; order_item_id: string; reserved: number; consumed: number; unretrieved: number; productName: string; productSku: string }>>([]);
+  const [commitDialogOpen, setCommitDialogOpen] = useState(false);
+  const [commitLoading, setCommitLoading] = useState(false);
   const [reservedExtraCounts, setReservedExtraCounts] = useState<Record<string, number>>({});
   const [addedToExtraCounts, setAddedToExtraCounts] = useState<Record<string, number>>({});
   const [retrievedFromExtraCounts, setRetrievedFromExtraCounts] = useState<Record<string, number>>({});
@@ -398,7 +401,89 @@ export default function OrderDetail() {
     }
   };
 
-  const handleCancelOrder = async () => {
+  const prepareCommitSummary = async () => {
+    if (!id) return;
+    try {
+      // Fetch all reserved batches for this order
+      const { data: reserved, error: resErr } = await supabase
+        .from("extra_batches")
+        .select("order_item_id, product_id, quantity, product:products(name, sku)")
+        .eq("order_id", id)
+        .eq("inventory_state", "RESERVED");
+      if (resErr) throw resErr;
+      if (!reserved || reserved.length === 0) {
+        toast.error("No reserved extra batches to commit");
+        return;
+      }
+
+      // Fetch consumed history
+      const { data: consumed, error: conErr } = await supabase
+        .from("extra_batch_history")
+        .select("consuming_order_item_id, quantity")
+        .eq("event_type", "CONSUMED")
+        .eq("consuming_order_id", id);
+      if (conErr) throw conErr;
+
+      // Group reserved by order_item_id + product_id
+      const grouped = new Map<string, { product_id: string; order_item_id: string; reserved: number; productName: string; productSku: string }>();
+      (reserved || []).forEach((b: any) => {
+        const key = `${b.order_item_id}-${b.product_id}`;
+        if (!grouped.has(key)) {
+          grouped.set(key, {
+            product_id: b.product_id,
+            order_item_id: b.order_item_id,
+            reserved: 0,
+            productName: b.product?.name || "Unknown",
+            productSku: b.product?.sku || "N/A",
+          });
+        }
+        grouped.get(key)!.reserved += b.quantity;
+      });
+
+      // Sum consumed per order_item
+      const consumedMap = new Map<string, number>();
+      (consumed || []).forEach((h: any) => {
+        consumedMap.set(h.consuming_order_item_id, (consumedMap.get(h.consuming_order_item_id) || 0) + h.quantity);
+      });
+
+      const summary = Array.from(grouped.values()).map((g) => ({
+        ...g,
+        consumed: consumedMap.get(g.order_item_id) || 0,
+        unretrieved: Math.max(0, g.reserved - (consumedMap.get(g.order_item_id) || 0)),
+      }));
+
+      setCommitSummary(summary);
+      setCommitDialogOpen(true);
+    } catch (error) {
+      console.error("Error preparing commit summary:", error);
+      toast.error("Failed to load commit summary");
+    }
+  };
+
+  const handleCommitExtra = async () => {
+    if (!id || !user) return;
+    setCommitLoading(true);
+    try {
+      const { data, error } = await supabase.rpc("commit_extra_inventory", {
+        p_order_id: id,
+        p_user_id: user.id,
+      });
+      if (error) throw error;
+
+      const result = data as any;
+      toast.success(`${t("orders.commit_success")}: ${result.total_released} ${t("orders.commit_released")}, ${result.total_requeued} ${t("orders.commit_requeued")}`);
+      setCommitDialogOpen(false);
+      fetchOrder();
+      fetchReservedExtraCounts();
+      fetchExtraInventoryCounts();
+    } catch (error: any) {
+      console.error("Commit error:", error);
+      toast.error(error.message || "Failed to commit extra inventory");
+    } finally {
+      setCommitLoading(false);
+    }
+  };
+
     try {
       await supabase
         .from("extra_batches")
@@ -738,6 +823,12 @@ export default function OrderDetail() {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          {canUpdate && order?.status === "in_progress" && Object.values(reservedExtraCounts).reduce((s, c) => s + c, 0) > 0 && (
+            <Button variant="outline" size="sm" onClick={prepareCommitSummary}>
+              <CheckCircle className="h-4 w-4 mr-1" />
+              {t("orders.commit_extra")}
+            </Button>
+          )}
           {canDelete && order?.status !== "cancelled" && (
             <AlertDialog>
               <AlertDialogTrigger asChild>
@@ -1126,6 +1217,47 @@ export default function OrderDetail() {
           <PackagingReferenceDisplay notes={order?.notes || null} />
         </DialogContent>
       </Dialog>
+
+      {/* Commit Extra Inventory Dialog */}
+      <AlertDialog open={commitDialogOpen} onOpenChange={setCommitDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("orders.commit_extra")}</AlertDialogTitle>
+            <AlertDialogDescription>{t("orders.commit_extra_desc")}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-2 my-4">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b">
+                  <th className="text-start p-2 font-medium">{t("common.product")}</th>
+                  <th className="text-center p-2 font-medium">{t("orders.commit_reserved")}</th>
+                  <th className="text-center p-2 font-medium">{t("orders.commit_retrieved")}</th>
+                  <th className="text-center p-2 font-medium">{t("orders.commit_unretrieved")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {commitSummary.map((item, i) => (
+                  <tr key={i} className="border-b">
+                    <td className="p-2">
+                      <p className="font-medium">{item.productName}</p>
+                      <p className="text-xs text-muted-foreground font-mono">{item.productSku}</p>
+                    </td>
+                    <td className="p-2 text-center">{item.reserved}</td>
+                    <td className="p-2 text-center text-green-600">{item.consumed}</td>
+                    <td className="p-2 text-center text-amber-600 font-medium">{item.unretrieved}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={commitLoading}>{t("orders.go_back")}</AlertDialogCancel>
+            <AlertDialogAction onClick={handleCommitExtra} disabled={commitLoading}>
+              {commitLoading ? t("common.loading") : t("orders.commit_extra")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

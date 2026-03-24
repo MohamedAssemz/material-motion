@@ -1207,5 +1207,15 @@ export const translations: Record<string, TranslationEntry> = {
   "reports.status":             { en: "Status",             ar: "الحالة" },
   "reports.product":            { en: "Product",            ar: "المنتج" },
   "reports.orders":             { en: "orders",             ar: "طلبات" },
+
+  // ── Commit Extra Inventory ──
+  "orders.commit_extra":        { en: "Commit Extra Inventory", ar: "تثبيت المخزون الإضافي" },
+  "orders.commit_extra_desc":   { en: "Release unretrieved reserved batches back to available stock and send unretrieved quantities to manufacturing.", ar: "إعادة الدفعات المحجوزة غير المسترجعة إلى المخزون المتاح وإرسال الكميات غير المسترجعة إلى التصنيع." },
+  "orders.commit_reserved":     { en: "Reserved",              ar: "محجوز" },
+  "orders.commit_retrieved":    { en: "Retrieved",             ar: "مسترجع" },
+  "orders.commit_unretrieved":  { en: "Unretrieved → Manufacturing", ar: "غير مسترجع ← التصنيع" },
+  "orders.commit_success":      { en: "Extra inventory committed successfully", ar: "تم تثبيت المخزون الإضافي بنجاح" },
+  "orders.commit_released":     { en: "released back to stock", ar: "تمت إعادتها إلى المخزون" },
+  "orders.commit_requeued":     { en: "sent to manufacturing", ar: "أُرسلت إلى التصنيع" },
 };
 
