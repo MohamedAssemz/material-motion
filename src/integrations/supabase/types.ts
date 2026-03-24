@@ -936,6 +936,10 @@ export type Database = {
         }
         Returns: Json
       }
+      commit_extra_inventory: {
+        Args: { p_order_id: string; p_user_id: string }
+        Returns: Json
+      }
       generate_batch_code: { Args: never; Returns: string }
       generate_box_code: { Args: never; Returns: string }
       generate_extra_batch_code: { Args: never; Returns: string }
