@@ -1,42 +1,43 @@
 
 
-## Plan: Order Cancellation Freeze Logic
+# Plan: Extra Inventory Commit Action
 
-### Requirements
-1. When an order is cancelled, freeze all actions on phase pages **except** production rate (machine) assignment (which still respects role permissions)
-2. Unretrieved reserved extra batches should be released back to AVAILABLE on cancellation
+## What It Does
 
-### Analysis
-- Requirement 2 is **already implemented** in `handleCancelOrder` in `OrderDetail.tsx` (lines 462-471) — it releases reserved extra batches back to AVAILABLE
-- Requirement 1 needs changes across 4 phase pages and their child components
+A "Commit" button on the Order Detail page that finalizes extra inventory usage:
+1. **Retrieved items** — already consumed, no action needed
+2. **Unretrieved reserved batches** — returned to AVAILABLE (unreserved)
+3. **Unretrieved quantities** — new `order_batches` created in `in_manufacturing` state so they enter the production pipeline
 
-### Implementation
+## Example Flow
+Order reserved 200 units across 4 phases. Managers retrieved 100 total. On commit:
+- 100 unretrieved reserved extra batches → set back to AVAILABLE
+- 100 new order_batches created in `in_manufacturing` for the same products/order_items
 
-**Core approach:** Each phase page already has a `canManage` boolean that gates actions. Add an `isCancelled` check derived from `order?.status === 'cancelled'` and use it to disable all actions except machine assignment.
+## Implementation
 
-**Files to modify:**
+### 1. Database: Create RPC function `commit_extra_inventory`
+A new migration with an RPC that atomically:
+- Fetches all RESERVED extra_batches for the order
+- Fetches CONSUMED history to calculate retrieved quantities per product/order_item
+- For each reserved batch: unreserve it (set `inventory_state=AVAILABLE`, `order_id=null`, `order_item_id=null`)
+- For unretrieved quantity per order_item: create `order_batches` in `in_manufacturing`
+- Log `RELEASED` events in `extra_batch_history` for audit trail
+- Returns summary of what was committed
 
-1. **`OrderManufacturing.tsx`** — Add `const isCancelled = order?.status === 'cancelled'`. Pass `isCancelled` to disable:
-   - Box assignment dialog actions
-   - Terminate/redo actions
-   - MoveToExtraDialog
-   - ExtraItemsTab `canManage` → `canManage && !isCancelled`
-   - BoxReceiveDialog actions
-   - Keep `ProductionRateSection canManage={canManage}` unchanged (still allows machine assignment)
+### 2. UI: Add Commit button to OrderDetail.tsx
+- Show a "Commit Extra Inventory" button in the order detail page (visible when order is `in_progress` and has reserved extra batches)
+- Button opens an AlertDialog showing a summary: per-product breakdown of retrieved vs unretrieved quantities
+- On confirm, calls the RPC and refreshes the page
+- Admin-only action
 
-2. **`OrderFinishing.tsx`** — Same pattern: `isCancelled` disables accept boxes, assign to box, MoveToExtraDialog, ExtraItemsTab, but keeps ProductionRateSection canManage unchanged.
+### 3. Translations
+- Add keys for commit button, dialog title/description, summary labels
 
-3. **`OrderPackaging.tsx`** — Same pattern.
-
-4. **`OrderBoxing.tsx`** — Same pattern. Additionally disable shipment creation.
-
-5. **`OrderDetail.tsx`** — Add a visible "Cancelled" banner/badge. The cancel button is already hidden when `status === 'cancelled'`. Start Order and Extra Inventory sections are already gated to pending orders, so no changes needed there.
-
-**Specific prop changes per phase page:**
-- `ExtraItemsTab canManage={canManage && !isCancelled}` — freezes extra retrieval
-- `ProductionRateSection canManage={canManage}` — unchanged, still allows machine assignment
-- All action buttons (accept, assign, terminate, redo, move to extra, create shipment) gated with `!isCancelled`
-- Box receive dialogs disabled when cancelled
-
-**No database changes needed** — the cancellation already releases reserved batches.
+### Files to modify
+| File | Change |
+|------|--------|
+| New migration SQL | `commit_extra_inventory` RPC function |
+| `src/pages/OrderDetail.tsx` | Add commit button + confirmation dialog with summary |
+| `src/lib/translations.ts` | Add ~8 commit-related translation keys |
 
