@@ -446,11 +446,15 @@ export default function OrderDetail() {
         consumedMap.set(h.consuming_order_item_id, (consumedMap.get(h.consuming_order_item_id) || 0) + h.quantity);
       });
 
-      const summary = Array.from(grouped.values()).map((g) => ({
-        ...g,
-        consumed: consumedMap.get(g.order_item_id) || 0,
-        unretrieved: Math.max(0, g.reserved - (consumedMap.get(g.order_item_id) || 0)),
-      }));
+      const summary = Array.from(grouped.values()).map((g) => {
+        const consumed = consumedMap.get(g.order_item_id) || 0;
+        return {
+          ...g,
+          reserved: g.reserved + consumed, // original reservation = current qty + consumed
+          consumed,
+          unretrieved: g.reserved, // current batch qty IS the unretrieved amount
+        };
+      });
 
       setCommitSummary(summary);
       setCommitDialogOpen(true);
