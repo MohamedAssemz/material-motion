@@ -1,43 +1,36 @@
 
 
-# Plan: Extra Inventory Commit Action
+# Fix: Commit Extra Inventory Double-Counting Bug
 
-## What It Does
+## Problem
+When 75 items are reserved and 50 retrieved, the consumption process reduces `extra_batches.quantity` from 75 to 25. At commit time, both the UI and RPC calculate:
+- `reserved` = 25 (current batch quantity)
+- `consumed` = 50 (from history)
+- `unretrieved` = max(0, 25 - 50) = **0** ← wrong
 
-A "Commit" button on the Order Detail page that finalizes extra inventory usage:
-1. **Retrieved items** — already consumed, no action needed
-2. **Unretrieved reserved batches** — returned to AVAILABLE (unreserved)
-3. **Unretrieved quantities** — new `order_batches` created in `in_manufacturing` state so they enter the production pipeline
+The correct unretrieved count is **25** — the current batch quantity itself.
 
-## Example Flow
-Order reserved 200 units across 4 phases. Managers retrieved 100 total. On commit:
-- 100 unretrieved reserved extra batches → set back to AVAILABLE
-- 100 new order_batches created in `in_manufacturing` for the same products/order_items
+## Fix
 
-## Implementation
+The display should show:
+- **Originally reserved** = current quantity + consumed from history = 75
+- **Retrieved** = consumed from history = 50  
+- **Unretrieved** = current batch quantity = 25
 
-### 1. Database: Create RPC function `commit_extra_inventory`
-A new migration with an RPC that atomically:
-- Fetches all RESERVED extra_batches for the order
-- Fetches CONSUMED history to calculate retrieved quantities per product/order_item
-- For each reserved batch: unreserve it (set `inventory_state=AVAILABLE`, `order_id=null`, `order_item_id=null`)
-- For unretrieved quantity per order_item: create `order_batches` in `in_manufacturing`
-- Log `RELEASED` events in `extra_batch_history` for audit trail
-- Returns summary of what was committed
+### 1. UI: Fix `prepareCommitSummary` in `OrderDetail.tsx`
+Change the summary calculation:
+- `reserved` = `g.reserved + consumed` (original reservation = what's left + what was consumed)
+- `consumed` = from history (unchanged)
+- `unretrieved` = `g.reserved` (current batch qty IS the unretrieved amount)
 
-### 2. UI: Add Commit button to OrderDetail.tsx
-- Show a "Commit Extra Inventory" button in the order detail page (visible when order is `in_progress` and has reserved extra batches)
-- Button opens an AlertDialog showing a summary: per-product breakdown of retrieved vs unretrieved quantities
-- On confirm, calls the RPC and refreshes the page
-- Admin-only action
-
-### 3. Translations
-- Add keys for commit button, dialog title/description, summary labels
+### 2. Database RPC: Fix `commit_extra_inventory`
+Same logic fix:
+- `v_unretrieved_qty` should equal `v_order_item.reserved_qty` (the current remaining quantity), not `reserved_qty - consumed_qty`
+- The summary should report `original_reserved = reserved_qty + consumed_qty`
 
 ### Files to modify
 | File | Change |
 |------|--------|
-| New migration SQL | `commit_extra_inventory` RPC function |
-| `src/pages/OrderDetail.tsx` | Add commit button + confirmation dialog with summary |
-| `src/lib/translations.ts` | Add ~8 commit-related translation keys |
+| `src/pages/OrderDetail.tsx` | Fix `prepareCommitSummary` calculation (~3 lines) |
+| New migration SQL | Update `commit_extra_inventory` RPC to fix unretrieved calculation |
 
