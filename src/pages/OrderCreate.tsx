@@ -29,6 +29,7 @@ import {
   Package,
 } from "lucide-react";
 import { RawMaterialImageUpload } from "@/components/RawMaterialImageUpload";
+import { CountrySelect } from "@/components/catalog/CountrySelect";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -75,6 +76,7 @@ export default function OrderCreate() {
   const [notes, setNotes] = useState("");
   const [priority, setPriority] = useState<"high" | "normal">("normal");
   const [shippingType, setShippingType] = useState<"domestic" | "international">("domestic");
+  const [country, setCountry] = useState("");
   const [estimatedFulfillment, setEstimatedFulfillment] = useState<Date | undefined>();
   const [rawMaterials, setRawMaterials] = useState("");
   const [rawMaterialImages, setRawMaterialImages] = useState<string[]>([]);
@@ -206,6 +208,7 @@ export default function OrderCreate() {
           estimated_fulfillment_time: estimatedFulfillment?.toISOString() || null,
           created_by: user?.id,
           customer_id: selectedCustomerId,
+          country: country || null,
         })
         .select()
         .single();
@@ -461,13 +464,20 @@ export default function OrderCreate() {
                 </Popover>
               </div>
               <div>
-                <Label htmlFor="raw_materials">{t('order.raw_materials')} *</Label>
+                <Label>{t('order.country')}</Label>
+                <CountrySelect
+                  value={country}
+                  onValueChange={setCountry}
+                  placeholder={t('order.select_country')}
+                />
+              </div>
+              <div>
+                <Label htmlFor="raw_materials">{t('order.raw_materials')}</Label>
                 <Textarea
                   id="raw_materials"
                   value={rawMaterials}
                   onChange={(e) => setRawMaterials(e.target.value)}
                   placeholder={t('order.raw_materials_placeholder')}
-                  required
                   rows={3}
                 />
                 <div className="mt-2">
