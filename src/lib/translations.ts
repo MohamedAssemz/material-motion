@@ -703,6 +703,8 @@ export const translations: Record<string, TranslationEntry> = {
   "order.estimated_fulfillment": { en: "Estimated Fulfillment Time", ar: "وقت التنفيذ المتوقع" },
   "order.select_date":        { en: "Select date",          ar: "اختر تاريخ" },
   "order.raw_materials":      { en: "Raw Materials",        ar: "المواد الخام" },
+  "order.country":            { en: "Country",              ar: "البلد" },
+  "order.select_country":     { en: "Select country",       ar: "اختر البلد" },
   "order.raw_materials_placeholder": { en: "Enter raw material details for this order...", ar: "أدخل تفاصيل المواد الخام لهذا الطلب..." },
   "order.order_items":        { en: "Order Items",          ar: "عناصر الطلب" },
   "order.product":            { en: "Product",              ar: "المنتج" },
