@@ -575,6 +575,7 @@ export type Database = {
       }
       orders: {
         Row: {
+          country: string | null
           created_at: string | null
           created_by: string | null
           customer_id: string | null
@@ -588,6 +589,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          country?: string | null
           created_at?: string | null
           created_by?: string | null
           customer_id?: string | null
@@ -601,6 +603,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          country?: string | null
           created_at?: string | null
           created_by?: string | null
           customer_id?: string | null
