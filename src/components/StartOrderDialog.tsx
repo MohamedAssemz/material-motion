@@ -29,6 +29,8 @@ interface BatchSummary {
   product_name: string;
   product_sku: string;
   quantity: number;
+  initial_state?: string;
+  is_special?: boolean;
 }
 
 interface ReservedExtraItem {
@@ -70,9 +72,9 @@ export function StartOrderDialog({
       const [batchesResult, extraResult] = await Promise.all([
         supabase
           .from('order_batches')
-          .select(`id, product_id, quantity, product:products(id, name, sku)`)
+          .select(`id, product_id, quantity, current_state, is_special, product:products(id, name, sku)`)
           .eq('order_id', orderId)
-          .eq('current_state', 'in_manufacturing'),
+          .neq('current_state', 'shipped'),
         supabase
           .from('extra_batches')
           .select(`id, product_id, quantity, product:products(id, name, sku)`)
@@ -83,18 +85,20 @@ export function StartOrderDialog({
       if (batchesResult.error) throw batchesResult.error;
       if (extraResult.error) throw extraResult.error;
 
-      // Group manufacturing batches by product
+      // Group manufacturing batches by product + initial state
       const grouped = (batchesResult.data || []).reduce((acc: Record<string, BatchSummary>, batch: any) => {
-        const productId = batch.product_id;
-        if (!acc[productId]) {
-          acc[productId] = {
-            product_id: productId,
+        const key = `${batch.product_id}-${batch.current_state}`;
+        if (!acc[key]) {
+          acc[key] = {
+            product_id: batch.product_id,
             product_name: batch.product?.name || 'Unknown',
             product_sku: batch.product?.sku || '',
             quantity: 0,
+            initial_state: batch.current_state,
+            is_special: batch.is_special || false,
           };
         }
-        acc[productId].quantity += batch.quantity;
+        acc[key].quantity += batch.quantity;
         return acc;
       }, {});
       setManufacturingBatches(Object.values(grouped));
@@ -173,20 +177,28 @@ export function StartOrderDialog({
             </div>
           ) : (
             <>
-              {/* Manufacturing batches */}
+              {/* Manufacturing batches grouped by initial state */}
               {manufacturingBatches.length > 0 && (
                 <div className="bg-muted rounded-lg p-4">
-                  <p className="text-sm font-medium mb-3">Items in Manufacturing:</p>
+                  <p className="text-sm font-medium mb-3">Items to Process:</p>
                   <ul className="space-y-2">
-                    {manufacturingBatches.map(batch => (
-                      <li key={batch.product_id} className="text-sm flex justify-between items-center">
-                        <div>
-                          <span className="font-medium">{batch.product_name}</span>
-                          <span className="text-muted-foreground ml-2 text-xs">{batch.product_sku}</span>
-                        </div>
-                        <span className="font-semibold">{batch.quantity}</span>
-                      </li>
-                    ))}
+                    {manufacturingBatches.map(batch => {
+                      const stateLabel = batch.initial_state?.replace('in_', '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) || 'Manufacturing';
+                      return (
+                        <li key={`${batch.product_id}-${batch.initial_state}`} className="text-sm flex justify-between items-center">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{batch.product_name}</span>
+                            <span className="text-muted-foreground text-xs">{batch.product_sku}</span>
+                            {batch.is_special && (
+                              <Badge variant="outline" className="text-[10px] px-1 py-0 bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border-amber-300">
+                                ⚡ {stateLabel}
+                              </Badge>
+                            )}
+                          </div>
+                          <span className="font-semibold">{batch.quantity}</span>
+                        </li>
+                      );
+                    })}
                   </ul>
                   <div className="mt-3 pt-3 border-t flex justify-between text-sm font-medium">
                     <span>Total</span>
