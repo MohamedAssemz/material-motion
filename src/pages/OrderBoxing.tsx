@@ -1322,7 +1322,20 @@ export default function OrderBoxing() {
                     <Package className="h-4 w-4 me-2" />
                     {t('phase.assign_to_extra')}
                   </Button>
-                  <Button onClick={() => setMoveToReadyDialogOpen(true)} disabled={totalSelected === 0}>
+                  <Button onClick={() => {
+                    // Enforce single product per box
+                    const selectedProductIds = new Set(
+                      Array.from(productSelections.entries())
+                        .filter(([_, qty]) => qty > 0)
+                        .map(([key]) => inBoxingGroups.find(g => g.groupKey === key)?.product_id)
+                        .filter(Boolean)
+                    );
+                    if (selectedProductIds.size > 1) {
+                      toast.error(t('phase.single_product_per_box'));
+                      return;
+                    }
+                    setMoveToReadyDialogOpen(true);
+                  }} disabled={totalSelected === 0}>
                     <Package className="h-4 w-4 me-2" />
                     {t('phase.move_to_ready')}
                   </Button>

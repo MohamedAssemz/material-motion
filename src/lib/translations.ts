@@ -751,6 +751,7 @@ export const translations: Record<string, TranslationEntry> = {
   "phase.accept_boxes":       { en: "Accept Boxes",         ar: "قبول الصناديق" },
   "phase.assign_to_box":      { en: "Assign to Box",        ar: "تعيين للصندوق" },
   "phase.select_items_first": { en: "Please select items first", ar: "يرجى تحديد العناصر أولاً" },
+  "phase.single_product_per_box": { en: "A box can only contain one product. Please select items from a single product.", ar: "يمكن للصندوق أن يحتوي على منتج واحد فقط. يرجى تحديد عناصر من منتج واحد." },
   "phase.no_boxes_ready":     { en: "No boxes ready",       ar: "لا توجد صناديق جاهزة" },
   "phase.search_box_sku":     { en: "Search by box or SKU...", ar: "ابحث بالصندوق أو رمز المنتج..." },
   "phase.cancelled_order_msg": { en: "This order has been cancelled. Actions are frozen except machine assignment.", ar: "تم إلغاء هذا الطلب. الإجراءات مجمدة باستثناء تعيين الماكينة." },

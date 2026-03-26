@@ -621,6 +621,13 @@ export default function OrderFinishing() {
       return;
     }
 
+    // Enforce single product per box
+    const selectedProductIds = new Set(selectedGroups.map(g => g.product_id));
+    if (selectedProductIds.size > 1) {
+      toast.error(t('phase.single_product_per_box'));
+      return;
+    }
+
     setSelectedBox(null);
     setBoxSearchCode("");
     setSelectedMachine(null);

@@ -494,6 +494,17 @@ export default function OrderManufacturing() {
       toast.error(t('phase.select_items_first'));
       return;
     }
+    // Enforce single product per box
+    const selectedProductIds = new Set(
+      Array.from(productSelections.entries())
+        .filter(([_, qty]) => qty > 0)
+        .map(([key]) => productGroups.find(g => g.groupKey === key)?.product_id)
+        .filter(Boolean)
+    );
+    if (selectedProductIds.size > 1) {
+      toast.error(t('phase.single_product_per_box'));
+      return;
+    }
     setSelectedBox(null);
     setBoxSearchCode("");
     setSelectedMachine(null);
