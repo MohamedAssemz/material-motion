@@ -34,6 +34,7 @@ interface Batch {
   finishing_machine_id: string | null;
   manufacturing_machine_id: string | null;
   from_extra_state?: string | null;
+  is_special?: boolean;
   product: {
     id: string;
     name: string;
@@ -661,8 +662,9 @@ export default function OrderFinishing() {
         const group = inFinishingGroups.find((g) => g.groupKey === key);
         if (!group) continue;
 
-        // Determine next state based on needs_packing
-        const nextState = group.needs_packing ? "ready_for_packaging" : "ready_for_boxing";
+        // Determine next state: special items go to ready_for_boxing
+        const isGroupSpecial = group.batches.some(b => b.is_special);
+        const nextState = isGroupSpecial ? "ready_for_boxing" : (group.needs_packing ? "ready_for_packaging" : "ready_for_boxing");
 
         let remainingQty = quantity;
         // Sort batches: prioritize those with machine assigned, then by quantity
@@ -700,6 +702,7 @@ export default function OrderFinishing() {
           } else {
             const { data: qrCode } = await supabase.rpc("generate_extra_batch_code");
             // Inherit machine IDs from parent batch
+            const splitNextState = batch.is_special ? "ready_for_boxing" : nextState;
             const { data: newBatch } = await supabase
               .from("order_batches")
               .insert({
@@ -707,13 +710,14 @@ export default function OrderFinishing() {
                 order_id: id,
                 product_id: batch.product_id,
                 order_item_id: batch.order_item_id,
-                current_state: nextState,
+                current_state: splitNextState,
                 quantity: useQty,
                 box_id: selectedBox.id,
                 created_by: user?.id,
                 manufacturing_machine_id: batch.manufacturing_machine_id,
                 finishing_machine_id: machineId || batch.finishing_machine_id,
                 from_extra_state: batch.from_extra_state,
+                is_special: batch.is_special || false,
               })
               .select("id")
               .single();
