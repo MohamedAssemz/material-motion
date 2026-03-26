@@ -124,6 +124,8 @@ interface OrderItem {
   product_id: string;
   quantity: number;
   needs_boxing: boolean;
+  is_special?: boolean;
+  initial_state?: string | null;
   product: {
     id: string;
     name: string;
@@ -211,7 +213,7 @@ export default function OrderDetail() {
         supabase.from("orders").select(`*, customer:customers(name, code)`).eq("id", id).maybeSingle(),
         supabase
           .from("order_items")
-          .select("id, product_id, quantity, needs_boxing, product:products(id, name, sku, needs_packing)")
+          .select("id, product_id, quantity, needs_boxing, is_special, initial_state, product:products(id, name, sku, needs_packing)")
           .eq("order_id", id),
       ]);
 
@@ -1100,7 +1102,8 @@ export default function OrderDetail() {
                   <th className="text-left p-3 font-medium">{t("common.product")}</th>
                   <th className="text-center p-3 font-medium">{t("common.quantity")}</th>
                   <th className="text-center p-3 font-medium">{t("orders.packing")}</th>
-                  <th className="text-center p-3 font-medium">{t("orders.boxing_col")}</th>
+                   <th className="text-center p-3 font-medium">{t("orders.boxing_col")}</th>
+                  <th className="text-center p-3 font-medium">{t("order.special")}</th>
                   <th className="text-center p-3 font-medium">{t("orders.progress")}</th>
                 </tr>
               </thead>
@@ -1139,6 +1142,15 @@ export default function OrderDetail() {
                           </Badge>
                         ) : (
                           <Badge variant="secondary">{t("common.no")}</Badge>
+                        )}
+                      </td>
+                      <td className="p-3 text-center">
+                        {item.is_special ? (
+                          <Badge variant="outline" className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border-amber-300 text-xs">
+                            ⚡ {(item.initial_state || 'in_manufacturing').replace('in_', '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">—</span>
                         )}
                       </td>
                       <td className="p-3">
