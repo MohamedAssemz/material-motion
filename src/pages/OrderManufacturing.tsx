@@ -209,9 +209,12 @@ export default function OrderManufacturing() {
       setOrder(orderRes.data as Order);
       setBatches((batchesRes.data || []) as unknown as Batch[]);
       const allCompleted = (completedRes.data || []) as any[];
-      const filteredCompleted = allCompleted.filter(
-        (b: any) => !['extra_manufacturing', 'extra_finishing', 'extra_packaging', 'extra_boxing'].includes(b.from_extra_state)
-      );
+      const filteredCompleted = allCompleted.filter((b: any) => {
+        if (['extra_manufacturing', 'extra_finishing', 'extra_packaging', 'extra_boxing'].includes(b.from_extra_state)) return false;
+        // Exclude special items that didn't start in manufacturing
+        if (b.is_special && b.order_item?.initial_state !== 'in_manufacturing') return false;
+        return true;
+      });
       setCompletedBatches(filteredCompleted as unknown as Batch[]);
     } catch (error: any) {
       toast.error(error.message);
@@ -752,7 +755,7 @@ export default function OrderManufacturing() {
 
       <Tabs defaultValue="active" className="space-y-4">
         <TabsList className="grid grid-cols-3 w-full max-w-xl">
-          <TabsTrigger value="active">{t('phase.active_tab')} ({totalInManufacturing})</TabsTrigger>
+          <TabsTrigger value="active">{t('phase.process')} ({totalInManufacturing})</TabsTrigger>
           <TabsTrigger value="extra">{t('phase.extra_tab')} ({extraCount})</TabsTrigger>
           <TabsTrigger value="completed">{t('phase.processed_tab')} ({totalCompleted})</TabsTrigger>
         </TabsList>
