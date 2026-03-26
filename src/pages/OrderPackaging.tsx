@@ -43,7 +43,7 @@ interface Batch {
     needs_packing?: boolean;
   };
   box?: { id: string; box_code: string } | null;
-  order_item?: { id: string; needs_boxing: boolean } | null;
+  order_item?: { id: string; needs_boxing: boolean; initial_state?: string | null } | null;
 }
 
 interface Order {
@@ -119,7 +119,14 @@ export default function OrderPackaging() {
   const isCancelled = order?.status === 'cancelled';
 
   // completedBatches already excludes retrieved-from-extra items via from_extra_state filter
-  const processedBatchesForRate = completedBatches;
+  // Exclude special items that skipped packaging (initial_state must be in_manufacturing, in_finishing, or in_packaging)
+  const processedBatchesForRate = completedBatches.filter(b => {
+    if (b.is_special) {
+      const init = b.order_item?.initial_state;
+      return init === 'in_manufacturing' || init === 'in_finishing' || init === 'in_packaging';
+    }
+    return true;
+  });
 
   const fetchExtraCount = async () => {
     if (!id) return;
@@ -205,7 +212,7 @@ export default function OrderPackaging() {
       if (orderItemIds.length > 0) {
         const { data: orderItemsData } = await supabase
           .from("order_items")
-          .select("id, needs_boxing")
+          .select("id, needs_boxing, initial_state")
           .in("id", [...new Set(orderItemIds)]);
         orderItemsData?.forEach((oi) => orderItemMap.set(oi.id, oi));
       }

@@ -38,7 +38,7 @@ interface Batch {
   manufacturing_machine_id: string | null;
   product: { id: string; name: string; sku: string; needs_packing: boolean };
   box?: { id: string; box_code: string } | null;
-  order_item?: { id: string; needs_boxing: boolean } | null;
+  order_item?: { id: string; needs_boxing: boolean; initial_state?: string | null } | null;
   from_extra_state?: string | null;
   is_special?: boolean;
 }
@@ -209,7 +209,7 @@ export default function OrderBoxing() {
       if (orderItemIds.length > 0) {
         const { data: orderItemsData } = await supabase
           .from("order_items")
-          .select("id, needs_boxing")
+          .select("id, needs_boxing, initial_state")
           .in("id", orderItemIds);
         orderItemsData?.forEach((oi) => orderItemMap.set(oi.id, oi));
       }
@@ -1514,7 +1514,7 @@ export default function OrderBoxing() {
           {/* Production Rate Section - for shipped batches that were processed in boxing */}
           <ProductionRateSection
             batches={[
-              ...batches.filter(b => b.current_state === 'shipped' && b.from_extra_state !== 'extra_boxing').map(b => ({
+              ...batches.filter(b => b.current_state === 'shipped' && b.from_extra_state !== 'extra_boxing' && !b.is_special && b.order_item?.needs_boxing !== false).map(b => ({
                 id: b.id,
                 product_id: b.product_id,
                 product_name: b.product?.name || 'Unknown',

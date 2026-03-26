@@ -54,6 +54,7 @@ interface Batch {
   };
   order_item?: {
     needs_boxing: boolean;
+    initial_state?: string | null;
   };
 }
 
@@ -121,7 +122,13 @@ export default function OrderManufacturing() {
   const isCancelled = order?.status === 'cancelled';
 
   // completedBatches already excludes retrieved-from-extra items via from_extra_state filter
-  const processedBatchesForRate = completedBatches;
+  // Also exclude special items that skipped manufacturing (initial_state is not in_manufacturing)
+  const processedBatchesForRate = completedBatches.filter(b => {
+    if (b.is_special) {
+      return b.order_item?.initial_state === 'in_manufacturing';
+    }
+    return true;
+  });
 
   const fetchExtraCount = async () => {
     if (!id) return;
