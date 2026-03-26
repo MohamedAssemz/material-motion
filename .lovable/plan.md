@@ -1,32 +1,42 @@
 
-Fix the Packaging completed-tab production rate so special items are excluded unless Packaging is their actual initial phase.
 
-What I’ll change
+# Fix: Packaging Completed Count + Empty State for Special Items
 
-1. Tighten Packaging production-rate filtering
-- File: `src/pages/OrderPackaging.tsx`
-- Replace the current special-item rule in `processedBatchesForRate`.
-- Right now Packaging still counts special items whose `initial_state` is `in_manufacturing` or `in_finishing`, which is why skipped items appear under Production Rate.
-- New rule:
-  - normal items: keep existing behavior
-  - special items: count only when `order_item.initial_state === "in_packaging"`
+## Problem
+1. `completedBatches` still includes special items that skipped packaging — the filter at line 239 only excludes `from_extra_state` but not special items by `initial_state`
+2. This inflates the completed card count (50) and tab label "Completed (50)"
+3. The empty state at line 1127 checks `completedGroups.length === 0 && completedBatches.length === 0` but also needs to account for `processedBatchesForRate` and `addedToExtraItems` being empty
 
-2. Audit completed-tab source data in Packaging
-- Make sure the data passed into `<ProductionRateSection />` comes only from that stricter `processedBatchesForRate` list plus real packaging extra-history items.
-- Keep retrieved-from-extra items separate in the dedicated retrieved section, not mixed into Packaging’s processed rate.
+## Changes
 
-3. Prevent similar inconsistency in Packaging metrics
-- Verify that Packaging’s “completed” grouping can still show moved-forward items if intended, but the Production Rate block must only reflect items actually processed in Packaging.
-- If the same loose special-item rule appears in nearby Packaging-derived counts, align it with the same strict “initial phase only” rule.
+### File: `src/pages/OrderPackaging.tsx`
 
-Technical detail
-- Correct rule for special items:
-  - Manufacturing rate: only `in_manufacturing`
-  - Finishing rate: only `in_finishing`
-  - Packaging rate: only `in_packaging`
-  - Boxing rate: exclude special items entirely
-- For this specific bug, the key fix is in `OrderPackaging.tsx`, where the current filter is too permissive.
+**1. Filter special items from `completedBatches` at the source (line 239-241)**
 
-Expected result
-- In `TEST SPECIAL 3`, the Packaging Completed tab will no longer show those 50 skipped special items in the Production Rate section.
-- Only items that were actually processed in Packaging will be shown there.
+Add the special item exclusion to `filteredCompleted` so all downstream consumers (counts, groups, tab labels) are correct:
+
+```typescript
+const filteredCompleted = allCompletedWithData.filter((b: any) => {
+  if (['extra_packaging', 'extra_boxing'].includes(b.from_extra_state)) return false;
+  // Exclude special items that didn't start in packaging
+  if (b.is_special && b.order_item?.initial_state !== 'in_packaging') return false;
+  return true;
+});
+```
+
+**2. Fix empty state condition (line 1127)**
+
+Update the empty state to show when there's truly nothing in the completed tab — no production rate items, no retrieved-from-extra, and no added-to-extra:
+
+```typescript
+{processedBatchesForRate.length === 0 && retrievedFromExtraBatches.length === 0 && addedToExtraItems.length === 0 && (
+  <Card>
+    <CardContent className="p-8 text-center text-muted-foreground">
+      {t('phase.no_completed_items')}
+    </CardContent>
+  </Card>
+)}
+```
+
+This single source-level filter fix will cascade to the completed card showing 0, the tab showing "Completed (0)", and the empty state appearing correctly.
+
