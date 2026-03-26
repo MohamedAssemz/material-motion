@@ -35,6 +35,7 @@ interface Batch {
   finishing_machine_id: string | null;
   manufacturing_machine_id: string | null;
   from_extra_state?: string | null;
+  is_special?: boolean;
   product: {
     id: string;
     name: string;
