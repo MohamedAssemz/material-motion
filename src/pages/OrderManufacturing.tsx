@@ -180,7 +180,7 @@ export default function OrderManufacturing() {
         supabase
           .from("order_batches")
           .select(
-            "id, qr_code_data, current_state, quantity, product_id, order_item_id, eta, lead_time_days, box_id, manufacturing_machine_id, from_extra_state, is_special, product:products(id, name, sku, needs_packing), order_item:order_items(needs_boxing)",
+            "id, qr_code_data, current_state, quantity, product_id, order_item_id, eta, lead_time_days, box_id, manufacturing_machine_id, from_extra_state, is_special, product:products(id, name, sku, needs_packing), order_item:order_items(needs_boxing, initial_state)",
           )
           .eq("order_id", id)
           .in("current_state", ["in_manufacturing"]),
@@ -188,7 +188,7 @@ export default function OrderManufacturing() {
         supabase
           .from("order_batches")
           .select(
-            "id, qr_code_data, current_state, quantity, product_id, order_item_id, eta, lead_time_days, box_id, manufacturing_machine_id, from_extra_state, is_special, product:products(id, name, sku, needs_packing), order_item:order_items(needs_boxing)",
+            "id, qr_code_data, current_state, quantity, product_id, order_item_id, eta, lead_time_days, box_id, manufacturing_machine_id, from_extra_state, is_special, product:products(id, name, sku, needs_packing), order_item:order_items(needs_boxing, initial_state)",
           )
           .eq("order_id", id)
           .in("current_state", [
