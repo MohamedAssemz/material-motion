@@ -175,7 +175,7 @@ export default function OrderFinishing() {
         supabase
           .from("order_batches")
           .select(
-            "id, qr_code_data, current_state, quantity, product_id, order_item_id, box_id, manufacturing_machine_id, finishing_machine_id, from_extra_state, product:products(id, name, sku, needs_packing)",
+            "id, qr_code_data, current_state, quantity, product_id, order_item_id, box_id, manufacturing_machine_id, finishing_machine_id, from_extra_state, is_special, product:products(id, name, sku, needs_packing)",
           )
           .eq("order_id", id)
           .in("current_state", ["ready_for_finishing", "in_finishing"]),
@@ -183,7 +183,7 @@ export default function OrderFinishing() {
         supabase
           .from("order_batches")
           .select(
-            "id, qr_code_data, current_state, quantity, product_id, order_item_id, box_id, manufacturing_machine_id, finishing_machine_id, from_extra_state, product:products(id, name, sku, needs_packing)",
+            "id, qr_code_data, current_state, quantity, product_id, order_item_id, box_id, manufacturing_machine_id, finishing_machine_id, from_extra_state, is_special, product:products(id, name, sku, needs_packing)",
           )
           .eq("order_id", id)
           .in("current_state", [
