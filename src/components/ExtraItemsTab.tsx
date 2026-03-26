@@ -297,6 +297,17 @@ export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true, onC
       toast.error("Please select items first");
       return;
     }
+    // Enforce single product per box
+    const selectedProductIds = new Set(
+      Array.from(productSelections.entries())
+        .filter(([_, qty]) => qty > 0)
+        .map(([key]) => productGroups.find(g => g.product_id === key)?.product_id)
+        .filter(Boolean)
+    );
+    if (selectedProductIds.size > 1) {
+      toast.error(t('phase.single_product_per_box'));
+      return;
+    }
     // For boxing phase, skip box dialog and move directly
     if (phase === "boxing") {
       handleMoveToReady();

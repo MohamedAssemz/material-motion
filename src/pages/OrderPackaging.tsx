@@ -587,6 +587,17 @@ export default function OrderPackaging() {
       toast.error("Please select items first");
       return;
     }
+    // Enforce single product per box
+    const selectedProductIds = new Set(
+      Array.from(productSelections.entries())
+        .filter(([_, qty]) => qty > 0)
+        .map(([key]) => inPackagingGroups.find(g => g.groupKey === key)?.product_id)
+        .filter(Boolean)
+    );
+    if (selectedProductIds.size > 1) {
+      toast.error(t('phase.single_product_per_box'));
+      return;
+    }
     setSelectedBox(null);
     setBoxSearchCode("");
     setSelectedMachine(null);
