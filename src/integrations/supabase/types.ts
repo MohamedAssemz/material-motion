@@ -211,6 +211,7 @@ export type Database = {
           finishing_machine_id: string | null
           id: string
           inventory_state: string
+          is_special: boolean
           manufacturing_machine_id: string | null
           order_id: string | null
           order_item_id: string | null
@@ -229,6 +230,7 @@ export type Database = {
           finishing_machine_id?: string | null
           id?: string
           inventory_state?: string
+          is_special?: boolean
           manufacturing_machine_id?: string | null
           order_id?: string | null
           order_item_id?: string | null
@@ -247,6 +249,7 @@ export type Database = {
           finishing_machine_id?: string | null
           id?: string
           inventory_state?: string
+          is_special?: boolean
           manufacturing_machine_id?: string | null
           order_id?: string | null
           order_item_id?: string | null
@@ -377,6 +380,7 @@ export type Database = {
           finishing_machine_id: string | null
           from_extra_state: string | null
           id: string
+          is_special: boolean
           lead_time_days: number | null
           manufacturing_machine_id: string | null
           order_id: string
@@ -398,6 +402,7 @@ export type Database = {
           finishing_machine_id?: string | null
           from_extra_state?: string | null
           id?: string
+          is_special?: boolean
           lead_time_days?: number | null
           manufacturing_machine_id?: string | null
           order_id: string
@@ -419,6 +424,7 @@ export type Database = {
           finishing_machine_id?: string | null
           from_extra_state?: string | null
           id?: string
+          is_special?: boolean
           lead_time_days?: number | null
           manufacturing_machine_id?: string | null
           order_id?: string
@@ -533,6 +539,8 @@ export type Database = {
           created_at: string | null
           deducted_to_extra: number
           id: string
+          initial_state: string | null
+          is_special: boolean
           needs_boxing: boolean
           order_id: string
           product_id: string
@@ -542,6 +550,8 @@ export type Database = {
           created_at?: string | null
           deducted_to_extra?: number
           id?: string
+          initial_state?: string | null
+          is_special?: boolean
           needs_boxing?: boolean
           order_id: string
           product_id: string
@@ -551,6 +561,8 @@ export type Database = {
           created_at?: string | null
           deducted_to_extra?: number
           id?: string
+          initial_state?: string | null
+          is_special?: boolean
           needs_boxing?: boolean
           order_id?: string
           product_id?: string
