@@ -548,6 +548,8 @@ export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true, onC
 
       // Execute all operations
       for (const { batch, useQty, group } of operations) {
+        // Special items go to ready_for_boxing (will be received as ready_for_shipment in boxing)
+        const batchNextState = batch.is_special ? "ready_for_boxing" : nextOrderState;
         // Create an order_batch from the extra batch
         const { data: batchCode } = await supabase.rpc("generate_extra_batch_code");
         const { data: newOrderBatch, error: insertError } = await supabase
@@ -557,11 +559,12 @@ export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true, onC
             order_id: orderId,
             order_item_id: batch.order_item_id,
             product_id: batch.product_id,
-            current_state: nextOrderState,
+            current_state: batchNextState,
             quantity: useQty,
             box_id: selectedBox.id,
             created_by: user?.id,
             from_extra_state: batch.current_state,
+            is_special: batch.is_special || false,
           })
           .select("id")
           .single();
