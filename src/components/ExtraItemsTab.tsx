@@ -166,7 +166,7 @@ export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true, onC
         .from("extra_batches")
         .select(
           `
-          id, qr_code_data, product_id, quantity, current_state, box_id, order_item_id,
+          id, qr_code_data, product_id, quantity, current_state, box_id, order_item_id, is_special,
           product:products(id, name, sku)
         `,
         )
@@ -194,6 +194,7 @@ export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true, onC
         current_state: batch.current_state,
         box_id: batch.box_id,
         order_item_id: batch.order_item_id,
+        is_special: (batch as any).is_special || false,
         product: batch.product as ExtraBatch["product"],
         box: batch.box_id ? boxMap.get(batch.box_id) : null,
       }));
