@@ -1,36 +1,56 @@
 
 
-# Fix: Commit Extra Inventory Double-Counting Bug
+# Plan: Single Product Per Order Box
 
-## Problem
-When 75 items are reserved and 50 retrieved, the consumption process reduces `extra_batches.quantity` from 75 to 25. At commit time, both the UI and RPC calculate:
-- `reserved` = 25 (current batch quantity)
-- `consumed` = 50 (from history)
-- `unretrieved` = max(0, 25 - 50) = **0** ← wrong
+## Constraint
+Since order boxes must be **empty** before assignment (already enforced), the only validation needed is: **block users from selecting multiple products at once** when assigning to a box.
 
-The correct unretrieved count is **25** — the current batch quantity itself.
+If a user selects quantities from Product A and Product B simultaneously, they cannot proceed to assign a box — they must assign one product at a time.
 
-## Fix
+## Changes
 
-The display should show:
-- **Originally reserved** = current quantity + consumed from history = 75
-- **Retrieved** = consumed from history = 50  
-- **Unretrieved** = current batch quantity = 25
+### 1. Add validation in each phase page's "open box dialog" handler
+Check that all selected `productSelections` map to the **same `product_id`**. If multiple products are selected, show an error toast and block the dialog.
 
-### 1. UI: Fix `prepareCommitSummary` in `OrderDetail.tsx`
-Change the summary calculation:
-- `reserved` = `g.reserved + consumed` (original reservation = what's left + what was consumed)
-- `consumed` = from history (unchanged)
-- `unretrieved` = `g.reserved` (current batch qty IS the unretrieved amount)
+**Files:**
+- `src/pages/OrderManufacturing.tsx` — `handleOpenBoxDialog` (~line 492)
+- `src/pages/OrderFinishing.tsx` — `handleOpenAssignDialog`
+- `src/pages/OrderPackaging.tsx` — `handleOpenAssignDialog`
+- `src/pages/OrderBoxing.tsx` — equivalent handler
+- `src/components/ExtraItemsTab.tsx` — box assignment handler
 
-### 2. Database RPC: Fix `commit_extra_inventory`
-Same logic fix:
-- `v_unretrieved_qty` should equal `v_order_item.reserved_qty` (the current remaining quantity), not `reserved_qty - consumed_qty`
-- The summary should report `original_reserved = reserved_qty + consumed_qty`
+**Validation pattern (same in all files):**
+```typescript
+const selectedProductIds = new Set(
+  Array.from(productSelections.entries())
+    .filter(([_, qty]) => qty > 0)
+    .map(([key]) => {
+      const group = productGroups.find(g => g.groupKey === key);
+      return group?.product_id;
+    })
+    .filter(Boolean)
+);
+if (selectedProductIds.size > 1) {
+  toast.error(t('phase.single_product_per_box'));
+  return;
+}
+```
 
-### Files to modify
+### 2. Add translations
+Add `phase.single_product_per_box` to `src/lib/translations.ts`:
+- EN: "A box can only contain one product. Please select items from a single product."
+- AR: Arabic equivalent
+
+### Summary
+
 | File | Change |
 |------|--------|
-| `src/pages/OrderDetail.tsx` | Fix `prepareCommitSummary` calculation (~3 lines) |
-| New migration SQL | Update `commit_extra_inventory` RPC to fix unretrieved calculation |
+| `src/pages/OrderManufacturing.tsx` | Add product_id check in `handleOpenBoxDialog` |
+| `src/pages/OrderFinishing.tsx` | Add product_id check in assign handler |
+| `src/pages/OrderPackaging.tsx` | Add product_id check in assign handler |
+| `src/pages/OrderBoxing.tsx` | Add product_id check in assign handler |
+| `src/components/ExtraItemsTab.tsx` | Add product_id check in box assignment |
+| `src/lib/translations.ts` | Add 1 translation key |
+
+No database changes needed — the constraint is purely UI-level since boxes are always empty at assignment time.
 
