@@ -171,7 +171,7 @@ export default function OrderPackaging() {
         supabase
           .from("order_batches")
           .select(
-            "id, qr_code_data, current_state, quantity, product_id, order_item_id, box_id, manufacturing_machine_id, finishing_machine_id, packaging_machine_id, from_extra_state, product:products(id, name, sku, needs_packing)",
+            "id, qr_code_data, current_state, quantity, product_id, order_item_id, box_id, manufacturing_machine_id, finishing_machine_id, packaging_machine_id, from_extra_state, is_special, product:products(id, name, sku, needs_packing)",
           )
           .eq("order_id", id)
           .in("current_state", ["ready_for_packaging", "in_packaging"]),
@@ -179,7 +179,7 @@ export default function OrderPackaging() {
         supabase
           .from("order_batches")
           .select(
-            "id, qr_code_data, current_state, quantity, product_id, order_item_id, box_id, manufacturing_machine_id, finishing_machine_id, packaging_machine_id, from_extra_state, product:products(id, name, sku, needs_packing)",
+            "id, qr_code_data, current_state, quantity, product_id, order_item_id, box_id, manufacturing_machine_id, finishing_machine_id, packaging_machine_id, from_extra_state, is_special, product:products(id, name, sku, needs_packing)",
           )
           .eq("order_id", id)
           .in("current_state", ["ready_for_boxing", "in_boxing", "ready_for_shipment", "shipped"]),
@@ -678,6 +678,7 @@ export default function OrderPackaging() {
                 finishing_machine_id: batch.finishing_machine_id,
                 packaging_machine_id: machineId || batch.packaging_machine_id,
                 from_extra_state: batch.from_extra_state,
+                is_special: batch.is_special || false,
               })
               .select("id")
               .single();
