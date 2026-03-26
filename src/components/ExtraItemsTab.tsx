@@ -437,8 +437,8 @@ export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true, onC
       }
 
       for (const { batch, useQty } of operations) {
-        // Special items go to ready_for_boxing (then boxing receives as ready_for_shipment)
-        const targetState = batch.is_special ? "ready_for_boxing" : directState;
+        // Special items go directly to ready_for_shipment (no box needed)
+        const targetState = batch.is_special ? "ready_for_shipment" : directState;
         const { data: batchCode } = await supabase.rpc("generate_extra_batch_code");
         const { error: insertError } = await supabase.from("order_batches").insert({
           qr_code_data: batchCode || `OB-${Date.now()}`,
