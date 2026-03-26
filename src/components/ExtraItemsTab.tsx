@@ -305,7 +305,7 @@ export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true, onC
         .filter(Boolean)
     );
     if (selectedProductIds.size > 1) {
-      toast.error(t('phase.single_product_per_box'));
+      toast.error("A box can only contain one product. Please select items from a single product.");
       return;
     }
     // For boxing phase, skip box dialog and move directly
