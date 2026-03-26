@@ -32,6 +32,7 @@ interface ExtraBatch {
   current_state: string;
   box_id: string | null;
   order_item_id: string | null;
+  is_special?: boolean;
   product: {
     id: string;
     name: string;
