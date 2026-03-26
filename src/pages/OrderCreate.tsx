@@ -139,9 +139,9 @@ export default function OrderCreate() {
     }
   };
 
-  const updateItem = (index: number, field: keyof OrderItem, value: string | number | boolean) => {
+  const updateItem = (index: number, updates: Partial<OrderItem>) => {
     const newItems = [...items];
-    newItems[index] = { ...newItems[index], [field]: value };
+    newItems[index] = { ...newItems[index], ...updates };
     setItems(newItems);
   };
 
