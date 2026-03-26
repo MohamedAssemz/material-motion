@@ -607,6 +607,38 @@ export default function OrderCreate() {
                       {t('order.boxing')}
                     </Label>
                   </div>
+                  <div className="flex items-center gap-2 pb-1">
+                    <Checkbox
+                      id={`is_special_${index}`}
+                      checked={item.is_special}
+                      onCheckedChange={(checked) => {
+                        updateItem(index, "is_special", !!checked);
+                        if (!checked) updateItem(index, "initial_state", "in_manufacturing");
+                      }}
+                    />
+                    <Label htmlFor={`is_special_${index}`} className="text-xs cursor-pointer">
+                      {t('order.special')}
+                    </Label>
+                  </div>
+                  {item.is_special && (
+                    <div className="w-40">
+                      <Label className="text-xs">{t('order.initial_state')}</Label>
+                      <Select
+                        value={item.initial_state}
+                        onValueChange={(val) => updateItem(index, "initial_state", val)}
+                      >
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue placeholder={t('order.select_initial_state')} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="in_manufacturing">{t('state.manufacturing')}</SelectItem>
+                          <SelectItem value="in_finishing">{t('state.finishing')}</SelectItem>
+                          <SelectItem value="in_packaging">{t('state.packaging')}</SelectItem>
+                          <SelectItem value="in_boxing">{t('state.boxing')}</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                   <Button
                     type="button"
                     variant="ghost"
