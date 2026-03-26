@@ -139,9 +139,9 @@ export default function OrderCreate() {
     }
   };
 
-  const updateItem = (index: number, field: keyof OrderItem, value: string | number | boolean) => {
+  const updateItem = (index: number, updates: Partial<OrderItem>) => {
     const newItems = [...items];
-    newItems[index] = { ...newItems[index], [field]: value };
+    newItems[index] = { ...newItems[index], ...updates };
     setItems(newItems);
   };
 
@@ -510,146 +510,146 @@ export default function OrderCreate() {
                 </Button>
               </div>
             </CardHeader>
-            <CardContent className="space-y-4">
-              {items.map((item, index) => (
-                <div key={index} className="flex gap-4 items-end">
-                  <div className="flex-1">
-                    <Label>{t('order.product')} *</Label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button variant="outline" role="combobox" className="w-full justify-between">
-                          {item.product_id
-                            ? products.find((p) => p.id === item.product_id)
-                              ? `${products.find((p) => p.id === item.product_id)?.sku} - ${products.find((p) => p.id === item.product_id)?.name}`
-                              : t('order.select_product')
-                            : t('order.select_product')}
-                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-[400px] p-0" align="start">
-                        <Command>
-                          <CommandInput placeholder={t('order.search_products')} />
-                          <CommandList>
-                            <CommandEmpty>{t('order.no_product_found')}</CommandEmpty>
-                            {/* Suggested products for selected customer */}
-                            {selectedCustomerId &&
-                              (() => {
-                                const suggestedIds = customerProductMapping.get(selectedCustomerId);
-                                const suggestedProducts = suggestedIds
-                                  ? products.filter((p) => suggestedIds.has(p.id))
-                                  : [];
-
-                                if (suggestedProducts.length > 0) {
-                                  return (
-                                    <CommandGroup heading={t('order.suggested_for_customer')}>
-                                      {suggestedProducts.map((product) => (
-                                        <CommandItem
-                                          key={`suggested-${product.id}`}
-                                          value={`suggested-${product.sku} ${product.name}`}
-                                          onSelect={() => updateItem(index, "product_id", product.id)}
-                                        >
-                                          <Check
-                                            className={cn(
-                                              "mr-2 h-4 w-4",
-                                              item.product_id === product.id ? "opacity-100" : "opacity-0",
-                                            )}
-                                          />
-                                          <span className="font-mono mr-2">{product.sku}</span>
-                                          <span className="text-muted-foreground">{product.name}</span>
-                                          <Badge variant="secondary" className="ms-2 text-xs">
-                                            {t('order.suggested')}
-                                          </Badge>
-                                        </CommandItem>
-                                      ))}
-                                    </CommandGroup>
-                                  );
-                                }
-                                return null;
-                              })()}
-                            <CommandGroup heading={selectedCustomerId ? t('order.all_products') : undefined}>
-                              {products.map((product) => (
-                                <CommandItem
-                                  key={product.id}
-                                  value={`${product.sku} ${product.name}`}
-                                  onSelect={() => updateItem(index, "product_id", product.id)}
-                                >
-                                  <Check
-                                    className={cn(
-                                      "mr-2 h-4 w-4",
-                                      item.product_id === product.id ? "opacity-100" : "opacity-0",
-                                    )}
-                                  />
-                                  <span className="font-mono mr-2">{product.sku}</span>
-                                  <span className="text-muted-foreground">{product.name}</span>
-                                </CommandItem>
-                              ))}
-                            </CommandGroup>
-                          </CommandList>
-                        </Command>
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                  <div className="w-32">
-                    <Label>{t('order.quantity')} *</Label>
-                    <NumericInput
-                      min={1}
-                      value={item.quantity}
-                      onValueChange={(val) => updateItem(index, "quantity", val ?? 1)}
-                    />
-                  </div>
-                  <div className="flex items-center gap-2 pb-1">
-                    <Checkbox
-                      id={`needs_boxing_${index}`}
-                      checked={item.needs_boxing}
-                      onCheckedChange={(checked) => updateItem(index, "needs_boxing", !!checked)}
-                    />
-                    <Label htmlFor={`needs_boxing_${index}`} className="text-xs cursor-pointer">
-                      {t('order.boxing')}
-                    </Label>
-                  </div>
-                  <div className="flex items-center gap-2 pb-1">
-                    <Checkbox
-                      id={`is_special_${index}`}
-                      checked={item.is_special}
-                      onCheckedChange={(checked) => {
-                        updateItem(index, "is_special", !!checked);
-                        if (!checked) updateItem(index, "initial_state", "in_manufacturing");
-                      }}
-                    />
-                    <Label htmlFor={`is_special_${index}`} className="text-xs cursor-pointer">
-                      {t('order.special')}
-                    </Label>
-                  </div>
-                  {item.is_special && (
-                    <div className="w-40">
-                      <Label className="text-xs">{t('order.initial_state')}</Label>
-                      <Select
-                        value={item.initial_state}
-                        onValueChange={(val) => updateItem(index, "initial_state", val)}
-                      >
-                        <SelectTrigger className="h-8 text-xs">
-                          <SelectValue placeholder={t('order.select_initial_state')} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="in_manufacturing">{t('state.manufacturing')}</SelectItem>
-                          <SelectItem value="in_finishing">{t('state.finishing')}</SelectItem>
-                          <SelectItem value="in_packaging">{t('state.packaging')}</SelectItem>
-                          <SelectItem value="in_boxing">{t('state.boxing')}</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => removeItem(index)}
-                    disabled={items.length === 1}
+            <CardContent className="space-y-3">
+              {items.map((item, index) => {
+                const selectedProduct = products.find((p) => p.id === item.product_id);
+                return (
+                  <div
+                    key={index}
+                    className={cn(
+                      "rounded-lg border bg-muted/30 p-4 space-y-3 transition-colors",
+                      item.is_special && "border-primary/40 bg-primary/5"
+                    )}
                   >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
+                    {/* Row 1: Product selector + Quantity + Delete */}
+                    <div className="flex gap-3 items-start">
+                      <div className="flex-1">
+                        <Label className="text-xs text-muted-foreground mb-1 block">{t('order.product')} *</Label>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button variant="outline" role="combobox" className="w-full justify-between h-9 text-sm">
+                              {selectedProduct
+                                ? <span className="truncate"><span className="font-mono">{selectedProduct.sku}</span> — {selectedProduct.name}</span>
+                                : <span className="text-muted-foreground">{t('order.select_product')}</span>}
+                              <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-50" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-[400px] p-0" align="start">
+                            <Command>
+                              <CommandInput placeholder={t('order.search_products')} />
+                              <CommandList>
+                                <CommandEmpty>{t('order.no_product_found')}</CommandEmpty>
+                                {selectedCustomerId &&
+                                  (() => {
+                                    const suggestedIds = customerProductMapping.get(selectedCustomerId);
+                                    const suggestedProducts = suggestedIds
+                                      ? products.filter((p) => suggestedIds.has(p.id))
+                                      : [];
+                                    if (suggestedProducts.length > 0) {
+                                      return (
+                                        <CommandGroup heading={t('order.suggested_for_customer')}>
+                                          {suggestedProducts.map((product) => (
+                                            <CommandItem
+                                              key={`suggested-${product.id}`}
+                                              value={`suggested-${product.sku} ${product.name}`}
+                                              onSelect={() => updateItem(index, { product_id: product.id })}
+                                            >
+                                              <Check className={cn("mr-2 h-4 w-4", item.product_id === product.id ? "opacity-100" : "opacity-0")} />
+                                              <span className="font-mono mr-2">{product.sku}</span>
+                                              <span className="text-muted-foreground">{product.name}</span>
+                                              <Badge variant="secondary" className="ms-2 text-xs">{t('order.suggested')}</Badge>
+                                            </CommandItem>
+                                          ))}
+                                        </CommandGroup>
+                                      );
+                                    }
+                                    return null;
+                                  })()}
+                                <CommandGroup heading={selectedCustomerId ? t('order.all_products') : undefined}>
+                                  {products.map((product) => (
+                                    <CommandItem
+                                      key={product.id}
+                                      value={`${product.sku} ${product.name}`}
+                                      onSelect={() => updateItem(index, { product_id: product.id })}
+                                    >
+                                      <Check className={cn("mr-2 h-4 w-4", item.product_id === product.id ? "opacity-100" : "opacity-0")} />
+                                      <span className="font-mono mr-2">{product.sku}</span>
+                                      <span className="text-muted-foreground">{product.name}</span>
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                      <div className="w-24">
+                        <Label className="text-xs text-muted-foreground mb-1 block">{t('order.quantity')} *</Label>
+                        <NumericInput
+                          min={1}
+                          value={item.quantity}
+                          onValueChange={(val) => updateItem(index, { quantity: val ?? 1 })}
+                          className="h-9"
+                        />
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="mt-5 h-9 w-9 text-muted-foreground hover:text-destructive"
+                        onClick={() => removeItem(index)}
+                        disabled={items.length === 1}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+
+                    {/* Row 2: Toggles and options */}
+                    <div className="flex items-center gap-4 flex-wrap">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <Checkbox
+                          checked={item.needs_boxing}
+                          onCheckedChange={(checked) => updateItem(index, { needs_boxing: !!checked })}
+                        />
+                        <span className="text-sm">{t('order.boxing')}</span>
+                      </label>
+
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <Checkbox
+                          checked={item.is_special}
+                          onCheckedChange={(checked) => {
+                            updateItem(index, {
+                              is_special: !!checked,
+                              ...(!checked ? { initial_state: "in_manufacturing" } : {}),
+                            });
+                          }}
+                        />
+                        <span className="text-sm">{t('order.special')}</span>
+                      </label>
+
+                      {item.is_special && (
+                        <div className="flex items-center gap-2 ml-auto">
+                          <span className="text-xs text-muted-foreground">{t('order.initial_state')}:</span>
+                          <Select
+                            value={item.initial_state}
+                            onValueChange={(val) => updateItem(index, { initial_state: val })}
+                          >
+                            <SelectTrigger className="h-8 w-36 text-xs">
+                              <SelectValue placeholder={t('order.select_initial_state')} />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="in_manufacturing">{t('state.manufacturing')}</SelectItem>
+                              <SelectItem value="in_finishing">{t('state.finishing')}</SelectItem>
+                              <SelectItem value="in_packaging">{t('state.packaging')}</SelectItem>
+                              <SelectItem value="in_boxing">{t('state.boxing')}</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </CardContent>
           </Card>
 
