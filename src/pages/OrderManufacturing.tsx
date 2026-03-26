@@ -54,6 +54,7 @@ interface Batch {
   };
   order_item?: {
     needs_boxing: boolean;
+    initial_state?: string | null;
   };
 }
 
@@ -121,7 +122,13 @@ export default function OrderManufacturing() {
   const isCancelled = order?.status === 'cancelled';
 
   // completedBatches already excludes retrieved-from-extra items via from_extra_state filter
-  const processedBatchesForRate = completedBatches;
+  // Also exclude special items that skipped manufacturing (initial_state is not in_manufacturing)
+  const processedBatchesForRate = completedBatches.filter(b => {
+    if (b.is_special) {
+      return b.order_item?.initial_state === 'in_manufacturing';
+    }
+    return true;
+  });
 
   const fetchExtraCount = async () => {
     if (!id) return;
@@ -173,7 +180,7 @@ export default function OrderManufacturing() {
         supabase
           .from("order_batches")
           .select(
-            "id, qr_code_data, current_state, quantity, product_id, order_item_id, eta, lead_time_days, box_id, manufacturing_machine_id, from_extra_state, is_special, product:products(id, name, sku, needs_packing), order_item:order_items(needs_boxing)",
+            "id, qr_code_data, current_state, quantity, product_id, order_item_id, eta, lead_time_days, box_id, manufacturing_machine_id, from_extra_state, is_special, product:products(id, name, sku, needs_packing), order_item:order_items(needs_boxing, initial_state)",
           )
           .eq("order_id", id)
           .in("current_state", ["in_manufacturing"]),
@@ -181,7 +188,7 @@ export default function OrderManufacturing() {
         supabase
           .from("order_batches")
           .select(
-            "id, qr_code_data, current_state, quantity, product_id, order_item_id, eta, lead_time_days, box_id, manufacturing_machine_id, from_extra_state, is_special, product:products(id, name, sku, needs_packing), order_item:order_items(needs_boxing)",
+            "id, qr_code_data, current_state, quantity, product_id, order_item_id, eta, lead_time_days, box_id, manufacturing_machine_id, from_extra_state, is_special, product:products(id, name, sku, needs_packing), order_item:order_items(needs_boxing, initial_state)",
           )
           .eq("order_id", id)
           .in("current_state", [
