@@ -546,7 +546,7 @@ export default function OrderCreate() {
                                         <CommandItem
                                           key={`suggested-${product.id}`}
                                           value={`suggested-${product.sku} ${product.name}`}
-                                          onSelect={() => updateItem(index, "product_id", product.id)}
+                                          onSelect={() => updateItem(index, { product_id: product.id })}
                                         >
                                           <Check
                                             className={cn(
@@ -571,7 +571,7 @@ export default function OrderCreate() {
                                 <CommandItem
                                   key={product.id}
                                   value={`${product.sku} ${product.name}`}
-                                  onSelect={() => updateItem(index, "product_id", product.id)}
+                                  onSelect={() => updateItem(index, { product_id: product.id })}
                                 >
                                   <Check
                                     className={cn(
@@ -594,14 +594,14 @@ export default function OrderCreate() {
                     <NumericInput
                       min={1}
                       value={item.quantity}
-                      onValueChange={(val) => updateItem(index, "quantity", val ?? 1)}
+                      onValueChange={(val) => updateItem(index, { quantity: val ?? 1 })}
                     />
                   </div>
                   <div className="flex items-center gap-2 pb-1">
                     <Checkbox
                       id={`needs_boxing_${index}`}
                       checked={item.needs_boxing}
-                      onCheckedChange={(checked) => updateItem(index, "needs_boxing", !!checked)}
+                      onCheckedChange={(checked) => updateItem(index, { needs_boxing: !!checked })}
                     />
                     <Label htmlFor={`needs_boxing_${index}`} className="text-xs cursor-pointer">
                       {t('order.boxing')}
@@ -612,8 +612,10 @@ export default function OrderCreate() {
                       id={`is_special_${index}`}
                       checked={item.is_special}
                       onCheckedChange={(checked) => {
-                        updateItem(index, "is_special", !!checked);
-                        if (!checked) updateItem(index, "initial_state", "in_manufacturing");
+                        updateItem(index, {
+                          is_special: !!checked,
+                          ...(!checked ? { initial_state: "in_manufacturing" } : {}),
+                        });
                       }}
                     />
                     <Label htmlFor={`is_special_${index}`} className="text-xs cursor-pointer">
@@ -625,7 +627,7 @@ export default function OrderCreate() {
                       <Label className="text-xs">{t('order.initial_state')}</Label>
                       <Select
                         value={item.initial_state}
-                        onValueChange={(val) => updateItem(index, "initial_state", val)}
+                        onValueChange={(val) => updateItem(index, { initial_state: val })}
                       >
                         <SelectTrigger className="h-8 text-xs">
                           <SelectValue placeholder={t('order.select_initial_state')} />
