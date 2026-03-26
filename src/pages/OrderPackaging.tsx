@@ -236,9 +236,11 @@ export default function OrderPackaging() {
 
       setOrder(orderRes.data as Order);
       setBatches(batchesWithData as Batch[]);
-      const filteredCompleted = allCompletedWithData.filter(
-        (b: any) => !['extra_packaging', 'extra_boxing'].includes(b.from_extra_state)
-      );
+      const filteredCompleted = allCompletedWithData.filter((b: any) => {
+        if (['extra_packaging', 'extra_boxing'].includes(b.from_extra_state)) return false;
+        if (b.is_special && b.order_item?.initial_state !== 'in_packaging') return false;
+        return true;
+      });
       setCompletedBatches(filteredCompleted as Batch[]);
     } catch (error: any) {
       toast.error(error.message);
@@ -1124,7 +1126,7 @@ export default function OrderPackaging() {
             batches={retrievedFromExtraBatches}
           />
 
-          {completedGroups.length === 0 && completedBatches.length === 0 && retrievedFromExtraBatches.length === 0 && (
+          {processedBatchesForRate.length === 0 && retrievedFromExtraBatches.length === 0 && addedToExtraItems.length === 0 && (
             <Card>
               <CardContent className="p-8 text-center text-muted-foreground">{t('phase.no_completed_items')}</CardContent>
             </Card>
