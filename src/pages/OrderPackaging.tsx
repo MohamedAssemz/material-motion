@@ -119,11 +119,10 @@ export default function OrderPackaging() {
   const isCancelled = order?.status === 'cancelled';
 
   // completedBatches already excludes retrieved-from-extra items via from_extra_state filter
-  // Exclude special items that skipped packaging (initial_state must be in_manufacturing, in_finishing, or in_packaging)
+  // Only count special items if packaging is their actual initial phase
   const processedBatchesForRate = completedBatches.filter(b => {
     if (b.is_special) {
-      const init = b.order_item?.initial_state;
-      return init === 'in_manufacturing' || init === 'in_finishing' || init === 'in_packaging';
+      return b.order_item?.initial_state === 'in_packaging';
     }
     return true;
   });
