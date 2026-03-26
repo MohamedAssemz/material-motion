@@ -639,9 +639,21 @@ export default function OrderDetail() {
     };
     const excludeStates = laterExtraStates[phaseName] || [];
 
+    // Special items skip phases before their initial_state
+    const skippedByInitialState: Record<string, string[]> = {
+      manufacturing: ["in_finishing", "in_packaging", "in_boxing"],
+      finishing: ["in_packaging", "in_boxing"],
+      packaging: ["in_boxing"],
+      boxing: [],
+    };
+    const skippedInitials = skippedByInitialState[phaseName] || [];
+
     const pastStateBatches = relevantBatches.filter((b) => {
       if (getAllStates().indexOf(b.current_state as UnitState) <= stateIndex) return false;
       if (excludeStates.includes((b as any).from_extra_state)) return false;
+      // Exclude special items that skipped this phase entirely
+      const orderItem = orderItems.find(oi => oi.id === b.order_item_id);
+      if (orderItem?.is_special && orderItem.initial_state && skippedInitials.includes(orderItem.initial_state)) return false;
       return true;
     });
 
