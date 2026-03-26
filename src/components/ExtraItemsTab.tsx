@@ -365,6 +365,7 @@ export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true, onC
           box_id: null,
           created_by: user?.id,
           from_extra_state: batch.current_state,
+          is_special: batch.is_special || false,
         });
 
         if (insertError) throw insertError;
