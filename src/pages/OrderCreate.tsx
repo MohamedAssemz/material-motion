@@ -53,6 +53,8 @@ interface OrderItem {
   product_id: string;
   quantity: number;
   needs_boxing: boolean;
+  is_special: boolean;
+  initial_state: string;
 }
 
 const orderSchema = z.object({
@@ -83,7 +85,7 @@ export default function OrderCreate() {
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const [customerOpen, setCustomerOpen] = useState(false);
   const [eftOpen, setEftOpen] = useState(false);
-  const [items, setItems] = useState<OrderItem[]>([{ product_id: "", quantity: 1, needs_boxing: true }]);
+  const [items, setItems] = useState<OrderItem[]>([{ product_id: "", quantity: 1, needs_boxing: true, is_special: false, initial_state: "in_manufacturing" }]);
   const [customerProductMapping, setCustomerProductMapping] = useState<Map<string, Set<string>>>(new Map());
   const [showPackagingRef, setShowPackagingRef] = useState(false);
   const [packagingRows, setPackagingRows] = useState<Array<{ item_index: number; quantity: number; length_cm: string; width_cm: string; height_cm: string; weight_kg: string }>>([]);
@@ -128,7 +130,7 @@ export default function OrderCreate() {
   };
 
   const addItem = () => {
-    setItems([...items, { product_id: "", quantity: 1, needs_boxing: true }]);
+    setItems([...items, { product_id: "", quantity: 1, needs_boxing: true, is_special: false, initial_state: "in_manufacturing" }]);
   };
 
   const removeItem = (index: number) => {
@@ -233,6 +235,8 @@ export default function OrderCreate() {
         product_id: string;
         quantity: number;
         needs_boxing: boolean;
+        is_special: boolean;
+        initial_state: string;
         isExtra?: boolean;
         extraProductId?: string;
       }> = [];
@@ -246,6 +250,8 @@ export default function OrderCreate() {
             product_id: item.product_id,
             quantity: item.quantity,
             needs_boxing: item.needs_boxing,
+            is_special: item.is_special,
+            initial_state: item.is_special ? item.initial_state : null,
           })
           .select()
           .single();
@@ -256,6 +262,8 @@ export default function OrderCreate() {
           product_id: item.product_id,
           quantity: item.quantity,
           needs_boxing: item.needs_boxing,
+          is_special: item.is_special,
+          initial_state: item.initial_state,
         });
       }
 
@@ -270,9 +278,10 @@ export default function OrderCreate() {
           order_id: order.id,
           order_item_id: orderItem.id,
           product_id: orderItem.product_id,
-          current_state: "in_manufacturing",
+          current_state: orderItem.is_special ? orderItem.initial_state : "in_manufacturing",
           quantity: orderItem.quantity,
           created_by: user?.id,
+          is_special: orderItem.is_special,
         });
 
         if (batchError) throw batchError;
@@ -598,6 +607,38 @@ export default function OrderCreate() {
                       {t('order.boxing')}
                     </Label>
                   </div>
+                  <div className="flex items-center gap-2 pb-1">
+                    <Checkbox
+                      id={`is_special_${index}`}
+                      checked={item.is_special}
+                      onCheckedChange={(checked) => {
+                        updateItem(index, "is_special", !!checked);
+                        if (!checked) updateItem(index, "initial_state", "in_manufacturing");
+                      }}
+                    />
+                    <Label htmlFor={`is_special_${index}`} className="text-xs cursor-pointer">
+                      {t('order.special')}
+                    </Label>
+                  </div>
+                  {item.is_special && (
+                    <div className="w-40">
+                      <Label className="text-xs">{t('order.initial_state')}</Label>
+                      <Select
+                        value={item.initial_state}
+                        onValueChange={(val) => updateItem(index, "initial_state", val)}
+                      >
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue placeholder={t('order.select_initial_state')} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="in_manufacturing">{t('state.manufacturing')}</SelectItem>
+                          <SelectItem value="in_finishing">{t('state.finishing')}</SelectItem>
+                          <SelectItem value="in_packaging">{t('state.packaging')}</SelectItem>
+                          <SelectItem value="in_boxing">{t('state.boxing')}</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                   <Button
                     type="button"
                     variant="ghost"

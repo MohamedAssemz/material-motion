@@ -45,6 +45,7 @@ interface Batch {
   box_id: string | null;
   manufacturing_machine_id?: string | null;
   from_extra_state?: string | null;
+  is_special?: boolean;
   product: {
     id: string;
     name: string;
@@ -172,7 +173,7 @@ export default function OrderManufacturing() {
         supabase
           .from("order_batches")
           .select(
-            "id, qr_code_data, current_state, quantity, product_id, order_item_id, eta, lead_time_days, box_id, manufacturing_machine_id, from_extra_state, product:products(id, name, sku, needs_packing), order_item:order_items(needs_boxing)",
+            "id, qr_code_data, current_state, quantity, product_id, order_item_id, eta, lead_time_days, box_id, manufacturing_machine_id, from_extra_state, is_special, product:products(id, name, sku, needs_packing), order_item:order_items(needs_boxing)",
           )
           .eq("order_id", id)
           .in("current_state", ["in_manufacturing"]),
@@ -180,7 +181,7 @@ export default function OrderManufacturing() {
         supabase
           .from("order_batches")
           .select(
-            "id, qr_code_data, current_state, quantity, product_id, order_item_id, eta, lead_time_days, box_id, manufacturing_machine_id, from_extra_state, product:products(id, name, sku, needs_packing), order_item:order_items(needs_boxing)",
+            "id, qr_code_data, current_state, quantity, product_id, order_item_id, eta, lead_time_days, box_id, manufacturing_machine_id, from_extra_state, is_special, product:products(id, name, sku, needs_packing), order_item:order_items(needs_boxing)",
           )
           .eq("order_id", id)
           .in("current_state", [
@@ -559,10 +560,12 @@ export default function OrderManufacturing() {
 
           if (useQty === batch.quantity) {
             // Update entire batch - no ETA here, set when receiving
+            // Special items go directly to ready_for_boxing
+            const nextState = batch.is_special ? "ready_for_boxing" : "ready_for_finishing";
             await supabase
               .from("order_batches")
               .update({
-                current_state: "ready_for_finishing",
+                current_state: nextState,
                 box_id: selectedBox.id,
                 manufacturing_machine_id: machineId || batch.manufacturing_machine_id,
               })
@@ -584,6 +587,8 @@ export default function OrderManufacturing() {
             const { data: qrCode } = await supabase.rpc("generate_extra_batch_code");
 
             // Create new batch with selected quantity - no ETA here
+            // Special items go directly to ready_for_boxing
+            const splitNextState = batch.is_special ? "ready_for_boxing" : "ready_for_finishing";
             // Inherit manufacturing_machine_id from parent batch or use selected
             const { data: newBatch } = await supabase
               .from("order_batches")
@@ -592,12 +597,13 @@ export default function OrderManufacturing() {
                 order_id: id,
                 product_id: batch.product_id,
                 order_item_id: batch.order_item_id,
-                current_state: "ready_for_finishing",
+                current_state: splitNextState,
                 quantity: useQty,
                 box_id: selectedBox.id,
                 created_by: user?.id,
                 manufacturing_machine_id: machineId || batch.manufacturing_machine_id,
                 from_extra_state: batch.from_extra_state,
+                is_special: batch.is_special || false,
               })
               .select("id")
               .single();

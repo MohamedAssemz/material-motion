@@ -35,6 +35,7 @@ interface Batch {
   finishing_machine_id: string | null;
   manufacturing_machine_id: string | null;
   from_extra_state?: string | null;
+  is_special?: boolean;
   product: {
     id: string;
     name: string;
@@ -170,7 +171,7 @@ export default function OrderPackaging() {
         supabase
           .from("order_batches")
           .select(
-            "id, qr_code_data, current_state, quantity, product_id, order_item_id, box_id, manufacturing_machine_id, finishing_machine_id, packaging_machine_id, from_extra_state, product:products(id, name, sku, needs_packing)",
+            "id, qr_code_data, current_state, quantity, product_id, order_item_id, box_id, manufacturing_machine_id, finishing_machine_id, packaging_machine_id, from_extra_state, is_special, product:products(id, name, sku, needs_packing)",
           )
           .eq("order_id", id)
           .in("current_state", ["ready_for_packaging", "in_packaging"]),
@@ -178,7 +179,7 @@ export default function OrderPackaging() {
         supabase
           .from("order_batches")
           .select(
-            "id, qr_code_data, current_state, quantity, product_id, order_item_id, box_id, manufacturing_machine_id, finishing_machine_id, packaging_machine_id, from_extra_state, product:products(id, name, sku, needs_packing)",
+            "id, qr_code_data, current_state, quantity, product_id, order_item_id, box_id, manufacturing_machine_id, finishing_machine_id, packaging_machine_id, from_extra_state, is_special, product:products(id, name, sku, needs_packing)",
           )
           .eq("order_id", id)
           .in("current_state", ["ready_for_boxing", "in_boxing", "ready_for_shipment", "shipped"]),
@@ -677,6 +678,7 @@ export default function OrderPackaging() {
                 finishing_machine_id: batch.finishing_machine_id,
                 packaging_machine_id: machineId || batch.packaging_machine_id,
                 from_extra_state: batch.from_extra_state,
+                is_special: batch.is_special || false,
               })
               .select("id")
               .single();
@@ -730,8 +732,11 @@ export default function OrderPackaging() {
         const group = inPackagingGroups.find((g) => g.groupKey === key);
         if (!group) continue;
 
-        // Route based on needs_boxing: true -> in_boxing, false -> ready_for_shipment
-        const nextState = group.needs_boxing ? "in_boxing" : "ready_for_shipment";
+        // Route based on needs_boxing and is_special:
+        // is_special -> ready_for_shipment (skip boxing)
+        // needs_boxing=true -> in_boxing, needs_boxing=false -> ready_for_shipment
+        const isGroupSpecial = group.batches.some(b => b.is_special);
+        const nextState = isGroupSpecial ? "ready_for_shipment" : (group.needs_boxing ? "in_boxing" : "ready_for_shipment");
 
         let remainingQty = quantity;
         const sortedBatches = [...group.batches].sort((a, b) => {

@@ -40,6 +40,7 @@ interface Batch {
   box?: { id: string; box_code: string } | null;
   order_item?: { id: string; needs_boxing: boolean } | null;
   from_extra_state?: string | null;
+  is_special?: boolean;
 }
 
 interface Order {
@@ -185,7 +186,7 @@ export default function OrderBoxing() {
         supabase
           .from("order_batches")
           .select(
-            "id, qr_code_data, current_state, quantity, product_id, order_item_id, box_id, manufacturing_machine_id, finishing_machine_id, packaging_machine_id, boxing_machine_id, from_extra_state, product:products(id, name, sku, needs_packing)",
+            "id, qr_code_data, current_state, quantity, product_id, order_item_id, box_id, manufacturing_machine_id, finishing_machine_id, packaging_machine_id, boxing_machine_id, from_extra_state, is_special, product:products(id, name, sku, needs_packing)",
           )
           .eq("order_id", id)
           .in("current_state", ["ready_for_boxing", "in_boxing", "ready_for_shipment", "shipped"]),
@@ -533,11 +534,12 @@ export default function OrderBoxing() {
         (b) => b.current_state === "ready_for_boxing" && b.box_id && selectedBoxes.has(b.box_id),
       );
 
-      // Route based on needs_boxing flag per batch:
-      // needs_boxing = true -> in_boxing (Processing)
+      // Route based on needs_boxing flag and is_special per batch:
+      // is_special = true -> ready_for_shipment (special items skip boxing processing)
+      // needs_boxing = true (non-special) -> in_boxing (Processing)
       // needs_boxing = false -> ready_for_shipment (Ready for Shipment)
-      const batchesToBoxing = selectedBatches.filter((b) => b.order_item?.needs_boxing !== false);
-      const batchesToShipment = selectedBatches.filter((b) => b.order_item?.needs_boxing === false);
+      const batchesToBoxing = selectedBatches.filter((b) => b.order_item?.needs_boxing !== false && !b.is_special);
+      const batchesToShipment = selectedBatches.filter((b) => b.order_item?.needs_boxing === false || b.is_special);
 
       // Clear box_id when receiving - boxes become available again
       if (batchesToBoxing.length > 0) {
