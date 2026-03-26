@@ -732,8 +732,11 @@ export default function OrderPackaging() {
         const group = inPackagingGroups.find((g) => g.groupKey === key);
         if (!group) continue;
 
-        // Route based on needs_boxing: true -> in_boxing, false -> ready_for_shipment
-        const nextState = group.needs_boxing ? "in_boxing" : "ready_for_shipment";
+        // Route based on needs_boxing and is_special:
+        // is_special -> ready_for_shipment (skip boxing)
+        // needs_boxing=true -> in_boxing, needs_boxing=false -> ready_for_shipment
+        const isGroupSpecial = group.batches.some(b => b.is_special);
+        const nextState = isGroupSpecial ? "ready_for_shipment" : (group.needs_boxing ? "in_boxing" : "ready_for_shipment");
 
         let remainingQty = quantity;
         const sortedBatches = [...group.batches].sort((a, b) => {
