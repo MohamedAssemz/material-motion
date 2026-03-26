@@ -1,42 +1,28 @@
 
 
-# Fix: Special Items Phase Stats & Extra Move Directly
+# Fix: Special Items in Production Rate + Boxing Rate Filtering
 
-## Issue 1: Special items incorrectly counted as completed in earlier phases
+## Problem
+1. Special items (e.g., starting at finishing) appear in the production rate of phases they skipped (manufacturing, packaging, etc.)
+2. Boxing production rate shows items that were routed directly to `ready_for_shipment` (special items, `needs_boxing=false`) — these weren't actually processed in boxing
 
-**Root cause**: `getPhaseStats` in `OrderDetail.tsx` counts any batch past a phase's state index as "completed" for that phase. A special item starting at packaging (e.g., `in_packaging`) has a state index higher than manufacturing and finishing, so it's counted as completed for both — even though it never went through them.
+## Solution
 
-**Fix**: In `getPhaseStats`, filter out batches where the order item's `initial_state` indicates the batch skipped this phase entirely. A batch skips a phase if its `initial_state` is at or after the phase being measured.
+### 1. Filter special items from production rate in phases they skipped
+In each phase page's `processedBatchesForRate` (or equivalent filter), exclude special batches whose `initial_state` indicates they skipped this phase.
 
-For example, if `initial_state = 'in_packaging'`, the batch skips manufacturing and finishing. The logic maps each phase to a set of initial states that would skip it:
-- Manufacturing: skipped by `in_finishing`, `in_packaging`, `in_boxing`
-- Finishing: skipped by `in_packaging`, `in_boxing`
-- Packaging: skipped by `in_boxing`
-- Boxing: never skipped
-
-This filter applies to `pastStateBatches` calculation (line ~642).
-
-**File**: `src/pages/OrderDetail.tsx` — `getPhaseStats` function
-
-## Issue 2: "Move directly" errors for special items with `ready_for_boxing`
-
-**Root cause**: In `ExtraItemsTab.tsx`, `handleMoveDirectly` routes special items to `ready_for_boxing` with `box_id: null`. But the DB trigger `enforce_box_id_for_transitioning_states` requires `box_id` for `ready_for_boxing`.
-
-**Fix**: Special items from extra inventory should go directly to `ready_for_shipment` instead of `ready_for_boxing` when using "Move directly". They don't need boxing processing — the whole point is they skip to shipment after their initial phase.
+**Files**: `OrderManufacturing.tsx`, `OrderFinishing.tsx`, `OrderPackaging.tsx`
 
 ```typescript
-// In handleMoveDirectly:
-const targetState = batch.is_special ? "ready_for_shipment" : directState;
+// Example for manufacturing:
+const processedBatchesForRate = completedBatches.filter(b => {
+  if (b.is_special) {
+    const initialState = b.order_item?.initial_state;
+    // Only count in manufacturing if initial_state is in_manufacturing
+    return initialState === 'in_manufacturing';
+  }
+  return true;
+});
 ```
 
-Same fix needed in `handleAssignToBox` — when assigning special items to a box, set state to `ready_for_boxing` (which requires `box_id`, and box is provided in that flow — so it works). But for "Move directly" (no box), use `ready_for_shipment`.
-
-**File**: `src/components/ExtraItemsTab.tsx` — `handleMoveDirectly` function (line ~441)
-
-## Files Summary
-
-| File | Change |
-|------|--------|
-| `src/pages/OrderDetail.tsx` | Filter special items from phase stats for phases they skipped |
-| `src/components/ExtraItemsTab.tsx` | Route special items to `ready_for_shipment` in `handleMoveDirectly` |
-
+Same pattern for finishing (only count `in_manufacturing` or
