@@ -45,7 +45,7 @@ interface Category {
 
 interface Brand {
   id: string;
-  name: string;
+  name_en: string;
   logo_url: string | null;
   created_at: string;
   product_count?: number;
@@ -54,15 +54,19 @@ interface Brand {
 interface Product {
   id: string;
   sku: string;
-  name: string;
-  description: string | null;
-  size: string | null;
-  color: string | null;
+  name_en: string;
+  name_ar: string | null;
+  description_en: string | null;
+  description_ar: string | null;
+  size_from: string | null;
+  size_to: string | null;
+  color_en: string | null;
+  color_ar: string | null;
   country: string | null;
   needs_packing: boolean | null;
   brand_id: string | null;
   created_at: string | null;
-  brand?: { id: string; name: string } | null;
+  brand?: { id: string; name_en: string } | null;
   categories?: { category: { id: string; name: string } }[];
   images?: { id: string; image_url: string; is_main: boolean | null; sort_order: number | null }[];
   potential_customers?: { customer: { id: string; name: string; code: string | null } }[];
@@ -120,7 +124,7 @@ export default function Catalog() {
           .select(
             `
           *,
-          brand:brands(id, name),
+          brand:brands(id, name_en),
           categories:product_categories(category:categories(id, name)),
           images:product_images(id, image_url, is_main, sort_order),
           product_customers:product_customers(customer:customers(id, name, code))
@@ -190,9 +194,10 @@ export default function Catalog() {
       if (searchTerm) {
         const term = searchTerm.toLowerCase();
         const matchesSearch =
-          product.name.toLowerCase().includes(term) ||
+          product.name_en.toLowerCase().includes(term) ||
+          (product.name_ar?.toLowerCase().includes(term) ?? false) ||
           product.sku.toLowerCase().includes(term) ||
-          (product.description?.toLowerCase().includes(term) ?? false);
+          (product.description_en?.toLowerCase().includes(term) ?? false);
         if (!matchesSearch) return false;
       }
 
@@ -209,7 +214,13 @@ export default function Catalog() {
 
       // Size filter
       if (selectedSize !== "all") {
-        if (product.size !== selectedSize) return false;
+        const sizeIdx = SIZE_OPTIONS.indexOf(selectedSize as any);
+        const fromIdx = product.size_from ? SIZE_OPTIONS.indexOf(product.size_from as any) : -1;
+        const toIdx = product.size_to ? SIZE_OPTIONS.indexOf(product.size_to as any) : -1;
+        if (fromIdx < 0 && toIdx < 0) return false;
+        const effectiveFrom = fromIdx >= 0 ? fromIdx : toIdx;
+        const effectiveTo = toIdx >= 0 ? toIdx : fromIdx;
+        if (sizeIdx < effectiveFrom || sizeIdx > effectiveTo) return false;
       }
 
       // Country filter
@@ -240,10 +251,14 @@ export default function Catalog() {
     return {
       id: product.id,
       sku: product.sku,
-      name: product.name,
-      description: product.description || "",
-      size: product.size || "",
-      color: product.color || "",
+      name_en: product.name_en,
+      name_ar: product.name_ar || "",
+      description_en: product.description_en || "",
+      description_ar: product.description_ar || "",
+      size_from: product.size_from || "",
+      size_to: product.size_to || "",
+      color_en: product.color_en || "",
+      color_ar: product.color_ar || "",
       brand_id: product.brand_id || "",
       country: product.country || "",
       needs_packing: product.needs_packing ?? true,
@@ -306,7 +321,7 @@ export default function Catalog() {
 
       toast({
         title: t("catalog.product_deleted"),
-        description: `${productToDelete.name} ${t("catalog.deleted_success")}`,
+        description: `${productToDelete.name_en} ${t("catalog.deleted_success")}`,
       });
 
       fetchData();
@@ -470,7 +485,7 @@ export default function Catalog() {
                 <SelectItem value="all">{t("catalog.all_brands")}</SelectItem>
                 {brands.map((b) => (
                   <SelectItem key={b.id} value={b.id}>
-                    {b.name}
+                    {b.name_en}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -571,7 +586,7 @@ export default function Catalog() {
           <AlertDialogHeader>
             <AlertDialogTitle>{t("catalog.delete_product")}</AlertDialogTitle>
             <AlertDialogDescription>
-              {t("catalog.delete_confirm")} "{productToDelete?.name}"? {t("catalog.cannot_undone")}
+              {t("catalog.delete_confirm")} "{productToDelete?.name_en}"? {t("catalog.cannot_undone")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
