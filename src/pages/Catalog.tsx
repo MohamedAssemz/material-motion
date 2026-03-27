@@ -58,8 +58,7 @@ interface Product {
   name_ar: string | null;
   description_en: string | null;
   description_ar: string | null;
-  size_from: string | null;
-  size_to: string | null;
+  sizes: string[] | null;
   color_en: string | null;
   color_ar: string | null;
   country: string | null;
@@ -214,13 +213,7 @@ export default function Catalog() {
 
       // Size filter
       if (selectedSize !== "all") {
-        const sizeIdx = SIZE_OPTIONS.indexOf(selectedSize as any);
-        const fromIdx = product.size_from ? SIZE_OPTIONS.indexOf(product.size_from as any) : -1;
-        const toIdx = product.size_to ? SIZE_OPTIONS.indexOf(product.size_to as any) : -1;
-        if (fromIdx < 0 && toIdx < 0) return false;
-        const effectiveFrom = fromIdx >= 0 ? fromIdx : toIdx;
-        const effectiveTo = toIdx >= 0 ? toIdx : fromIdx;
-        if (sizeIdx < effectiveFrom || sizeIdx > effectiveTo) return false;
+        if (!product.sizes || !product.sizes.includes(selectedSize)) return false;
       }
 
       // Country filter
@@ -255,8 +248,7 @@ export default function Catalog() {
       name_ar: product.name_ar || "",
       description_en: product.description_en || "",
       description_ar: product.description_ar || "",
-      size_from: product.size_from || "",
-      size_to: product.size_to || "",
+      sizes: product.sizes || [],
       color_en: product.color_en || "",
       color_ar: product.color_ar || "",
       brand_id: product.brand_id || "",
