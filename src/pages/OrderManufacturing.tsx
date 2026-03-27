@@ -408,13 +408,13 @@ export default function OrderManufacturing() {
     }
   };
 
-  // Group batches by product_id + needs_boxing to combine same product items with same boxing requirements
+  // Group batches by order_item_id to keep different sizes/colors/boxing as separate entries
   const productGroups: ProductGroup[] = [];
   const groupMap = new Map<string, ProductGroup>();
 
   batches.forEach((batch) => {
     const needsBoxing = batch.order_item?.needs_boxing ?? true;
-    const groupKey = `${batch.product_id}-${needsBoxing ? "boxing" : "no-boxing"}`;
+    const groupKey = batch.order_item_id || `${batch.product_id}-fallback`;
 
     if (!groupMap.has(groupKey)) {
       groupMap.set(groupKey, {
@@ -422,6 +422,10 @@ export default function OrderManufacturing() {
         product_id: batch.product_id,
         product_name: batch.product?.name_en || "Unknown",
         product_sku: batch.product?.sku || "N/A",
+        product_name_ar: batch.product?.name_ar,
+        product_color_en: batch.product?.color_en,
+        product_color_ar: batch.product?.color_ar,
+        size: batch.order_item?.size,
         needs_packing: batch.product?.needs_packing ?? true,
         needs_boxing: needsBoxing,
         inManufacturing: 0,
@@ -438,15 +442,14 @@ export default function OrderManufacturing() {
   });
 
   groupMap.forEach((g) => productGroups.push(g));
-  // Sort by product name for consistent ordering
   productGroups.sort((a, b) => a.product_name.localeCompare(b.product_name));
 
-  // Group completed items by product + needs_boxing
+  // Group completed items by order_item_id
   const completedGroups: ProductGroup[] = [];
   const completedGroupMap = new Map<string, ProductGroup>();
   completedBatches.forEach((batch) => {
     const needsBoxing = batch.order_item?.needs_boxing ?? true;
-    const groupKey = `${batch.product_id}-${needsBoxing ? "boxing" : "no-boxing"}`;
+    const groupKey = batch.order_item_id || `${batch.product_id}-fallback`;
 
     if (!completedGroupMap.has(groupKey)) {
       completedGroupMap.set(groupKey, {
@@ -454,6 +457,10 @@ export default function OrderManufacturing() {
         product_id: batch.product_id,
         product_name: batch.product?.name_en || "Unknown",
         product_sku: batch.product?.sku || "N/A",
+        product_name_ar: batch.product?.name_ar,
+        product_color_en: batch.product?.color_en,
+        product_color_ar: batch.product?.color_ar,
+        size: batch.order_item?.size,
         needs_packing: batch.product?.needs_packing ?? true,
         needs_boxing: needsBoxing,
         inManufacturing: 0,
@@ -463,7 +470,7 @@ export default function OrderManufacturing() {
     }
     const group = completedGroupMap.get(groupKey)!;
     group.batches.push(batch);
-    group.inManufacturing += batch.quantity; // reusing field for total
+    group.inManufacturing += batch.quantity;
     if (batch.order_item_id && !group.order_item_ids.includes(batch.order_item_id)) {
       group.order_item_ids.push(batch.order_item_id);
     }
