@@ -761,8 +761,7 @@ export type Database = {
           name_ar: string | null
           name_en: string
           needs_packing: boolean | null
-          size_from: string | null
-          size_to: string | null
+          sizes: string[] | null
           sku: string
         }
         Insert: {
@@ -777,8 +776,7 @@ export type Database = {
           name_ar?: string | null
           name_en: string
           needs_packing?: boolean | null
-          size_from?: string | null
-          size_to?: string | null
+          sizes?: string[] | null
           sku: string
         }
         Update: {
@@ -793,8 +791,7 @@ export type Database = {
           name_ar?: string | null
           name_en?: string
           needs_packing?: boolean | null
-          size_from?: string | null
-          size_to?: string | null
+          sizes?: string[] | null
           sku?: string
         }
         Relationships: [
