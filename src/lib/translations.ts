@@ -462,6 +462,7 @@ export const translations: Record<string, TranslationEntry> = {
   "catalog.product_s":        { en: "Product(s)",           ar: "منتج/منتجات" },
   "catalog.packing":          { en: "Packing",              ar: "التغليف" },
   "catalog.image":            { en: "Image",                ar: "الصورة" },
+  "catalog.upload_image":     { en: "Upload Image",         ar: "رفع صورة" },
   "catalog.name":             { en: "Name",                 ar: "الاسم" },
   "catalog.created_label":    { en: "created",              ar: "تم إنشاؤه" },
   "catalog.skipped":          { en: "skipped",              ar: "تم تخطيه" },

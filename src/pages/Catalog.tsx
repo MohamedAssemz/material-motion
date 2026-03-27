@@ -37,8 +37,10 @@ import { SIZE_OPTIONS } from "@/lib/catalogConstants";
 
 interface Category {
   id: string;
-  name: string;
+  name_en: string;
+  name_ar: string | null;
   description: string | null;
+  image_url: string | null;
   created_at: string;
   product_count?: number;
 }
@@ -66,7 +68,7 @@ interface Product {
   brand_id: string | null;
   created_at: string | null;
   brand?: { id: string; name_en: string } | null;
-  categories?: { category: { id: string; name: string } }[];
+  categories?: { category: { id: string; name_en: string } }[];
   images?: { id: string; image_url: string; is_main: boolean | null; sort_order: number | null }[];
   potential_customers?: { customer: { id: string; name: string; code: string | null } }[];
 }
@@ -124,13 +126,13 @@ export default function Catalog() {
             `
           *,
           brand:brands(id, name_en),
-          categories:product_categories(category:categories(id, name)),
+          categories:product_categories(category:categories(id, name_en)),
           images:product_images(id, image_url, is_main, sort_order),
           product_customers:product_customers(customer:customers(id, name, code))
         `,
           )
           .order("created_at", { ascending: false }),
-        supabase.from("categories").select("*").order("name"),
+        supabase.from("categories").select("*").order("name_en"),
         supabase.from("brands").select("*").order("name_en"),
       ]);
 
@@ -463,7 +465,7 @@ export default function Catalog() {
                 <SelectItem value="all">{t("catalog.all_categories")}</SelectItem>
                 {categories.map((c) => (
                   <SelectItem key={c.id} value={c.id}>
-                    {c.name}
+                    {c.name_en}
                   </SelectItem>
                 ))}
               </SelectContent>

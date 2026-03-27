@@ -16,7 +16,7 @@ import { getSizesLabel } from '@/lib/catalogConstants';
 interface ProductCategory {
   category: {
     id: string;
-    name: string;
+    name_en: string;
   } | null;
 }
 
@@ -153,7 +153,7 @@ export function ProductCard({
           <div className="flex flex-wrap gap-1">
             {product.categories.slice(0, 3).map((pc, idx) => pc.category && (
               <Badge key={pc.category.id || idx} variant="secondary" className="text-xs">
-                {pc.category.name}
+                {pc.category.name_en}
               </Badge>
             ))}
             {product.categories.filter(pc => pc.category).length > 3 && (

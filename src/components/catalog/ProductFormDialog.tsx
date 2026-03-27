@@ -22,7 +22,7 @@ function CategoriesSelector({
   onToggle,
   t,
 }: { 
-  categories: { id: string; name: string }[]; 
+  categories: { id: string; name_en: string }[]; 
   selectedIds: string[]; 
   onToggle: (id: string) => void;
   t: (key: string) => string;
@@ -32,7 +32,7 @@ function CategoriesSelector({
   const filtered = useMemo(() => {
     if (!search.trim()) return categories;
     return categories.filter(c => 
-      c.name.toLowerCase().includes(search.toLowerCase())
+      c.name_en.toLowerCase().includes(search.toLowerCase())
     );
   }, [categories, search]);
 
@@ -66,7 +66,7 @@ function CategoriesSelector({
                   checked={selectedIds.includes(category.id)}
                   onCheckedChange={() => onToggle(category.id)}
                 />
-                {category.name}
+                {category.name_en}
               </label>
             ))
           )}
@@ -78,7 +78,7 @@ function CategoriesSelector({
 
 interface Category {
   id: string;
-  name: string;
+  name_en: string;
 }
 
 interface Brand {
@@ -188,7 +188,7 @@ export function ProductFormDialog({
     setLoading(true);
     try {
       const [categoriesRes, brandsRes, customersRes] = await Promise.all([
-        supabase.from('categories').select('id, name').order('name'),
+        supabase.from('categories').select('id, name_en').order('name_en'),
         supabase.from('brands').select('id, name_en').order('name_en'),
         supabase.from('customers').select('id, name, code').order('name'),
       ]);

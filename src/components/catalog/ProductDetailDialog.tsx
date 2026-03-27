@@ -206,7 +206,7 @@ export function ProductDetailDialog({
                   <h4 className="text-sm font-medium text-muted-foreground mb-2">{t('catalog.categories')}</h4>
                   <div className="flex flex-wrap gap-1.5">
                     {product.categories.map((pc, idx) => pc.category && (
-                      <Badge key={pc.category.id || idx} variant="secondary">{pc.category.name}</Badge>
+                      <Badge key={pc.category.id || idx} variant="secondary">{pc.category.name_en}</Badge>
                     ))}
                   </div>
                 </div>
