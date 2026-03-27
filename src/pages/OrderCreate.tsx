@@ -61,7 +61,7 @@ interface OrderItem {
 const orderSchema = z.object({
   order_number: z.string().trim().min(1, "Order number is required").max(50, "Order number too long"),
   notes: z.string().trim().max(500, "Notes must be less than 500 characters").optional(),
-  priority: z.enum(["high", "normal"]),
+  priority: z.enum(["low", "normal", "high"]),
   shipping_type: z.enum(["domestic", "international"]),
   raw_materials: z.string().optional(),
 });
@@ -77,7 +77,7 @@ export default function OrderCreate() {
   const [submitting, setSubmitting] = useState(false);
   const [orderNumber, setOrderNumber] = useState("");
   const [notes, setNotes] = useState("");
-  const [priority, setPriority] = useState<"high" | "normal">("normal");
+  const [priority, setPriority] = useState<"low" | "normal" | "high">("normal");
   const [shippingType, setShippingType] = useState<"domestic" | "international">("domestic");
   const [country, setCountry] = useState("");
   const [estimatedFulfillment, setEstimatedFulfillment] = useState<Date | undefined>();
@@ -89,6 +89,7 @@ export default function OrderCreate() {
   const [items, setItems] = useState<OrderItem[]>([{ product_id: "", sizeQuantities: {}, needs_boxing: true, is_special: false, initial_state: "in_manufacturing" }]);
   const [customerProductMapping, setCustomerProductMapping] = useState<Map<string, Set<string>>>(new Map());
   const [showPackagingRef, setShowPackagingRef] = useState(false);
+  const [productPopoverOpen, setProductPopoverOpen] = useState<Record<number, boolean>>({});
   const [packagingRows, setPackagingRows] = useState<Array<{ item_index: number; quantity: number; length_cm: string; width_cm: string; height_cm: string; weight_kg: string }>>([]);
 
   useEffect(() => {
@@ -458,11 +459,12 @@ export default function OrderCreate() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="priority">{t('order.priority')} *</Label>
-                  <Select value={priority} onValueChange={(value: "high" | "normal") => setPriority(value)}>
+                  <Select value={priority} onValueChange={(value: "low" | "normal" | "high") => setPriority(value)}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="low">{t('order.priority_low')}</SelectItem>
                       <SelectItem value="normal">{t('order.priority_normal')}</SelectItem>
                       <SelectItem value="high">{t('order.priority_high')}</SelectItem>
                     </SelectContent>
@@ -577,7 +579,7 @@ export default function OrderCreate() {
                     <div className="flex gap-3 items-start">
                       <div className="flex-1">
                         <Label className="text-xs text-muted-foreground mb-1 block">{t('order.product')} *</Label>
-                        <Popover>
+                      <Popover open={productPopoverOpen[index] || false} onOpenChange={(open) => setProductPopoverOpen(prev => ({ ...prev, [index]: open }))}>
                           <PopoverTrigger asChild>
                             <Button variant="outline" role="combobox" className="w-full justify-between h-9 text-sm">
                               {selectedProduct
@@ -604,7 +606,7 @@ export default function OrderCreate() {
                                             <CommandItem
                                               key={`suggested-${product.id}`}
                                               value={`suggested-${product.sku} ${product.name_en}`}
-                                              onSelect={() => updateItem(index, { product_id: product.id })}
+                                              onSelect={() => { updateItem(index, { product_id: product.id }); setProductPopoverOpen(prev => ({ ...prev, [index]: false })); }}
                                             >
                                               <Check className={cn("mr-2 h-4 w-4", item.product_id === product.id ? "opacity-100" : "opacity-0")} />
                                               <span className="font-mono mr-2">{product.sku}</span>
@@ -622,7 +624,7 @@ export default function OrderCreate() {
                                     <CommandItem
                                       key={product.id}
                                       value={`${product.sku} ${product.name_en}`}
-                                      onSelect={() => updateItem(index, { product_id: product.id })}
+                                      onSelect={() => { updateItem(index, { product_id: product.id }); setProductPopoverOpen(prev => ({ ...prev, [index]: false })); }}
                                     >
                                       <Check className={cn("mr-2 h-4 w-4", item.product_id === product.id ? "opacity-100" : "opacity-0")} />
                                       <span className="font-mono mr-2">{product.sku}</span>

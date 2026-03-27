@@ -707,6 +707,7 @@ export const translations: Record<string, TranslationEntry> = {
   "order.no_customer_found":  { en: "No customer found.",   ar: "لم يتم العثور على عميل." },
   "order.no_customer":        { en: "No customer",          ar: "بدون عميل" },
   "order.priority":           { en: "Priority",             ar: "الأولوية" },
+  "order.priority_low":       { en: "Low",                  ar: "منخفض" },
   "order.priority_normal":    { en: "Normal",               ar: "عادي" },
   "order.priority_high":      { en: "High",                 ar: "عالي" },
   "order.shipping_type":      { en: "Shipping Type",        ar: "نوع الشحن" },
