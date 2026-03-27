@@ -15,7 +15,8 @@ import { format } from 'date-fns';
 
 interface Brand {
   id: string;
-  name: string;
+  name_en: string;
+  name_ar: string | null;
   logo_url: string | null;
   created_at: string;
   product_count?: number;
@@ -30,7 +31,7 @@ export default function CatalogBrands() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [editingBrand, setEditingBrand] = useState<Brand | null>(null);
   const [deletingBrand, setDeletingBrand] = useState<Brand | null>(null);
-  const [formData, setFormData] = useState({ name: '', logo_url: '' });
+  const [formData, setFormData] = useState({ name_en: '', name_ar: '', logo_url: '' });
   const [saving, setSaving] = useState(false);
 
   const canManage = hasRole('admin');
@@ -44,8 +45,8 @@ export default function CatalogBrands() {
       // Fetch brands with product count
       const { data: brandsData, error } = await supabase
         .from('brands')
-        .select('id, name, logo_url, created_at')
-        .order('name');
+        .select('id, name_en, name_ar, logo_url, created_at')
+        .order('name_en');
 
       if (error) throw error;
 
@@ -82,7 +83,7 @@ export default function CatalogBrands() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.name.trim()) {
+    if (!formData.name_en.trim()) {
       toast({
         title: 'Validation Error',
         description: 'Brand name is required',
@@ -98,7 +99,8 @@ export default function CatalogBrands() {
         const { error } = await supabase
           .from('brands')
           .update({
-            name: formData.name.trim(),
+            name_en: formData.name_en.trim(),
+            name_ar: formData.name_ar.trim() || null,
             logo_url: formData.logo_url.trim() || null,
           })
           .eq('id', editingBrand.id);
@@ -109,7 +111,8 @@ export default function CatalogBrands() {
         const { error } = await supabase
           .from('brands')
           .insert({
-            name: formData.name.trim(),
+            name_en: formData.name_en.trim(),
+            name_ar: formData.name_ar.trim() || null,
             logo_url: formData.logo_url.trim() || null,
           });
 
@@ -156,14 +159,15 @@ export default function CatalogBrands() {
   };
 
   const resetForm = () => {
-    setFormData({ name: '', logo_url: '' });
+    setFormData({ name_en: '', name_ar: '', logo_url: '' });
     setEditingBrand(null);
   };
 
   const openEditDialog = (brand: Brand) => {
     setEditingBrand(brand);
     setFormData({
-      name: brand.name,
+      name_en: brand.name_en,
+      name_ar: brand.name_ar || '',
       logo_url: brand.logo_url || '',
     });
     setDialogOpen(true);
@@ -207,13 +211,23 @@ export default function CatalogBrands() {
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                  <Label htmlFor="name">Name *</Label>
+                  <Label htmlFor="name_en">English Name *</Label>
                   <Input
-                    id="name"
-                    value={formData.name}
-                    onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                    placeholder="Brand name"
+                    id="name_en"
+                    value={formData.name_en}
+                    onChange={(e) => setFormData(prev => ({ ...prev, name_en: e.target.value }))}
+                    placeholder="Brand name (English)"
                     required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="name_ar">Arabic Name</Label>
+                  <Input
+                    id="name_ar"
+                    value={formData.name_ar}
+                    onChange={(e) => setFormData(prev => ({ ...prev, name_ar: e.target.value }))}
+                    placeholder="اسم العلامة التجارية"
+                    dir="rtl"
                   />
                 </div>
                 <div>
@@ -271,13 +285,13 @@ export default function CatalogBrands() {
                   <TableRow key={brand.id}>
                     <TableCell>
                       <Avatar className="h-10 w-10">
-                        <AvatarImage src={brand.logo_url || undefined} alt={brand.name} />
+                        <AvatarImage src={brand.logo_url || undefined} alt={brand.name_en} />
                         <AvatarFallback className="text-xs">
-                          {brand.name.substring(0, 2).toUpperCase()}
+                          {brand.name_en.substring(0, 2).toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
                     </TableCell>
-                    <TableCell className="font-medium">{brand.name}</TableCell>
+                    <TableCell className="font-medium">{brand.name_en}</TableCell>
                     <TableCell className="text-center">{brand.product_count}</TableCell>
                     <TableCell className="text-muted-foreground">
                       {format(new Date(brand.created_at), 'MMM d, yyyy')}
@@ -318,7 +332,7 @@ export default function CatalogBrands() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Brand?</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete "{deletingBrand?.name}"? 
+              Are you sure you want to delete "{deletingBrand?.name_en}"? 
               Products using this brand will have their brand cleared. This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>

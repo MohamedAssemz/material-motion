@@ -229,7 +229,7 @@ export default function Dashboard() {
           .select("product_id, quantity")
           .in("current_state", ["shipped", "ready_for_shipment"])
           .gte("created_at", rangeStart),
-        supabase.from("machines").select("id, name_en"),
+        supabase.from("machines").select("id, name"),
         supabase.from("order_batches").select("current_state, quantity").gte("updated_at", rangeStart),
         supabase
           .from("orders")
@@ -665,7 +665,7 @@ export default function Dashboard() {
                     >
                       {i + 1}
                     </span>
-                    <span className="text-sm font-medium truncate">{p.name_en}</span>
+                    <span className="text-sm font-medium truncate">{p.name}</span>
                   </div>
                   <Badge variant="secondary" className="text-xs shrink-0">
                     {p.quantity} {t("common.units")}

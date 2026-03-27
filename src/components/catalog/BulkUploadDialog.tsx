@@ -14,7 +14,7 @@ import ExcelJS from 'exceljs';
 interface BulkUploadDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  brands: { id: string; name: string }[];
+  brands: { id: string; name_en: string }[];
   onSuccess: () => void;
 }
 
@@ -26,10 +26,14 @@ interface UploadResult {
 
 interface ParsedProduct {
   sku: string;
-  name: string;
-  description: string | null;
-  size: string | null;
-  color: string | null;
+  name_en: string;
+  name_ar: string | null;
+  description_en: string | null;
+  description_ar: string | null;
+  size_from: string | null;
+  size_to: string | null;
+  color_en: string | null;
+  color_ar: string | null;
   brand_id: string | null;
   brand_name: string;
   needs_packing: boolean;
@@ -89,11 +93,16 @@ export function BulkUploadDialog({ open, onOpenChange, brands, onSuccess }: Bulk
     const sheet = workbook.addWorksheet('Products');
 
     sheet.columns = [
-      { header: 'name', key: 'name', width: 30 },
-      { header: 'description', key: 'description', width: 40 },
-      { header: 'size', key: 'size', width: 12 },
-      { header: 'color', key: 'color', width: 15 },
-      { header: 'brand', key: 'brand', width: 20 },
+      { header: 'english_name', key: 'english_name', width: 30 },
+      { header: 'arabic_name', key: 'arabic_name', width: 30 },
+      { header: 'english_description', key: 'english_description', width: 40 },
+      { header: 'arabic_description', key: 'arabic_description', width: 40 },
+      { header: 'size_from', key: 'size_from', width: 12 },
+      { header: 'size_to', key: 'size_to', width: 12 },
+      { header: 'english_color', key: 'english_color', width: 15 },
+      { header: 'arabic_color', key: 'arabic_color', width: 15 },
+      { header: 'english_brand', key: 'english_brand', width: 20 },
+      { header: 'arabic_brand', key: 'arabic_brand', width: 20 },
       { header: 'needs_packing', key: 'needs_packing', width: 15 },
       { header: 'image_url', key: 'image_url', width: 40 },
     ];
@@ -116,47 +125,69 @@ export function BulkUploadDialog({ open, onOpenChange, brands, onSuccess }: Bulk
     URL.revokeObjectURL(url);
   };
 
-  const processRows = (rows: { name: string; description: string; size: string; color: string; brand: string; needs_packing: string; image_url: string }[]): ParsedData => {
-    const brandMap = new Map(brands.map(b => [b.name.toLowerCase(), b.id]));
+  const processRows = (rows: Record<string, string>[]): ParsedData => {
+    const brandMap = new Map(brands.map(b => [b.name_en.toLowerCase(), b.id]));
     const warnings: string[] = [];
     const productsToInsert: ParsedProduct[] = [];
+    const newBrands: Map<string, { name_en: string; name_ar: string | null }> = new Map();
+
+    // First pass: detect new brands
+    rows.forEach((row) => {
+      const brandNameEn = (row.english_brand || row.brand || '').trim();
+      const brandNameAr = (row.arabic_brand || '').trim();
+      if (brandNameEn && !brandMap.has(brandNameEn.toLowerCase()) && !newBrands.has(brandNameEn.toLowerCase())) {
+        newBrands.set(brandNameEn.toLowerCase(), { name_en: brandNameEn, name_ar: brandNameAr || null });
+      }
+    });
 
     rows.forEach((row, idx) => {
       const rowNum = idx + 2;
-      const name = row.name?.trim();
-      if (!name) {
-        warnings.push(`Row ${rowNum}: Skipped – missing name.`);
+      const nameEn = (row.english_name || row.name || '').trim();
+      if (!nameEn) {
+        warnings.push(`Row ${rowNum}: Skipped – missing english name.`);
         return;
       }
 
-      let size: string | null = row.size?.trim().toUpperCase() || null;
-      if (size && !sizeSet.has(size)) {
-        warnings.push(`Row ${rowNum}: Invalid size "${size}" – cleared.`);
-        size = null;
+      let sizeFrom: string | null = (row.size_from || row.size || '').trim().toUpperCase() || null;
+      let sizeTo: string | null = (row.size_to || '').trim().toUpperCase() || null;
+      if (sizeFrom && !sizeSet.has(sizeFrom)) {
+        warnings.push(`Row ${rowNum}: Invalid size_from "${sizeFrom}" – cleared.`);
+        sizeFrom = null;
       }
+      if (sizeTo && !sizeSet.has(sizeTo)) {
+        warnings.push(`Row ${rowNum}: Invalid size_to "${sizeTo}" – cleared.`);
+        sizeTo = null;
+      }
+      if (sizeFrom && !sizeTo) sizeTo = sizeFrom;
+      if (sizeTo && !sizeFrom) sizeFrom = sizeTo;
 
-      const brandName = row.brand?.trim();
+      const brandNameEn = (row.english_brand || row.brand || '').trim();
       let brand_id: string | null = null;
-      if (brandName) {
-        brand_id = brandMap.get(brandName.toLowerCase()) ?? null;
+      if (brandNameEn) {
+        brand_id = brandMap.get(brandNameEn.toLowerCase()) ?? null;
         if (!brand_id) {
-          warnings.push(`Row ${rowNum}: Brand "${brandName}" not found – skipped.`);
+          // Will be auto-created
+          warnings.push(`Row ${rowNum}: Brand "${brandNameEn}" will be auto-created.`);
         }
       }
 
-      const needsPackingRaw = row.needs_packing?.trim().toLowerCase();
+      const needsPackingRaw = (row.needs_packing || '').trim().toLowerCase();
       const needs_packing = needsPackingRaw === 'false' ? false : true;
 
-      const imageUrl = row.image_url?.trim() || null;
+      const imageUrl = (row.image_url || '').trim() || null;
 
       productsToInsert.push({
         sku: generateSKU(idx),
-        name,
-        description: row.description?.trim() || null,
-        size,
-        color: row.color?.trim() || null,
+        name_en: nameEn,
+        name_ar: (row.arabic_name || '').trim() || null,
+        description_en: (row.english_description || row.description || '').trim() || null,
+        description_ar: (row.arabic_description || '').trim() || null,
+        size_from: sizeFrom,
+        size_to: sizeTo,
+        color_en: (row.english_color || row.color || '').trim() || null,
+        color_ar: (row.arabic_color || '').trim() || null,
         brand_id,
-        brand_name: brandName || '',
+        brand_name: brandNameEn || '',
         needs_packing,
         image_url: imageUrl,
       });
@@ -174,7 +205,7 @@ export function BulkUploadDialog({ open, onOpenChange, brands, onSuccess }: Bulk
     setUploading(true);
 
     try {
-      let rows: { name: string; description: string; size: string; color: string; brand: string; needs_packing: string; image_url: string }[] = [];
+      let rows: Record<string, string>[] = [];
       const isExcel = file.name.match(/\.xlsx?$/i);
 
       if (isExcel) {
@@ -193,14 +224,11 @@ export function BulkUploadDialog({ open, onOpenChange, brands, onSuccess }: Bulk
           if (rowNumber === 1) return;
           const vals: string[] = [];
          row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
-            // ExcelJS can return objects for hyperlinks/rich text - extract the plain text
             const raw = cell.value;
             let strVal = '';
             if (raw == null) {
               strVal = '';
             } else if (typeof raw === 'object') {
-              // Hyperlink cells: { text: '...', hyperlink: '...' }
-              // Rich text cells: { richText: [...] }
               strVal = (raw as any).text ?? (raw as any).hyperlink ?? (raw as any).result ?? String(raw);
             } else {
               strVal = String(raw);
@@ -211,15 +239,9 @@ export function BulkUploadDialog({ open, onOpenChange, brands, onSuccess }: Bulk
             const idx = headers.indexOf(col);
             return idx >= 0 ? vals[idx] ?? '' : '';
           };
-          rows.push({
-            name: getVal('name'),
-            description: getVal('description'),
-            size: getVal('size'),
-            color: getVal('color'),
-            brand: getVal('brand'),
-            needs_packing: getVal('needs_packing'),
-            image_url: getVal('image_url'),
-          });
+          const rowData: Record<string, string> = {};
+          headers.forEach(h => { rowData[h] = getVal(h); });
+          rows.push(rowData);
         });
       } else {
         const text = await file.text();
@@ -230,8 +252,8 @@ export function BulkUploadDialog({ open, onOpenChange, brands, onSuccess }: Bulk
           return;
         }
         const headers = parseCSVLine(lines[0]).map(h => h.toLowerCase().trim());
-        if (!headers.includes('name')) {
-          toast({ title: 'Error', description: 'File must contain a "name" column.', variant: 'destructive' });
+        if (!headers.includes('english_name') && !headers.includes('name')) {
+          toast({ title: 'Error', description: 'File must contain an "english_name" or "name" column.', variant: 'destructive' });
           setUploading(false);
           return;
         }
@@ -241,15 +263,9 @@ export function BulkUploadDialog({ open, onOpenChange, brands, onSuccess }: Bulk
         };
         for (let i = 1; i < lines.length; i++) {
           const values = parseCSVLine(lines[i]);
-          rows.push({
-            name: getVal(values, 'name'),
-            description: getVal(values, 'description'),
-            size: getVal(values, 'size'),
-            color: getVal(values, 'color'),
-            brand: getVal(values, 'brand'),
-            needs_packing: getVal(values, 'needs_packing'),
-            image_url: getVal(values, 'image_url'),
-          });
+          const rowData: Record<string, string> = {};
+          headers.forEach(h => { rowData[h] = getVal(values, h); });
+          rows.push(rowData);
         }
       }
 
@@ -281,7 +297,34 @@ export function BulkUploadDialog({ open, onOpenChange, brands, onSuccess }: Bulk
     setInserting(true);
 
     try {
-      const toInsert = parsedData.productsToInsert.map(({ brand_name, image_url, ...p }) => p);
+      // Auto-create new brands
+      const brandMap = new Map(brands.map(b => [b.name_en.toLowerCase(), b.id]));
+      const newBrandNames = new Set<string>();
+      parsedData.productsToInsert.forEach(p => {
+        if (p.brand_name && !p.brand_id && !brandMap.has(p.brand_name.toLowerCase())) {
+          newBrandNames.add(p.brand_name.toLowerCase());
+        }
+      });
+
+      if (newBrandNames.size > 0) {
+        const brandsToCreate = Array.from(newBrandNames).map(name => {
+          const product = parsedData.productsToInsert.find(p => p.brand_name.toLowerCase() === name);
+          return { name_en: product?.brand_name || name };
+        });
+        const { data: createdBrands } = await supabase
+          .from('brands')
+          .insert(brandsToCreate)
+          .select('id, name_en');
+        createdBrands?.forEach(b => brandMap.set(b.name_en.toLowerCase(), b.id));
+      }
+
+      // Assign brand_ids for auto-created brands
+      const productsWithBrands = parsedData.productsToInsert.map(p => ({
+        ...p,
+        brand_id: p.brand_id || (p.brand_name ? brandMap.get(p.brand_name.toLowerCase()) || null : null),
+      }));
+
+      const toInsert = productsWithBrands.map(({ brand_name, image_url, ...p }) => p);
       const { data: inserted, error } = await supabase
         .from('products')
         .insert(toInsert)
@@ -378,9 +421,9 @@ export function BulkUploadDialog({ open, onOpenChange, brands, onSuccess }: Bulk
                 <TableBody>
                   {parsedData.productsToInsert.map((p, i) => (
                     <TableRow key={i}>
-                      <TableCell className="text-xs font-medium">{p.name}</TableCell>
-                      <TableCell className="text-xs">{p.size || '—'}</TableCell>
-                      <TableCell className="text-xs">{p.color || '—'}</TableCell>
+                    <TableCell className="text-xs font-medium">{p.name_en}</TableCell>
+                      <TableCell className="text-xs">{p.size_from ? (p.size_to && p.size_to !== p.size_from ? `${p.size_from}-${p.size_to}` : p.size_from) : '—'}</TableCell>
+                      <TableCell className="text-xs">{p.color_en || '—'}</TableCell>
                       <TableCell className="text-xs">{p.brand_name || '—'}</TableCell>
                       <TableCell className="text-xs">{p.needs_packing ? t('common.yes') : t('common.no')}</TableCell>
                       <TableCell className="text-xs truncate max-w-[120px]">{p.image_url || '—'}</TableCell>
