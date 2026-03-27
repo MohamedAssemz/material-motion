@@ -75,6 +75,10 @@ interface ProductGroup {
   product_id: string;
   product_name: string;
   product_sku: string;
+  product_name_ar?: string | null;
+  product_color_en?: string | null;
+  product_color_ar?: string | null;
+  size?: string | null;
   needs_packing: boolean;
   needs_boxing: boolean;
   inManufacturing: number;
