@@ -59,12 +59,16 @@ interface BoxGroup {
   totalQty: number;
 }
 
-// Group by product + needs_boxing to combine same product items
+// Group by order_item_id to keep different sizes/colors as separate entries
 interface OrderItemGroup {
-  groupKey: string; // product_id + needs_boxing
+  groupKey: string;
   product_id: string;
   product_name: string;
   product_sku: string;
+  product_name_ar?: string | null;
+  product_color_en?: string | null;
+  product_color_ar?: string | null;
+  size?: string | null;
   needs_boxing: boolean;
   quantity: number;
   batches: Batch[];
@@ -408,20 +412,24 @@ export default function OrderBoxing() {
     });
   boxGroupMap.forEach((g) => readyBoxGroups.push(g));
 
-  // Group in_boxing by product + needs_boxing
+  // Group in_boxing by order_item_id
   const inBoxingGroups: OrderItemGroup[] = [];
   const orderItemMap = new Map<string, OrderItemGroup>();
   batches
     .filter((b) => b.current_state === "in_boxing")
     .forEach((batch) => {
       const needsBoxing = batch.order_item?.needs_boxing ?? true;
-      const groupKey = `${batch.product_id}-${needsBoxing ? 'boxing' : 'no-boxing'}`;
+      const groupKey = batch.order_item_id || `${batch.product_id}-fallback`;
       if (!orderItemMap.has(groupKey)) {
         orderItemMap.set(groupKey, {
           groupKey,
           product_id: batch.product_id,
           product_name: batch.product?.name_en || "Unknown",
           product_sku: batch.product?.sku || "N/A",
+          product_name_ar: batch.product?.name_ar,
+          product_color_en: batch.product?.color_en,
+          product_color_ar: batch.product?.color_ar,
+          size: batch.order_item?.size,
           needs_boxing: needsBoxing,
           quantity: 0,
           batches: [],
@@ -438,20 +446,24 @@ export default function OrderBoxing() {
   orderItemMap.forEach((g) => inBoxingGroups.push(g));
   inBoxingGroups.sort((a, b) => a.product_name.localeCompare(b.product_name));
 
-  // Group ready_for_shipment by product + needs_boxing
+  // Group ready_for_shipment by order_item_id
   const readyForShipmentGroups: OrderItemGroup[] = [];
   const readyShipmentMap = new Map<string, OrderItemGroup>();
   batches
     .filter((b) => b.current_state === "ready_for_shipment")
     .forEach((batch) => {
       const needsBoxing = batch.order_item?.needs_boxing ?? true;
-      const groupKey = `${batch.product_id}-${needsBoxing ? 'boxing' : 'no-boxing'}`;
+      const groupKey = batch.order_item_id || `${batch.product_id}-fallback`;
       if (!readyShipmentMap.has(groupKey)) {
         readyShipmentMap.set(groupKey, {
           groupKey,
           product_id: batch.product_id,
           product_name: batch.product?.name_en || "Unknown",
           product_sku: batch.product?.sku || "N/A",
+          product_name_ar: batch.product?.name_ar,
+          product_color_en: batch.product?.color_en,
+          product_color_ar: batch.product?.color_ar,
+          size: batch.order_item?.size,
           needs_boxing: needsBoxing,
           quantity: 0,
           batches: [],
