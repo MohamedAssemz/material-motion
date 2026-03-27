@@ -816,8 +816,17 @@ export default function OrderManufacturing() {
                   <CardContent className="p-4">
                     <div className="flex items-center justify-between">
                       <div className="flex-1">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <p className="font-medium">{group.product_name}</p>
+                          {group.product_name_ar && (
+                            <span className="text-sm text-muted-foreground">({group.product_name_ar})</span>
+                          )}
+                          {group.size && (
+                            <Badge variant="outline" className="text-xs">{group.size}</Badge>
+                          )}
+                          {group.product_color_en && (
+                            <Badge variant="outline" className="text-xs">{group.product_color_en}</Badge>
+                          )}
                           {group.needs_boxing ? (
                             <Badge variant="outline" className="text-xs bg-primary/10">
                               {t('phase.needs_boxing')}
