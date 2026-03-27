@@ -249,7 +249,7 @@ export default function OrderManufacturing() {
         } else {
           productMap.set(record.product_id, {
             product_id: record.product_id,
-            product_name: record.products?.name || "Unknown",
+            product_name: record.products?.name_en || "Unknown",
             product_sku: record.products?.sku || "N/A",
             quantity: record.quantity,
           });
@@ -276,7 +276,7 @@ export default function OrderManufacturing() {
           (extraBatches || []).map((eb: any) => ({
             id: eb.id,
             product_id: eb.product_id,
-            product_name: eb.product?.name || "Unknown",
+            product_name: eb.product?.name_en || "Unknown",
             product_sku: eb.product?.sku || "N/A",
             quantity: historyByBatch.get(eb.id) || 0,
             manufacturing_machine_id: eb.manufacturing_machine_id,
@@ -313,7 +313,7 @@ export default function OrderManufacturing() {
           productMap.set(key, {
             id: key,
             product_id: record.product_id,
-            product_name: record.products?.name || 'Unknown',
+            product_name: record.products?.name_en || 'Unknown',
             product_sku: record.products?.sku || 'N/A',
             quantity: record.quantity,
             order_item_id: record.consuming_order_item_id || null,
@@ -412,7 +412,7 @@ export default function OrderManufacturing() {
       groupMap.set(groupKey, {
         groupKey,
         product_id: batch.product_id,
-        product_name: batch.product?.name || "Unknown",
+        product_name: batch.product?.name_en || "Unknown",
         product_sku: batch.product?.sku || "N/A",
         needs_packing: batch.product?.needs_packing ?? true,
         needs_boxing: needsBoxing,
@@ -444,7 +444,7 @@ export default function OrderManufacturing() {
       completedGroupMap.set(groupKey, {
         groupKey,
         product_id: batch.product_id,
-        product_name: batch.product?.name || "Unknown",
+        product_name: batch.product?.name_en || "Unknown",
         product_sku: batch.product?.sku || "N/A",
         needs_packing: batch.product?.needs_packing ?? true,
         needs_boxing: needsBoxing,
@@ -882,7 +882,7 @@ export default function OrderManufacturing() {
               ...processedBatchesForRate.map((batch) => ({
                 id: batch.id,
                 product_id: batch.product_id,
-                product_name: batch.product?.name || "Unknown",
+                product_name: batch.product?.name_en || "Unknown",
                 product_sku: batch.product?.sku || "N/A",
                 quantity: batch.quantity,
                 machine_id: batch.manufacturing_machine_id || null,

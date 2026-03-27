@@ -281,7 +281,7 @@ export default function OrderFinishing() {
         } else {
           productMap.set(record.product_id, {
             product_id: record.product_id,
-            product_name: record.products?.name || "Unknown",
+            product_name: record.products?.name_en || "Unknown",
             product_sku: record.products?.sku || "N/A",
             quantity: record.quantity,
           });
@@ -306,7 +306,7 @@ export default function OrderFinishing() {
           (extraBatches || []).map((eb: any) => ({
             id: eb.id,
             product_id: eb.product_id,
-            product_name: eb.product?.name || "Unknown",
+            product_name: eb.product?.name_en || "Unknown",
             product_sku: eb.product?.sku || "N/A",
             quantity: historyByBatch.get(eb.id) || 0,
             finishing_machine_id: eb.finishing_machine_id,
@@ -343,7 +343,7 @@ export default function OrderFinishing() {
           productMap.set(key, {
             id: key,
             product_id: record.product_id,
-            product_name: record.products?.name || 'Unknown',
+            product_name: record.products?.name_en || 'Unknown',
             product_sku: record.products?.sku || 'N/A',
             quantity: record.quantity,
             order_item_id: record.consuming_order_item_id || null,
@@ -463,7 +463,7 @@ export default function OrderFinishing() {
         orderItemGroupMap.set(groupKey, {
           groupKey,
           product_id: batch.product_id,
-          product_name: batch.product?.name || "Unknown",
+          product_name: batch.product?.name_en || "Unknown",
           product_sku: batch.product?.sku || "N/A",
           needs_packing: batch.product?.needs_packing ?? true,
           needs_boxing: needsBoxing,
@@ -493,7 +493,7 @@ export default function OrderFinishing() {
       completedGroupMap.set(groupKey, {
         groupKey,
         product_id: batch.product_id,
-        product_name: batch.product?.name || "Unknown",
+        product_name: batch.product?.name_en || "Unknown",
         product_sku: batch.product?.sku || "N/A",
         needs_packing: batch.product?.needs_packing ?? true,
         needs_boxing: needsBoxing,
@@ -543,7 +543,7 @@ export default function OrderFinishing() {
         const query = receiveSearchQuery.trim().toUpperCase();
         if (group.box_code.toUpperCase().includes(query)) return true;
         return group.batches.some(
-          (b) => b.product?.sku?.toUpperCase().includes(query) || b.product?.name?.toUpperCase().includes(query),
+          (b) => b.product?.sku?.toUpperCase().includes(query) || b.product?.name_en?.toUpperCase().includes(query),
         );
       })
     : readyBoxGroups;
@@ -950,7 +950,7 @@ export default function OrderFinishing() {
                       </div>
                       <Badge variant="secondary">{group.totalQty} {t('phase.items')}</Badge>
                       <div className="flex-1 text-sm text-muted-foreground">
-                        {group.batches.map((b) => `${b.product?.sku} - ${b.product?.name} (${b.quantity})`).join(", ")}
+                        {group.batches.map((b) => `${b.product?.sku} - ${b.product?.name_en} (${b.quantity})`).join(", ")}
                       </div>
                     </div>
                   </CardContent>
@@ -1065,7 +1065,7 @@ export default function OrderFinishing() {
               ...processedBatchesForRate.map((b) => ({
                 id: b.id,
                 product_id: b.product_id,
-                product_name: b.product?.name || "Unknown",
+                product_name: b.product?.name_en || "Unknown",
                 product_sku: b.product?.sku || "N/A",
                 quantity: b.quantity,
                 machine_id: b.finishing_machine_id,

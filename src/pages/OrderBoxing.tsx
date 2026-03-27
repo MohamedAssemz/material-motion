@@ -255,7 +255,7 @@ export default function OrderBoxing() {
         } else {
           productMap.set(record.product_id, {
             product_id: record.product_id,
-            product_name: record.products?.name || 'Unknown',
+            product_name: record.products?.name_en || 'Unknown',
             product_sku: record.products?.sku || 'N/A',
             quantity: record.quantity,
           });
@@ -280,7 +280,7 @@ export default function OrderBoxing() {
           (extraBatches || []).map((eb: any) => ({
             id: eb.id,
             product_id: eb.product_id,
-            product_name: eb.product?.name || 'Unknown',
+            product_name: eb.product?.name_en || 'Unknown',
             product_sku: eb.product?.sku || 'N/A',
             quantity: historyByBatch.get(eb.id) || 0,
             boxing_machine_id: eb.boxing_machine_id,
@@ -316,7 +316,7 @@ export default function OrderBoxing() {
           productMap.set(key, {
             id: key,
             product_id: record.product_id,
-            product_name: record.products?.name || 'Unknown',
+            product_name: record.products?.name_en || 'Unknown',
             product_sku: record.products?.sku || 'N/A',
             quantity: record.quantity,
             order_item_id: record.consuming_order_item_id || null,
@@ -420,7 +420,7 @@ export default function OrderBoxing() {
         orderItemMap.set(groupKey, {
           groupKey,
           product_id: batch.product_id,
-          product_name: batch.product?.name || "Unknown",
+          product_name: batch.product?.name_en || "Unknown",
           product_sku: batch.product?.sku || "N/A",
           needs_boxing: needsBoxing,
           quantity: 0,
@@ -450,7 +450,7 @@ export default function OrderBoxing() {
         readyShipmentMap.set(groupKey, {
           groupKey,
           product_id: batch.product_id,
-          product_name: batch.product?.name || "Unknown",
+          product_name: batch.product?.name_en || "Unknown",
           product_sku: batch.product?.sku || "N/A",
           needs_boxing: needsBoxing,
           quantity: 0,
@@ -971,7 +971,7 @@ export default function OrderBoxing() {
             idx === 0 && shipment.height_cm != null ? String(shipment.height_cm) : '',
             idx === 0 && shipment.weight_kg != null ? String(shipment.weight_kg) : '',
             batch.product?.sku || '',
-            batch.product?.name || '',
+            batch.product?.name_en || '',
             String(batch.quantity),
             (batch.order_item?.needs_boxing ?? true) ? 'Yes' : 'No'
           ]);
@@ -1302,7 +1302,7 @@ export default function OrderBoxing() {
                       </div>
                       <Badge variant="secondary">{group.totalQty} {t('phase.items')}</Badge>
                       <div className="flex-1 text-sm text-muted-foreground">
-                        {group.batches.map((b) => `${b.product?.sku} - ${b.product?.name} (${b.quantity})`).join(", ")}
+                        {group.batches.map((b) => `${b.product?.sku} - ${b.product?.name_en} (${b.quantity})`).join(", ")}
                       </div>
                     </div>
                   </CardContent>
@@ -1517,7 +1517,7 @@ export default function OrderBoxing() {
               ...batches.filter(b => b.current_state === 'shipped' && b.from_extra_state !== 'extra_boxing' && !b.is_special && b.order_item?.needs_boxing !== false).map(b => ({
                 id: b.id,
                 product_id: b.product_id,
-                product_name: b.product?.name || 'Unknown',
+                product_name: b.product?.name_en || 'Unknown',
                 product_sku: b.product?.sku || 'N/A',
                 quantity: b.quantity,
                 machine_id: b.boxing_machine_id,
@@ -1586,7 +1586,7 @@ export default function OrderBoxing() {
                           onClick={() => {
                             const items = shipment.batches.map(batch => ({
                               sku: batch.product?.sku || '',
-                              name: batch.product?.name || '',
+                              name: batch.product?.name_en || '',
                               qty: batch.quantity,
                               needsBoxing: batch.order_item?.needs_boxing ?? true,
                             }));
@@ -1630,7 +1630,7 @@ export default function OrderBoxing() {
                             groupedItems.set(orderItemId, {
                               order_item_id: orderItemId,
                               product_sku: batch.product?.sku || 'N/A',
-                              product_name: batch.product?.name || 'Unknown',
+                              product_name: batch.product?.name_en || 'Unknown',
                               total_quantity: batch.quantity,
                               needs_boxing: batch.order_item?.needs_boxing ?? true,
                             });
