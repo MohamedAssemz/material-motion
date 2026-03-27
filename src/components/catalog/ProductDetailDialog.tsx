@@ -90,8 +90,8 @@ export function ProductDetailDialog({
           )}
         </DialogHeader>
         
-        <ScrollArea className="flex-1">
-          <div className="grid gap-6 md:grid-cols-2">
+        <ScrollArea className="flex-1 overflow-auto">
+          <div className="grid gap-6 md:grid-cols-2 pb-4">
             {/* Image Gallery */}
             <div className="space-y-3">
               <AspectRatio ratio={1} className="bg-muted rounded-lg overflow-hidden">
