@@ -5,7 +5,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2, Search } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -107,8 +106,7 @@ export interface ProductFormData {
   name_ar: string;
   description_en: string;
   description_ar: string;
-  size_from: string;
-  size_to: string;
+  sizes: string[];
   color_en: string;
   color_ar: string;
   brand_id: string;
@@ -134,8 +132,7 @@ const initialFormData: ProductFormData = {
   name_ar: '',
   description_en: '',
   description_ar: '',
-  size_from: '',
-  size_to: '',
+  sizes: [],
   color_en: '',
   color_ar: '',
   brand_id: '',
@@ -215,11 +212,10 @@ export function ProductFormDialog({
   const hasChangesFromOriginal = (): boolean => {
     if (!isDuplicating || !originalProduct) return true;
     
-    // Compare all relevant fields
     return (
       formData.name_en !== originalProduct.name_en ||
       formData.description_en !== originalProduct.description_en ||
-      formData.size_from !== originalProduct.size_from ||
+      JSON.stringify([...formData.sizes].sort()) !== JSON.stringify([...originalProduct.sizes].sort()) ||
       formData.color_en !== originalProduct.color_en ||
       formData.brand_id !== originalProduct.brand_id ||
       formData.country !== originalProduct.country ||
@@ -256,18 +252,15 @@ export function ProductFormDialog({
     setSaving(true);
     
     try {
-      // Use preview SKU for new products, existing SKU for edits
       const sku = formData.id ? formData.sku : previewSku;
       
-      // Prepare product data
       const productData = {
         sku,
         name_en: formData.name_en.trim(),
         name_ar: formData.name_ar.trim() || null,
         description_en: formData.description_en.trim() || null,
         description_ar: formData.description_ar.trim() || null,
-        size_from: formData.size_from || null,
-        size_to: formData.size_to || null,
+        sizes: formData.sizes.length > 0 ? formData.sizes : [],
         color_en: formData.color_en.trim() || null,
         color_ar: formData.color_ar.trim() || null,
         brand_id: formData.brand_id || null,
@@ -278,7 +271,6 @@ export function ProductFormDialog({
       let productId = formData.id;
 
       if (productId) {
-        // Update existing product
         const { error } = await supabase
           .from('products')
           .update(productData)
@@ -286,7 +278,6 @@ export function ProductFormDialog({
 
         if (error) throw error;
       } else {
-        // Create new product
         const { data, error } = await supabase
           .from('products')
           .insert(productData)
@@ -297,7 +288,7 @@ export function ProductFormDialog({
         productId = data.id;
       }
 
-      // Update categories (delete all, then insert new)
+      // Update categories
       await supabase
         .from('product_categories')
         .delete()
@@ -312,7 +303,7 @@ export function ProductFormDialog({
         );
       }
 
-      // Update customers (delete all, then insert new)
+      // Update customers
       await supabase
         .from('product_customers')
         .delete()
@@ -327,7 +318,7 @@ export function ProductFormDialog({
         );
       }
 
-      // Update images (delete existing, insert new)
+      // Update images
       await supabase
         .from('product_images')
         .delete()
@@ -381,6 +372,15 @@ export function ProductFormDialog({
     }));
   };
 
+  const toggleSize = (size: string) => {
+    setFormData(prev => ({
+      ...prev,
+      sizes: prev.sizes.includes(size)
+        ? prev.sizes.filter(s => s !== size)
+        : [...prev.sizes, size],
+    }));
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
@@ -407,7 +407,7 @@ export function ProductFormDialog({
         ) : (
           <form onSubmit={handleSubmit} className="flex-1 min-h-0 flex flex-col overflow-hidden">
             <div className="flex-1 overflow-y-auto pr-4 space-y-6 pb-4">
-                {/* Basic Info */}
+                {/* Names: EN left, AR right */}
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div>
                     <Label htmlFor="name_en">{t('catalog.english_name')} *</Label>
@@ -429,7 +429,10 @@ export function ProductFormDialog({
                       dir="rtl"
                     />
                   </div>
-                  
+                </div>
+
+                {/* Descriptions: EN left, AR right */}
+                <div className="grid gap-4 sm:grid-cols-2">
                   <div>
                     <Label htmlFor="description_en">{t('catalog.english_description')}</Label>
                     <Textarea
@@ -451,60 +454,54 @@ export function ProductFormDialog({
                       dir="rtl"
                     />
                   </div>
+                </div>
 
-                  <div>
-                    <Label>{t('catalog.size_from')}</Label>
-                    <Select
-                      value={formData.size_from}
-                      onValueChange={(value) => setFormData(prev => ({ ...prev, size_from: value }))}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder={t('catalog.select_size')} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {SIZE_OPTIONS.map(size => (
-                          <SelectItem key={size} value={size}>{size}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <Label>{t('catalog.size_to')}</Label>
-                    <Select
-                      value={formData.size_to}
-                      onValueChange={(value) => setFormData(prev => ({ ...prev, size_to: value }))}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder={t('catalog.select_size')} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {SIZE_OPTIONS.map(size => (
-                          <SelectItem key={size} value={size}>{size}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
+                {/* Colors: EN left, AR right (before sizes) */}
+                <div className="grid gap-4 sm:grid-cols-2">
                   <div>
                     <Label htmlFor="color_en">{t('catalog.english_color')}</Label>
                     <Input
                       id="color_en"
                       value={formData.color_en}
                       onChange={(e) => setFormData(prev => ({ ...prev, color_en: e.target.value }))}
+                      placeholder="e.g. Red, Blue"
                     />
                   </div>
-
                   <div>
                     <Label htmlFor="color_ar">{t('catalog.arabic_color')}</Label>
                     <Input
                       id="color_ar"
                       value={formData.color_ar}
                       onChange={(e) => setFormData(prev => ({ ...prev, color_ar: e.target.value }))}
+                      placeholder="مثال: أحمر، أزرق"
                       dir="rtl"
                     />
                   </div>
+                </div>
 
+                {/* Sizes: multi-select checkboxes */}
+                <div>
+                  <Label className="mb-2 block">{t('catalog.size')}</Label>
+                  <div className="border rounded-lg p-3">
+                    <div className="flex flex-wrap gap-3">
+                      {SIZE_OPTIONS.map(size => (
+                        <label 
+                          key={size} 
+                          className="flex items-center gap-1.5 cursor-pointer text-sm"
+                        >
+                          <Checkbox
+                            checked={formData.sizes.includes(size)}
+                            onCheckedChange={() => toggleSize(size)}
+                          />
+                          {size}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Brand & Country */}
+                <div className="grid gap-4 sm:grid-cols-2">
                   <div>
                     <Label htmlFor="brand">{t('catalog.brands')}</Label>
                     <SearchableSelect

@@ -3,12 +3,12 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Package, Edit, Check, X } from 'lucide-react';
-import { useState } from 'react';
+import { Package, Edit, Check, X, BarChart3, Loader2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
 import { ProductCardData } from './ProductCard';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { getProductDisplayName, getProductDisplayColor, getProductDisplayDescription, getBrandDisplayName } from '@/lib/catalogHelpers';
-import { getSizeRangeLabel } from '@/lib/catalogConstants';
+import { getProductDisplayDescription, getBrandDisplayName } from '@/lib/catalogHelpers';
+import { supabase } from '@/integrations/supabase/client';
 
 interface ProductPotentialCustomer {
   customer: {
@@ -39,13 +39,36 @@ export function ProductDetailDialog({
 }: ProductDetailDialogProps) {
   const { t, language } = useLanguage();
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const [totalOrdered, setTotalOrdered] = useState<number | null>(null);
+  const [loadingInsights, setLoadingInsights] = useState(false);
   
+  useEffect(() => {
+    if (open && product) {
+      setSelectedImageIndex(0);
+      fetchInsights(product.id);
+    }
+  }, [open, product?.id]);
+
+  const fetchInsights = async (productId: string) => {
+    setLoadingInsights(true);
+    try {
+      const { data, error } = await supabase
+        .from('order_items')
+        .select('quantity')
+        .eq('product_id', productId);
+      
+      if (error) throw error;
+      const total = (data || []).reduce((sum, item) => sum + item.quantity, 0);
+      setTotalOrdered(total);
+    } catch {
+      setTotalOrdered(null);
+    } finally {
+      setLoadingInsights(false);
+    }
+  };
+
   if (!product) return null;
 
-  const displayName = getProductDisplayName(product, language);
-  const displayDescription = getProductDisplayDescription(product, language);
-  const displayColor = getProductDisplayColor(product, language);
-  const sizeLabel = getSizeRangeLabel(product.size_from, product.size_to || null);
   const mainImageIndex = product.images?.findIndex(img => img.is_main) ?? 0;
   const currentImage = product.images?.[selectedImageIndex] || product.images?.[mainImageIndex];
 
@@ -54,7 +77,10 @@ export function ProductDetailDialog({
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader className="flex flex-row items-start justify-between">
           <div>
-            <DialogTitle className="text-xl">{displayName}</DialogTitle>
+            <DialogTitle className="text-xl">{product.name_en}</DialogTitle>
+            {product.name_ar && (
+              <p className="text-base text-muted-foreground" dir="rtl">{product.name_ar}</p>
+            )}
             <p className="text-sm font-mono text-muted-foreground">{product.sku}</p>
           </div>
           {onEdit && (
@@ -71,7 +97,7 @@ export function ProductDetailDialog({
             <div className="space-y-3">
               <AspectRatio ratio={1} className="bg-muted rounded-lg overflow-hidden">
                 {currentImage ? (
-                  <img src={currentImage.image_url} alt={displayName} className="h-full w-full object-cover" />
+                  <img src={currentImage.image_url} alt={product.name_en} className="h-full w-full object-cover" />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center">
                     <Package className="h-20 w-20 text-muted-foreground/40" />
@@ -97,41 +123,57 @@ export function ProductDetailDialog({
 
             {/* Product Details */}
             <div className="space-y-4">
-              {/* Bilingual Names */}
-              {product.name_ar && (
+              {/* Bilingual Names - always show both */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <h4 className="text-sm font-medium text-muted-foreground mb-1">{t('catalog.english_name')}</h4>
+                  <p className="text-sm font-medium">{product.name_en}</p>
+                </div>
+                <div>
+                  <h4 className="text-sm font-medium text-muted-foreground mb-1">{t('catalog.arabic_name')}</h4>
+                  <p className="text-sm font-medium" dir="rtl">{product.name_ar || '—'}</p>
+                </div>
+              </div>
+
+              {/* Bilingual Descriptions */}
+              {(product.description_en || product.description_ar) && (
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <h4 className="text-sm font-medium text-muted-foreground mb-1">{t('catalog.english_name')}</h4>
-                    <p className="text-sm font-medium">{product.name_en}</p>
+                    <h4 className="text-sm font-medium text-muted-foreground mb-1">{t('catalog.english_description')}</h4>
+                    <p className="text-sm">{product.description_en || '—'}</p>
                   </div>
                   <div>
-                    <h4 className="text-sm font-medium text-muted-foreground mb-1">{t('catalog.arabic_name')}</h4>
-                    <p className="text-sm font-medium" dir="rtl">{product.name_ar}</p>
+                    <h4 className="text-sm font-medium text-muted-foreground mb-1">{t('catalog.arabic_description')}</h4>
+                    <p className="text-sm" dir="rtl">{product.description_ar || '—'}</p>
                   </div>
                 </div>
               )}
 
-              {displayDescription && (
+              {/* Bilingual Colors */}
+              {(product.color_en || product.color_ar) && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <h4 className="text-sm font-medium text-muted-foreground mb-1">{t('catalog.english_color')}</h4>
+                    <span className="text-sm font-medium">{product.color_en || '—'}</span>
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-medium text-muted-foreground mb-1">{t('catalog.arabic_color')}</h4>
+                    <span className="text-sm font-medium" dir="rtl">{product.color_ar || '—'}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Sizes as tags */}
+              {product.sizes && product.sizes.length > 0 && (
                 <div>
-                  <h4 className="text-sm font-medium text-muted-foreground mb-1">{t('catalog.description')}</h4>
-                  <p className="text-sm">{displayDescription}</p>
+                  <h4 className="text-sm font-medium text-muted-foreground mb-2">{t('catalog.size')}</h4>
+                  <div className="flex flex-wrap gap-1.5">
+                    {product.sizes.map((size) => (
+                      <Badge key={size} variant="secondary">{size}</Badge>
+                    ))}
+                  </div>
                 </div>
               )}
-
-              <div className="grid grid-cols-2 gap-4">
-                {sizeLabel && (
-                  <div>
-                    <h4 className="text-sm font-medium text-muted-foreground mb-1">{t('catalog.size')}</h4>
-                    <Badge variant="secondary">{sizeLabel}</Badge>
-                  </div>
-                )}
-                {displayColor && (
-                  <div>
-                    <h4 className="text-sm font-medium text-muted-foreground mb-1">{t('catalog.color')}</h4>
-                    <span className="text-sm font-medium">{displayColor}</span>
-                  </div>
-                )}
-              </div>
 
               {product.brand && (
                 <div>
@@ -191,6 +233,27 @@ export function ProductDetailDialog({
                   <span className="text-sm text-muted-foreground">{new Date(product.created_at).toLocaleDateString()}</span>
                 </div>
               )}
+
+              {/* Quick Product Insights */}
+              <div className="border-t pt-4 mt-4">
+                <h4 className="text-sm font-medium text-foreground mb-3 flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4 text-primary" />
+                  {t('catalog.quick_insights')}
+                </h4>
+                {loadingInsights ? (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    {t('common.loading')}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 gap-2">
+                    <div className="flex items-center justify-between p-2 rounded-md bg-muted/50">
+                      <span className="text-sm text-muted-foreground">{t('catalog.total_ordered')}</span>
+                      <span className="text-sm font-semibold">{totalOrdered ?? 0}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </ScrollArea>
