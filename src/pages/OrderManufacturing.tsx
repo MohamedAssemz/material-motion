@@ -48,13 +48,17 @@ interface Batch {
   is_special?: boolean;
   product: {
     id: string;
-    name: string;
+    name_en: string;
+    name_ar?: string | null;
     sku: string;
     needs_packing: boolean;
+    color_en?: string | null;
+    color_ar?: string | null;
   };
   order_item?: {
     needs_boxing: boolean;
     initial_state?: string | null;
+    size?: string | null;
   };
 }
 
@@ -71,6 +75,10 @@ interface ProductGroup {
   product_id: string;
   product_name: string;
   product_sku: string;
+  product_name_ar?: string | null;
+  product_color_en?: string | null;
+  product_color_ar?: string | null;
+  size?: string | null;
   needs_packing: boolean;
   needs_boxing: boolean;
   inManufacturing: number;
@@ -180,7 +188,7 @@ export default function OrderManufacturing() {
         supabase
           .from("order_batches")
           .select(
-            "id, qr_code_data, current_state, quantity, product_id, order_item_id, eta, lead_time_days, box_id, manufacturing_machine_id, from_extra_state, is_special, product:products(id, name_en, sku, needs_packing), order_item:order_items(needs_boxing, initial_state)",
+            "id, qr_code_data, current_state, quantity, product_id, order_item_id, eta, lead_time_days, box_id, manufacturing_machine_id, from_extra_state, is_special, product:products(id, name_en, name_ar, sku, needs_packing, color_en, color_ar), order_item:order_items(needs_boxing, initial_state, size)",
           )
           .eq("order_id", id)
           .in("current_state", ["in_manufacturing"]),
@@ -188,7 +196,7 @@ export default function OrderManufacturing() {
         supabase
           .from("order_batches")
           .select(
-            "id, qr_code_data, current_state, quantity, product_id, order_item_id, eta, lead_time_days, box_id, manufacturing_machine_id, from_extra_state, is_special, product:products(id, name_en, sku, needs_packing), order_item:order_items(needs_boxing, initial_state)",
+            "id, qr_code_data, current_state, quantity, product_id, order_item_id, eta, lead_time_days, box_id, manufacturing_machine_id, from_extra_state, is_special, product:products(id, name_en, name_ar, sku, needs_packing, color_en, color_ar), order_item:order_items(needs_boxing, initial_state, size)",
           )
           .eq("order_id", id)
           .in("current_state", [
@@ -228,7 +236,7 @@ export default function OrderManufacturing() {
     try {
       const { data, error } = await supabase
         .from("extra_batch_history")
-        .select("quantity, product_id, extra_batch_id, products(name_en, sku)")
+        .select("quantity, product_id, extra_batch_id, products(name_en, name_ar, sku, color_en, color_ar)")
         .eq("event_type", "CREATED")
         .eq("source_order_id", id)
         .eq("from_state", "in_manufacturing");
@@ -249,7 +257,7 @@ export default function OrderManufacturing() {
         } else {
           productMap.set(record.product_id, {
             product_id: record.product_id,
-            product_name: record.products?.name || "Unknown",
+            product_name: record.products?.name_en || "Unknown",
             product_sku: record.products?.sku || "N/A",
             quantity: record.quantity,
           });
@@ -270,13 +278,13 @@ export default function OrderManufacturing() {
         // Still fetch extra_batches for machine IDs only
         const { data: extraBatches } = await supabase
           .from("extra_batches")
-          .select("id, product_id, manufacturing_machine_id, product:products(name_en, sku)")
+          .select("id, product_id, manufacturing_machine_id, product:products(name_en, name_ar, sku, color_en, color_ar)")
           .in("id", Array.from(extraBatchIds));
         setExtraBatchesForRate(
           (extraBatches || []).map((eb: any) => ({
             id: eb.id,
             product_id: eb.product_id,
-            product_name: eb.product?.name || "Unknown",
+            product_name: eb.product?.name_en || "Unknown",
             product_sku: eb.product?.sku || "N/A",
             quantity: historyByBatch.get(eb.id) || 0,
             manufacturing_machine_id: eb.manufacturing_machine_id,
@@ -296,7 +304,7 @@ export default function OrderManufacturing() {
     try {
       const { data, error } = await supabase
         .from('extra_batch_history')
-        .select('quantity, product_id, consuming_order_item_id, products(name_en, sku)')
+        .select('quantity, product_id, consuming_order_item_id, products(name_en, name_ar, sku, color_en, color_ar)')
         .eq('event_type', 'CONSUMED')
         .eq('consuming_order_id', id)
         .eq('from_state', 'extra_manufacturing');
@@ -313,7 +321,7 @@ export default function OrderManufacturing() {
           productMap.set(key, {
             id: key,
             product_id: record.product_id,
-            product_name: record.products?.name || 'Unknown',
+            product_name: record.products?.name_en || 'Unknown',
             product_sku: record.products?.sku || 'N/A',
             quantity: record.quantity,
             order_item_id: record.consuming_order_item_id || null,
@@ -400,20 +408,24 @@ export default function OrderManufacturing() {
     }
   };
 
-  // Group batches by product_id + needs_boxing to combine same product items with same boxing requirements
+  // Group batches by order_item_id to keep different sizes/colors/boxing as separate entries
   const productGroups: ProductGroup[] = [];
   const groupMap = new Map<string, ProductGroup>();
 
   batches.forEach((batch) => {
     const needsBoxing = batch.order_item?.needs_boxing ?? true;
-    const groupKey = `${batch.product_id}-${needsBoxing ? "boxing" : "no-boxing"}`;
+    const groupKey = batch.order_item_id || `${batch.product_id}-fallback`;
 
     if (!groupMap.has(groupKey)) {
       groupMap.set(groupKey, {
         groupKey,
         product_id: batch.product_id,
-        product_name: batch.product?.name || "Unknown",
+        product_name: batch.product?.name_en || "Unknown",
         product_sku: batch.product?.sku || "N/A",
+        product_name_ar: batch.product?.name_ar,
+        product_color_en: batch.product?.color_en,
+        product_color_ar: batch.product?.color_ar,
+        size: batch.order_item?.size,
         needs_packing: batch.product?.needs_packing ?? true,
         needs_boxing: needsBoxing,
         inManufacturing: 0,
@@ -430,22 +442,25 @@ export default function OrderManufacturing() {
   });
 
   groupMap.forEach((g) => productGroups.push(g));
-  // Sort by product name for consistent ordering
   productGroups.sort((a, b) => a.product_name.localeCompare(b.product_name));
 
-  // Group completed items by product + needs_boxing
+  // Group completed items by order_item_id
   const completedGroups: ProductGroup[] = [];
   const completedGroupMap = new Map<string, ProductGroup>();
   completedBatches.forEach((batch) => {
     const needsBoxing = batch.order_item?.needs_boxing ?? true;
-    const groupKey = `${batch.product_id}-${needsBoxing ? "boxing" : "no-boxing"}`;
+    const groupKey = batch.order_item_id || `${batch.product_id}-fallback`;
 
     if (!completedGroupMap.has(groupKey)) {
       completedGroupMap.set(groupKey, {
         groupKey,
         product_id: batch.product_id,
-        product_name: batch.product?.name || "Unknown",
+        product_name: batch.product?.name_en || "Unknown",
         product_sku: batch.product?.sku || "N/A",
+        product_name_ar: batch.product?.name_ar,
+        product_color_en: batch.product?.color_en,
+        product_color_ar: batch.product?.color_ar,
+        size: batch.order_item?.size,
         needs_packing: batch.product?.needs_packing ?? true,
         needs_boxing: needsBoxing,
         inManufacturing: 0,
@@ -455,7 +470,7 @@ export default function OrderManufacturing() {
     }
     const group = completedGroupMap.get(groupKey)!;
     group.batches.push(batch);
-    group.inManufacturing += batch.quantity; // reusing field for total
+    group.inManufacturing += batch.quantity;
     if (batch.order_item_id && !group.order_item_ids.includes(batch.order_item_id)) {
       group.order_item_ids.push(batch.order_item_id);
     }
@@ -801,8 +816,17 @@ export default function OrderManufacturing() {
                   <CardContent className="p-4">
                     <div className="flex items-center justify-between">
                       <div className="flex-1">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <p className="font-medium">{group.product_name}</p>
+                          {group.product_name_ar && (
+                            <span className="text-sm text-muted-foreground">({group.product_name_ar})</span>
+                          )}
+                          {group.size && (
+                            <Badge variant="outline" className="text-xs">{group.size}</Badge>
+                          )}
+                          {group.product_color_en && (
+                            <Badge variant="outline" className="text-xs">{group.product_color_en}</Badge>
+                          )}
                           {group.needs_boxing ? (
                             <Badge variant="outline" className="text-xs bg-primary/10">
                               {t('phase.needs_boxing')}
@@ -882,7 +906,7 @@ export default function OrderManufacturing() {
               ...processedBatchesForRate.map((batch) => ({
                 id: batch.id,
                 product_id: batch.product_id,
-                product_name: batch.product?.name || "Unknown",
+                product_name: batch.product?.name_en || "Unknown",
                 product_sku: batch.product?.sku || "N/A",
                 quantity: batch.quantity,
                 machine_id: batch.manufacturing_machine_id || null,

@@ -38,12 +38,15 @@ interface Batch {
   is_special?: boolean;
   product: {
     id: string;
-    name: string;
+    name_en: string;
+    name_ar?: string | null;
     sku: string;
     needs_packing?: boolean;
+    color_en?: string | null;
+    color_ar?: string | null;
   };
   box?: { id: string; box_code: string } | null;
-  order_item?: { id: string; needs_boxing: boolean; initial_state?: string | null } | null;
+  order_item?: { id: string; needs_boxing: boolean; initial_state?: string | null; size?: string | null } | null;
 }
 
 interface Order {
@@ -61,16 +64,20 @@ interface BoxGroup {
   totalQty: number;
 }
 
-// Group by product + needs_boxing to combine same product items
+// Group by order_item_id to keep different sizes/colors as separate entries
 interface OrderItemGroup {
-  groupKey: string; // product_id + needs_boxing
+  groupKey: string;
   product_id: string;
   product_name: string;
   product_sku: string;
+  product_name_ar?: string | null;
+  product_color_en?: string | null;
+  product_color_ar?: string | null;
+  size?: string | null;
   needs_boxing: boolean;
   quantity: number;
   batches: Batch[];
-  order_item_ids: string[]; // Track all order_item_ids in this group
+  order_item_ids: string[];
 }
 
 export default function OrderPackaging() {
@@ -177,7 +184,7 @@ export default function OrderPackaging() {
         supabase
           .from("order_batches")
           .select(
-            "id, qr_code_data, current_state, quantity, product_id, order_item_id, box_id, manufacturing_machine_id, finishing_machine_id, packaging_machine_id, from_extra_state, is_special, product:products(id, name_en, sku, needs_packing)",
+            "id, qr_code_data, current_state, quantity, product_id, order_item_id, box_id, manufacturing_machine_id, finishing_machine_id, packaging_machine_id, from_extra_state, is_special, product:products(id, name_en, name_ar, sku, needs_packing, color_en, color_ar)",
           )
           .eq("order_id", id)
           .in("current_state", ["ready_for_packaging", "in_packaging"]),
@@ -185,7 +192,7 @@ export default function OrderPackaging() {
         supabase
           .from("order_batches")
           .select(
-            "id, qr_code_data, current_state, quantity, product_id, order_item_id, box_id, manufacturing_machine_id, finishing_machine_id, packaging_machine_id, from_extra_state, is_special, product:products(id, name_en, sku, needs_packing)",
+            "id, qr_code_data, current_state, quantity, product_id, order_item_id, box_id, manufacturing_machine_id, finishing_machine_id, packaging_machine_id, from_extra_state, is_special, product:products(id, name_en, name_ar, sku, needs_packing, color_en, color_ar)",
           )
           .eq("order_id", id)
           .in("current_state", ["ready_for_boxing", "in_boxing", "ready_for_shipment", "shipped"]),
@@ -211,7 +218,7 @@ export default function OrderPackaging() {
       if (orderItemIds.length > 0) {
         const { data: orderItemsData } = await supabase
           .from("order_items")
-          .select("id, needs_boxing, initial_state")
+          .select("id, needs_boxing, initial_state, size")
           .in("id", [...new Set(orderItemIds)]);
         orderItemsData?.forEach((oi) => orderItemMap.set(oi.id, oi));
       }
@@ -254,7 +261,7 @@ export default function OrderPackaging() {
     try {
       const { data, error } = await supabase
         .from("extra_batch_history")
-        .select("quantity, product_id, extra_batch_id, products(name_en, sku)")
+        .select("quantity, product_id, extra_batch_id, products(name_en, name_ar, sku, color_en, color_ar)")
         .eq("event_type", "CREATED")
         .eq("source_order_id", id)
         .eq("from_state", "in_packaging");
@@ -274,7 +281,7 @@ export default function OrderPackaging() {
         } else {
           productMap.set(record.product_id, {
             product_id: record.product_id,
-            product_name: record.products?.name || "Unknown",
+            product_name: record.products?.name_en || "Unknown",
             product_sku: record.products?.sku || "N/A",
             quantity: record.quantity,
           });
@@ -293,13 +300,13 @@ export default function OrderPackaging() {
       if (extraBatchIds.size > 0) {
         const { data: extraBatches } = await supabase
           .from("extra_batches")
-          .select("id, product_id, packaging_machine_id, product:products(name_en, sku)")
+          .select("id, product_id, packaging_machine_id, product:products(name_en, name_ar, sku, color_en, color_ar)")
           .in("id", Array.from(extraBatchIds));
         setExtraBatchesForRate(
           (extraBatches || []).map((eb: any) => ({
             id: eb.id,
             product_id: eb.product_id,
-            product_name: eb.product?.name || "Unknown",
+            product_name: eb.product?.name_en || "Unknown",
             product_sku: eb.product?.sku || "N/A",
             quantity: historyByBatch.get(eb.id) || 0,
             packaging_machine_id: eb.packaging_machine_id,
@@ -319,7 +326,7 @@ export default function OrderPackaging() {
     try {
       const { data, error } = await supabase
         .from('extra_batch_history')
-        .select('quantity, product_id, consuming_order_item_id, products(name_en, sku)')
+        .select('quantity, product_id, consuming_order_item_id, products(name_en, name_ar, sku, color_en, color_ar)')
         .eq('event_type', 'CONSUMED')
         .eq('consuming_order_id', id)
         .eq('from_state', 'extra_packaging');
@@ -336,7 +343,7 @@ export default function OrderPackaging() {
           productMap.set(key, {
             id: key,
             product_id: record.product_id,
-            product_name: record.products?.name || 'Unknown',
+            product_name: record.products?.name_en || 'Unknown',
             product_sku: record.products?.sku || 'N/A',
             quantity: record.quantity,
             order_item_id: record.consuming_order_item_id || null,
@@ -439,21 +446,25 @@ export default function OrderPackaging() {
     });
   boxGroupMap.forEach((g) => readyBoxGroups.push(g));
 
-  // Group in_packaging by product + needs_boxing to combine same product items
+  // Group in_packaging by order_item_id to keep different sizes/colors as separate entries
   const inPackagingGroups: OrderItemGroup[] = [];
   const orderItemGroupMap = new Map<string, OrderItemGroup>();
   batches
     .filter((b) => b.current_state === "in_packaging")
     .forEach((batch) => {
       const needsBoxing = batch.order_item?.needs_boxing ?? true;
-      const groupKey = `${batch.product_id}-${needsBoxing ? "boxing" : "no-boxing"}`;
+      const groupKey = batch.order_item_id || `${batch.product_id}-fallback`;
 
       if (!orderItemGroupMap.has(groupKey)) {
         orderItemGroupMap.set(groupKey, {
           groupKey,
           product_id: batch.product_id,
-          product_name: batch.product?.name || "Unknown",
+          product_name: batch.product?.name_en || "Unknown",
           product_sku: batch.product?.sku || "N/A",
+          product_name_ar: batch.product?.name_ar,
+          product_color_en: batch.product?.color_en,
+          product_color_ar: batch.product?.color_ar,
+          size: batch.order_item?.size,
           needs_boxing: needsBoxing,
           quantity: 0,
           batches: [],
@@ -493,19 +504,23 @@ export default function OrderPackaging() {
     }))
     .filter((s) => s.quantity > 0);
 
-  // Group completed items by product + needs_boxing
+  // Group completed items by order_item_id
   const completedGroups: OrderItemGroup[] = [];
   const completedGroupMap = new Map<string, OrderItemGroup>();
   completedBatches.forEach((batch) => {
     const needsBoxing = batch.order_item?.needs_boxing ?? true;
-    const groupKey = `${batch.product_id}-${needsBoxing ? "boxing" : "no-boxing"}`;
+    const groupKey = batch.order_item_id || `${batch.product_id}-fallback`;
 
     if (!completedGroupMap.has(groupKey)) {
       completedGroupMap.set(groupKey, {
         groupKey,
         product_id: batch.product_id,
-        product_name: batch.product?.name || "Unknown",
+        product_name: batch.product?.name_en || "Unknown",
         product_sku: batch.product?.sku || "N/A",
+        product_name_ar: batch.product?.name_ar,
+        product_color_en: batch.product?.color_en,
+        product_color_ar: batch.product?.color_ar,
+        size: batch.order_item?.size,
         needs_boxing: needsBoxing,
         quantity: 0,
         batches: [],
@@ -530,7 +545,7 @@ export default function OrderPackaging() {
         const query = receiveSearchQuery.trim().toUpperCase();
         if (group.box_code.toUpperCase().includes(query)) return true;
         return group.batches.some(
-          (b) => b.product?.sku?.toUpperCase().includes(query) || b.product?.name?.toUpperCase().includes(query),
+          (b) => b.product?.sku?.toUpperCase().includes(query) || b.product?.name_en?.toUpperCase().includes(query),
         );
       })
     : readyBoxGroups;
@@ -971,7 +986,7 @@ export default function OrderPackaging() {
                       <span className="font-mono font-bold">{group.box_code}</span>
                       <Badge variant="secondary">{group.totalQty} {t('phase.items')}</Badge>
                       <div className="flex-1 text-sm text-muted-foreground">
-                        {group.batches.map((b) => `${b.product?.sku} - ${b.product?.name} (${b.quantity})`).join(", ")}
+                        {group.batches.map((b) => `${b.product?.sku} - ${b.product?.name_en} (${b.quantity})`).join(", ")}
                       </div>
                     </div>
                   </CardContent>
@@ -1023,6 +1038,15 @@ export default function OrderPackaging() {
                       <div>
                         <div className="flex items-center gap-2">
                           <p className="font-medium">{group.product_name}</p>
+                          {group.product_name_ar && (
+                            <span className="text-sm text-muted-foreground">({group.product_name_ar})</span>
+                          )}
+                          {group.size && (
+                            <Badge variant="outline" className="text-xs">{group.size}</Badge>
+                          )}
+                          {group.product_color_en && (
+                            <Badge variant="outline" className="text-xs">{group.product_color_en}</Badge>
+                          )}
                           {group.needs_boxing ? (
                             <Badge variant="outline" className="text-xs bg-primary/10">
                               {t('phase.needs_boxing')}
@@ -1097,7 +1121,7 @@ export default function OrderPackaging() {
               ...processedBatchesForRate.map((b) => ({
                 id: b.id,
                 product_id: b.product_id,
-                product_name: b.product?.name || "Unknown",
+                product_name: b.product?.name_en || "Unknown",
                 product_sku: b.product?.sku || "N/A",
                 quantity: b.quantity,
                 machine_id: b.packaging_machine_id,
