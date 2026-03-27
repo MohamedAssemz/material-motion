@@ -1138,12 +1138,33 @@ export default function OrderDetail() {
                   return (
                     <tr key={item.id} className="border-b hover:bg-muted/50">
                       <td className="p-3">
-                        <p className="font-medium">{item.product?.name_en || "Unknown"}</p>
+                        <p className="font-medium">
+                          {language === 'ar' ? (item.product?.name_ar || item.product?.name_en || "Unknown") : (item.product?.name_en || "Unknown")}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {language === 'ar' ? item.product?.name_en : item.product?.name_ar}
+                        </p>
                         {item.product?.sku && (
                           <p className="text-xs text-muted-foreground font-mono mt-0.5">{item.product.sku}</p>
                         )}
                       </td>
-                      <td className="p-3 text-center">{item.quantity}</td>
+                      <td className="p-3 text-center">
+                        {item.size ? (
+                          <Badge variant="outline">{item.size}</Badge>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">—</span>
+                        )}
+                      </td>
+                      <td className="p-3 text-center">
+                        {(() => {
+                          const color = language === 'ar' ? (item.product?.color_ar || item.product?.color_en) : (item.product?.color_en || item.product?.color_ar);
+                          return color ? (
+                            <span className="text-sm">{color}</span>
+                          ) : (
+                            <span className="text-muted-foreground text-xs">—</span>
+                          );
+                        })()}
+                      </td>
                       <td className="p-3 text-center">
                         {item.product?.needs_packing ? (
                           <Badge variant="outline" className="bg-primary/10">
