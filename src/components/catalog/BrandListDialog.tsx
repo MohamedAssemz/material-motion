@@ -28,7 +28,7 @@ interface BrandListDialogProps {
 
 export function BrandListDialog({ open, onOpenChange, brands, onRefresh }: BrandListDialogProps) {
   const { toast } = useToast();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [showForm, setShowForm] = useState(false);
   const [editingBrand, setEditingBrand] = useState<Brand | null>(null);
   const [form, setForm] = useState({ name_en: '', name_ar: '', logo_url: '' });
