@@ -502,7 +502,7 @@ export default function OrderBoxing() {
         if (group.box_code.toUpperCase().includes(query)) return true;
         return group.batches.some(b => 
           b.product?.sku?.toUpperCase().includes(query) ||
-          b.product?.name?.toUpperCase().includes(query)
+          b.product?.name_en?.toUpperCase().includes(query)
         );
       })
     : readyBoxGroups;
