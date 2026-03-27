@@ -132,7 +132,7 @@ export default function Catalog() {
           )
           .order("created_at", { ascending: false }),
         supabase.from("categories").select("*").order("name"),
-        supabase.from("brands").select("*").order("name"),
+        supabase.from("brands").select("*").order("name_en"),
       ]);
 
       if (productsRes.error) throw productsRes.error;
