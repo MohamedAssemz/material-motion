@@ -30,8 +30,7 @@ interface ParsedProduct {
   name_ar: string | null;
   description_en: string | null;
   description_ar: string | null;
-  size_from: string | null;
-  size_to: string | null;
+  sizes: string[];
   color_en: string | null;
   color_ar: string | null;
   brand_id: string | null;
@@ -97,8 +96,7 @@ export function BulkUploadDialog({ open, onOpenChange, brands, onSuccess }: Bulk
       { header: 'arabic_name', key: 'arabic_name', width: 30 },
       { header: 'english_description', key: 'english_description', width: 40 },
       { header: 'arabic_description', key: 'arabic_description', width: 40 },
-      { header: 'size_from', key: 'size_from', width: 12 },
-      { header: 'size_to', key: 'size_to', width: 12 },
+      { header: 'sizes', key: 'sizes', width: 25 },
       { header: 'english_color', key: 'english_color', width: 15 },
       { header: 'arabic_color', key: 'arabic_color', width: 15 },
       { header: 'english_brand', key: 'english_brand', width: 20 },
@@ -148,18 +146,19 @@ export function BulkUploadDialog({ open, onOpenChange, brands, onSuccess }: Bulk
         return;
       }
 
-      let sizeFrom: string | null = (row.size_from || row.size || '').trim().toUpperCase() || null;
-      let sizeTo: string | null = (row.size_to || '').trim().toUpperCase() || null;
-      if (sizeFrom && !sizeSet.has(sizeFrom)) {
-        warnings.push(`Row ${rowNum}: Invalid size_from "${sizeFrom}" – cleared.`);
-        sizeFrom = null;
+      // Parse sizes (comma-separated)
+      const sizesRaw = (row.sizes || row.size || '').trim().toUpperCase();
+      const parsedSizes: string[] = [];
+      if (sizesRaw) {
+        sizesRaw.split(/[,;]+/).forEach(s => {
+          const trimmed = s.trim();
+          if (sizeSet.has(trimmed)) {
+            parsedSizes.push(trimmed);
+          } else if (trimmed) {
+            warnings.push(`Row ${rowNum}: Invalid size "${trimmed}" – skipped.`);
+          }
+        });
       }
-      if (sizeTo && !sizeSet.has(sizeTo)) {
-        warnings.push(`Row ${rowNum}: Invalid size_to "${sizeTo}" – cleared.`);
-        sizeTo = null;
-      }
-      if (sizeFrom && !sizeTo) sizeTo = sizeFrom;
-      if (sizeTo && !sizeFrom) sizeFrom = sizeTo;
 
       const brandNameEn = (row.english_brand || row.brand || '').trim();
       let brand_id: string | null = null;
@@ -182,8 +181,7 @@ export function BulkUploadDialog({ open, onOpenChange, brands, onSuccess }: Bulk
         name_ar: (row.arabic_name || '').trim() || null,
         description_en: (row.english_description || row.description || '').trim() || null,
         description_ar: (row.arabic_description || '').trim() || null,
-        size_from: sizeFrom,
-        size_to: sizeTo,
+        sizes: parsedSizes,
         color_en: (row.english_color || row.color || '').trim() || null,
         color_ar: (row.arabic_color || '').trim() || null,
         brand_id,
@@ -422,7 +420,7 @@ export function BulkUploadDialog({ open, onOpenChange, brands, onSuccess }: Bulk
                   {parsedData.productsToInsert.map((p, i) => (
                     <TableRow key={i}>
                     <TableCell className="text-xs font-medium">{p.name_en}</TableCell>
-                      <TableCell className="text-xs">{p.size_from ? (p.size_to && p.size_to !== p.size_from ? `${p.size_from}-${p.size_to}` : p.size_from) : '—'}</TableCell>
+                      <TableCell className="text-xs">{p.sizes.length > 0 ? p.sizes.join(', ') : '—'}</TableCell>
                       <TableCell className="text-xs">{p.color_en || '—'}</TableCell>
                       <TableCell className="text-xs">{p.brand_name || '—'}</TableCell>
                       <TableCell className="text-xs">{p.needs_packing ? t('common.yes') : t('common.no')}</TableCell>
