@@ -964,28 +964,16 @@ export default function OrderDetail() {
         </div>
       )}
 
-      {/* Production Timeline */}
+      {/* Production Timeline - Only show after order starts */}
+      {!isPendingOrder && (
       <Card>
         <CardHeader>
-          <CardTitle className={isPendingOrder ? "text-muted-foreground" : ""}>
+          <CardTitle>
             {t("orders.production_timeline")}
           </CardTitle>
-          <CardDescription>{isPendingOrder ? t("orders.start_to_track") : t("orders.track_progress")}</CardDescription>
+          <CardDescription>{t("orders.track_progress")}</CardDescription>
         </CardHeader>
         <CardContent>
-          {isPendingOrder ? (
-            <div className="flex flex-col items-center justify-center py-8 text-center">
-              <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-4">
-                <Clock className="h-6 w-6 text-muted-foreground" />
-              </div>
-              <p className="text-muted-foreground font-medium">{t("orders.timeline_inactive")}</p>
-              <p className="text-sm text-muted-foreground mt-1">{t("orders.click_start")}</p>
-              <div className="mt-4 text-sm">
-                <span className="font-medium">{totalItems}</span>
-                <span className="text-muted-foreground"> {t("orders.items_planned")}</span>
-              </div>
-            </div>
-          ) : (
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <Link to={`/orders/${id}/manufacturing`} className="block">
                 <Card className="hover:border-primary transition-colors cursor-pointer">
@@ -1019,8 +1007,8 @@ export default function OrderDetail() {
                 <Card className="hover:border-primary transition-colors cursor-pointer">
                   <CardContent className="p-4">
                     <div className="flex items-center gap-3 mb-3">
-                      <div className="p-2 rounded-lg bg-indigo-100 dark:bg-indigo-900/30">
-                        <Package className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                      <div className="p-2 rounded-lg bg-orange-100 dark:bg-orange-900/30">
+                        <Package className="h-5 w-5 text-orange-600 dark:text-orange-400" />
                       </div>
                       <p className="font-medium">{t("state.packaging")}</p>
                     </div>
@@ -1033,8 +1021,8 @@ export default function OrderDetail() {
                 <Card className="hover:border-primary transition-colors cursor-pointer">
                   <CardContent className="p-4">
                     <div className="flex items-center gap-3 mb-3">
-                      <div className="p-2 rounded-lg bg-cyan-100 dark:bg-cyan-900/30">
-                        <Box className="h-5 w-5 text-cyan-600 dark:text-cyan-400" />
+                      <div className="p-2 rounded-lg bg-green-100 dark:bg-green-900/30">
+                        <Box className="h-5 w-5 text-green-600 dark:text-green-400" />
                       </div>
                       <p className="font-medium">{t("state.boxing")}</p>
                     </div>
@@ -1043,9 +1031,9 @@ export default function OrderDetail() {
                 </Card>
               </Link>
             </div>
-          )}
         </CardContent>
       </Card>
+      )}
 
       {/* Extra Inventory - Only show for pending orders */}
       {isPendingOrder && canUpdate && (
