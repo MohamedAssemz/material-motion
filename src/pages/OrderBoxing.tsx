@@ -76,7 +76,7 @@ interface ShippedBatch {
   qr_code_data: string;
   quantity: number;
   order_item_id: string | null;
-  product: { id: string; name: string; sku: string };
+  product: { id: string; name_en: string; name_ar?: string | null; sku: string };
   order_item?: { needs_boxing: boolean } | null;
   from_extra_state?: string | null;
 }
