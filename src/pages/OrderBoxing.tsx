@@ -1373,6 +1373,15 @@ export default function OrderBoxing() {
                         <div>
                           <div className="flex items-center gap-2">
                             <p className="font-medium">{group.product_name}</p>
+                          {group.product_name_ar && (
+                            <span className="text-sm text-muted-foreground">({group.product_name_ar})</span>
+                          )}
+                          {group.size && (
+                            <Badge variant="outline" className="text-xs">{group.size}</Badge>
+                          )}
+                          {group.product_color_en && (
+                            <Badge variant="outline" className="text-xs">{group.product_color_en}</Badge>
+                          )}
                             {group.needs_boxing ? (
                             <Badge variant="outline" className="text-xs bg-primary/10">
                               {t('phase.needs_boxing')}
@@ -1477,6 +1486,15 @@ export default function OrderBoxing() {
                         <div>
                           <div className="flex items-center gap-2">
                             <p className="font-medium">{group.product_name}</p>
+                          {group.product_name_ar && (
+                            <span className="text-sm text-muted-foreground">({group.product_name_ar})</span>
+                          )}
+                          {group.size && (
+                            <Badge variant="outline" className="text-xs">{group.size}</Badge>
+                          )}
+                          {group.product_color_en && (
+                            <Badge variant="outline" className="text-xs">{group.product_color_en}</Badge>
+                          )}
                             {group.needs_boxing ? (
                               <Badge variant="outline" className="text-xs bg-primary/10">
                                 Boxed

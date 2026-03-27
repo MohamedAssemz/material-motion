@@ -1013,6 +1013,15 @@ export default function OrderFinishing() {
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="font-medium">{group.product_name}</p>
+                          {group.product_name_ar && (
+                            <span className="text-sm text-muted-foreground">({group.product_name_ar})</span>
+                          )}
+                          {group.size && (
+                            <Badge variant="outline" className="text-xs">{group.size}</Badge>
+                          )}
+                          {group.product_color_en && (
+                            <Badge variant="outline" className="text-xs">{group.product_color_en}</Badge>
+                          )}
                         <p className="text-sm text-muted-foreground">
                           {group.product_sku} · {group.needs_packing ? t('phase.needs_packing') : t('phase.no_packing')} ·{" "}
                           {group.needs_boxing ? t('phase.needs_boxing') : t('phase.no_boxing')}
