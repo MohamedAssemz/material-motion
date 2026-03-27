@@ -186,7 +186,7 @@ export default function OrderBoxing() {
         supabase
           .from("order_batches")
           .select(
-            "id, qr_code_data, current_state, quantity, product_id, order_item_id, box_id, manufacturing_machine_id, finishing_machine_id, packaging_machine_id, boxing_machine_id, from_extra_state, is_special, product:products(id, name_en, sku, needs_packing)",
+            "id, qr_code_data, current_state, quantity, product_id, order_item_id, box_id, manufacturing_machine_id, finishing_machine_id, packaging_machine_id, boxing_machine_id, from_extra_state, is_special, product:products(id, name_en, name_ar, sku, needs_packing, color_en, color_ar)",
           )
           .eq("order_id", id)
           .in("current_state", ["ready_for_boxing", "in_boxing", "ready_for_shipment", "shipped"]),
@@ -209,7 +209,7 @@ export default function OrderBoxing() {
       if (orderItemIds.length > 0) {
         const { data: orderItemsData } = await supabase
           .from("order_items")
-          .select("id, needs_boxing, initial_state")
+          .select("id, needs_boxing, initial_state, size")
           .in("id", orderItemIds);
         orderItemsData?.forEach((oi) => orderItemMap.set(oi.id, oi));
       }
@@ -238,7 +238,7 @@ export default function OrderBoxing() {
     try {
       const { data, error } = await supabase
         .from('extra_batch_history')
-        .select('quantity, product_id, extra_batch_id, products(name_en, sku)')
+        .select('quantity, product_id, extra_batch_id, products(name_en, name_ar, sku, color_en, color_ar)')
         .eq('event_type', 'CREATED')
         .eq('source_order_id', id)
         .eq('from_state', 'in_boxing');
@@ -274,7 +274,7 @@ export default function OrderBoxing() {
       if (extraBatchIds.size > 0) {
         const { data: extraBatches } = await supabase
           .from('extra_batches')
-          .select('id, product_id, boxing_machine_id, product:products(name_en, sku)')
+          .select('id, product_id, boxing_machine_id, product:products(name_en, name_ar, sku, color_en, color_ar)')
           .in('id', Array.from(extraBatchIds));
         setExtraBatchesForRate(
           (extraBatches || []).map((eb: any) => ({
@@ -299,7 +299,7 @@ export default function OrderBoxing() {
     try {
       const { data, error } = await supabase
         .from('extra_batch_history')
-        .select('quantity, product_id, consuming_order_item_id, products(name_en, sku)')
+        .select('quantity, product_id, consuming_order_item_id, products(name_en, name_ar, sku, color_en, color_ar)')
         .eq('event_type', 'CONSUMED')
         .eq('consuming_order_id', id)
         .eq('from_state', 'extra_boxing');
@@ -350,7 +350,7 @@ export default function OrderBoxing() {
             quantity,
             order_item_id,
             from_extra_state,
-            product:products(id, name_en, sku)
+            product:products(id, name_en, name_ar, sku, color_en, color_ar)
           `)
           .eq("shipment_id", shipment.id);
 
