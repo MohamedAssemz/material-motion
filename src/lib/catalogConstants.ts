@@ -6,20 +6,13 @@ export const SIZE_OPTIONS = [
 
 export type ProductSize = typeof SIZE_OPTIONS[number];
 
-export function getSizeIndex(size: string): number {
-  return SIZE_OPTIONS.indexOf(size as ProductSize);
-}
-
-export function isValidSizeRange(from: string, to: string): boolean {
-  const fromIdx = getSizeIndex(from);
-  const toIdx = getSizeIndex(to);
-  return fromIdx >= 0 && toIdx >= 0 && fromIdx <= toIdx;
-}
-
-export function getSizeRangeLabel(from: string | null, to: string | null): string {
-  if (!from && !to) return '';
-  if (from && !to) return from;
-  if (!from && to) return to;
-  if (from === to) return from!;
-  return `${from} - ${to}`;
+export function getSizesLabel(sizes: string[] | null | undefined): string {
+  if (!sizes || sizes.length === 0) return '';
+  // Sort by SIZE_OPTIONS order
+  const sorted = [...sizes].sort((a, b) => {
+    const ai = SIZE_OPTIONS.indexOf(a as ProductSize);
+    const bi = SIZE_OPTIONS.indexOf(b as ProductSize);
+    return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+  });
+  return sorted.join(', ');
 }
