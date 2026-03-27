@@ -1,98 +1,64 @@
 
 
-# Catalog Size Multi-Select + UI Improvements
+# Edit Order Items & EFT — Revised Plan
 
-## Overview
-Replace size range (from/to) with multi-select sizes, improve product form layout, and enhance product cards and detail view with bilingual content.
+## Change from Previous Plan
+The "Edit Order" button moves from the header area into the **Order Items table card header**, next to the title. This keeps the editing action contextually close to the items being edited.
 
-## 1. Database Migration
+## UI Placement
 
-Replace `size_from` and `size_to` columns with a single `sizes` text array column:
-
-```sql
-ALTER TABLE products ADD COLUMN sizes text[] DEFAULT '{}';
-
--- Migrate existing data: expand size_from/size_to ranges into individual sizes
-UPDATE products SET sizes = ... (expand range using SIZE_OPTIONS order);
-
-ALTER TABLE products DROP COLUMN size_from;
-ALTER TABLE products DROP COLUMN size_to;
+In `OrderDetail.tsx`, the Order Items `<Card>` (line ~1096) currently has:
+```
+<CardHeader>
+  <CardTitle>{t("orders.order_items")}</CardTitle>
+  <CardDescription>{t("orders.products_in_order")}</CardDescription>
+</CardHeader>
 ```
 
-The migration will expand ranges (e.g. `size_from='S', size_to='XL'`) into `['S','M','L','XL']` using the SIZE_OPTIONS ordering.
+This becomes a flex row with an "Edit Order" button on the right side (admin-only, non-cancelled orders only):
+```
+<CardHeader className="flex flex-row items-center justify-between">
+  <div>
+    <CardTitle>...</CardTitle>
+    <CardDescription>...</CardDescription>
+  </div>
+  {canUpdate && order.status !== 'cancelled' && (
+    <Button variant="outline" size="sm" onClick={() => setEditOrderOpen(true)}>
+      <Pencil /> {t("orders.edit_order")}
+    </Button>
+  )}
+</CardHeader>
+```
 
-## 2. Product Form Dialog (`ProductFormDialog.tsx`)
+## Components
 
-**Layout changes (field reordering):**
-- English fields always on the LEFT column, Arabic fields always on the RIGHT column (regardless of system language)
-- Field order within the grid: Names → Descriptions → Colors → Sizes → Brand/Country
+### 1. `EditOrderDialog.tsx` (new file)
+A dialog with two sections:
 
-**Sizes:** Replace two dropdowns with a single "Size" section using checkboxes (similar to categories selector). Each SIZE_OPTION is a checkbox.
+**EFT Section** — Date picker for `estimated_fulfillment_time`
 
-**Colors:** Add placeholder hints — English color input gets `"e.g. Red, Blue"`, Arabic color input gets `"مثال: أحمر، أزرق"`. Hints stay in their respective language regardless of system language.
+**Order Items Section** — Table listing current items (product, size, color, qty) with:
+- `NumericInput` to adjust quantity per item
+- Trash button to delete an item
+- "Add Item" button to add new products (product selector + size picker, similar to OrderCreate pattern)
 
-**Form data model:** Replace `size_from: string` and `size_to: string` with `sizes: string[]`.
+**On Save**, computes diffs per item:
+- **New items**: Insert `order_items` row; if order is `in_progress`, create `order_batches` in `in_manufacturing`
+- **Increased qty**: Update `order_items.quantity`; if `in_progress`, create new batches
+- **Decreased qty**: Pre-check for box-assigned batches → block if found. Otherwise delete batches in state priority order (manufacturing first → shipped last), then update quantity
+- **Deleted items**: Same box check → delete all batches for item → release reserved extra_batches → delete order_item row
 
-**Arabic fields direction:** Arabic inputs keep `dir="rtl"` always. English inputs keep default LTR.
-
-## 3. Product Card (`ProductCard.tsx`)
-
-Show **both** names (EN and AR) on the card:
-- Primary: English name
-- Secondary (smaller, muted): Arabic name (if exists)
-
-Show **both** colors (EN and AR), separated by `/` if both exist.
-
-Show sizes as comma-separated list (e.g. "S, M, L, XL").
-
-## 4. Product Detail Dialog (`ProductDetailDialog.tsx`)
-
-- Always show both EN and AR names side by side (not conditional on `name_ar` existing)
-- Always show both EN and AR descriptions side by side
-- Always show both EN and AR colors side by side
-- **Sizes**: Show each size as an individual Badge/tag instead of a range label
-- **New section: "Quick Product Insights"** — query `order_items` + `order_batches` for this product, grouped by... 
-
-**Note on insights:** The current schema doesn't store size per order_item or per batch — orders are placed for a product (all sizes). So "quantity ordered per size" isn't available from the current data model. We have two options:
-
-1. Show total quantity ordered for this product (without size breakdown) — achievable now
-2. Add a `size` column to `order_items` to track which size was ordered — requires schema change + order creation flow update
-
-I'll ask the user about this.
-
-## 5. Catalog Page (`Catalog.tsx`)
-
-- Update size filter to work with `sizes` array (check if selected size is in `product.sizes`)
-- Update `prepareProductFormData` to map `sizes` array instead of `size_from`/`size_to`
-- Update Product type interface
-
-## 6. Bulk Upload (`BulkUploadDialog.tsx`)
-
-- Change CSV columns from `size_from`/`size_to` to `sizes` (comma-separated in CSV, parsed to array)
-- Update template and parsing logic
-
-## 7. Supporting Files
-
-- **`catalogConstants.ts`**: Remove `getSizeRangeLabel`, `isValidSizeRange`, `getSizeIndex`. Add `getSizesLabel(sizes: string[]): string` helper.
-- **`catalogHelpers.ts`**: No changes needed (name/color/description helpers unaffected).
-- **`translations.ts`**: Replace `catalog.size_from`/`catalog.size_to` with `catalog.sizes`. Add `catalog.quick_insights`, `catalog.total_ordered`, `catalog.color_hint_en`, `catalog.color_hint_ar`.
-
-## 8. Files Changed
-
+### 2. Files to modify
 | File | Change |
-|---|---|
-| DB migration | Drop `size_from`/`size_to`, add `sizes text[]` |
-| `ProductFormDialog.tsx` | Multi-select sizes, field reorder, color hints, EN-left/AR-right |
-| `ProductCard.tsx` | Both names, both colors, comma-separated sizes |
-| `ProductDetailDialog.tsx` | All bilingual fields shown, size tags, insights section |
-| `Catalog.tsx` | Filter update, type update, form data mapping |
-| `BulkUploadDialog.tsx` | CSV column change |
-| `catalogConstants.ts` | New helpers for sizes array |
-| `translations.ts` | New/updated keys |
+|------|--------|
+| `src/components/EditOrderDialog.tsx` | Create — full dialog component |
+| `src/pages/OrderDetail.tsx` | Add Edit button in items card header, dialog state, import |
+| `src/lib/translations.ts` | Add keys: `edit_order`, `edit_order_desc`, `add_item`, `boxes_must_be_emptied`, `save_changes` |
 
-## Open Question
+### 3. Batch deletion priority
+When decreasing quantity, batches are deleted in this order (earliest phase first):
+1. `in_manufacturing` → 2. `ready_for_finishing` → 3. `in_finishing` → 4. `ready_for_packaging` → 5. `in_packaging` → 6. `ready_for_boxing` → 7. `in_boxing` → 8. `ready_for_shipment` → 9. `shipped`
 
-The "Quick Product Insights" section requests quantity ordered **per size**. Currently `order_items` doesn't have a `size` column — orders are for a product regardless of size. Should we:
-- **A)** Add a `size` column to `order_items` (and update OrderCreate to select a size per item) — enables per-size insights
-- **B)** Show total quantity ordered for this product (no size breakdown) — works with current schema
+### 4. Box occupancy guard
+Before any decrease/delete: query `order_batches WHERE order_item_id = ? AND box_id IS NOT NULL`. If any exist, show alert blocking the action until boxes are emptied.
 
