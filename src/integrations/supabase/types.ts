@@ -46,19 +46,22 @@ export type Database = {
           created_at: string
           id: string
           logo_url: string | null
-          name: string
+          name_ar: string | null
+          name_en: string
         }
         Insert: {
           created_at?: string
           id?: string
           logo_url?: string | null
-          name: string
+          name_ar?: string | null
+          name_en: string
         }
         Update: {
           created_at?: string
           id?: string
           logo_url?: string | null
-          name?: string
+          name_ar?: string | null
+          name_en?: string
         }
         Relationships: []
       }
@@ -748,38 +751,50 @@ export type Database = {
       products: {
         Row: {
           brand_id: string | null
-          color: string | null
+          color_ar: string | null
+          color_en: string | null
           country: string | null
           created_at: string | null
-          description: string | null
+          description_ar: string | null
+          description_en: string | null
           id: string
-          name: string
+          name_ar: string | null
+          name_en: string
           needs_packing: boolean | null
-          size: string | null
+          size_from: string | null
+          size_to: string | null
           sku: string
         }
         Insert: {
           brand_id?: string | null
-          color?: string | null
+          color_ar?: string | null
+          color_en?: string | null
           country?: string | null
           created_at?: string | null
-          description?: string | null
+          description_ar?: string | null
+          description_en?: string | null
           id?: string
-          name: string
+          name_ar?: string | null
+          name_en: string
           needs_packing?: boolean | null
-          size?: string | null
+          size_from?: string | null
+          size_to?: string | null
           sku: string
         }
         Update: {
           brand_id?: string | null
-          color?: string | null
+          color_ar?: string | null
+          color_en?: string | null
           country?: string | null
           created_at?: string | null
-          description?: string | null
+          description_ar?: string | null
+          description_en?: string | null
           id?: string
-          name?: string
+          name_ar?: string | null
+          name_en?: string
           needs_packing?: boolean | null
-          size?: string | null
+          size_from?: string | null
+          size_to?: string | null
           sku?: string
         }
         Relationships: [
