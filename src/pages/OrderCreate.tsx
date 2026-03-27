@@ -30,16 +30,17 @@ import {
 } from "lucide-react";
 import { RawMaterialImageUpload } from "@/components/RawMaterialImageUpload";
 import { CountrySelect } from "@/components/catalog/CountrySelect";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { z } from "zod";
 import { format } from "date-fns";
+import { SIZE_OPTIONS } from "@/lib/catalogConstants";
 
 interface Product {
   id: string;
   sku: string;
   name_en: string;
+  sizes: string[] | null;
 }
 
 interface Customer {
@@ -51,7 +52,7 @@ interface Customer {
 
 interface OrderItem {
   product_id: string;
-  quantity: number;
+  sizeQuantities: Record<string, number>;
   needs_boxing: boolean;
   is_special: boolean;
   initial_state: string;
@@ -85,7 +86,7 @@ export default function OrderCreate() {
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const [customerOpen, setCustomerOpen] = useState(false);
   const [eftOpen, setEftOpen] = useState(false);
-  const [items, setItems] = useState<OrderItem[]>([{ product_id: "", quantity: 1, needs_boxing: true, is_special: false, initial_state: "in_manufacturing" }]);
+  const [items, setItems] = useState<OrderItem[]>([{ product_id: "", sizeQuantities: {}, needs_boxing: true, is_special: false, initial_state: "in_manufacturing" }]);
   const [customerProductMapping, setCustomerProductMapping] = useState<Map<string, Set<string>>>(new Map());
   const [showPackagingRef, setShowPackagingRef] = useState(false);
   const [packagingRows, setPackagingRows] = useState<Array<{ item_index: number; quantity: number; length_cm: string; width_cm: string; height_cm: string; weight_kg: string }>>([]);
@@ -97,7 +98,7 @@ export default function OrderCreate() {
   const fetchData = async () => {
     try {
       const [productsRes, customersRes, productCustomersRes] = await Promise.all([
-        supabase.from("products").select("id, sku, name_en").order("sku"),
+        supabase.from("products").select("id, sku, name_en, sizes").order("sku"),
         supabase.from("customers").select("id, name, code, is_domestic").order("name"),
         supabase.from("product_customers").select("product_id, customer_id"),
       ]);
@@ -106,7 +107,6 @@ export default function OrderCreate() {
       if (customersRes.error) throw customersRes.error;
       if (productCustomersRes.error) throw productCustomersRes.error;
 
-      // Build customer->product mapping (directly by product_id)
       const customerProductMap = new Map<string, Set<string>>();
       (productCustomersRes.data || []).forEach((pc: any) => {
         if (!customerProductMap.has(pc.customer_id)) {
@@ -130,7 +130,7 @@ export default function OrderCreate() {
   };
 
   const addItem = () => {
-    setItems([...items, { product_id: "", quantity: 1, needs_boxing: true, is_special: false, initial_state: "in_manufacturing" }]);
+    setItems([...items, { product_id: "", sizeQuantities: {}, needs_boxing: true, is_special: false, initial_state: "in_manufacturing" }]);
   };
 
   const removeItem = (index: number) => {
@@ -142,7 +142,38 @@ export default function OrderCreate() {
   const updateItem = (index: number, updates: Partial<OrderItem>) => {
     const newItems = [...items];
     newItems[index] = { ...newItems[index], ...updates };
+    // If product changed, reset sizeQuantities
+    if (updates.product_id !== undefined && updates.product_id !== items[index].product_id) {
+      newItems[index].sizeQuantities = {};
+    }
     setItems(newItems);
+  };
+
+  const updateSizeQty = (itemIndex: number, size: string, qty: number | undefined) => {
+    const newItems = [...items];
+    const newSizeQties = { ...newItems[itemIndex].sizeQuantities };
+    if (qty === undefined || qty <= 0) {
+      delete newSizeQties[size];
+    } else {
+      newSizeQties[size] = qty;
+    }
+    newItems[itemIndex] = { ...newItems[itemIndex], sizeQuantities: newSizeQties };
+    setItems(newItems);
+  };
+
+  const getItemTotalQty = (item: OrderItem): number => {
+    return Object.values(item.sizeQuantities).reduce((sum, q) => sum + q, 0);
+  };
+
+  const getProductSizes = (productId: string): string[] => {
+    const product = products.find(p => p.id === productId);
+    const sizes = product?.sizes || [];
+    // Sort by SIZE_OPTIONS order
+    return [...sizes].sort((a, b) => {
+      const ai = SIZE_OPTIONS.indexOf(a as any);
+      const bi = SIZE_OPTIONS.indexOf(b as any);
+      return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -165,9 +196,9 @@ export default function OrderCreate() {
         return;
       }
 
-      const validItems = items.filter((item) => item.product_id && item.quantity > 0);
-
-      if (validItems.length === 0) {
+      // Validate: at least one item with quantity
+      const hasValidItems = items.some(item => item.product_id && getItemTotalQty(item) > 0);
+      if (!hasValidItems) {
         toast({
           title: "Validation Error",
           description: "Please add at least one product with valid quantity",
@@ -178,7 +209,6 @@ export default function OrderCreate() {
 
       setSubmitting(true);
 
-      // Create order
       // Build final notes with packaging reference
       let finalNotes = notes.trim();
       const validPackagingRows = packagingRows.filter(r => r.item_index >= 0 && r.quantity > 0);
@@ -228,69 +258,89 @@ export default function OrderCreate() {
         });
       }
 
-      // Create order items for each item row separately (preserving identity)
-      // Items with same product but different needs_boxing stay separate
-      const createdOrderItems: Array<{
-        id: string;
-        product_id: string;
-        quantity: number;
-        needs_boxing: boolean;
-        is_special: boolean;
-        initial_state: string;
-        isExtra?: boolean;
-        extraProductId?: string;
-      }> = [];
-
-      // Create order items for regular items
-      for (const item of validItems) {
-        const { data: orderItem, error: itemError } = await supabase
-          .from("order_items")
-          .insert({
-            order_id: order.id,
-            product_id: item.product_id,
-            quantity: item.quantity,
-            needs_boxing: item.needs_boxing,
-            is_special: item.is_special,
-            initial_state: item.is_special ? item.initial_state : null,
-          })
-          .select()
-          .single();
-
-        if (itemError) throw itemError;
-        createdOrderItems.push({
-          id: orderItem.id,
-          product_id: item.product_id,
-          quantity: item.quantity,
-          needs_boxing: item.needs_boxing,
-          is_special: item.is_special,
-          initial_state: item.initial_state,
-        });
-      }
-
-      // Create batches linked to each order item
+      // Create order items: one per product+size combination
       let totalBatchQuantity = 0;
 
-      for (const orderItem of createdOrderItems) {
-        const { data: batchCode } = await supabase.rpc("generate_batch_code");
+      for (const item of items) {
+        if (!item.product_id) continue;
+        const sizes = getProductSizes(item.product_id);
+        const hasSizes = sizes.length > 0;
 
-        const { error: batchError } = await supabase.from("order_batches").insert({
-          qr_code_data: batchCode || `EB-${Date.now()}`,
-          order_id: order.id,
-          order_item_id: orderItem.id,
-          product_id: orderItem.product_id,
-          current_state: orderItem.is_special ? orderItem.initial_state : "in_manufacturing",
-          quantity: orderItem.quantity,
-          created_by: user?.id,
-          is_special: orderItem.is_special,
-        });
+        if (hasSizes) {
+          // Create one order_item per size that has quantity
+          for (const size of sizes) {
+            const qty = item.sizeQuantities[size];
+            if (!qty || qty <= 0) continue;
 
-        if (batchError) throw batchError;
-        totalBatchQuantity += orderItem.quantity;
+            const { data: orderItem, error: itemError } = await supabase
+              .from("order_items")
+              .insert({
+                order_id: order.id,
+                product_id: item.product_id,
+                quantity: qty,
+                needs_boxing: item.needs_boxing,
+                is_special: item.is_special,
+                initial_state: item.is_special ? item.initial_state : null,
+                size: size,
+              } as any)
+              .select()
+              .single();
+
+            if (itemError) throw itemError;
+
+            const { data: batchCode } = await supabase.rpc("generate_batch_code");
+            const { error: batchError } = await supabase.from("order_batches").insert({
+              qr_code_data: batchCode || `B-${Date.now()}`,
+              order_id: order.id,
+              order_item_id: orderItem.id,
+              product_id: item.product_id,
+              current_state: item.is_special ? item.initial_state : "in_manufacturing",
+              quantity: qty,
+              created_by: user?.id,
+              is_special: item.is_special,
+            });
+            if (batchError) throw batchError;
+            totalBatchQuantity += qty;
+          }
+        } else {
+          // Product with no sizes - use total as single item (backward compat)
+          const totalQty = getItemTotalQty(item);
+          if (totalQty <= 0) continue;
+
+          const { data: orderItem, error: itemError } = await supabase
+            .from("order_items")
+            .insert({
+              order_id: order.id,
+              product_id: item.product_id,
+              quantity: totalQty,
+              needs_boxing: item.needs_boxing,
+              is_special: item.is_special,
+              initial_state: item.is_special ? item.initial_state : null,
+            })
+            .select()
+            .single();
+
+          if (itemError) throw itemError;
+
+          const { data: batchCode } = await supabase.rpc("generate_batch_code");
+          const { error: batchError } = await supabase.from("order_batches").insert({
+            qr_code_data: batchCode || `B-${Date.now()}`,
+            order_id: order.id,
+            order_item_id: orderItem.id,
+            product_id: item.product_id,
+            current_state: item.is_special ? item.initial_state : "in_manufacturing",
+            quantity: totalQty,
+            created_by: user?.id,
+            is_special: item.is_special,
+          });
+          if (batchError) throw batchError;
+          totalBatchQuantity += totalQty;
+        }
       }
 
       toast({
         title: "Success",
-        description: `Order ${orderNumber} created with ${totalBatchQuantity} items in ${createdOrderItems.length} batch(es)`,
+        description: `Order ${orderNumber} created with ${totalBatchQuantity} total units`,
       });
 
       navigate("/orders");
@@ -496,7 +546,6 @@ export default function OrderCreate() {
                   />
                 </div>
               </div>
-              {/* Notes moved below items card */}
             </CardContent>
           </Card>
 
@@ -513,6 +562,9 @@ export default function OrderCreate() {
             <CardContent className="space-y-3">
               {items.map((item, index) => {
                 const selectedProduct = products.find((p) => p.id === item.product_id);
+                const productSizes = item.product_id ? getProductSizes(item.product_id) : [];
+                const totalQty = getItemTotalQty(item);
+
                 return (
                   <div
                     key={index}
@@ -521,7 +573,7 @@ export default function OrderCreate() {
                       item.is_special && "border-primary/40 bg-primary/5"
                     )}
                   >
-                    {/* Row 1: Product selector + Quantity + Delete */}
+                    {/* Row 1: Product selector + Delete */}
                     <div className="flex gap-3 items-start">
                       <div className="flex-1">
                         <Label className="text-xs text-muted-foreground mb-1 block">{t('order.product')} *</Label>
@@ -583,15 +635,6 @@ export default function OrderCreate() {
                           </PopoverContent>
                         </Popover>
                       </div>
-                      <div className="w-24">
-                        <Label className="text-xs text-muted-foreground mb-1 block">{t('order.quantity')} *</Label>
-                        <NumericInput
-                          min={1}
-                          value={item.quantity}
-                          onValueChange={(val) => updateItem(index, { quantity: val ?? 1 })}
-                          className="h-9"
-                        />
-                      </div>
                       <Button
                         type="button"
                         variant="ghost"
@@ -604,7 +647,48 @@ export default function OrderCreate() {
                       </Button>
                     </div>
 
-                    {/* Row 2: Toggles and options */}
+                    {/* Row 2: Size quantity inputs */}
+                    {item.product_id && productSizes.length > 0 && (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-xs text-muted-foreground">{t('catalog.sizes')}</Label>
+                          {totalQty > 0 && (
+                            <Badge variant="outline" className="text-xs">
+                              {t('order.total')}: {totalQty}
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+                          {productSizes.map((size) => (
+                            <div key={size} className="space-y-1">
+                              <Label className="text-xs font-medium text-center block">{size}</Label>
+                              <NumericInput
+                                min={0}
+                                value={item.sizeQuantities[size] || undefined}
+                                onValueChange={(val) => updateSizeQty(index, size, val)}
+                                placeholder="0"
+                                className="h-8 text-center text-sm"
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Fallback: single quantity for products without sizes */}
+                    {item.product_id && productSizes.length === 0 && (
+                      <div className="w-32">
+                        <Label className="text-xs text-muted-foreground mb-1 block">{t('order.quantity')} *</Label>
+                        <NumericInput
+                          min={1}
+                          value={item.sizeQuantities["_default"] || undefined}
+                          onValueChange={(val) => updateSizeQty(index, "_default", val)}
+                          className="h-9"
+                        />
+                      </div>
+                    )}
+
+                    {/* Row 3: Toggles and options */}
                     <div className="flex items-center gap-4 flex-wrap">
                       <label className="flex items-center gap-2 cursor-pointer">
                         <Checkbox
@@ -707,12 +791,12 @@ export default function OrderCreate() {
                   </div>
                   <div className="space-y-4">
                     {packagingRows.map((row, index) => {
-                      const validItems = items.filter(it => it.product_id);
+                      const validItems = items.filter(it => it.product_id && getItemTotalQty(it) > 0);
                       const orderItem = row.item_index >= 0 ? items[row.item_index] : undefined;
                       const totalAllocated = packagingRows
                         .filter((r, i) => i !== index && r.item_index === row.item_index && r.item_index >= 0)
                         .reduce((sum, r) => sum + r.quantity, 0);
-                      const maxQty = orderItem ? orderItem.quantity - totalAllocated : 1;
+                      const maxQty = orderItem ? getItemTotalQty(orderItem) - totalAllocated : 1;
 
                       return (
                         <div key={index} className="border rounded-lg p-3 space-y-2">
@@ -736,11 +820,11 @@ export default function OrderCreate() {
                                   const totalAllocatedForItem = packagingRows
                                     .filter((r, ri) => ri !== index && r.item_index === originalIndex)
                                     .reduce((sum, r) => sum + r.quantity, 0);
-                                  const remaining = it.quantity - totalAllocatedForItem;
+                                  const remaining = getItemTotalQty(it) - totalAllocatedForItem;
                                   if (remaining <= 0 && row.item_index !== originalIndex) return null;
                                   return (
                                     <SelectItem key={originalIndex} value={String(originalIndex)}>
-                                      {product?.sku} - {product?.name_en} ({it.needs_boxing ? t('order.boxing') : t('order.no_boxing')}) x{it.quantity}
+                                      {product?.sku} - {product?.name_en} ({it.needs_boxing ? t('order.boxing') : t('order.no_boxing')}) x{getItemTotalQty(it)}
                                     </SelectItem>
                                   );
                                 })}
