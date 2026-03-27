@@ -48,13 +48,17 @@ interface Batch {
   is_special?: boolean;
   product: {
     id: string;
-    name: string;
+    name_en: string;
+    name_ar?: string | null;
     sku: string;
     needs_packing: boolean;
+    color_en?: string | null;
+    color_ar?: string | null;
   };
   order_item?: {
     needs_boxing: boolean;
     initial_state?: string | null;
+    size?: string | null;
   };
 }
 
