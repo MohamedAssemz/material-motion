@@ -31,7 +31,7 @@ import { ExtraBoxSelectionDialog } from "@/components/ExtraBoxSelectionDialog";
 interface Product {
   id: string;
   sku: string;
-  name: string;
+  name_en: string;
 }
 
 interface ExtraBatch {
@@ -103,7 +103,7 @@ export default function ExtraInventory() {
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       result = result.filter(
-        (b) => b.product.name.toLowerCase().includes(q) || b.product.sku.toLowerCase().includes(q),
+        (b) => b.product.name_en.toLowerCase().includes(q) || b.product.sku.toLowerCase().includes(q),
       );
     }
     if (stateFilter !== "all") result = result.filter((b) => b.current_state === stateFilter);
@@ -398,7 +398,7 @@ export default function ExtraInventory() {
                       <SelectContent>
                         {products.map((product) => (
                           <SelectItem key={product.id} value={product.id}>
-                            {product.sku} - {product.name}
+                            {product.sku} - {product.name_en}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -626,7 +626,7 @@ export default function ExtraInventory() {
                       <TableRow key={batch.id}>
                         <TableCell>
                           <div>
-                            <p className="font-medium">{batch.product.name}</p>
+                            <p className="font-medium">{batch.product.name_en}</p>
                             <p className="text-xs text-muted-foreground">{batch.product.sku}</p>
                           </div>
                         </TableCell>

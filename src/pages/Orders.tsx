@@ -108,7 +108,7 @@ export default function Orders() {
 
       const { data: itemsData } = await supabase
         .from("order_items")
-        .select("id, order_id, quantity, deducted_to_extra, product:products(name, sku)")
+        .select("id, order_id, quantity, deducted_to_extra, product:products(name_en, sku)")
         .in("order_id", ordersData?.map((o) => o.id) || []);
 
       const itemsMap = new Map<string, OrderItem[]>();

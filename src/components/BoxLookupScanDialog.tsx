@@ -191,7 +191,7 @@ export function BoxLookupScanDialog({ open, onOpenChange }: BoxLookupScanDialogP
             qr_code_data,
             quantity,
             current_state,
-            product:products(sku, name)
+            product:products(sku, name_en)
           `)
           .eq('box_id', boxData.id);
 
@@ -215,7 +215,7 @@ export function BoxLookupScanDialog({ open, onOpenChange }: BoxLookupScanDialogP
             qr_code_data,
             quantity,
             current_state,
-            product:products(sku, name)
+            product:products(sku, name_en)
           `)
           .eq('box_id', boxData.id);
 

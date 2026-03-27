@@ -177,7 +177,7 @@ export default function OrderPackaging() {
         supabase
           .from("order_batches")
           .select(
-            "id, qr_code_data, current_state, quantity, product_id, order_item_id, box_id, manufacturing_machine_id, finishing_machine_id, packaging_machine_id, from_extra_state, is_special, product:products(id, name, sku, needs_packing)",
+            "id, qr_code_data, current_state, quantity, product_id, order_item_id, box_id, manufacturing_machine_id, finishing_machine_id, packaging_machine_id, from_extra_state, is_special, product:products(id, name_en, sku, needs_packing)",
           )
           .eq("order_id", id)
           .in("current_state", ["ready_for_packaging", "in_packaging"]),
@@ -185,7 +185,7 @@ export default function OrderPackaging() {
         supabase
           .from("order_batches")
           .select(
-            "id, qr_code_data, current_state, quantity, product_id, order_item_id, box_id, manufacturing_machine_id, finishing_machine_id, packaging_machine_id, from_extra_state, is_special, product:products(id, name, sku, needs_packing)",
+            "id, qr_code_data, current_state, quantity, product_id, order_item_id, box_id, manufacturing_machine_id, finishing_machine_id, packaging_machine_id, from_extra_state, is_special, product:products(id, name_en, sku, needs_packing)",
           )
           .eq("order_id", id)
           .in("current_state", ["ready_for_boxing", "in_boxing", "ready_for_shipment", "shipped"]),
@@ -254,7 +254,7 @@ export default function OrderPackaging() {
     try {
       const { data, error } = await supabase
         .from("extra_batch_history")
-        .select("quantity, product_id, extra_batch_id, products(name, sku)")
+        .select("quantity, product_id, extra_batch_id, products(name_en, sku)")
         .eq("event_type", "CREATED")
         .eq("source_order_id", id)
         .eq("from_state", "in_packaging");
@@ -293,7 +293,7 @@ export default function OrderPackaging() {
       if (extraBatchIds.size > 0) {
         const { data: extraBatches } = await supabase
           .from("extra_batches")
-          .select("id, product_id, packaging_machine_id, product:products(name, sku)")
+          .select("id, product_id, packaging_machine_id, product:products(name_en, sku)")
           .in("id", Array.from(extraBatchIds));
         setExtraBatchesForRate(
           (extraBatches || []).map((eb: any) => ({
@@ -319,7 +319,7 @@ export default function OrderPackaging() {
     try {
       const { data, error } = await supabase
         .from('extra_batch_history')
-        .select('quantity, product_id, consuming_order_item_id, products(name, sku)')
+        .select('quantity, product_id, consuming_order_item_id, products(name_en, sku)')
         .eq('event_type', 'CONSUMED')
         .eq('consuming_order_id', id)
         .eq('from_state', 'extra_packaging');

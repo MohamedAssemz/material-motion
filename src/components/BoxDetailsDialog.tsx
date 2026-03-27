@@ -167,7 +167,7 @@ export function BoxDetailsDialog({
             quantity,
             current_state,
             order_id,
-            product:products(name, sku),
+            product:products(name_en, sku),
             order:orders(order_number)
           `)
           .eq('box_id', boxId);
@@ -175,7 +175,7 @@ export function BoxDetailsDialog({
         if (error) throw error;
         setOrderBatches((data || []).map(b => ({
           ...b,
-          product: b.product as { name: string; sku: string } | null,
+          product: b.product ? { name: (b.product as any).name_en, sku: (b.product as any).sku } : null,
           order: b.order as { order_number: string } | null,
         })));
       } else {
@@ -187,14 +187,14 @@ export function BoxDetailsDialog({
             quantity,
             current_state,
             inventory_state,
-            product:products(name, sku)
+            product:products(name_en, sku)
           `)
           .eq('box_id', boxId);
 
         if (error) throw error;
         setExtraBatches((data || []).map(b => ({
           ...b,
-          product: b.product as { name: string; sku: string } | null,
+          product: b.product ? { name: (b.product as any).name_en, sku: (b.product as any).sku } : null,
         })));
       }
     } catch (error: any) {

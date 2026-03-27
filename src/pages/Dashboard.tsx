@@ -229,7 +229,7 @@ export default function Dashboard() {
           .select("product_id, quantity")
           .in("current_state", ["shipped", "ready_for_shipment"])
           .gte("created_at", rangeStart),
-        supabase.from("machines").select("id, name"),
+        supabase.from("machines").select("id, name_en"),
         supabase.from("order_batches").select("current_state, quantity").gte("updated_at", rangeStart),
         supabase
           .from("orders")
@@ -271,12 +271,12 @@ export default function Dashboard() {
       if (topProductIds.length > 0) {
         const prodRes = await supabase
           .from("products")
-          .select("id, name")
+          .select("id, name_en")
           .in(
             "id",
             topProductIds.map((p) => p[0]),
           );
-        const prodMap = new Map((prodRes.data || []).map((p) => [p.id, p.name]));
+        const prodMap = new Map((prodRes.data || []).map((p) => [p.id, p.name_en]));
         topProducts = topProductIds.map(([id, qty]) => ({ name: prodMap.get(id) || "Unknown", quantity: qty }));
       }
 
@@ -665,7 +665,7 @@ export default function Dashboard() {
                     >
                       {i + 1}
                     </span>
-                    <span className="text-sm font-medium truncate">{p.name}</span>
+                    <span className="text-sm font-medium truncate">{p.name_en}</span>
                   </div>
                   <Badge variant="secondary" className="text-xs shrink-0">
                     {p.quantity} {t("common.units")}

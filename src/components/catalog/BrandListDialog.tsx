@@ -12,7 +12,8 @@ import { useLanguage } from '@/contexts/LanguageContext';
 
 interface Brand {
   id: string;
-  name: string;
+  name_en: string;
+  name_ar?: string | null;
   logo_url: string | null;
   created_at: string;
   product_count?: number;
@@ -27,17 +28,17 @@ interface BrandListDialogProps {
 
 export function BrandListDialog({ open, onOpenChange, brands, onRefresh }: BrandListDialogProps) {
   const { toast } = useToast();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [showForm, setShowForm] = useState(false);
   const [editingBrand, setEditingBrand] = useState<Brand | null>(null);
-  const [form, setForm] = useState({ name: '', logo_url: '' });
+  const [form, setForm] = useState({ name_en: '', name_ar: '', logo_url: '' });
   const [saving, setSaving] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
   const resetForm = () => {
     setShowForm(false);
     setEditingBrand(null);
-    setForm({ name: '', logo_url: '' });
+    setForm({ name_en: '', name_ar: '', logo_url: '' });
   };
 
   const filteredBrands = useMemo(() => {
@@ -46,24 +47,24 @@ export function BrandListDialog({ open, onOpenChange, brands, onRefresh }: Brand
     );
     if (!searchQuery.trim()) return sorted;
     const query = searchQuery.toLowerCase();
-    return sorted.filter(brand => brand.name.toLowerCase().includes(query));
+    return sorted.filter(brand => brand.name_en.toLowerCase().includes(query) || brand.name_ar?.toLowerCase().includes(query));
   }, [brands, searchQuery]);
 
   const handleSave = async () => {
-    if (!form.name.trim()) return;
+    if (!form.name_en.trim()) return;
     setSaving(true);
     try {
       if (editingBrand) {
         const { error } = await supabase
           .from('brands')
-          .update({ name: form.name.trim(), logo_url: form.logo_url.trim() || null })
+          .update({ name_en: form.name_en.trim(), name_ar: form.name_ar.trim() || null, logo_url: form.logo_url.trim() || null })
           .eq('id', editingBrand.id);
         if (error) throw error;
         toast({ title: t('catalog.brand_updated') });
       } else {
         const { error } = await supabase
           .from('brands')
-          .insert({ name: form.name.trim(), logo_url: form.logo_url.trim() || null });
+          .insert({ name_en: form.name_en.trim(), name_ar: form.name_ar.trim() || null, logo_url: form.logo_url.trim() || null });
         if (error) throw error;
         toast({ title: t('catalog.brand_created') });
       }
@@ -90,7 +91,7 @@ export function BrandListDialog({ open, onOpenChange, brands, onRefresh }: Brand
 
   const handleEdit = (brand: Brand) => {
     setEditingBrand(brand);
-    setForm({ name: brand.name, logo_url: brand.logo_url || '' });
+    setForm({ name_en: brand.name_en, name_ar: brand.name_ar || '', logo_url: brand.logo_url || '' });
     setShowForm(true);
   };
 
@@ -109,26 +110,23 @@ export function BrandListDialog({ open, onOpenChange, brands, onRefresh }: Brand
 
         {showForm ? (
           <div className="space-y-4 py-4">
-            <div>
-              <Label htmlFor="brand-name">{t('catalog.brand_name')} *</Label>
-              <Input
-                id="brand-name"
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="brand-name-en">{t('catalog.english_brand')} *</Label>
+                <Input id="brand-name-en" value={form.name_en} onChange={(e) => setForm({ ...form, name_en: e.target.value })} />
+              </div>
+              <div>
+                <Label htmlFor="brand-name-ar">{t('catalog.arabic_brand')}</Label>
+                <Input id="brand-name-ar" value={form.name_ar} onChange={(e) => setForm({ ...form, name_ar: e.target.value })} dir="rtl" />
+              </div>
             </div>
             <div>
               <Label htmlFor="brand-logo">{t('catalog.logo_url')}</Label>
-              <Input
-                id="brand-logo"
-                value={form.logo_url}
-                onChange={(e) => setForm({ ...form, logo_url: e.target.value })}
-                placeholder="https://example.com/logo.png"
-              />
+              <Input id="brand-logo" value={form.logo_url} onChange={(e) => setForm({ ...form, logo_url: e.target.value })} placeholder="https://example.com/logo.png" />
             </div>
             <div className="flex gap-2 justify-end">
               <Button variant="outline" onClick={resetForm}>{t('common.cancel')}</Button>
-              <Button onClick={handleSave} disabled={saving || !form.name.trim()}>
+              <Button onClick={handleSave} disabled={saving || !form.name_en.trim()}>
                 {saving && <Loader2 className="me-2 h-4 w-4 animate-spin" />}
                 {editingBrand ? t('common.update') : t('common.create')}
               </Button>
@@ -166,7 +164,7 @@ export function BrandListDialog({ open, onOpenChange, brands, onRefresh }: Brand
                     >
                       <div className="flex items-center gap-3 flex-1 min-w-0">
                         {brand.logo_url ? (
-                          <img src={brand.logo_url} alt={brand.name} className="h-10 w-10 object-contain rounded" />
+                          <img src={brand.logo_url} alt={brand.name_en} className="h-10 w-10 object-contain rounded" />
                         ) : (
                           <div className="h-10 w-10 rounded bg-muted flex items-center justify-center shrink-0">
                             <Palette className="h-5 w-5 text-muted-foreground" />
@@ -174,7 +172,7 @@ export function BrandListDialog({ open, onOpenChange, brands, onRefresh }: Brand
                         )}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
-                            <span className="font-medium truncate">{brand.name}</span>
+                            <span className="font-medium truncate">{language === 'ar' && brand.name_ar ? brand.name_ar : brand.name_en}</span>
                             <Badge variant="secondary" className="shrink-0">
                               {brand.product_count || 0} {t('catalog.products_label')}
                             </Badge>

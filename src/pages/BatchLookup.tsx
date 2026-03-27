@@ -22,7 +22,7 @@ interface BatchInfo {
     priority: string;
   };
   product: {
-    name: string;
+    name_en: string;
     sku: string;
   };
   units: Array<{
@@ -57,7 +57,7 @@ export default function BatchLookup() {
         .select(`
           *,
           order:orders(id, order_number, priority),
-          product:products(name, sku),
+          product:products(name_en, sku),
           units(id, serial_no, state, is_damaged)
         `)
         .eq('qr_code_data', batchCode.toUpperCase())
@@ -177,7 +177,7 @@ export default function BatchLookup() {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Product</p>
-                  <p className="font-medium">{batch.product.name}</p>
+                  <p className="font-medium">{batch.product.name_en}</p>
                   <p className="text-sm text-muted-foreground">SKU: {batch.product.sku}</p>
                 </div>
                 <div>

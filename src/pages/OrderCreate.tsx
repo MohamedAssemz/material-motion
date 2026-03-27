@@ -39,7 +39,7 @@ import { format } from "date-fns";
 interface Product {
   id: string;
   sku: string;
-  name: string;
+  name_en: string;
 }
 
 interface Customer {
@@ -97,7 +97,7 @@ export default function OrderCreate() {
   const fetchData = async () => {
     try {
       const [productsRes, customersRes, productCustomersRes] = await Promise.all([
-        supabase.from("products").select("id, sku, name").order("sku"),
+        supabase.from("products").select("id, sku, name_en").order("sku"),
         supabase.from("customers").select("id, name, code, is_domestic").order("name"),
         supabase.from("product_customers").select("product_id, customer_id"),
       ]);
@@ -551,12 +551,12 @@ export default function OrderCreate() {
                                           {suggestedProducts.map((product) => (
                                             <CommandItem
                                               key={`suggested-${product.id}`}
-                                              value={`suggested-${product.sku} ${product.name}`}
+                                              value={`suggested-${product.sku} ${product.name_en}`}
                                               onSelect={() => updateItem(index, { product_id: product.id })}
                                             >
                                               <Check className={cn("mr-2 h-4 w-4", item.product_id === product.id ? "opacity-100" : "opacity-0")} />
                                               <span className="font-mono mr-2">{product.sku}</span>
-                                              <span className="text-muted-foreground">{product.name}</span>
+                                              <span className="text-muted-foreground">{product.name_en}</span>
                                               <Badge variant="secondary" className="ms-2 text-xs">{t('order.suggested')}</Badge>
                                             </CommandItem>
                                           ))}
@@ -569,12 +569,12 @@ export default function OrderCreate() {
                                   {products.map((product) => (
                                     <CommandItem
                                       key={product.id}
-                                      value={`${product.sku} ${product.name}`}
+                                      value={`${product.sku} ${product.name_en}`}
                                       onSelect={() => updateItem(index, { product_id: product.id })}
                                     >
                                       <Check className={cn("mr-2 h-4 w-4", item.product_id === product.id ? "opacity-100" : "opacity-0")} />
                                       <span className="font-mono mr-2">{product.sku}</span>
-                                      <span className="text-muted-foreground">{product.name}</span>
+                                      <span className="text-muted-foreground">{product.name_en}</span>
                                     </CommandItem>
                                   ))}
                                 </CommandGroup>
