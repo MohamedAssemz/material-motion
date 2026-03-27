@@ -55,7 +55,9 @@ import {
   MessageSquare,
   StickyNote,
   ChevronDown,
+  Pencil,
 } from "lucide-react";
+import { EditOrderDialog } from "@/components/EditOrderDialog";
 import {
   getNextState,
   getStateLabel,
