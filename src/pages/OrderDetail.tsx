@@ -1165,6 +1165,7 @@ export default function OrderDetail() {
                           );
                         })()}
                       </td>
+                      <td className="p-3 text-center">{item.quantity}</td>
                       <td className="p-3 text-center">
                         {item.product?.needs_packing ? (
                           <Badge variant="outline" className="bg-primary/10">
