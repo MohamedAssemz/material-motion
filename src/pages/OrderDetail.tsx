@@ -142,7 +142,7 @@ export default function OrderDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { hasRole, user } = useAuth();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [order, setOrder] = useState<Order | null>(null);
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1115,7 +1115,9 @@ export default function OrderDetail() {
             <table className="w-full">
               <thead>
                 <tr className="border-b">
-                  <th className="text-left p-3 font-medium">{t("common.product")}</th>
+                  <th className="text-start p-3 font-medium">{t("common.product")}</th>
+                  <th className="text-center p-3 font-medium">{t("catalog.size")}</th>
+                  <th className="text-center p-3 font-medium">{t("catalog.color")}</th>
                   <th className="text-center p-3 font-medium">{t("common.quantity")}</th>
                   <th className="text-center p-3 font-medium">{t("orders.packing")}</th>
                    <th className="text-center p-3 font-medium">{t("orders.boxing_col")}</th>
