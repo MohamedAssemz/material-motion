@@ -229,7 +229,7 @@ export default function Dashboard() {
           .select("product_id, quantity")
           .in("current_state", ["shipped", "ready_for_shipment"])
           .gte("created_at", rangeStart),
-        supabase.from("machines").select("id, name"),
+        supabase.from("machines").select("id, name_en"),
         supabase.from("order_batches").select("current_state, quantity").gte("updated_at", rangeStart),
         supabase
           .from("orders")
@@ -271,7 +271,7 @@ export default function Dashboard() {
       if (topProductIds.length > 0) {
         const prodRes = await supabase
           .from("products")
-          .select("id, name")
+          .select("id, name_en")
           .in(
             "id",
             topProductIds.map((p) => p[0]),
