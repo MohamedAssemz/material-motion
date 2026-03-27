@@ -519,7 +519,7 @@ export default function OrderDetail() {
     if (!printWindow) return;
 
     const itemsList = orderItems.map((item) => ({
-      name: item.product?.name || "Unknown",
+      name: item.product?.name_en || "Unknown",
       sku: item.product?.sku || "N/A",
       quantity: item.quantity,
     }));
@@ -696,7 +696,7 @@ export default function OrderDetail() {
       .forEach((batch) => {
         if (!stateData.has(batch.product_id)) {
           stateData.set(batch.product_id, {
-            name: batch.product?.name || "Unknown",
+            name: batch.product?.name_en || "Unknown",
             sku: batch.product?.sku || "N/A",
             needsPacking: batch.product?.needs_packing ?? true,
             quantity: 0,
@@ -735,7 +735,7 @@ export default function OrderDetail() {
       id: b.id,
       qr_code_data: b.qr_code_data,
       product_id: b.product_id,
-      product_name: b.product?.name || "Unknown",
+      product_name: b.product?.name_en || "Unknown",
       product_sku: b.product?.sku || "N/A",
       quantity: b.quantity,
     }));
@@ -1132,7 +1132,7 @@ export default function OrderDetail() {
                   return (
                     <tr key={item.id} className="border-b hover:bg-muted/50">
                       <td className="p-3">
-                        <p className="font-medium">{item.product?.name || "Unknown"}</p>
+                        <p className="font-medium">{item.product?.name_en || "Unknown"}</p>
                         {item.product?.sku && (
                           <p className="text-xs text-muted-foreground font-mono mt-0.5">{item.product.sku}</p>
                         )}
@@ -1200,7 +1200,7 @@ export default function OrderDetail() {
             id: b.id,
             batch_code: b.qr_code_data,
             product_id: b.product_id,
-            product_name: b.product?.name || "Unknown",
+            product_name: b.product?.name_en || "Unknown",
             product_sku: b.product?.sku || "N/A",
             quantity: b.quantity,
           }))}

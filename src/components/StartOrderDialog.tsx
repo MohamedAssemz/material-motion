@@ -19,7 +19,7 @@ interface OrderItem {
   quantity: number;
   product: {
     id: string;
-    name: string;
+    name_en: string;
     sku: string;
   };
 }

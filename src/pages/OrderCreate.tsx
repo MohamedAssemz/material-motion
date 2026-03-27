@@ -529,7 +529,7 @@ export default function OrderCreate() {
                           <PopoverTrigger asChild>
                             <Button variant="outline" role="combobox" className="w-full justify-between h-9 text-sm">
                               {selectedProduct
-                                ? <span className="truncate"><span className="font-mono">{selectedProduct.sku}</span> — {selectedProduct.name}</span>
+                                ? <span className="truncate"><span className="font-mono">{selectedProduct.sku}</span> — {selectedProduct.name_en}</span>
                                 : <span className="text-muted-foreground">{t('order.select_product')}</span>}
                               <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-50" />
                             </Button>
@@ -740,7 +740,7 @@ export default function OrderCreate() {
                                   if (remaining <= 0 && row.item_index !== originalIndex) return null;
                                   return (
                                     <SelectItem key={originalIndex} value={String(originalIndex)}>
-                                      {product?.sku} - {product?.name} ({it.needs_boxing ? t('order.boxing') : t('order.no_boxing')}) x{it.quantity}
+                                      {product?.sku} - {product?.name_en} ({it.needs_boxing ? t('order.boxing') : t('order.no_boxing')}) x{it.quantity}
                                     </SelectItem>
                                   );
                                 })}

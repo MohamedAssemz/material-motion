@@ -717,7 +717,7 @@ export default function ExtraInventory() {
           <AlertDialogHeader>
             <AlertDialogTitle>{t("extra.delete_batch")}</AlertDialogTitle>
             <AlertDialogDescription>
-              {t("extra.delete_confirm")} ({batchToDelete?.product?.name} × {batchToDelete?.quantity})?
+              {t("extra.delete_confirm")} ({batchToDelete?.product?.name_en} × {batchToDelete?.quantity})?
               {batchToDelete?.inventory_state === "RESERVED" && ` ${t("extra.reserved_release")}`}{" "}
               {t("extra.cannot_undo")}
             </AlertDialogDescription>
