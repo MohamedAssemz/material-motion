@@ -126,11 +126,15 @@ interface OrderItem {
   needs_boxing: boolean;
   is_special?: boolean;
   initial_state?: string | null;
+  size?: string | null;
   product: {
     id: string;
     name_en: string;
+    name_ar: string | null;
     sku: string;
     needs_packing: boolean;
+    color_en: string | null;
+    color_ar: string | null;
   };
 }
 
