@@ -44,6 +44,7 @@ export type Database = {
       brands: {
         Row: {
           created_at: string
+          description: string | null
           id: string
           logo_url: string | null
           name_ar: string | null
@@ -51,6 +52,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          description?: string | null
           id?: string
           logo_url?: string | null
           name_ar?: string | null
@@ -58,6 +60,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          description?: string | null
           id?: string
           logo_url?: string | null
           name_ar?: string | null
@@ -70,19 +73,25 @@ export type Database = {
           created_at: string
           description: string | null
           id: string
-          name: string
+          image_url: string | null
+          name_ar: string | null
+          name_en: string
         }
         Insert: {
           created_at?: string
           description?: string | null
           id?: string
-          name: string
+          image_url?: string | null
+          name_ar?: string | null
+          name_en: string
         }
         Update: {
           created_at?: string
           description?: string | null
           id?: string
-          name?: string
+          image_url?: string | null
+          name_ar?: string | null
+          name_en?: string
         }
         Relationships: []
       }
