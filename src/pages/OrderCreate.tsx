@@ -61,7 +61,7 @@ interface OrderItem {
 const orderSchema = z.object({
   order_number: z.string().trim().min(1, "Order number is required").max(50, "Order number too long"),
   notes: z.string().trim().max(500, "Notes must be less than 500 characters").optional(),
-  priority: z.enum(["high", "normal"]),
+  priority: z.enum(["low", "normal", "high"]),
   shipping_type: z.enum(["domestic", "international"]),
   raw_materials: z.string().optional(),
 });
@@ -77,7 +77,7 @@ export default function OrderCreate() {
   const [submitting, setSubmitting] = useState(false);
   const [orderNumber, setOrderNumber] = useState("");
   const [notes, setNotes] = useState("");
-  const [priority, setPriority] = useState<"high" | "normal">("normal");
+  const [priority, setPriority] = useState<"low" | "normal" | "high">("normal");
   const [shippingType, setShippingType] = useState<"domestic" | "international">("domestic");
   const [country, setCountry] = useState("");
   const [estimatedFulfillment, setEstimatedFulfillment] = useState<Date | undefined>();
@@ -458,11 +458,12 @@ export default function OrderCreate() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="priority">{t('order.priority')} *</Label>
-                  <Select value={priority} onValueChange={(value: "high" | "normal") => setPriority(value)}>
+                  <Select value={priority} onValueChange={(value: "low" | "normal" | "high") => setPriority(value)}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="low">{t('order.priority_low')}</SelectItem>
                       <SelectItem value="normal">{t('order.priority_normal')}</SelectItem>
                       <SelectItem value="high">{t('order.priority_high')}</SelectItem>
                     </SelectContent>
@@ -577,7 +578,11 @@ export default function OrderCreate() {
                     <div className="flex gap-3 items-start">
                       <div className="flex-1">
                         <Label className="text-xs text-muted-foreground mb-1 block">{t('order.product')} *</Label>
-                        <Popover>
+                      <Popover open={item._productOpen} onOpenChange={(open) => {
+                          const newItems = [...items];
+                          (newItems[index] as any)._productOpen = open;
+                          setItems(newItems);
+                        }}>
                           <PopoverTrigger asChild>
                             <Button variant="outline" role="combobox" className="w-full justify-between h-9 text-sm">
                               {selectedProduct
