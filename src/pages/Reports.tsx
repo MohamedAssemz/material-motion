@@ -47,7 +47,7 @@ export default function Reports() {
         extraHistoryRes,
       ] = await Promise.all([
         supabase.from('orders').select('id, order_number, status, priority, created_at, updated_at, estimated_fulfillment_time, customer_id'),
-        supabase.from('products').select('id, name'),
+        supabase.from('products').select('id, name_en'),
         supabase.from('order_items').select('order_id, product_id, quantity'),
         supabase.from('boxes').select('id, box_code, created_at, items_list'),
         supabase.from('shipments').select('id, created_at, status'),

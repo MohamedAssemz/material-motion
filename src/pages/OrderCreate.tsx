@@ -194,7 +194,7 @@ export default function OrderCreate() {
             row.weight_kg ? `Wt:${row.weight_kg}` : '',
           ].filter(Boolean).join(' ');
           const dimsSuffix = dims ? ` {${dims}}` : '';
-          return `Shipment ${i + 1}: [${product?.sku || "?"}] ${product?.name || "Unknown"}${boxingLabel} x ${row.quantity}${dimsSuffix}`;
+          return `Shipment ${i + 1}: [${product?.sku || "?"}] ${product?.name_en || "Unknown"}${boxingLabel} x ${row.quantity}${dimsSuffix}`;
         }).join("\n");
         const block = `\n---PACKAGING_REFERENCE---\n${packagingBlock}\n---END_PACKAGING_REFERENCE---`;
         finalNotes = finalNotes ? finalNotes + block : block.trim();

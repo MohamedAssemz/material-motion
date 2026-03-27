@@ -131,11 +131,11 @@ export default function ExtraInventory() {
   const fetchData = async () => {
     try {
       const [productsRes, batchesRes] = await Promise.all([
-        supabase.from("products").select("id, sku, name").order("sku"),
+        supabase.from("products").select("id, sku, name_en").order("sku"),
         supabase
           .from("extra_batches")
           .select(
-            `id, product_id, quantity, current_state, inventory_state, created_at, box_id, qr_code_data, product:products(id, sku, name)`,
+            `id, product_id, quantity, current_state, inventory_state, created_at, box_id, qr_code_data, product:products(id, sku, name_en)`,
           )
           .order("created_at", { ascending: false }),
       ]);

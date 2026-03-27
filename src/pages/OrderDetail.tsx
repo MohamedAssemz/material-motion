@@ -77,7 +77,7 @@ interface Batch {
   box_id: string | null;
   product: {
     id: string;
-    name: string;
+    name_en: string;
     sku: string;
     needs_packing: boolean;
   };
@@ -128,7 +128,7 @@ interface OrderItem {
   initial_state?: string | null;
   product: {
     id: string;
-    name: string;
+    name_en: string;
     sku: string;
     needs_packing: boolean;
   };
@@ -435,7 +435,7 @@ export default function OrderDetail() {
             product_id: b.product_id,
             order_item_id: b.order_item_id,
             reserved: 0,
-            productName: b.product?.name || "Unknown",
+            productName: b.product?.name_en || "Unknown",
             productSku: b.product?.sku || "N/A",
           });
         }
