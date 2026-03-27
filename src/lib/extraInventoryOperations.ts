@@ -237,7 +237,7 @@ export async function updateExtraBoxItemsList(boxId: string): Promise<void> {
   // Fetch all batches in this box
   const { data: batches, error: fetchError } = await supabase
     .from('extra_batches')
-    .select('product_id, quantity, product:products(name, sku)')
+    .select('product_id, quantity, product:products(name_en, sku)')
     .eq('box_id', boxId);
 
   if (fetchError) throw fetchError;

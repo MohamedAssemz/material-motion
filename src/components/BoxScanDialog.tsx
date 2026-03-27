@@ -114,7 +114,7 @@ export function BoxScanDialog({
             current_state,
             quantity,
             box_id,
-            product:products(name, sku)
+            product:products(name_en, sku)
           `)
           .eq('current_state', filterState || '')
           .not('box_id', 'is', null);
@@ -219,7 +219,7 @@ export function BoxScanDialog({
             qr_code_data,
             current_state,
             quantity,
-            product:products(name, sku)
+            product:products(name_en, sku)
           `)
           .eq('box_id', box.id)
           .eq('current_state', filterState || '')

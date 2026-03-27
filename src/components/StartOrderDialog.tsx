@@ -72,12 +72,12 @@ export function StartOrderDialog({
       const [batchesResult, extraResult] = await Promise.all([
         supabase
           .from('order_batches')
-          .select(`id, product_id, quantity, current_state, is_special, product:products(id, name, sku)`)
+          .select(`id, product_id, quantity, current_state, is_special, product:products(id, name_en, sku)`)
           .eq('order_id', orderId)
           .neq('current_state', 'shipped'),
         supabase
           .from('extra_batches')
-          .select(`id, product_id, quantity, product:products(id, name, sku)`)
+          .select(`id, product_id, quantity, product:products(id, name_en, sku)`)
           .eq('order_id', orderId)
           .eq('inventory_state', 'RESERVED'),
       ]);

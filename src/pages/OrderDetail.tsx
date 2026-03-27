@@ -213,7 +213,7 @@ export default function OrderDetail() {
         supabase.from("orders").select(`*, customer:customers(name, code)`).eq("id", id).maybeSingle(),
         supabase
           .from("order_items")
-          .select("id, product_id, quantity, needs_boxing, is_special, initial_state, product:products(id, name, sku, needs_packing)")
+          .select("id, product_id, quantity, needs_boxing, is_special, initial_state, product:products(id, name_en, sku, needs_packing)")
           .eq("order_id", id),
       ]);
 
@@ -227,7 +227,7 @@ export default function OrderDetail() {
       const { data: batchesData, error: batchesError } = await supabase
         .from("order_batches")
         .select(
-          "id, qr_code_data, current_state, quantity, product_id, order_item_id, eta, lead_time_days, box_id, from_extra_state, product:products(id, name, sku, needs_packing)",
+          "id, qr_code_data, current_state, quantity, product_id, order_item_id, eta, lead_time_days, box_id, from_extra_state, product:products(id, name_en, sku, needs_packing)",
         )
         .eq("order_id", id);
 
@@ -409,7 +409,7 @@ export default function OrderDetail() {
       // Fetch all reserved batches for this order
       const { data: reserved, error: resErr } = await supabase
         .from("extra_batches")
-        .select("order_item_id, product_id, quantity, product:products(name, sku)")
+        .select("order_item_id, product_id, quantity, product:products(name_en, sku)")
         .eq("order_id", id)
         .eq("inventory_state", "RESERVED");
       if (resErr) throw resErr;

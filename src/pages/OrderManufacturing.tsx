@@ -180,7 +180,7 @@ export default function OrderManufacturing() {
         supabase
           .from("order_batches")
           .select(
-            "id, qr_code_data, current_state, quantity, product_id, order_item_id, eta, lead_time_days, box_id, manufacturing_machine_id, from_extra_state, is_special, product:products(id, name, sku, needs_packing), order_item:order_items(needs_boxing, initial_state)",
+            "id, qr_code_data, current_state, quantity, product_id, order_item_id, eta, lead_time_days, box_id, manufacturing_machine_id, from_extra_state, is_special, product:products(id, name_en, sku, needs_packing), order_item:order_items(needs_boxing, initial_state)",
           )
           .eq("order_id", id)
           .in("current_state", ["in_manufacturing"]),
@@ -188,7 +188,7 @@ export default function OrderManufacturing() {
         supabase
           .from("order_batches")
           .select(
-            "id, qr_code_data, current_state, quantity, product_id, order_item_id, eta, lead_time_days, box_id, manufacturing_machine_id, from_extra_state, is_special, product:products(id, name, sku, needs_packing), order_item:order_items(needs_boxing, initial_state)",
+            "id, qr_code_data, current_state, quantity, product_id, order_item_id, eta, lead_time_days, box_id, manufacturing_machine_id, from_extra_state, is_special, product:products(id, name_en, sku, needs_packing), order_item:order_items(needs_boxing, initial_state)",
           )
           .eq("order_id", id)
           .in("current_state", [
@@ -228,7 +228,7 @@ export default function OrderManufacturing() {
     try {
       const { data, error } = await supabase
         .from("extra_batch_history")
-        .select("quantity, product_id, extra_batch_id, products(name, sku)")
+        .select("quantity, product_id, extra_batch_id, products(name_en, sku)")
         .eq("event_type", "CREATED")
         .eq("source_order_id", id)
         .eq("from_state", "in_manufacturing");
@@ -270,7 +270,7 @@ export default function OrderManufacturing() {
         // Still fetch extra_batches for machine IDs only
         const { data: extraBatches } = await supabase
           .from("extra_batches")
-          .select("id, product_id, manufacturing_machine_id, product:products(name, sku)")
+          .select("id, product_id, manufacturing_machine_id, product:products(name_en, sku)")
           .in("id", Array.from(extraBatchIds));
         setExtraBatchesForRate(
           (extraBatches || []).map((eb: any) => ({
@@ -296,7 +296,7 @@ export default function OrderManufacturing() {
     try {
       const { data, error } = await supabase
         .from('extra_batch_history')
-        .select('quantity, product_id, consuming_order_item_id, products(name, sku)')
+        .select('quantity, product_id, consuming_order_item_id, products(name_en, sku)')
         .eq('event_type', 'CONSUMED')
         .eq('consuming_order_id', id)
         .eq('from_state', 'extra_manufacturing');

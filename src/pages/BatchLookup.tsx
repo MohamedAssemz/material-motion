@@ -57,7 +57,7 @@ export default function BatchLookup() {
         .select(`
           *,
           order:orders(id, order_number, priority),
-          product:products(name, sku),
+          product:products(name_en, sku),
           units(id, serial_no, state, is_damaged)
         `)
         .eq('qr_code_data', batchCode.toUpperCase())
