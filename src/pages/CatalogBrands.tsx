@@ -1,22 +1,24 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Edit, Trash2, Loader2, Tag } from 'lucide-react';
+import { Plus, Edit, Trash2, Loader2, Tag, Upload, X } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface Brand {
   id: string;
   name_en: string;
   name_ar: string | null;
+  description: string | null;
   logo_url: string | null;
   created_at: string;
   product_count?: number;
@@ -31,8 +33,12 @@ export default function CatalogBrands() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [editingBrand, setEditingBrand] = useState<Brand | null>(null);
   const [deletingBrand, setDeletingBrand] = useState<Brand | null>(null);
-  const [formData, setFormData] = useState({ name_en: '', name_ar: '', logo_url: '' });
+  const [formData, setFormData] = useState({ name_en: '', name_ar: '', description: '' });
   const [saving, setSaving] = useState(false);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const canManage = hasRole('admin');
 
@@ -42,15 +48,13 @@ export default function CatalogBrands() {
 
   const fetchBrands = async () => {
     try {
-      // Fetch brands with product count
       const { data: brandsData, error } = await supabase
         .from('brands')
-        .select('id, name_en, name_ar, logo_url, created_at')
+        .select('id, name_en, name_ar, description, logo_url, created_at')
         .order('name_en');
 
       if (error) throw error;
 
-      // Get product counts separately
       const { data: countData } = await supabase
         .from('products')
         .select('brand_id')
@@ -70,41 +74,60 @@ export default function CatalogBrands() {
 
       setBrands(brandsWithCount);
     } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.message,
-        variant: 'destructive',
-      });
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!formData.name_en.trim()) {
-      toast({
-        title: 'Validation Error',
-        description: 'Brand name is required',
-        variant: 'destructive',
-      });
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      toast({ title: 'Invalid file', description: 'Please select an image file', variant: 'destructive' });
       return;
     }
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
+  };
 
-    setSaving(true);
-
+  const uploadImage = async (): Promise<string | null> => {
+    if (!imageFile) return editingBrand?.logo_url || null;
+    setUploading(true);
     try {
+      const ext = imageFile.name.split('.').pop();
+      const path = `brands/${Date.now()}.${ext}`;
+      const { error } = await supabase.storage.from('product-images').upload(path, imageFile);
+      if (error) throw error;
+      const { data: urlData } = supabase.storage.from('product-images').getPublicUrl(path);
+      return urlData.publicUrl;
+    } catch (error: any) {
+      toast({ title: 'Upload failed', description: error.message, variant: 'destructive' });
+      return editingBrand?.logo_url || null;
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.name_en.trim()) {
+      toast({ title: 'Validation Error', description: 'English name is required', variant: 'destructive' });
+      return;
+    }
+    setSaving(true);
+    try {
+      const imageUrl = await uploadImage();
       if (editingBrand) {
         const { error } = await supabase
           .from('brands')
           .update({
             name_en: formData.name_en.trim(),
             name_ar: formData.name_ar.trim() || null,
-            logo_url: formData.logo_url.trim() || null,
+            description: formData.description.trim() || null,
+            logo_url: imageUrl,
           })
           .eq('id', editingBrand.id);
-
         if (error) throw error;
         toast({ title: 'Success', description: 'Brand updated successfully' });
       } else {
@@ -113,22 +136,17 @@ export default function CatalogBrands() {
           .insert({
             name_en: formData.name_en.trim(),
             name_ar: formData.name_ar.trim() || null,
-            logo_url: formData.logo_url.trim() || null,
+            description: formData.description.trim() || null,
+            logo_url: imageUrl,
           });
-
         if (error) throw error;
         toast({ title: 'Success', description: 'Brand created successfully' });
       }
-
       setDialogOpen(false);
       resetForm();
       fetchBrands();
     } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.message,
-        variant: 'destructive',
-      });
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
     } finally {
       setSaving(false);
     }
@@ -136,22 +154,13 @@ export default function CatalogBrands() {
 
   const handleDelete = async () => {
     if (!deletingBrand) return;
-
     try {
-      const { error } = await supabase
-        .from('brands')
-        .delete()
-        .eq('id', deletingBrand.id);
-
+      const { error } = await supabase.from('brands').delete().eq('id', deletingBrand.id);
       if (error) throw error;
       toast({ title: 'Success', description: 'Brand deleted successfully' });
       fetchBrands();
     } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.message,
-        variant: 'destructive',
-      });
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
     } finally {
       setDeleteDialogOpen(false);
       setDeletingBrand(null);
@@ -159,8 +168,10 @@ export default function CatalogBrands() {
   };
 
   const resetForm = () => {
-    setFormData({ name_en: '', name_ar: '', logo_url: '' });
+    setFormData({ name_en: '', name_ar: '', description: '' });
     setEditingBrand(null);
+    setImageFile(null);
+    setImagePreview(null);
   };
 
   const openEditDialog = (brand: Brand) => {
@@ -168,8 +179,10 @@ export default function CatalogBrands() {
     setFormData({
       name_en: brand.name_en,
       name_ar: brand.name_ar || '',
-      logo_url: brand.logo_url || '',
+      description: brand.description || '',
     });
+    setImagePreview(brand.logo_url || null);
+    setImageFile(null);
     setDialogOpen(true);
   };
 
@@ -210,42 +223,76 @@ export default function CatalogBrands() {
                 </DialogTitle>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="name_en">English Name *</Label>
+                    <Input
+                      id="name_en"
+                      value={formData.name_en}
+                      onChange={(e) => setFormData(prev => ({ ...prev, name_en: e.target.value }))}
+                      placeholder="Brand name"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="name_ar">Arabic Name</Label>
+                    <Input
+                      id="name_ar"
+                      value={formData.name_ar}
+                      onChange={(e) => setFormData(prev => ({ ...prev, name_ar: e.target.value }))}
+                      placeholder="اسم العلامة التجارية"
+                      dir="rtl"
+                    />
+                  </div>
+                </div>
                 <div>
-                  <Label htmlFor="name_en">English Name *</Label>
-                  <Input
-                    id="name_en"
-                    value={formData.name_en}
-                    onChange={(e) => setFormData(prev => ({ ...prev, name_en: e.target.value }))}
-                    placeholder="Brand name (English)"
-                    required
+                  <Label htmlFor="description">Description</Label>
+                  <Textarea
+                    id="description"
+                    value={formData.description}
+                    onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                    placeholder="Optional description"
+                    rows={3}
                   />
                 </div>
                 <div>
-                  <Label htmlFor="name_ar">Arabic Name</Label>
-                  <Input
-                    id="name_ar"
-                    value={formData.name_ar}
-                    onChange={(e) => setFormData(prev => ({ ...prev, name_ar: e.target.value }))}
-                    placeholder="اسم العلامة التجارية"
-                    dir="rtl"
+                  <Label>Image</Label>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleFileSelect}
                   />
-                </div>
-                <div>
-                  <Label htmlFor="logo_url">Logo URL</Label>
-                  <Input
-                    id="logo_url"
-                    value={formData.logo_url}
-                    onChange={(e) => setFormData(prev => ({ ...prev, logo_url: e.target.value }))}
-                    placeholder="https://example.com/logo.png"
-                    type="url"
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Optional: Enter a URL to the brand logo
-                  </p>
+                  {imagePreview ? (
+                    <div className="relative w-24 h-24 mt-2">
+                      <img src={imagePreview} alt="Preview" className="w-full h-full object-cover rounded-lg border" />
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="icon"
+                        className="absolute -top-2 -right-2 h-6 w-6"
+                        onClick={() => { setImageFile(null); setImagePreview(null); }}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="mt-2"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <Upload className="mr-2 h-4 w-4" />
+                      Upload Image
+                    </Button>
+                  )}
                 </div>
                 <div className="flex gap-2">
-                  <Button type="submit" className="flex-1" disabled={saving}>
-                    {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  <Button type="submit" className="flex-1" disabled={saving || uploading}>
+                    {(saving || uploading) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     {editingBrand ? 'Update' : 'Create'}
                   </Button>
                   <Button type="button" variant="outline" onClick={() => {
@@ -266,8 +313,9 @@ export default function CatalogBrands() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[60px]">Logo</TableHead>
+                <TableHead className="w-[60px]">Image</TableHead>
                 <TableHead>Name</TableHead>
+                <TableHead>Description</TableHead>
                 <TableHead className="text-center">Products</TableHead>
                 <TableHead>Created</TableHead>
                 {canManage && <TableHead className="w-[100px]">Actions</TableHead>}
@@ -276,7 +324,7 @@ export default function CatalogBrands() {
             <TableBody>
               {brands.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={canManage ? 5 : 4} className="text-center text-muted-foreground py-12">
+                  <TableCell colSpan={canManage ? 6 : 5} className="text-center text-muted-foreground py-12">
                     No brands yet
                   </TableCell>
                 </TableRow>
@@ -291,7 +339,12 @@ export default function CatalogBrands() {
                         </AvatarFallback>
                       </Avatar>
                     </TableCell>
-                    <TableCell className="font-medium">{brand.name_en}</TableCell>
+                    <TableCell className="font-medium">
+                      {brand.name_en}{brand.name_ar ? ` - ${brand.name_ar}` : ''}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {brand.description || '-'}
+                    </TableCell>
                     <TableCell className="text-center">{brand.product_count}</TableCell>
                     <TableCell className="text-muted-foreground">
                       {format(new Date(brand.created_at), 'MMM d, yyyy')}
@@ -299,11 +352,7 @@ export default function CatalogBrands() {
                     {canManage && (
                       <TableCell>
                         <div className="flex gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => openEditDialog(brand)}
-                          >
+                          <Button variant="ghost" size="icon" onClick={() => openEditDialog(brand)}>
                             <Edit className="h-4 w-4" />
                           </Button>
                           <Button
