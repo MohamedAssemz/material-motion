@@ -285,7 +285,7 @@ export default function CatalogBrands() {
                   <TableRow key={brand.id}>
                     <TableCell>
                       <Avatar className="h-10 w-10">
-                        <AvatarImage src={brand.logo_url || undefined} alt={brand.name} />
+                        <AvatarImage src={brand.logo_url || undefined} alt={brand.name_en} />
                         <AvatarFallback className="text-xs">
                           {brand.name_en.substring(0, 2).toUpperCase()}
                         </AvatarFallback>

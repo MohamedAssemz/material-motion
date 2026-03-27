@@ -91,7 +91,7 @@ export function StartOrderDialog({
         if (!acc[key]) {
           acc[key] = {
             product_id: batch.product_id,
-            product_name: batch.product?.name || 'Unknown',
+            product_name: batch.product?.name_en || 'Unknown',
             product_sku: batch.product?.sku || '',
             quantity: 0,
             initial_state: batch.current_state,
@@ -109,7 +109,7 @@ export function StartOrderDialog({
         if (!acc[productId]) {
           acc[productId] = {
             product_id: productId,
-            product_name: batch.product?.name || 'Unknown',
+            product_name: batch.product?.name_en || 'Unknown',
             product_sku: batch.product?.sku || '',
             quantity: 0,
           };
