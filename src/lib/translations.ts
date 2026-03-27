@@ -727,6 +727,7 @@ export const translations: Record<string, TranslationEntry> = {
   "order.suggested":          { en: "Suggested",            ar: "مقترح" },
   "order.all_products":       { en: "All products",         ar: "جميع المنتجات" },
   "order.quantity":           { en: "Quantity",             ar: "الكمية" },
+  "order.total":              { en: "Total",                ar: "المجموع" },
   "order.boxing":             { en: "Boxing",               ar: "تعليب" },
   "order.special":            { en: "Special",              ar: "خاص" },
   "order.special_item":       { en: "Special Item",         ar: "عنصر خاص" },

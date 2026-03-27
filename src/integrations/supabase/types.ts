@@ -557,6 +557,7 @@ export type Database = {
           order_id: string
           product_id: string
           quantity: number
+          size: string | null
         }
         Insert: {
           created_at?: string | null
@@ -568,6 +569,7 @@ export type Database = {
           order_id: string
           product_id: string
           quantity: number
+          size?: string | null
         }
         Update: {
           created_at?: string | null
@@ -579,6 +581,7 @@ export type Database = {
           order_id?: string
           product_id?: string
           quantity?: number
+          size?: string | null
         }
         Relationships: [
           {
