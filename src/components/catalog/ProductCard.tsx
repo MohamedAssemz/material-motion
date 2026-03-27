@@ -129,10 +129,12 @@ export function ProductCard({
       <CardContent className="p-4 space-y-2">
         <div>
           <h3 className="font-semibold text-foreground line-clamp-1 group-hover:text-primary transition-colors">
-            {product.name_en}
+            {language === 'ar' ? (product.name_ar || product.name_en) : product.name_en}
           </h3>
-          {product.name_ar && (
-            <p className="text-sm text-muted-foreground line-clamp-1" dir="rtl">{product.name_ar}</p>
+          {language === 'ar' ? (
+            <p className="text-sm text-muted-foreground line-clamp-1">{product.name_en}</p>
+          ) : (
+            product.name_ar && <p className="text-sm text-muted-foreground line-clamp-1" dir="rtl">{product.name_ar}</p>
           )}
           <p className="text-xs font-mono text-muted-foreground">{product.sku}</p>
         </div>

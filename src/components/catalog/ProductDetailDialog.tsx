@@ -75,16 +75,15 @@ export function ProductDetailDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
-        <DialogHeader className="flex flex-row items-start justify-between">
+        <DialogHeader className="flex flex-row items-start justify-between gap-4">
           <div>
-            <DialogTitle className="text-xl">{product.name_en}</DialogTitle>
-            {product.name_ar && (
-              <p className="text-base text-muted-foreground" dir="rtl">{product.name_ar}</p>
-            )}
+            <DialogTitle className="text-xl" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+              {language === 'ar' ? (product.name_ar || product.name_en) : product.name_en}
+            </DialogTitle>
             <p className="text-sm font-mono text-muted-foreground">{product.sku}</p>
           </div>
           {onEdit && (
-            <Button variant="outline" size="sm" onClick={() => onEdit(product)}>
+            <Button variant="outline" size="sm" className="mt-2 shrink-0" onClick={() => onEdit(product)}>
               <Edit className="h-4 w-4 me-2" />
               {t('catalog.edit')}
             </Button>
@@ -126,12 +125,12 @@ export function ProductDetailDialog({
               {/* Bilingual Names - always show both */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <h4 className="text-sm font-medium text-muted-foreground mb-1">{t('catalog.english_name')}</h4>
-                  <p className="text-sm font-medium">{product.name_en}</p>
+                  <h4 className="text-sm font-medium text-muted-foreground mb-1 text-start">{t('catalog.english_name')}</h4>
+                  <p className="text-sm font-medium text-start">{product.name_en}</p>
                 </div>
-                <div>
-                  <h4 className="text-sm font-medium text-muted-foreground mb-1">{t('catalog.arabic_name')}</h4>
-                  <p className="text-sm font-medium" dir="rtl">{product.name_ar || '—'}</p>
+                <div dir="rtl">
+                  <h4 className="text-sm font-medium text-muted-foreground mb-1 text-start">{t('catalog.arabic_name')}</h4>
+                  <p className="text-sm font-medium text-start">{product.name_ar || '—'}</p>
                 </div>
               </div>
 
@@ -139,12 +138,12 @@ export function ProductDetailDialog({
               {(product.description_en || product.description_ar) && (
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <h4 className="text-sm font-medium text-muted-foreground mb-1">{t('catalog.english_description')}</h4>
-                    <p className="text-sm">{product.description_en || '—'}</p>
+                    <h4 className="text-sm font-medium text-muted-foreground mb-1 text-start">{t('catalog.english_description')}</h4>
+                    <p className="text-sm text-start">{product.description_en || '—'}</p>
                   </div>
-                  <div>
-                    <h4 className="text-sm font-medium text-muted-foreground mb-1">{t('catalog.arabic_description')}</h4>
-                    <p className="text-sm" dir="rtl">{product.description_ar || '—'}</p>
+                  <div dir="rtl">
+                    <h4 className="text-sm font-medium text-muted-foreground mb-1 text-start">{t('catalog.arabic_description')}</h4>
+                    <p className="text-sm text-start">{product.description_ar || '—'}</p>
                   </div>
                 </div>
               )}
@@ -153,12 +152,12 @@ export function ProductDetailDialog({
               {(product.color_en || product.color_ar) && (
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <h4 className="text-sm font-medium text-muted-foreground mb-1">{t('catalog.english_color')}</h4>
-                    <span className="text-sm font-medium">{product.color_en || '—'}</span>
+                    <h4 className="text-sm font-medium text-muted-foreground mb-1 text-start">{t('catalog.english_color')}</h4>
+                    <span className="text-sm font-medium text-start">{product.color_en || '—'}</span>
                   </div>
-                  <div>
-                    <h4 className="text-sm font-medium text-muted-foreground mb-1">{t('catalog.arabic_color')}</h4>
-                    <span className="text-sm font-medium" dir="rtl">{product.color_ar || '—'}</span>
+                  <div dir="rtl">
+                    <h4 className="text-sm font-medium text-muted-foreground mb-1 text-start">{t('catalog.arabic_color')}</h4>
+                    <span className="text-sm font-medium text-start">{product.color_ar || '—'}</span>
                   </div>
                 </div>
               )}
