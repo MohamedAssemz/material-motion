@@ -217,7 +217,7 @@ export default function OrderDetail() {
         supabase.from("orders").select(`*, customer:customers(name, code)`).eq("id", id).maybeSingle(),
         supabase
           .from("order_items")
-          .select("id, product_id, quantity, needs_boxing, is_special, initial_state, product:products(id, name_en, sku, needs_packing)")
+          .select("id, product_id, quantity, needs_boxing, is_special, initial_state, size, product:products(id, name_en, name_ar, sku, needs_packing, color_en, color_ar)")
           .eq("order_id", id),
       ]);
 
