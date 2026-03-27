@@ -16,7 +16,7 @@ import { getSizesLabel } from '@/lib/catalogConstants';
 interface ProductCategory {
   category: {
     id: string;
-    name: string;
+    name_en: string;
   } | null;
 }
 
