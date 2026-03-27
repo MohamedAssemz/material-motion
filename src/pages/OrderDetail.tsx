@@ -126,11 +126,15 @@ interface OrderItem {
   needs_boxing: boolean;
   is_special?: boolean;
   initial_state?: string | null;
+  size?: string | null;
   product: {
     id: string;
     name_en: string;
+    name_ar: string | null;
     sku: string;
     needs_packing: boolean;
+    color_en: string | null;
+    color_ar: string | null;
   };
 }
 
@@ -138,7 +142,7 @@ export default function OrderDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { hasRole, user } = useAuth();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [order, setOrder] = useState<Order | null>(null);
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -213,7 +217,7 @@ export default function OrderDetail() {
         supabase.from("orders").select(`*, customer:customers(name, code)`).eq("id", id).maybeSingle(),
         supabase
           .from("order_items")
-          .select("id, product_id, quantity, needs_boxing, is_special, initial_state, product:products(id, name_en, sku, needs_packing)")
+          .select("id, product_id, quantity, needs_boxing, is_special, initial_state, size, product:products(id, name_en, name_ar, sku, needs_packing, color_en, color_ar)")
           .eq("order_id", id),
       ]);
 
@@ -1111,7 +1115,9 @@ export default function OrderDetail() {
             <table className="w-full">
               <thead>
                 <tr className="border-b">
-                  <th className="text-left p-3 font-medium">{t("common.product")}</th>
+                  <th className="text-start p-3 font-medium">{t("common.product")}</th>
+                  <th className="text-center p-3 font-medium">{t("catalog.size")}</th>
+                  <th className="text-center p-3 font-medium">{t("catalog.color")}</th>
                   <th className="text-center p-3 font-medium">{t("common.quantity")}</th>
                   <th className="text-center p-3 font-medium">{t("orders.packing")}</th>
                    <th className="text-center p-3 font-medium">{t("orders.boxing_col")}</th>
@@ -1132,10 +1138,32 @@ export default function OrderDetail() {
                   return (
                     <tr key={item.id} className="border-b hover:bg-muted/50">
                       <td className="p-3">
-                        <p className="font-medium">{item.product?.name_en || "Unknown"}</p>
+                        <p className="font-medium">
+                          {language === 'ar' ? (item.product?.name_ar || item.product?.name_en || "Unknown") : (item.product?.name_en || "Unknown")}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {language === 'ar' ? item.product?.name_en : item.product?.name_ar}
+                        </p>
                         {item.product?.sku && (
                           <p className="text-xs text-muted-foreground font-mono mt-0.5">{item.product.sku}</p>
                         )}
+                      </td>
+                      <td className="p-3 text-center">
+                        {item.size ? (
+                          <Badge variant="outline">{item.size}</Badge>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">—</span>
+                        )}
+                      </td>
+                      <td className="p-3 text-center">
+                        {(() => {
+                          const color = language === 'ar' ? (item.product?.color_ar || item.product?.color_en) : (item.product?.color_en || item.product?.color_ar);
+                          return color ? (
+                            <span className="text-sm">{color}</span>
+                          ) : (
+                            <span className="text-muted-foreground text-xs">—</span>
+                          );
+                        })()}
                       </td>
                       <td className="p-3 text-center">{item.quantity}</td>
                       <td className="p-3 text-center">
