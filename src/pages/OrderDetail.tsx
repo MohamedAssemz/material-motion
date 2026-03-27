@@ -55,7 +55,9 @@ import {
   MessageSquare,
   StickyNote,
   ChevronDown,
+  Pencil,
 } from "lucide-react";
+import { EditOrderDialog } from "@/components/EditOrderDialog";
 import {
   getNextState,
   getStateLabel,
@@ -155,6 +157,7 @@ export default function OrderDetail() {
   const [startOrderOpen, setStartOrderOpen] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [packagingRefOpen, setPackagingRefOpen] = useState(false);
+  const [editOrderOpen, setEditOrderOpen] = useState(false);
   const [selectedExtraPhase, setSelectedExtraPhase] = useState<"manufacturing" | "finishing" | "packaging" | "boxing">(
     "manufacturing",
   );
@@ -1094,9 +1097,17 @@ export default function OrderDetail() {
 
       {/* Order Items Table */}
       <Card>
-        <CardHeader>
-          <CardTitle>{t("orders.order_items")}</CardTitle>
-          <CardDescription>{t("orders.products_in_order")}</CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle>{t("orders.order_items")}</CardTitle>
+            <CardDescription>{t("orders.products_in_order")}</CardDescription>
+          </div>
+          {canUpdate && order.status !== 'cancelled' && (
+            <Button variant="outline" size="sm" onClick={() => setEditOrderOpen(true)}>
+              <Pencil className="h-4 w-4 me-1" />
+              {t("orders.edit_order")}
+            </Button>
+          )}
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -1303,6 +1314,16 @@ export default function OrderDetail() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <EditOrderDialog
+        open={editOrderOpen}
+        onOpenChange={setEditOrderOpen}
+        orderId={id!}
+        orderStatus={order.status}
+        orderItems={orderItems}
+        currentEft={order.estimated_fulfillment_time}
+        onSaved={fetchOrder}
+      />
     </div>
   );
 }

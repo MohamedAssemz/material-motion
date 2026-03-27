@@ -67,6 +67,9 @@ export const translations: Record<string, TranslationEntry> = {
   "common.no_results":      { en: "No results found", ar: "لا توجد نتائج" },
   "common.back":            { en: "Back",             ar: "رجوع" },
   "common.close":           { en: "Close",            ar: "إغلاق" },
+  "common.ok":              { en: "OK",               ar: "حسنًا" },
+  "common.add":             { en: "Add",              ar: "إضافة" },
+  "common.new":             { en: "New",              ar: "جديد" },
   "common.actions":         { en: "Actions",          ar: "إجراءات" },
   "common.status":          { en: "Status",           ar: "الحالة" },
   "common.date":            { en: "Date",             ar: "التاريخ" },
@@ -234,6 +237,17 @@ export const translations: Record<string, TranslationEntry> = {
   "orders.not_found":         { en: "Order not found",     ar: "الطلب غير موجود" },
   "orders.back_to_orders":    { en: "Back to Orders",      ar: "العودة للطلبات" },
   "orders.packaging_reference": { en: "Packaging Reference", ar: "مرجع التغليف" },
+  "orders.edit_order":          { en: "Edit Order",           ar: "تعديل الطلب" },
+  "orders.edit_order_desc":     { en: "Edit order items and estimated fulfillment time", ar: "تعديل عناصر الطلب ووقت التنفيذ المتوقع" },
+  "orders.add_item":            { en: "Add Item",             ar: "إضافة عنصر" },
+  "orders.save_changes":        { en: "Save Changes",         ar: "حفظ التغييرات" },
+  "orders.boxes_must_be_emptied": { en: "Some batches are assigned to boxes. Please empty those boxes first before reducing quantity or deleting this item.", ar: "بعض الدفعات مخصصة لصناديق. يرجى إفراغ الصناديق أولاً قبل تقليل الكمية أو حذف هذا العنصر." },
+  "orders.boxes_must_be_emptied_title": { en: "Boxes Must Be Emptied", ar: "يجب إفراغ الصناديق" },
+  "orders.deleted_items":       { en: "Deleted items (click restore to undo)", ar: "العناصر المحذوفة (اضغط استعادة للتراجع)" },
+  "orders.restore":             { en: "Restore",              ar: "استعادة" },
+  "orders.select_product":      { en: "Select product...",    ar: "اختر منتج..." },
+  "orders.select_size":         { en: "Select size",          ar: "اختر المقاس" },
+  "orders.duplicate_item":      { en: "This product/size combination already exists", ar: "هذا المنتج/المقاس موجود بالفعل" },
 
   // ══════════════════════════════════════════
   //  MANUFACTURING
