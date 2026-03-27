@@ -89,6 +89,7 @@ export default function OrderCreate() {
   const [items, setItems] = useState<OrderItem[]>([{ product_id: "", sizeQuantities: {}, needs_boxing: true, is_special: false, initial_state: "in_manufacturing" }]);
   const [customerProductMapping, setCustomerProductMapping] = useState<Map<string, Set<string>>>(new Map());
   const [showPackagingRef, setShowPackagingRef] = useState(false);
+  const [productPopoverOpen, setProductPopoverOpen] = useState<Record<number, boolean>>({});
   const [packagingRows, setPackagingRows] = useState<Array<{ item_index: number; quantity: number; length_cm: string; width_cm: string; height_cm: string; weight_kg: string }>>([]);
 
   useEffect(() => {
@@ -578,11 +579,7 @@ export default function OrderCreate() {
                     <div className="flex gap-3 items-start">
                       <div className="flex-1">
                         <Label className="text-xs text-muted-foreground mb-1 block">{t('order.product')} *</Label>
-                      <Popover open={item._productOpen} onOpenChange={(open) => {
-                          const newItems = [...items];
-                          (newItems[index] as any)._productOpen = open;
-                          setItems(newItems);
-                        }}>
+                      <Popover open={productPopoverOpen[index] || false} onOpenChange={(open) => setProductPopoverOpen(prev => ({ ...prev, [index]: open }))}>
                           <PopoverTrigger asChild>
                             <Button variant="outline" role="combobox" className="w-full justify-between h-9 text-sm">
                               {selectedProduct
