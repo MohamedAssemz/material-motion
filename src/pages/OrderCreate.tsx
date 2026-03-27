@@ -606,7 +606,7 @@ export default function OrderCreate() {
                                             <CommandItem
                                               key={`suggested-${product.id}`}
                                               value={`suggested-${product.sku} ${product.name_en}`}
-                                              onSelect={() => updateItem(index, { product_id: product.id })}
+                                              onSelect={() => { updateItem(index, { product_id: product.id }); setProductPopoverOpen(prev => ({ ...prev, [index]: false })); }}
                                             >
                                               <Check className={cn("mr-2 h-4 w-4", item.product_id === product.id ? "opacity-100" : "opacity-0")} />
                                               <span className="font-mono mr-2">{product.sku}</span>
@@ -624,7 +624,7 @@ export default function OrderCreate() {
                                     <CommandItem
                                       key={product.id}
                                       value={`${product.sku} ${product.name_en}`}
-                                      onSelect={() => updateItem(index, { product_id: product.id })}
+                                      onSelect={() => { updateItem(index, { product_id: product.id }); setProductPopoverOpen(prev => ({ ...prev, [index]: false })); }}
                                     >
                                       <Check className={cn("mr-2 h-4 w-4", item.product_id === product.id ? "opacity-100" : "opacity-0")} />
                                       <span className="font-mono mr-2">{product.sku}</span>
