@@ -1314,6 +1314,16 @@ export default function OrderDetail() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <EditOrderDialog
+        open={editOrderOpen}
+        onOpenChange={setEditOrderOpen}
+        orderId={id!}
+        orderStatus={order.status}
+        orderItems={orderItems}
+        currentEft={order.estimated_fulfillment_time}
+        onSaved={fetchOrder}
+      />
     </div>
   );
 }
