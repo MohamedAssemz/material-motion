@@ -7,6 +7,8 @@ import { Package, Edit, Check, X } from 'lucide-react';
 import { useState } from 'react';
 import { ProductCardData } from './ProductCard';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { getProductDisplayName, getProductDisplayColor, getProductDisplayDescription, getBrandDisplayName } from '@/lib/catalogHelpers';
+import { getSizeRangeLabel } from '@/lib/catalogConstants';
 
 interface ProductPotentialCustomer {
   customer: {
@@ -35,11 +37,15 @@ export function ProductDetailDialog({
   product, 
   onEdit,
 }: ProductDetailDialogProps) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   
   if (!product) return null;
 
+  const displayName = getProductDisplayName(product, language);
+  const displayDescription = getProductDisplayDescription(product, language);
+  const displayColor = getProductDisplayColor(product, language);
+  const sizeLabel = getSizeRangeLabel(product.size_from, product.size_to || null);
   const mainImageIndex = product.images?.findIndex(img => img.is_main) ?? 0;
   const currentImage = product.images?.[selectedImageIndex] || product.images?.[mainImageIndex];
 
@@ -48,7 +54,7 @@ export function ProductDetailDialog({
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader className="flex flex-row items-start justify-between">
           <div>
-            <DialogTitle className="text-xl">{product.name}</DialogTitle>
+            <DialogTitle className="text-xl">{displayName}</DialogTitle>
             <p className="text-sm font-mono text-muted-foreground">{product.sku}</p>
           </div>
           {onEdit && (
@@ -65,19 +71,13 @@ export function ProductDetailDialog({
             <div className="space-y-3">
               <AspectRatio ratio={1} className="bg-muted rounded-lg overflow-hidden">
                 {currentImage ? (
-                  <img 
-                    src={currentImage.image_url} 
-                    alt={product.name}
-                    className="h-full w-full object-cover"
-                  />
+                  <img src={currentImage.image_url} alt={displayName} className="h-full w-full object-cover" />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center">
                     <Package className="h-20 w-20 text-muted-foreground/40" />
                   </div>
                 )}
               </AspectRatio>
-              
-              {/* Thumbnails */}
               {product.images && product.images.length > 1 && (
                 <div className="flex gap-2 overflow-x-auto pb-2">
                   {product.images.map((img, index) => (
@@ -85,16 +85,10 @@ export function ProductDetailDialog({
                       key={img.id}
                       onClick={() => setSelectedImageIndex(index)}
                       className={`relative shrink-0 w-16 h-16 rounded-md overflow-hidden border-2 transition-colors ${
-                        selectedImageIndex === index 
-                          ? 'border-primary' 
-                          : 'border-transparent hover:border-muted-foreground/50'
+                        selectedImageIndex === index ? 'border-primary' : 'border-transparent hover:border-muted-foreground/50'
                       }`}
                     >
-                      <img 
-                        src={img.image_url} 
-                        alt={`Thumbnail ${index + 1}`}
-                        className="h-full w-full object-cover"
-                      />
+                      <img src={img.image_url} alt={`Thumbnail ${index + 1}`} className="h-full w-full object-cover" />
                     </button>
                   ))}
                 </div>
@@ -103,24 +97,38 @@ export function ProductDetailDialog({
 
             {/* Product Details */}
             <div className="space-y-4">
-              {product.description && (
+              {/* Bilingual Names */}
+              {product.name_ar && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <h4 className="text-sm font-medium text-muted-foreground mb-1">{t('catalog.english_name')}</h4>
+                    <p className="text-sm font-medium">{product.name_en}</p>
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-medium text-muted-foreground mb-1">{t('catalog.arabic_name')}</h4>
+                    <p className="text-sm font-medium" dir="rtl">{product.name_ar}</p>
+                  </div>
+                </div>
+              )}
+
+              {displayDescription && (
                 <div>
                   <h4 className="text-sm font-medium text-muted-foreground mb-1">{t('catalog.description')}</h4>
-                  <p className="text-sm">{product.description}</p>
+                  <p className="text-sm">{displayDescription}</p>
                 </div>
               )}
 
               <div className="grid grid-cols-2 gap-4">
-                {product.size && (
+                {sizeLabel && (
                   <div>
                     <h4 className="text-sm font-medium text-muted-foreground mb-1">{t('catalog.size')}</h4>
-                    <Badge variant="secondary">{product.size}</Badge>
+                    <Badge variant="secondary">{sizeLabel}</Badge>
                   </div>
                 )}
-                {product.color && (
+                {displayColor && (
                   <div>
                     <h4 className="text-sm font-medium text-muted-foreground mb-1">{t('catalog.color')}</h4>
-                    <span className="text-sm font-medium">{product.color}</span>
+                    <span className="text-sm font-medium">{displayColor}</span>
                   </div>
                 )}
               </div>
@@ -128,7 +136,7 @@ export function ProductDetailDialog({
               {product.brand && (
                 <div>
                   <h4 className="text-sm font-medium text-muted-foreground mb-1">{t('catalog.brands')}</h4>
-                  <span className="text-sm font-medium">{product.brand.name}</span>
+                  <span className="text-sm font-medium">{getBrandDisplayName(product.brand, language)}</span>
                 </div>
               )}
 
@@ -144,14 +152,10 @@ export function ProductDetailDialog({
                 <div className="flex items-center gap-2">
                   {product.needs_packing ? (
                     <Badge className="bg-green-500/10 text-green-600 border-green-500/20">
-                      <Check className="h-3 w-3 me-1" />
-                      {t('common.yes')}
+                      <Check className="h-3 w-3 me-1" />{t('common.yes')}
                     </Badge>
                   ) : (
-                    <Badge variant="outline">
-                      <X className="h-3 w-3 me-1" />
-                      {t('common.no')}
-                    </Badge>
+                    <Badge variant="outline"><X className="h-3 w-3 me-1" />{t('common.no')}</Badge>
                   )}
                 </div>
               </div>
@@ -161,9 +165,7 @@ export function ProductDetailDialog({
                   <h4 className="text-sm font-medium text-muted-foreground mb-2">{t('catalog.categories')}</h4>
                   <div className="flex flex-wrap gap-1.5">
                     {product.categories.map((pc, idx) => pc.category && (
-                      <Badge key={pc.category.id || idx} variant="secondary">
-                        {pc.category.name}
-                      </Badge>
+                      <Badge key={pc.category.id || idx} variant="secondary">{pc.category.name}</Badge>
                     ))}
                   </div>
                 </div>
@@ -186,9 +188,7 @@ export function ProductDetailDialog({
               {product.created_at && (
                 <div>
                   <h4 className="text-sm font-medium text-muted-foreground mb-1">{t('catalog.created')}</h4>
-                  <span className="text-sm text-muted-foreground">
-                    {new Date(product.created_at).toLocaleDateString()}
-                  </span>
+                  <span className="text-sm text-muted-foreground">{new Date(product.created_at).toLocaleDateString()}</span>
                 </div>
               )}
             </div>

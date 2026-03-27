@@ -10,6 +10,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Package, MoreVertical, Eye, Trash2, Copy } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { getProductDisplayName, getProductDisplayColor, getBrandDisplayName } from '@/lib/catalogHelpers';
+import { getSizeRangeLabel } from '@/lib/catalogConstants';
 
 interface ProductCategory {
   category: {
@@ -27,16 +29,21 @@ interface ProductImage {
 
 interface ProductBrand {
   id: string;
-  name: string;
+  name_en: string;
+  name_ar?: string | null;
 }
 
 export interface ProductCardData {
   id: string;
   sku: string;
-  name: string;
-  description: string | null;
-  size: string | null;
-  color: string | null;
+  name_en: string;
+  name_ar?: string | null;
+  description_en: string | null;
+  description_ar?: string | null;
+  size_from: string | null;
+  size_to?: string | null;
+  color_en: string | null;
+  color_ar?: string | null;
   country: string | null;
   needs_packing: boolean | null;
   brand?: ProductBrand | null;
@@ -61,8 +68,11 @@ export function ProductCard({
   onDuplicate,
   showMenu = false 
 }: ProductCardProps) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const mainImage = product.images?.find(img => img.is_main) || product.images?.[0];
+  const displayName = getProductDisplayName(product, language);
+  const displayColor = getProductDisplayColor(product, language);
+  const sizeLabel = getSizeRangeLabel(product.size_from, product.size_to || null);
   
   return (
     <Card 
@@ -103,7 +113,7 @@ export function ProductCard({
         {mainImage ? (
           <img 
             src={mainImage.image_url} 
-            alt={product.name}
+            alt={displayName}
             className="h-full w-full object-cover transition-transform group-hover:scale-105"
           />
         ) : (
@@ -116,18 +126,18 @@ export function ProductCard({
       <CardContent className="p-4 space-y-2">
         <div>
           <h3 className="font-semibold text-foreground line-clamp-1 group-hover:text-primary transition-colors">
-            {product.name}
+            {displayName}
           </h3>
           <p className="text-xs font-mono text-muted-foreground">{product.sku}</p>
         </div>
         
         <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-          {product.size && (
-            <span>{t('catalog.size')}: <span className="font-medium text-foreground">{product.size}</span></span>
+          {sizeLabel && (
+            <span>{t('catalog.size')}: <span className="font-medium text-foreground">{sizeLabel}</span></span>
           )}
-          {product.size && product.color && <span className="text-border">|</span>}
-          {product.color && (
-            <span>{t('catalog.color')}: <span className="font-medium text-foreground">{product.color}</span></span>
+          {sizeLabel && displayColor && <span className="text-border">|</span>}
+          {displayColor && (
+            <span>{t('catalog.color')}: <span className="font-medium text-foreground">{displayColor}</span></span>
           )}
         </div>
         
@@ -148,7 +158,7 @@ export function ProductCard({
         
         {product.brand && (
           <p className="text-xs text-muted-foreground">
-            {t('catalog.brands')}: <span className="font-medium">{product.brand.name}</span>
+            {t('catalog.brands')}: <span className="font-medium">{getBrandDisplayName(product.brand, language)}</span>
           </p>
         )}
       </CardContent>
