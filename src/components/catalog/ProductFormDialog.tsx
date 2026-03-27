@@ -84,7 +84,7 @@ interface Category {
 
 interface Brand {
   id: string;
-  name: string;
+  name_en: string;
 }
 
 interface Customer {
@@ -103,10 +103,14 @@ interface ProductImage {
 export interface ProductFormData {
   id?: string;
   sku: string;
-  name: string;
-  description: string;
-  size: string;
-  color: string;
+  name_en: string;
+  name_ar: string;
+  description_en: string;
+  description_ar: string;
+  size_from: string;
+  size_to: string;
+  color_en: string;
+  color_ar: string;
   brand_id: string;
   country: string;
   needs_packing: boolean;
@@ -126,10 +130,14 @@ interface ProductFormDialogProps {
 
 const initialFormData: ProductFormData = {
   sku: '',
-  name: '',
-  description: '',
-  size: '',
-  color: '',
+  name_en: '',
+  name_ar: '',
+  description_en: '',
+  description_ar: '',
+  size_from: '',
+  size_to: '',
+  color_en: '',
+  color_ar: '',
   brand_id: '',
   country: '',
   needs_packing: true,
@@ -184,7 +192,7 @@ export function ProductFormDialog({
     try {
       const [categoriesRes, brandsRes, customersRes] = await Promise.all([
         supabase.from('categories').select('id, name').order('name'),
-        supabase.from('brands').select('id, name').order('name'),
+        supabase.from('brands').select('id, name_en').order('name_en'),
         supabase.from('customers').select('id, name, code').order('name'),
       ]);
 
@@ -209,10 +217,10 @@ export function ProductFormDialog({
     
     // Compare all relevant fields
     return (
-      formData.name !== originalProduct.name ||
-      formData.description !== originalProduct.description ||
-      formData.size !== originalProduct.size ||
-      formData.color !== originalProduct.color ||
+      formData.name_en !== originalProduct.name_en ||
+      formData.description_en !== originalProduct.description_en ||
+      formData.size_from !== originalProduct.size_from ||
+      formData.color_en !== originalProduct.color_en ||
       formData.brand_id !== originalProduct.brand_id ||
       formData.country !== originalProduct.country ||
       formData.needs_packing !== originalProduct.needs_packing ||
@@ -226,7 +234,7 @@ export function ProductFormDialog({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.name.trim()) {
+    if (!formData.name_en.trim()) {
       toast({
         title: t('toast.error'),
         description: t('catalog.name_required'),
@@ -254,10 +262,14 @@ export function ProductFormDialog({
       // Prepare product data
       const productData = {
         sku,
-        name: formData.name.trim(),
-        description: formData.description.trim() || null,
-        size: formData.size || null,
-        color: formData.color.trim() || null,
+        name_en: formData.name_en.trim(),
+        name_ar: formData.name_ar.trim() || null,
+        description_en: formData.description_en.trim() || null,
+        description_ar: formData.description_ar.trim() || null,
+        size_from: formData.size_from || null,
+        size_to: formData.size_to || null,
+        color_en: formData.color_en.trim() || null,
+        color_ar: formData.color_ar.trim() || null,
         brand_id: formData.brand_id || null,
         country: formData.country.trim() || null,
         needs_packing: formData.needs_packing,
@@ -397,33 +409,54 @@ export function ProductFormDialog({
             <div className="flex-1 overflow-y-auto pr-4 space-y-6 pb-4">
                 {/* Basic Info */}
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="sm:col-span-2">
-                    <Label htmlFor="name">{t('catalog.product_name')} *</Label>
+                  <div>
+                    <Label htmlFor="name_en">{t('catalog.english_name')} *</Label>
                     <Input
-                      id="name"
-                      value={formData.name}
-                      onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                      id="name_en"
+                      value={formData.name_en}
+                      onChange={(e) => setFormData(prev => ({ ...prev, name_en: e.target.value }))}
                       placeholder={t('catalog.enter_name')}
                       required
                     />
                   </div>
+                  <div>
+                    <Label htmlFor="name_ar">{t('catalog.arabic_name')}</Label>
+                    <Input
+                      id="name_ar"
+                      value={formData.name_ar}
+                      onChange={(e) => setFormData(prev => ({ ...prev, name_ar: e.target.value }))}
+                      placeholder="الاسم بالعربية"
+                      dir="rtl"
+                    />
+                  </div>
                   
-                  <div className="sm:col-span-2">
-                    <Label htmlFor="description">{t('catalog.description')}</Label>
+                  <div>
+                    <Label htmlFor="description_en">{t('catalog.english_description')}</Label>
                     <Textarea
-                      id="description"
-                      value={formData.description}
-                      onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                      id="description_en"
+                      value={formData.description_en}
+                      onChange={(e) => setFormData(prev => ({ ...prev, description_en: e.target.value }))}
                       placeholder={t('catalog.product_desc')}
-                      rows={3}
+                      rows={2}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="description_ar">{t('catalog.arabic_description')}</Label>
+                    <Textarea
+                      id="description_ar"
+                      value={formData.description_ar}
+                      onChange={(e) => setFormData(prev => ({ ...prev, description_ar: e.target.value }))}
+                      placeholder="الوصف بالعربية"
+                      rows={2}
+                      dir="rtl"
                     />
                   </div>
 
                   <div>
-                    <Label htmlFor="size">{t('catalog.size')}</Label>
+                    <Label>{t('catalog.size_from')}</Label>
                     <Select
-                      value={formData.size}
-                      onValueChange={(value) => setFormData(prev => ({ ...prev, size: value }))}
+                      value={formData.size_from}
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, size_from: value }))}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder={t('catalog.select_size')} />
@@ -437,18 +470,45 @@ export function ProductFormDialog({
                   </div>
 
                   <div>
-                    <Label htmlFor="color">{t('catalog.color')}</Label>
+                    <Label>{t('catalog.size_to')}</Label>
+                    <Select
+                      value={formData.size_to}
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, size_to: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder={t('catalog.select_size')} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {SIZE_OPTIONS.map(size => (
+                          <SelectItem key={size} value={size}>{size}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="color_en">{t('catalog.english_color')}</Label>
                     <Input
-                      id="color"
-                      value={formData.color}
-                      onChange={(e) => setFormData(prev => ({ ...prev, color: e.target.value }))}
+                      id="color_en"
+                      value={formData.color_en}
+                      onChange={(e) => setFormData(prev => ({ ...prev, color_en: e.target.value }))}
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="color_ar">{t('catalog.arabic_color')}</Label>
+                    <Input
+                      id="color_ar"
+                      value={formData.color_ar}
+                      onChange={(e) => setFormData(prev => ({ ...prev, color_ar: e.target.value }))}
+                      dir="rtl"
                     />
                   </div>
 
                   <div>
                     <Label htmlFor="brand">{t('catalog.brands')}</Label>
                     <SearchableSelect
-                      options={brands.map(b => ({ value: b.id, label: b.name }))}
+                      options={brands.map(b => ({ value: b.id, label: b.name_en }))}
                       value={formData.brand_id || null}
                       onValueChange={(value) => setFormData(prev => ({ ...prev, brand_id: value || '' }))}
                       placeholder={t('catalog.select_brand')}
