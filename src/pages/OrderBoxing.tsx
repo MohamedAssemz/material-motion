@@ -132,13 +132,15 @@ export default function OrderBoxing() {
 
   const [acceptDialogOpen, setAcceptDialogOpen] = useState(false);
   const [moveToReadyDialogOpen, setMoveToReadyDialogOpen] = useState(false);
-  const [kartonaDialogOpen, setKartonaDialogOpen] = useState(false);
+  const [cartonaDialogOpen, setCartonaDialogOpen] = useState(false);
   const [moveToExtraDialogOpen, setMoveToExtraDialogOpen] = useState(false);
   const [shipmentNotes, setShipmentNotes] = useState("");
   const [shipmentLength, setShipmentLength] = useState("");
   const [shipmentWidth, setShipmentWidth] = useState("");
   const [shipmentHeight, setShipmentHeight] = useState("");
   const [shipmentWeight, setShipmentWeight] = useState("");
+  const [selectedCartonId, setSelectedCartonId] = useState<string | null>(null);
+  const [shippingCartons, setShippingCartons] = useState<Array<{ id: string; name: string; length_cm: number; width_cm: number; height_cm: number; weight_kg: number }>>([]);
   const [submitting, setSubmitting] = useState(false);
   const [notesDialogOpen, setNotesDialogOpen] = useState(false);
 
