@@ -25,6 +25,7 @@ type TabStatus = "pending" | "completed" | "cancelled";
 interface Order {
   id: string;
   order_number: string;
+  reference_number: string | null;
   status: string;
   priority: string;
   notes: string | null;
@@ -183,12 +184,13 @@ export default function Orders() {
       if (searchTerm) {
         const term = searchTerm.toLowerCase();
         const matchesOrder = order.order_number.toLowerCase().includes(term);
+        const matchesRef = order.reference_number?.toLowerCase().includes(term);
         const matchesCustomer = order.customer?.name?.toLowerCase().includes(term);
         const items = orderItems.get(order.id) || [];
         const matchesItem = items.some(
           (item) => item.product?.name?.toLowerCase().includes(term) || item.product?.sku?.toLowerCase().includes(term),
         );
-        if (!matchesOrder && !matchesCustomer && !matchesItem) {
+        if (!matchesOrder && !matchesRef && !matchesCustomer && !matchesItem) {
           return false;
         }
       }
@@ -547,6 +549,7 @@ export default function Orders() {
                         <TableHeader>
                           <TableRow>
                             <TableHead>{t("orders.order_number")}</TableHead>
+                            <TableHead>{t("order.reference_number")}</TableHead>
                             <TableHead>{t("common.customer")}</TableHead>
                             {tab === "pending" && <TableHead>{t("common.status")}</TableHead>}
                             <TableHead>{t("common.units")}</TableHead>
@@ -594,6 +597,7 @@ export default function Orders() {
                                     )}
                                   </div>
                                 </TableCell>
+                                <TableCell className="text-muted-foreground text-sm">{order.reference_number || "-"}</TableCell>
                                 <TableCell>{order.customer?.name || "-"}</TableCell>
                                 {tab === "pending" && (
                                   <TableCell>
