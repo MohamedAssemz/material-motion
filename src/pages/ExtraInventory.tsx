@@ -603,6 +603,18 @@ export default function ExtraInventory() {
                   </SelectContent>
                 </Select>
               </div>
+              <div className="w-full sm:w-[160px]">
+                <Select value={storehouseFilter} onValueChange={setStorehouseFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder={t("warehouse.storehouse")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">{t("warehouse.storehouse")}</SelectItem>
+                    <SelectItem value="1">{t("warehouse.storehouse_1")}</SelectItem>
+                    <SelectItem value="2">{t("warehouse.storehouse_2")}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -636,12 +648,13 @@ export default function ExtraInventory() {
               <>
                 <Table>
                   <TableHeader>
-                    <TableRow>
+                     <TableRow>
+                      <TableHead>{t("table.box")}</TableHead>
                       <TableHead>{t("common.product")}</TableHead>
                       <TableHead>{t("common.quantity")}</TableHead>
+                      <TableHead>{t("warehouse.storehouse")}</TableHead>
                       <TableHead>{t("extra.current_state")}</TableHead>
                       <TableHead>{t("common.status")}</TableHead>
-                      <TableHead>{t("table.box")}</TableHead>
                       <TableHead>{t("table.created")}</TableHead>
                       {canManage && <TableHead className="w-[60px]"></TableHead>}
                     </TableRow>
@@ -649,27 +662,6 @@ export default function ExtraInventory() {
                   <TableBody>
                     {filteredBatches.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE).map((batch) => (
                       <TableRow key={batch.id}>
-                        <TableCell>
-                          <div>
-                            <p className="font-medium">{batch.product.name_en}</p>
-                            <p className="text-xs text-muted-foreground">{batch.product.sku}</p>
-                          </div>
-                        </TableCell>
-                        <TableCell className="font-bold">{batch.quantity}</TableCell>
-                        <TableCell>
-                          <Badge className={EXTRA_STATE_COLORS[batch.current_state] || "bg-gray-500"}>
-                            {EXTRA_STATE_LABELS[batch.current_state] || batch.current_state}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className={getInventoryStateColor(batch.inventory_state)}>
-                            {batch.inventory_state === "AVAILABLE"
-                              ? t("extra.available")
-                              : batch.inventory_state === "RESERVED"
-                                ? t("extra.reserved")
-                                : batch.inventory_state}
-                          </Badge>
-                        </TableCell>
                         <TableCell>
                           {batch.box ? (
                             <div className="flex items-center gap-1">
@@ -690,6 +682,32 @@ export default function ExtraInventory() {
                               {t("extra.assign")}
                             </Button>
                           )}
+                        </TableCell>
+                        <TableCell>
+                          <div>
+                            <p className="font-medium">{batch.product.name_en}</p>
+                            <p className="text-xs text-muted-foreground">{batch.product.sku}</p>
+                          </div>
+                        </TableCell>
+                        <TableCell className="font-bold">{batch.quantity}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline">
+                            {batch.storehouse === 2 ? t("warehouse.storehouse_2") : t("warehouse.storehouse_1")}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={EXTRA_STATE_COLORS[batch.current_state] || "bg-gray-500"}>
+                            {EXTRA_STATE_LABELS[batch.current_state] || batch.current_state}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={getInventoryStateColor(batch.inventory_state)}>
+                            {batch.inventory_state === "AVAILABLE"
+                              ? t("extra.available")
+                              : batch.inventory_state === "RESERVED"
+                                ? t("extra.reserved")
+                                : batch.inventory_state}
+                          </Badge>
                         </TableCell>
                         <TableCell>{format(new Date(batch.created_at), "PP")}</TableCell>
                         {canManage && (
