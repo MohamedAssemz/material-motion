@@ -813,7 +813,7 @@ export const translations: Record<string, TranslationEntry> = {
   "phase.needs_packing":      { en: "Needs Packing",        ar: "يحتاج تعبئة" },
   "phase.no_packing":         { en: "No Packing",           ar: "بدون تعبئة" },
   "phase.assign_to_extra":    { en: "Assign to Extra",      ar: "تعيين للإضافي" },
-  "phase.mark_in_progress":   { en: "Mark in progress",     ar: "قيد التشغيل" },
+  "phase.start_working":      { en: "Start Working",       ar: "بدء التشغيل" },
   "phase.in_progress":        { en: "In Progress",          ar: "قيد التشغيل" },
   "phase.added_to_extra_from_order": { en: "Added to Extra from this Order", ar: "أُضيف للإضافي من هذا الطلب" },
   "phase.to_extra":           { en: "to extra",             ar: "للإضافي" },
