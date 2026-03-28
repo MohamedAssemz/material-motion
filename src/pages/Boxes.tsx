@@ -466,12 +466,13 @@ export default function Boxes() {
         const { data: boxCode } = await supabase.rpc("generate_extra_box_code");
         const { error } = await supabase
           .from("extra_boxes")
-          .insert({ box_code: boxCode || `EBOX-${Date.now()}-${i}`, is_active: true });
+          .insert({ box_code: boxCode || `EBOX-${Date.now()}-${i}`, is_active: true, storehouse: newExtraStorehouse } as any);
         if (error) throw error;
       }
       toast({ title: t("toast.success"), description: `${t("toast.created_successfully")} (${newExtraBoxCount})` });
       setExtraDialogOpen(false);
       setNewExtraBoxCount(1);
+      setNewExtraStorehouse(1);
       fetchBoxes();
     } catch (error: any) {
       toast({ title: t("toast.error"), description: error.message, variant: "destructive" });
