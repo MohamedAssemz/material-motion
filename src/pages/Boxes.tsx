@@ -451,7 +451,70 @@ export default function Boxes() {
     }
   };
 
-  const handleCreateOrderBoxes = async (e: React.FormEvent) => {
+  const fetchShippingCartons = async () => {
+    const { data } = await supabase.from('shipping_cartons').select('*').order('name');
+    if (data) setShippingCartons(data.map(c => ({ ...c, length_cm: Number(c.length_cm), width_cm: Number(c.width_cm), height_cm: Number(c.height_cm), weight_kg: Number(c.weight_kg) })));
+  };
+
+  useEffect(() => { fetchShippingCartons(); }, []);
+
+  const handleSaveCarton = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const payload = {
+        name: cartonName.trim(),
+        length_cm: parseFloat(cartonLength) || 0,
+        width_cm: parseFloat(cartonWidth) || 0,
+        height_cm: parseFloat(cartonHeight) || 0,
+        weight_kg: parseFloat(cartonWeight) || 0,
+      };
+      if (editingCarton) {
+        const { error } = await supabase.from('shipping_cartons').update(payload).eq('id', editingCarton.id);
+        if (error) throw error;
+        toast({ title: t("toast.success"), description: t("warehouse.edit_carton") });
+      } else {
+        const { error } = await supabase.from('shipping_cartons').insert(payload);
+        if (error) throw error;
+        toast({ title: t("toast.success"), description: t("warehouse.add_carton") });
+      }
+      setCartonDialogOpen(false);
+      resetCartonForm();
+      fetchShippingCartons();
+    } catch (error: any) {
+      toast({ title: t("toast.error"), description: error.message, variant: "destructive" });
+    }
+  };
+
+  const handleDeleteCarton = async (id: string) => {
+    try {
+      const { error } = await supabase.from('shipping_cartons').delete().eq('id', id);
+      if (error) throw error;
+      toast({ title: t("toast.success"), description: t("warehouse.delete_carton") });
+      fetchShippingCartons();
+    } catch (error: any) {
+      toast({ title: t("toast.error"), description: error.message, variant: "destructive" });
+    }
+  };
+
+  const openEditCarton = (carton: typeof shippingCartons[0]) => {
+    setEditingCarton(carton);
+    setCartonName(carton.name);
+    setCartonLength(String(carton.length_cm));
+    setCartonWidth(String(carton.width_cm));
+    setCartonHeight(String(carton.height_cm));
+    setCartonWeight(String(carton.weight_kg));
+    setCartonDialogOpen(true);
+  };
+
+  const resetCartonForm = () => {
+    setEditingCarton(null);
+    setCartonName("");
+    setCartonLength("");
+    setCartonWidth("");
+    setCartonHeight("");
+    setCartonWeight("");
+  };
+
     e.preventDefault();
     try {
       for (let i = 0; i < newBoxCount; i++) {
