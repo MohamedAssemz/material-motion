@@ -81,6 +81,7 @@ export default function Boxes() {
   const [scanDialogOpen, setScanDialogOpen] = useState(false);
 
   const canManage = hasRole("admin");
+  const [activeBoxTab, setActiveBoxTab] = useState<"order" | "extra">("order");
   const [orderPage, setOrderPage] = useState(1);
   const [extraPage, setExtraPage] = useState(1);
   const PAGE_SIZE = 25;
@@ -741,16 +742,115 @@ export default function Boxes() {
       </header>
 
       <div className="container mx-auto p-6 space-y-6">
-        <Tabs defaultValue="order" className="w-full">
+        <Tabs value={activeBoxTab} onValueChange={(v) => setActiveBoxTab(v as "order" | "extra")} className="w-full">
           <div className="flex items-center justify-between flex-wrap gap-3">
             <TabsList className="grid grid-cols-2 max-w-md">
               <TabsTrigger value="order">
                 {t("warehouse.order_boxes")} ({orderBoxes.length})
               </TabsTrigger>
               <TabsTrigger value="extra">
-                {t("warehouse.extra_boxes")} ({extraBoxes.length})
+                {t("warehouse.extra_inventory_boxes")} ({extraBoxes.length})
               </TabsTrigger>
             </TabsList>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setPrintBoxType(activeBoxTab);
+                  setPrintDialogOpen(true);
+                }}
+                disabled={activeBoxTab === "order" ? orderBoxes.length === 0 : extraBoxes.length === 0}
+              >
+                <Printer className="mr-2 h-4 w-4" />
+                {t("warehouse.print_labels")}
+              </Button>
+              {canManage && activeBoxTab === "order" && (
+                <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button>
+                      <Plus className="mr-2 h-4 w-4" />
+                      {t("warehouse.create_order_boxes")}
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>{t("warehouse.create_order_boxes")}</DialogTitle>
+                    </DialogHeader>
+                    <form onSubmit={handleCreateOrderBoxes} className="space-y-4">
+                      <div>
+                        <Label htmlFor="count">{t("warehouse.num_boxes")}</Label>
+                        <NumericInput
+                          id="count"
+                          min={1}
+                          max={100}
+                          value={newBoxCount}
+                          onValueChange={(val) => setNewBoxCount(val ?? 1)}
+                          required
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">{t("warehouse.box_auto_gen")}</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button type="submit" className="flex-1">
+                          {t("common.create")}
+                        </Button>
+                        <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+                          {t("common.cancel")}
+                        </Button>
+                      </div>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+              )}
+              {canManage && activeBoxTab === "extra" && (
+                <Dialog open={extraDialogOpen} onOpenChange={setExtraDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button>
+                      <Plus className="mr-2 h-4 w-4" />
+                      {t("warehouse.create_extra_boxes")}
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>{t("warehouse.create_extra_boxes")}</DialogTitle>
+                    </DialogHeader>
+                    <form onSubmit={handleCreateExtraBoxes} className="space-y-4">
+                      <div>
+                        <Label htmlFor="extra-count">{t("warehouse.num_boxes")}</Label>
+                        <NumericInput
+                          id="extra-count"
+                          min={1}
+                          max={100}
+                          value={newExtraBoxCount}
+                          onValueChange={(val) => setNewExtraBoxCount(val ?? 1)}
+                          required
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">{t("warehouse.ebox_auto_gen")}</p>
+                      </div>
+                      <div>
+                        <Label>{t("warehouse.storehouse")}</Label>
+                        <Select value={String(newExtraStorehouse)} onValueChange={(v) => setNewExtraStorehouse(Number(v))}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="1">{t("warehouse.storehouse_1")}</SelectItem>
+                            <SelectItem value="2">{t("warehouse.storehouse_2")}</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button type="submit" className="flex-1">
+                          {t("common.create")}
+                        </Button>
+                        <Button type="button" variant="outline" onClick={() => setExtraDialogOpen(false)}>
+                          {t("common.cancel")}
+                        </Button>
+                      </div>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+              )}
+            </div>
           </div>
 
           {/* Order Boxes Tab */}
@@ -789,57 +889,6 @@ export default function Boxes() {
                   </div>
                 </CardContent>
               </Card>
-            </div>
-
-            <div className="flex justify-end gap-2">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setPrintBoxType("order");
-                  setPrintDialogOpen(true);
-                }}
-                disabled={orderBoxes.length === 0}
-              >
-                <Printer className="mr-2 h-4 w-4" />
-                {t("warehouse.print_labels")}
-              </Button>
-              {canManage && (
-                <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button>
-                      <Plus className="mr-2 h-4 w-4" />
-                      {t("warehouse.create_order_boxes")}
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>{t("warehouse.create_order_boxes")}</DialogTitle>
-                    </DialogHeader>
-                    <form onSubmit={handleCreateOrderBoxes} className="space-y-4">
-                      <div>
-                        <Label htmlFor="count">{t("warehouse.num_boxes")}</Label>
-                        <NumericInput
-                          id="count"
-                          min={1}
-                          max={100}
-                          value={newBoxCount}
-                          onValueChange={(val) => setNewBoxCount(val ?? 1)}
-                          required
-                        />
-                        <p className="text-xs text-muted-foreground mt-1">{t("warehouse.box_auto_gen")}</p>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button type="submit" className="flex-1">
-                          {t("common.create")}
-                        </Button>
-                        <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
-                          {t("common.cancel")}
-                        </Button>
-                      </div>
-                    </form>
-                  </DialogContent>
-                </Dialog>
-              )}
             </div>
 
             {renderFilterBar(
@@ -999,69 +1048,6 @@ export default function Boxes() {
                   </div>
                 </CardContent>
               </Card>
-            </div>
-
-            <div className="flex justify-end gap-2">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setPrintBoxType("extra");
-                  setPrintDialogOpen(true);
-                }}
-                disabled={extraBoxes.length === 0}
-              >
-                <Printer className="mr-2 h-4 w-4" />
-                {t("warehouse.print_labels")}
-              </Button>
-              {canManage && (
-                <Dialog open={extraDialogOpen} onOpenChange={setExtraDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button>
-                      <Plus className="mr-2 h-4 w-4" />
-                      {t("warehouse.create_extra_boxes")}
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>{t("warehouse.create_extra_boxes")}</DialogTitle>
-                    </DialogHeader>
-                    <form onSubmit={handleCreateExtraBoxes} className="space-y-4">
-                      <div>
-                        <Label htmlFor="extra-count">{t("warehouse.num_boxes")}</Label>
-                        <NumericInput
-                          id="extra-count"
-                          min={1}
-                          max={100}
-                          value={newExtraBoxCount}
-                          onValueChange={(val) => setNewExtraBoxCount(val ?? 1)}
-                          required
-                        />
-                        <p className="text-xs text-muted-foreground mt-1">{t("warehouse.ebox_auto_gen")}</p>
-                      </div>
-                      <div>
-                        <Label>{t("warehouse.storehouse")}</Label>
-                        <Select value={String(newExtraStorehouse)} onValueChange={(v) => setNewExtraStorehouse(Number(v))}>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="1">{t("warehouse.storehouse_1")}</SelectItem>
-                            <SelectItem value="2">{t("warehouse.storehouse_2")}</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button type="submit" className="flex-1">
-                          {t("common.create")}
-                        </Button>
-                        <Button type="button" variant="outline" onClick={() => setExtraDialogOpen(false)}>
-                          {t("common.cancel")}
-                        </Button>
-                      </div>
-                    </form>
-                  </DialogContent>
-                </Dialog>
-              )}
             </div>
 
             {renderFilterBar(
