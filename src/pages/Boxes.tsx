@@ -1090,52 +1090,7 @@ export default function Boxes() {
               setExtraDateFrom,
               extraDateTo,
               setExtraDateTo,
-            )}
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-muted-foreground">{t("warehouse.storehouse_1_empty")}</p>
-                      <p className="text-2xl font-bold text-green-600">{emptyExtraBoxesS1.length}</p>
-                    </div>
-                    <Box className="h-8 w-8 text-green-600 opacity-50" />
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-muted-foreground">{t("warehouse.storehouse_2_empty")}</p>
-                      <p className="text-2xl font-bold text-blue-600">{emptyExtraBoxesS2.length}</p>
-                    </div>
-                    <Box className="h-8 w-8 text-blue-600 opacity-50" />
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-muted-foreground">{t("warehouse.occupied_boxes")}</p>
-                      <p className="text-2xl font-bold text-amber-600">{occupiedExtraBoxes.length}</p>
-                    </div>
-                    <Package className="h-8 w-8 text-amber-600 opacity-50" />
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-muted-foreground">{t("warehouse.inactive_boxes")}</p>
-                      <p className="text-2xl font-bold text-muted-foreground">{inactiveExtraBoxes.length}</p>
-                    </div>
-                    <Box className="h-8 w-8 text-muted-foreground opacity-50" />
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+            )
 
             <Card>
               <CardHeader>
