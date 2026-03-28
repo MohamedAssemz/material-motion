@@ -48,6 +48,7 @@ interface ExtraBoxData {
   batch_count: number;
   total_quantity: number;
   primary_state: string | null;
+  storehouse: number;
 }
 
 export default function Boxes() {
@@ -62,6 +63,7 @@ export default function Boxes() {
   const [extraDialogOpen, setExtraDialogOpen] = useState(false);
   const [newBoxCount, setNewBoxCount] = useState(1);
   const [newExtraBoxCount, setNewExtraBoxCount] = useState(1);
+  const [newExtraStorehouse, setNewExtraStorehouse] = useState(1);
 
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [selectedBox, setSelectedBox] = useState<{
