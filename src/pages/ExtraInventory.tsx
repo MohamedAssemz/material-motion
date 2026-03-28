@@ -147,18 +147,22 @@ export default function ExtraInventory() {
       if (batchesRes.error) throw batchesRes.error;
 
       const boxIds = batchesRes.data?.filter((b) => b.box_id).map((b) => b.box_id) || [];
-      let boxMap = new Map();
+      let boxMap = new Map<string, { id: string; box_code: string; storehouse: number }>();
       if (boxIds.length > 0) {
-        const { data: boxesData } = await supabase.from("extra_boxes").select("id, box_code").in("id", boxIds);
-        boxesData?.forEach((box) => boxMap.set(box.id, box));
+        const { data: boxesData } = await supabase.from("extra_boxes").select("id, box_code, storehouse").in("id", boxIds) as any;
+        boxesData?.forEach((box: any) => boxMap.set(box.id, box));
       }
 
       const batchesWithBoxes =
-        batchesRes.data?.map((batch) => ({
-          ...batch,
-          product: batch.product as unknown as Product,
-          box: batch.box_id ? boxMap.get(batch.box_id) : null,
-        })) || [];
+        batchesRes.data?.map((batch) => {
+          const box = batch.box_id ? boxMap.get(batch.box_id) : null;
+          return {
+            ...batch,
+            product: batch.product as unknown as Product,
+            box: box || null,
+            storehouse: box?.storehouse || 1,
+          };
+        }) || [];
 
       setProducts(productsRes.data || []);
       setBatches(batchesWithBoxes);
