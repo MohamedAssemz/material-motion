@@ -515,6 +515,7 @@ export default function Boxes() {
     setCartonWeight("");
   };
 
+  const handleCreateOrderBoxes = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       for (let i = 0; i < newBoxCount; i++) {
