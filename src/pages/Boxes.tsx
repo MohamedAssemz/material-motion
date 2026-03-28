@@ -1090,7 +1090,7 @@ export default function Boxes() {
               setExtraDateFrom,
               extraDateTo,
               setExtraDateTo,
-            )
+            )}
 
             <Card>
               <CardHeader>
