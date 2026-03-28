@@ -513,7 +513,7 @@ export default function ExtraInventory() {
 
       <div className="container mx-auto p-6 space-y-6">
         {/* Stats */}
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-4">
           <Card>
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
@@ -529,10 +529,23 @@ export default function ExtraInventory() {
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">{t("extra.available_batches")}</p>
-                  <p className="text-2xl font-bold">{availableBatches.length}</p>
+                  <p className="text-sm text-muted-foreground">{t("warehouse.storehouse_1_batches")}</p>
+                  <p className="text-2xl font-bold text-blue-600">{storehouse1Units}</p>
+                  <p className="text-xs text-muted-foreground">{storehouse1Available.length} {t("extra.available_batches").toLowerCase()}</p>
                 </div>
-                <Package className="h-8 w-8 text-muted-foreground opacity-50" />
+                <Package className="h-8 w-8 text-blue-600 opacity-50" />
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">{t("warehouse.storehouse_2_batches")}</p>
+                  <p className="text-2xl font-bold text-purple-600">{storehouse2Units}</p>
+                  <p className="text-xs text-muted-foreground">{storehouse2Available.length} {t("extra.available_batches").toLowerCase()}</p>
+                </div>
+                <Package className="h-8 w-8 text-purple-600 opacity-50" />
               </div>
             </CardContent>
           </Card>
