@@ -199,7 +199,7 @@ export function BoxLookupScanDialog({ open, onOpenChange }: BoxLookupScanDialogP
           id: b.id,
           qr_code_data: b.qr_code_data,
           product_sku: (b.product as any)?.sku || 'N/A',
-          product_name: (b.product as any)?.name || 'Unknown',
+          product_name: (b.product as any)?.name_en || 'Unknown',
           quantity: b.quantity,
           current_state: b.current_state,
         }));
@@ -223,7 +223,7 @@ export function BoxLookupScanDialog({ open, onOpenChange }: BoxLookupScanDialogP
           id: b.id,
           qr_code_data: b.qr_code_data,
           product_sku: (b.product as any)?.sku || 'N/A',
-          product_name: (b.product as any)?.name || 'Unknown',
+          product_name: (b.product as any)?.name_en || 'Unknown',
           quantity: b.quantity,
           current_state: b.current_state,
         }));

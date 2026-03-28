@@ -215,7 +215,7 @@ export function OrderPerformanceTab({ orders, products, orderItems, customers = 
           quantity: qty,
           orders: orderIds.size,
           products: Array.from(prodMap.entries())
-            .map(([pid, q]) => ({ name: productMap.get(pid)?.name || 'Unknown', quantity: q }))
+            .map(([pid, q]) => ({ name: productMap.get(pid)?.name_en || 'Unknown', quantity: q }))
             .sort((a, b) => b.quantity - a.quantity),
         };
       })
@@ -245,7 +245,7 @@ export function OrderPerformanceTab({ orders, products, orderItems, customers = 
           quantity: qty,
           orders: orderIds.size,
           products: Array.from(prodMap.entries())
-            .map(([pid, q]) => ({ name: productMap.get(pid)?.name || 'Unknown', quantity: q }))
+            .map(([pid, q]) => ({ name: productMap.get(pid)?.name_en || 'Unknown', quantity: q }))
             .sort((a, b) => b.quantity - a.quantity),
         };
       })

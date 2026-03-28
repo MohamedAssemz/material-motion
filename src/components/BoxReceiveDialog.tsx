@@ -101,7 +101,7 @@ export function BoxReceiveDialog({
         product_id,
         quantity,
         current_state,
-        product:products(id, name, sku)
+        product:products(id, name_en, sku)
       `)
       .eq('box_id', box.id)
       .eq('order_id', orderId);
@@ -135,7 +135,7 @@ export function BoxReceiveDialog({
       batches: validBatches.map(b => ({
         id: b.id,
         product_id: b.product_id,
-        product_name: (b.product as any)?.name || 'Unknown',
+        product_name: (b.product as any)?.name_en || 'Unknown',
         product_sku: (b.product as any)?.sku || 'N/A',
         quantity: b.quantity,
       })),
@@ -196,7 +196,7 @@ export function BoxReceiveDialog({
           product_id,
           quantity,
           box_id,
-          product:products(id, name, sku)
+          product:products(id, name_en, sku)
         `)
         .eq('order_id', orderId)
         .eq('current_state', filterState)
@@ -242,7 +242,7 @@ export function BoxReceiveDialog({
         group.batches.push({
           id: batch.id,
           product_id: batch.product_id,
-          product_name: (batch.product as any)?.name || 'Unknown',
+          product_name: (batch.product as any)?.name_en || 'Unknown',
           product_sku: (batch.product as any)?.sku || 'N/A',
           quantity: batch.quantity,
         });
@@ -295,7 +295,7 @@ export function BoxReceiveDialog({
             id,
             product_id,
             quantity,
-            product:products(id, name, sku)
+            product:products(id, name_en, sku)
           `)
           .eq('box_id', box.id)
           .eq('order_id', orderId)
@@ -316,7 +316,7 @@ export function BoxReceiveDialog({
           batches: batches.map(b => ({
             id: b.id,
             product_id: b.product_id,
-            product_name: (b.product as any)?.name || 'Unknown',
+            product_name: (b.product as any)?.name_en || 'Unknown',
             product_sku: (b.product as any)?.sku || 'N/A',
             quantity: b.quantity,
           })),
@@ -333,7 +333,7 @@ export function BoxReceiveDialog({
             product_id,
             quantity,
             box_id,
-            product:products(id, name, sku)
+            product:products(id, name_en, sku)
           `)
           .eq('order_id', orderId)
           .eq('current_state', filterState)
@@ -343,7 +343,7 @@ export function BoxReceiveDialog({
         const filteredBatches = matchingBatches?.filter(b => {
           const product = b.product as any;
           return product?.sku?.toUpperCase().includes(searchTerm) || 
-                 product?.name?.toUpperCase().includes(searchTerm);
+                 product?.name_en?.toUpperCase().includes(searchTerm);
         }) || [];
 
         if (filteredBatches.length === 0) {
@@ -380,7 +380,7 @@ export function BoxReceiveDialog({
             batches: boxBatches.map(b => ({
               id: b.id,
               product_id: b.product_id,
-              product_name: (b.product as any)?.name || 'Unknown',
+              product_name: (b.product as any)?.name_en || 'Unknown',
               product_sku: (b.product as any)?.sku || 'N/A',
               quantity: b.quantity,
             })),

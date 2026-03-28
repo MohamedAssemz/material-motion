@@ -132,7 +132,7 @@ export function BoxScanPopup({
           product_id,
           quantity,
           current_state,
-          product:products(id, name, sku)
+          product:products(id, name_en, sku)
         `)
         .eq('box_id', box.id)
         .eq('order_id', orderId);
@@ -166,7 +166,7 @@ export function BoxScanPopup({
         batches: validBatches.map(b => ({
           id: b.id,
           product_id: b.product_id,
-          product_name: (b.product as any)?.name || 'Unknown',
+          product_name: (b.product as any)?.name_en || 'Unknown',
           product_sku: (b.product as any)?.sku || 'N/A',
           quantity: b.quantity,
         })),

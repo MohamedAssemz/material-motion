@@ -249,7 +249,7 @@ export async function updateExtraBoxItemsList(boxId: string): Promise<void> {
     const productId = batch.product_id;
     if (!productMap.has(productId)) {
       productMap.set(productId, {
-        name: batch.product?.name || 'Unknown',
+        name: batch.product?.name_en || 'Unknown',
         sku: batch.product?.sku || 'N/A',
         quantity: 0,
       });

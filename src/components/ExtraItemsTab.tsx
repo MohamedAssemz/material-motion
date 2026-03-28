@@ -35,7 +35,7 @@ interface ExtraBatch {
   is_special?: boolean;
   product: {
     id: string;
-    name: string;
+    name_en: string;
     sku: string;
   };
   box?: {
@@ -195,7 +195,7 @@ export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true, onC
         box_id: batch.box_id,
         order_item_id: batch.order_item_id,
         is_special: (batch as any).is_special || false,
-        product: { id: (batch.product as any)?.id, name: (batch.product as any)?.name_en, sku: (batch.product as any)?.sku } as ExtraBatch["product"],
+        product: { id: (batch.product as any)?.id, name_en: (batch.product as any)?.name_en, sku: (batch.product as any)?.sku } as ExtraBatch["product"],
         box: batch.box_id ? boxMap.get(batch.box_id) : null,
       }));
 
@@ -278,7 +278,7 @@ export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true, onC
     if (!groupMap.has(key)) {
       groupMap.set(key, {
         product_id: batch.product_id,
-        product_name: batch.product?.name || "Unknown",
+        product_name: batch.product?.name_en || "Unknown",
         product_sku: batch.product?.sku || "N/A",
         source_box_code: batch.box?.box_code || "No Box",
         quantity: 0,
@@ -653,7 +653,7 @@ export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true, onC
       } else {
         group.items.push({
           sku: batch.product?.sku || "N/A",
-          name: batch.product?.name || "Unknown",
+          name: batch.product?.name_en || "Unknown",
           qty: batch.quantity,
         });
       }
