@@ -79,6 +79,7 @@ export default function OrderCreate() {
   const [orderNumber, setOrderNumber] = useState("");
   const [referenceNumber, setReferenceNumber] = useState("");
   const [orderNumberLoading, setOrderNumberLoading] = useState(true);
+  const [notes, setNotes] = useState("");
   const [priority, setPriority] = useState<"low" | "normal" | "high">("normal");
   const [shippingType, setShippingType] = useState<"domestic" | "international">("domestic");
   const [country, setCountry] = useState("");
