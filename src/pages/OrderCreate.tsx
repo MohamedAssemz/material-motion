@@ -429,7 +429,6 @@ export default function OrderCreate() {
                   maxLength={50}
                 />
               </div>
-              </div>
               <div>
                 <Label>{t('order.customer')}</Label>
                 <Popover open={customerOpen} onOpenChange={setCustomerOpen}>
