@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useOrderItemProgress } from "@/hooks/useOrderItemProgress";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -143,6 +144,7 @@ export default function OrderBoxing() {
 
   const canManage = hasRole("boxing_manager") || hasRole("admin");
   const isCancelled = order?.status === 'cancelled';
+  const { isInProgress, toggleProgress } = useOrderItemProgress(id, 'boxing', user?.id);
 
   const fetchExtraCount = async () => {
     if (!id) return;
@@ -1366,8 +1368,10 @@ export default function OrderBoxing() {
             ) : (
               inBoxingGroups.map((group) => {
                 const key = group.groupKey;
+                const groupItemId = group.order_item_ids[0] || key;
+                const itemInProgress = isInProgress(groupItemId);
                 return (
-                  <Card key={key}>
+                  <Card key={key} className={itemInProgress ? "border-green-500 dark:border-green-400" : ""}>
                     <CardContent className="p-4">
                       <div className="flex items-center justify-between">
                         <div>
@@ -1396,6 +1400,16 @@ export default function OrderBoxing() {
                       </div>
                       <div className="flex items-center gap-4">
                         <Badge variant="secondary">{group.quantity} {t('phase.available')}</Badge>
+                        {canManage && !isCancelled && (
+                          <Button
+                            size="sm"
+                            variant={itemInProgress ? "default" : "outline"}
+                            className={itemInProgress ? "bg-green-600 hover:bg-green-700 text-white" : ""}
+                            onClick={() => toggleProgress(groupItemId)}
+                          >
+                            {itemInProgress ? t('phase.in_progress') : t('phase.mark_in_progress')}
+                          </Button>
+                        )}
                         {canManage && !isCancelled && (
                           <div className="flex items-center gap-2">
                             <Label className="text-xs text-muted-foreground">{t('phase.select')}</Label>

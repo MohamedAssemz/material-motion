@@ -549,6 +549,33 @@ export type Database = {
           },
         ]
       }
+      order_item_progress: {
+        Row: {
+          created_at: string
+          id: string
+          marked_by: string | null
+          order_id: string
+          order_item_id: string
+          phase: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          marked_by?: string | null
+          order_id: string
+          order_item_id: string
+          phase: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          marked_by?: string | null
+          order_id?: string
+          order_item_id?: string
+          phase?: string
+        }
+        Relationships: []
+      }
       order_items: {
         Row: {
           created_at: string | null

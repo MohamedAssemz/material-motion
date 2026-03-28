@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
+import { useOrderItemProgress } from "@/hooks/useOrderItemProgress";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -124,6 +125,7 @@ export default function OrderPackaging() {
 
   const canManage = hasRole("packaging_manager") || hasRole("admin");
   const isCancelled = order?.status === 'cancelled';
+  const { isInProgress, toggleProgress } = useOrderItemProgress(id, 'packaging', user?.id);
 
   // completedBatches already excludes retrieved-from-extra items via from_extra_state filter
   // Only count special items if packaging is their actual initial phase
@@ -1031,8 +1033,11 @@ export default function OrderPackaging() {
                 <CardContent className="p-8 text-center text-muted-foreground">{t('phase.no_items_packaging')}</CardContent>
               </Card>
             ) : (
-              inPackagingGroups.map((group) => (
-                <Card key={group.groupKey}>
+              inPackagingGroups.map((group) => {
+                const groupItemId = group.order_item_ids[0] || group.groupKey;
+                const itemInProgress = isInProgress(groupItemId);
+                return (
+                <Card key={group.groupKey} className={itemInProgress ? "border-green-500 dark:border-green-400" : ""}>
                   <CardContent className="p-4">
                     <div className="flex items-center justify-between">
                       <div>
@@ -1062,6 +1067,16 @@ export default function OrderPackaging() {
                       <div className="flex items-center gap-4">
                         <Badge variant="secondary">{group.quantity} {t('phase.available')}</Badge>
                         {canManage && !isCancelled && (
+                          <Button
+                            size="sm"
+                            variant={itemInProgress ? "default" : "outline"}
+                            className={itemInProgress ? "bg-green-600 hover:bg-green-700 text-white" : ""}
+                            onClick={() => toggleProgress(groupItemId)}
+                          >
+                            {itemInProgress ? t('phase.in_progress') : t('phase.mark_in_progress')}
+                          </Button>
+                        )}
+                        {canManage && !isCancelled && (
                           <div className="flex items-center gap-2">
                             <Label className="text-xs text-muted-foreground">{t('phase.select')}</Label>
                             <NumericInput
@@ -1079,7 +1094,8 @@ export default function OrderPackaging() {
                     </div>
                   </CardContent>
                 </Card>
-              ))
+                );
+              })
             )}
           </div>
         </TabsContent>
