@@ -360,6 +360,10 @@ export default function ExtraInventory() {
   const availableBatches = batches.filter((b) => b.inventory_state === "AVAILABLE");
   const reservedBatches = batches.filter((b) => b.inventory_state === "RESERVED");
   const totalAvailable = availableBatches.reduce((sum, b) => sum + b.quantity, 0);
+  const storehouse1Available = availableBatches.filter((b) => b.storehouse === 1);
+  const storehouse2Available = availableBatches.filter((b) => b.storehouse === 2);
+  const storehouse1Units = storehouse1Available.reduce((sum, b) => sum + b.quantity, 0);
+  const storehouse2Units = storehouse2Available.reduce((sum, b) => sum + b.quantity, 0);
 
   if (loading) {
     return (
