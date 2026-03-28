@@ -551,7 +551,7 @@ export default function Orders() {
                             <TableHead>{t("orders.order_number")}</TableHead>
                             <TableHead>{t("order.reference_number")}</TableHead>
                             <TableHead>{t("common.customer")}</TableHead>
-                            {tab === "pending" && <TableHead>{t("common.status")}</TableHead>}
+                            {(tab === "pending" || tab === "completed") && <TableHead>{t("common.status")}</TableHead>}
                             <TableHead>{t("common.units")}</TableHead>
                             <TableHead>{t("orders.eft")}</TableHead>
                             <TableHead>{t("table.created")}</TableHead>
@@ -561,7 +561,7 @@ export default function Orders() {
                           {paginatedOrders.length === 0 ? (
                             <TableRow>
                               <TableCell
-                                colSpan={tab === "pending" ? 7 : 6}
+                                colSpan={tab === "pending" || tab === "completed" ? 7 : 6}
                                 className="text-center text-muted-foreground"
                               >
                                 {t("orders.no_orders")}
@@ -606,6 +606,11 @@ export default function Orders() {
                                         ? t("status.in_progress")
                                         : t("status.pending")}
                                     </Badge>
+                                  </TableCell>
+                                )}
+                                {tab === "completed" && (
+                                  <TableCell>
+                                    <Badge className="bg-green-500 text-white">{t("status.fulfilled")}</Badge>
                                   </TableCell>
                                 )}
                                 <TableCell>
