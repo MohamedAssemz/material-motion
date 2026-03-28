@@ -60,6 +60,7 @@ interface OrderItem {
 
 const orderSchema = z.object({
   order_number: z.string().trim().min(1, "Order number is required").max(50, "Order number too long"),
+  reference_number: z.string().trim().max(50, "Reference number too long").optional(),
   notes: z.string().trim().max(500, "Notes must be less than 500 characters").optional(),
   priority: z.enum(["low", "normal", "high"]),
   shipping_type: z.enum(["domestic", "international"]),
@@ -76,7 +77,8 @@ export default function OrderCreate() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [orderNumber, setOrderNumber] = useState("");
-  const [notes, setNotes] = useState("");
+  const [referenceNumber, setReferenceNumber] = useState("");
+  const [orderNumberLoading, setOrderNumberLoading] = useState(true);
   const [priority, setPriority] = useState<"low" | "normal" | "high">("normal");
   const [shippingType, setShippingType] = useState<"domestic" | "international">("domestic");
   const [country, setCountry] = useState("");
