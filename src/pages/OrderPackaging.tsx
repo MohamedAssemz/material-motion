@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
+import { useOrderItemProgress } from "@/hooks/useOrderItemProgress";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
