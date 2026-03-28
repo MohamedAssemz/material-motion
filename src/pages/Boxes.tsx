@@ -742,17 +742,55 @@ export default function Boxes() {
 
       <div className="container mx-auto p-6 space-y-6">
         <Tabs defaultValue="order" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 max-w-md">
-            <TabsTrigger value="order">
-              {t("warehouse.order_boxes")} ({orderBoxes.length})
-            </TabsTrigger>
-            <TabsTrigger value="extra">
-              {t("warehouse.extra_boxes")} ({extraBoxes.length})
-            </TabsTrigger>
-          </TabsList>
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <TabsList className="grid grid-cols-2 max-w-md">
+              <TabsTrigger value="order">
+                {t("warehouse.order_boxes")} ({orderBoxes.length})
+              </TabsTrigger>
+              <TabsTrigger value="extra">
+                {t("warehouse.extra_boxes")} ({extraBoxes.length})
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
           {/* Order Boxes Tab */}
           <TabsContent value="order" className="space-y-6">
+            <div className="grid gap-4 md:grid-cols-3">
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">{t("warehouse.empty_boxes")}</p>
+                      <p className="text-2xl font-bold text-green-600">{emptyOrderBoxes.length}</p>
+                    </div>
+                    <Box className="h-8 w-8 text-green-600 opacity-50" />
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">{t("warehouse.occupied_boxes")}</p>
+                      <p className="text-2xl font-bold text-blue-600">{occupiedOrderBoxes.length}</p>
+                    </div>
+                    <Package className="h-8 w-8 text-blue-600 opacity-50" />
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">{t("warehouse.inactive_boxes")}</p>
+                      <p className="text-2xl font-bold text-muted-foreground">{inactiveOrderBoxes.length}</p>
+                    </div>
+                    <Box className="h-8 w-8 text-muted-foreground opacity-50" />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
             <div className="flex justify-end gap-2">
               <Button
                 variant="outline"
@@ -818,42 +856,6 @@ export default function Boxes() {
               orderDateTo,
               setOrderDateTo,
             )}
-
-            <div className="grid gap-4 md:grid-cols-3">
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-muted-foreground">{t("warehouse.empty_boxes")}</p>
-                      <p className="text-2xl font-bold text-green-600">{emptyOrderBoxes.length}</p>
-                    </div>
-                    <Box className="h-8 w-8 text-green-600 opacity-50" />
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-muted-foreground">{t("warehouse.occupied_boxes")}</p>
-                      <p className="text-2xl font-bold text-blue-600">{occupiedOrderBoxes.length}</p>
-                    </div>
-                    <Package className="h-8 w-8 text-blue-600 opacity-50" />
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-muted-foreground">{t("warehouse.inactive_boxes")}</p>
-                      <p className="text-2xl font-bold text-muted-foreground">{inactiveOrderBoxes.length}</p>
-                    </div>
-                    <Box className="h-8 w-8 text-muted-foreground opacity-50" />
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
 
             <Card>
               <CardHeader>
@@ -952,6 +954,53 @@ export default function Boxes() {
 
           {/* Extra Boxes Tab */}
           <TabsContent value="extra" className="space-y-6">
+            <div className="grid gap-4 md:grid-cols-4">
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">{t("warehouse.storehouse_1_empty")}</p>
+                      <p className="text-2xl font-bold text-green-600">{emptyExtraBoxesS1.length}</p>
+                    </div>
+                    <Box className="h-8 w-8 text-green-600 opacity-50" />
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">{t("warehouse.storehouse_2_empty")}</p>
+                      <p className="text-2xl font-bold text-blue-600">{emptyExtraBoxesS2.length}</p>
+                    </div>
+                    <Box className="h-8 w-8 text-blue-600 opacity-50" />
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">{t("warehouse.occupied_boxes")}</p>
+                      <p className="text-2xl font-bold text-amber-600">{occupiedExtraBoxes.length}</p>
+                    </div>
+                    <Package className="h-8 w-8 text-amber-600 opacity-50" />
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">{t("warehouse.inactive_boxes")}</p>
+                      <p className="text-2xl font-bold text-muted-foreground">{inactiveExtraBoxes.length}</p>
+                    </div>
+                    <Box className="h-8 w-8 text-muted-foreground opacity-50" />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
             <div className="flex justify-end gap-2">
               <Button
                 variant="outline"
@@ -1029,53 +1078,6 @@ export default function Boxes() {
               extraDateTo,
               setExtraDateTo,
             )}
-
-            <div className="grid gap-4 md:grid-cols-4">
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-muted-foreground">{t("warehouse.storehouse_1_empty")}</p>
-                      <p className="text-2xl font-bold text-green-600">{emptyExtraBoxesS1.length}</p>
-                    </div>
-                    <Box className="h-8 w-8 text-green-600 opacity-50" />
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-muted-foreground">{t("warehouse.storehouse_2_empty")}</p>
-                      <p className="text-2xl font-bold text-blue-600">{emptyExtraBoxesS2.length}</p>
-                    </div>
-                    <Box className="h-8 w-8 text-blue-600 opacity-50" />
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-muted-foreground">{t("warehouse.occupied_boxes")}</p>
-                      <p className="text-2xl font-bold text-amber-600">{occupiedExtraBoxes.length}</p>
-                    </div>
-                    <Package className="h-8 w-8 text-amber-600 opacity-50" />
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-muted-foreground">{t("warehouse.inactive_boxes")}</p>
-                      <p className="text-2xl font-bold text-muted-foreground">{inactiveExtraBoxes.length}</p>
-                    </div>
-                    <Box className="h-8 w-8 text-muted-foreground opacity-50" />
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
 
             <Card>
               <CardHeader>
