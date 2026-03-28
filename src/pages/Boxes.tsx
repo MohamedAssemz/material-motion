@@ -570,6 +570,8 @@ export default function Boxes() {
   const occupiedOrderBoxes = orderBoxes.filter((b) => b.batch_count > 0);
   const inactiveOrderBoxes = orderBoxes.filter((b) => !b.is_active);
   const emptyExtraBoxes = extraBoxes.filter((b) => b.batch_count === 0 && b.is_active);
+  const emptyExtraBoxesS1 = emptyExtraBoxes.filter((b) => b.storehouse === 1);
+  const emptyExtraBoxesS2 = emptyExtraBoxes.filter((b) => b.storehouse === 2);
   const occupiedExtraBoxes = extraBoxes.filter((b) => b.batch_count > 0);
   const inactiveExtraBoxes = extraBoxes.filter((b) => !b.is_active);
 
