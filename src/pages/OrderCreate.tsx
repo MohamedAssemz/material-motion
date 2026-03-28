@@ -97,6 +97,7 @@ export default function OrderCreate() {
 
   useEffect(() => {
     fetchData();
+    generateOrderNumber();
   }, []);
 
   const fetchData = async () => {
