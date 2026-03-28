@@ -944,6 +944,7 @@ export default function OrderBoxing() {
       setShipmentHeight("");
       setShipmentWeight("");
       setSelectedCartonId(null);
+      setSubmitting(false);
 
       // Open printable tab WITHOUT auto-printing (prevents UI freeze while print dialog is open)
       setTimeout(() => {
