@@ -979,6 +979,39 @@ export type Database = {
           },
         ]
       }
+      shipping_cartons: {
+        Row: {
+          created_at: string
+          height_cm: number
+          id: string
+          is_active: boolean
+          length_cm: number
+          name: string
+          weight_kg: number
+          width_cm: number
+        }
+        Insert: {
+          created_at?: string
+          height_cm?: number
+          id?: string
+          is_active?: boolean
+          length_cm?: number
+          name: string
+          weight_kg?: number
+          width_cm?: number
+        }
+        Update: {
+          created_at?: string
+          height_cm?: number
+          id?: string
+          is_active?: boolean
+          length_cm?: number
+          name?: string
+          weight_kg?: number
+          width_cm?: number
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string | null

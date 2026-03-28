@@ -301,7 +301,7 @@ export function ShipmentDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Truck className="h-5 w-5" />
-            Create New Shipment (Kartona)
+            Create New Shipment (Cartona)
           </DialogTitle>
         </DialogHeader>
 

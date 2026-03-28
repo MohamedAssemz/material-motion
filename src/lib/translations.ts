@@ -151,7 +151,7 @@ export const translations: Record<string, TranslationEntry> = {
   "dashboard.with_late_batches":  { en: "With late batches",        ar: "مع دفعات متأخرة" },
   "dashboard.available_items":    { en: "Available items",          ar: "العناصر المتاحة" },
   "dashboard.items_ready_shipment": { en: "items ready for shipment", ar: "عناصر جاهزة للشحن" },
-  "dashboard.ready_to_kartona":   { en: "Ready to be added to a Kartona", ar: "جاهز للإضافة إلى كرتونة" },
+  "dashboard.ready_to_kartona":   { en: "Ready to be added to a Cartona", ar: "جاهز للإضافة إلى كرتونة" },
   "dashboard.item_distribution":  { en: "Item distribution across phases", ar: "توزيع العناصر عبر المراحل" },
   "dashboard.order_status_breakdown": { en: "Order Status Breakdown", ar: "توزيع حالات الطلبات" },
   "dashboard.distribution_by_status": { en: "Distribution by status", ar: "التوزيع حسب الحالة" },
@@ -280,7 +280,7 @@ export const translations: Record<string, TranslationEntry> = {
   "boxing.title":             { en: "Boxing",               ar: "التعليب" },
   "boxing.queue":             { en: "Boxing Queue",         ar: "طابور التعليب" },
   "boxing.in_progress":       { en: "In Boxing",            ar: "قيد التعليب" },
-  "boxing.create_kartona":    { en: "Create Kartona",       ar: "إنشاء كرتونة" },
+  "boxing.create_kartona":    { en: "Create Cartona",       ar: "إنشاء كرتونة" },
 
   // ══════════════════════════════════════════
   //  WAREHOUSE / BOXES
@@ -714,7 +714,7 @@ export const translations: Record<string, TranslationEntry> = {
 
   "order.packaging_reference":{ en: "Packaging Reference",  ar: "مرجع التغليف" },
   "order.raw_material_images":{ en: "Raw Material Images",  ar: "صور المواد الخام" },
-  "order.create_kartona":     { en: "Create Kartona",       ar: "إنشاء كرتونة" },
+  "order.create_kartona":     { en: "Create Cartona",       ar: "إنشاء كرتونة" },
   "order.add_item":           { en: "Add Item",             ar: "إضافة عنصر" },
   "order.remove_item":        { en: "Remove Item",          ar: "إزالة عنصر" },
 
@@ -859,7 +859,14 @@ export const translations: Record<string, TranslationEntry> = {
   "boxing.ready_for_boxing":    { en: "Ready for Boxing", ar: "جاهز للتعليب" },
   "boxing.in_boxing_phase":     { en: "In Boxing",      ar: "قيد التعليب" },
   "boxing.ready_for_shipment":  { en: "Ready for Shipment", ar: "جاهز للشحن" },
-  "boxing.total_kartonas":      { en: "Total Kartonas", ar: "إجمالي الكراتين" },
+  "boxing.total_kartonas":      { en: "Total Cartonas", ar: "إجمالي الكراتين" },
+  "warehouse.shipping_cartons": { en: "Shipping Cartons", ar: "كراتين الشحن" },
+  "warehouse.carton_name":      { en: "Carton Name", ar: "اسم الكرتونة" },
+  "warehouse.add_carton":       { en: "Add Carton", ar: "إضافة كرتونة" },
+  "warehouse.edit_carton":      { en: "Edit Carton", ar: "تعديل الكرتونة" },
+  "warehouse.delete_carton":    { en: "Delete Carton", ar: "حذف الكرتونة" },
+  "warehouse.select_carton":    { en: "Select a predefined carton", ar: "اختر كرتونة محددة مسبقاً" },
+  "warehouse.custom_dimensions":{ en: "Custom dimensions", ar: "أبعاد مخصصة" },
   "boxing.total_shipped":       { en: "Total Shipped",  ar: "إجمالي الشحنات" },
   "boxing.select_items_to_ship": { en: "Select items to ship", ar: "اختر العناصر للشحن" },
   "boxing.export_csv":          { en: "Export CSV",     ar: "تصدير CSV" },

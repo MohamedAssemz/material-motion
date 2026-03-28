@@ -17,7 +17,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Plus, Box, Loader2, Package, Printer, QrCode, Search, CalendarIcon, X } from "lucide-react";
+import { ArrowLeft, Plus, Box, Loader2, Package, Printer, QrCode, Search, CalendarIcon, X, Pencil, Trash2, Truck } from "lucide-react";
 import { format, isWithinInterval, startOfDay, endOfDay } from "date-fns";
 import { BoxDetailsDialog } from "@/components/BoxDetailsDialog";
 import { BoxLabelPrintDialog } from "@/components/BoxLabelPrintDialog";
@@ -81,7 +81,17 @@ export default function Boxes() {
   const [scanDialogOpen, setScanDialogOpen] = useState(false);
 
   const canManage = hasRole("admin");
-  const [activeBoxTab, setActiveBoxTab] = useState<"order" | "extra">("order");
+  const [activeBoxTab, setActiveBoxTab] = useState<"order" | "extra" | "shipping">("order");
+  
+  // Shipping cartons state
+  const [shippingCartons, setShippingCartons] = useState<Array<{ id: string; name: string; length_cm: number; width_cm: number; height_cm: number; weight_kg: number; is_active: boolean; created_at: string }>>([]);
+  const [cartonDialogOpen, setCartonDialogOpen] = useState(false);
+  const [editingCarton, setEditingCarton] = useState<{ id: string; name: string; length_cm: number; width_cm: number; height_cm: number; weight_kg: number } | null>(null);
+  const [cartonName, setCartonName] = useState("");
+  const [cartonLength, setCartonLength] = useState("");
+  const [cartonWidth, setCartonWidth] = useState("");
+  const [cartonHeight, setCartonHeight] = useState("");
+  const [cartonWeight, setCartonWeight] = useState("");
   const [orderPage, setOrderPage] = useState(1);
   const [extraPage, setExtraPage] = useState(1);
   const PAGE_SIZE = 25;
@@ -441,6 +451,70 @@ export default function Boxes() {
     }
   };
 
+  const fetchShippingCartons = async () => {
+    const { data } = await supabase.from('shipping_cartons').select('*').order('name');
+    if (data) setShippingCartons(data.map(c => ({ ...c, length_cm: Number(c.length_cm), width_cm: Number(c.width_cm), height_cm: Number(c.height_cm), weight_kg: Number(c.weight_kg) })));
+  };
+
+  useEffect(() => { fetchShippingCartons(); }, []);
+
+  const handleSaveCarton = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const payload = {
+        name: cartonName.trim(),
+        length_cm: parseFloat(cartonLength) || 0,
+        width_cm: parseFloat(cartonWidth) || 0,
+        height_cm: parseFloat(cartonHeight) || 0,
+        weight_kg: parseFloat(cartonWeight) || 0,
+      };
+      if (editingCarton) {
+        const { error } = await supabase.from('shipping_cartons').update(payload).eq('id', editingCarton.id);
+        if (error) throw error;
+        toast({ title: t("toast.success"), description: t("warehouse.edit_carton") });
+      } else {
+        const { error } = await supabase.from('shipping_cartons').insert(payload);
+        if (error) throw error;
+        toast({ title: t("toast.success"), description: t("warehouse.add_carton") });
+      }
+      setCartonDialogOpen(false);
+      resetCartonForm();
+      fetchShippingCartons();
+    } catch (error: any) {
+      toast({ title: t("toast.error"), description: error.message, variant: "destructive" });
+    }
+  };
+
+  const handleDeleteCarton = async (id: string) => {
+    try {
+      const { error } = await supabase.from('shipping_cartons').delete().eq('id', id);
+      if (error) throw error;
+      toast({ title: t("toast.success"), description: t("warehouse.delete_carton") });
+      fetchShippingCartons();
+    } catch (error: any) {
+      toast({ title: t("toast.error"), description: error.message, variant: "destructive" });
+    }
+  };
+
+  const openEditCarton = (carton: typeof shippingCartons[0]) => {
+    setEditingCarton(carton);
+    setCartonName(carton.name);
+    setCartonLength(String(carton.length_cm));
+    setCartonWidth(String(carton.width_cm));
+    setCartonHeight(String(carton.height_cm));
+    setCartonWeight(String(carton.weight_kg));
+    setCartonDialogOpen(true);
+  };
+
+  const resetCartonForm = () => {
+    setEditingCarton(null);
+    setCartonName("");
+    setCartonLength("");
+    setCartonWidth("");
+    setCartonHeight("");
+    setCartonWeight("");
+  };
+
   const handleCreateOrderBoxes = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -742,21 +816,25 @@ export default function Boxes() {
       </header>
 
       <div className="container mx-auto p-6 space-y-6">
-        <Tabs value={activeBoxTab} onValueChange={(v) => setActiveBoxTab(v as "order" | "extra")} className="w-full">
+        <Tabs value={activeBoxTab} onValueChange={(v) => setActiveBoxTab(v as "order" | "extra" | "shipping")} className="w-full">
           <div className="flex items-center justify-between flex-wrap gap-3">
-            <TabsList className="grid grid-cols-2 max-w-md">
+            <TabsList className="grid grid-cols-3 max-w-lg">
               <TabsTrigger value="order">
                 {t("warehouse.order_boxes")} ({orderBoxes.length})
               </TabsTrigger>
               <TabsTrigger value="extra">
                 {t("warehouse.extra_inventory_boxes")} ({extraBoxes.length})
               </TabsTrigger>
+              <TabsTrigger value="shipping">
+                {t("warehouse.shipping_cartons")} ({shippingCartons.length})
+              </TabsTrigger>
             </TabsList>
             <div className="flex items-center gap-2">
+              {activeBoxTab !== "shipping" && (
               <Button
                 variant="outline"
                 onClick={() => {
-                  setPrintBoxType(activeBoxTab);
+                  setPrintBoxType(activeBoxTab as "order" | "extra");
                   setPrintDialogOpen(true);
                 }}
                 disabled={activeBoxTab === "order" ? orderBoxes.length === 0 : extraBoxes.length === 0}
@@ -764,6 +842,7 @@ export default function Boxes() {
                 <Printer className="mr-2 h-4 w-4" />
                 {t("warehouse.print_labels")}
               </Button>
+              )}
               {canManage && activeBoxTab === "order" && (
                 <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
                   <DialogTrigger asChild>
@@ -1191,7 +1270,93 @@ export default function Boxes() {
               </CardContent>
             </Card>
           </TabsContent>
+
+          {/* Shipping Cartons Tab */}
+          <TabsContent value="shipping" className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold">{t("warehouse.shipping_cartons")}</h3>
+              {canManage && (
+                <Button onClick={() => { resetCartonForm(); setCartonDialogOpen(true); }}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  {t("warehouse.add_carton")}
+                </Button>
+              )}
+            </div>
+            {shippingCartons.length === 0 ? (
+              <Card><CardContent className="p-8 text-center text-muted-foreground">{t("common.no_data")}</CardContent></Card>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {shippingCartons.map(carton => (
+                  <Card key={carton.id}>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="flex items-center justify-between">
+                        <span className="flex items-center gap-2">
+                          <Truck className="h-4 w-4" />
+                          {carton.name}
+                        </span>
+                        {canManage && (
+                          <div className="flex gap-1">
+                            <Button variant="ghost" size="icon" onClick={() => openEditCarton(carton)}>
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={() => handleDeleteCarton(carton.id)}>
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
+                        )}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <div><span className="text-muted-foreground">Length:</span> {carton.length_cm} cm</div>
+                        <div><span className="text-muted-foreground">Width:</span> {carton.width_cm} cm</div>
+                        <div><span className="text-muted-foreground">Height:</span> {carton.height_cm} cm</div>
+                        <div><span className="text-muted-foreground">Weight:</span> {carton.weight_kg} kg</div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </TabsContent>
         </Tabs>
+
+        {/* Add/Edit Carton Dialog */}
+        <Dialog open={cartonDialogOpen} onOpenChange={setCartonDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{editingCarton ? t("warehouse.edit_carton") : t("warehouse.add_carton")}</DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleSaveCarton} className="space-y-4">
+              <div>
+                <Label>{t("warehouse.carton_name")}</Label>
+                <Input value={cartonName} onChange={(e) => setCartonName(e.target.value)} required placeholder="e.g. Small, Medium, Large" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>Length (cm)</Label>
+                  <Input type="number" min={0} step="0.1" value={cartonLength} onChange={(e) => setCartonLength(e.target.value)} required />
+                </div>
+                <div>
+                  <Label>Width (cm)</Label>
+                  <Input type="number" min={0} step="0.1" value={cartonWidth} onChange={(e) => setCartonWidth(e.target.value)} required />
+                </div>
+                <div>
+                  <Label>Height (cm)</Label>
+                  <Input type="number" min={0} step="0.1" value={cartonHeight} onChange={(e) => setCartonHeight(e.target.value)} required />
+                </div>
+                <div>
+                  <Label>Weight (kg)</Label>
+                  <Input type="number" min={0} step="0.1" value={cartonWeight} onChange={(e) => setCartonWeight(e.target.value)} />
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button type="submit" className="flex-1">{editingCarton ? t("common.save") : t("common.create")}</Button>
+                <Button type="button" variant="outline" onClick={() => setCartonDialogOpen(false)}>{t("common.cancel")}</Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
 
       {selectedBox && (
