@@ -56,8 +56,10 @@ import {
   StickyNote,
   ChevronDown,
   Pencil,
+  Download,
 } from "lucide-react";
 import { EditOrderDialog } from "@/components/EditOrderDialog";
+import { generatePackingInvoice } from "@/lib/packingInvoiceGenerator";
 import {
   getNextState,
   getStateLabel,
@@ -1080,9 +1082,29 @@ export default function OrderDetail() {
               <CardTitle>{t("orders.shipments")}</CardTitle>
               <CardDescription>{t("orders.view_manage_shipments")}</CardDescription>
             </div>
-            <Button variant="outline" onClick={() => navigate(`/orders/${id}/boxing?tab=shipments`)}>
-              {t("orders.view_shipments")}
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={async () => {
+                  try {
+                    await generatePackingInvoice({
+                      orderId: id!,
+                      orderNumber: order?.order_number || '',
+                      customerName: order?.customer?.name || 'N/A',
+                    });
+                    toast.success(t("orders.packing_invoice_exported"));
+                  } catch (err: any) {
+                    toast.error(err.message || 'Export failed');
+                  }
+                }}
+                disabled={shippedItems === 0}
+              >
+                <Download className="h-4 w-4 me-1" />
+                {t("orders.export_packing_invoice")}
+              </Button>
+              <Button variant="outline" onClick={() => navigate(`/orders/${id}/boxing?tab=shipments`)}>
+                {t("orders.view_shipments")}
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-4">

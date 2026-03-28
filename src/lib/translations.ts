@@ -225,6 +225,8 @@ export const translations: Record<string, TranslationEntry> = {
   "orders.view_shipments":    { en: "View Shipments",      ar: "عرض الشحنات" },
   "orders.items_shipped":     { en: "items shipped",       ar: "عناصر تم شحنها" },
   "orders.view_manage_shipments": { en: "View and manage order shipments", ar: "عرض وإدارة شحنات الطلب" },
+  "orders.export_packing_invoice": { en: "Export Packing Invoice", ar: "انشاء تقرير الشحنة" },
+  "orders.packing_invoice_exported": { en: "Packing invoice exported successfully", ar: "تم تصدير تقرير الشحنة بنجاح" },
   "orders.order_items":       { en: "Order Items",         ar: "عناصر الطلب" },
   "orders.products_in_order": { en: "Products included in this order", ar: "المنتجات في هذا الطلب" },
   "orders.packing":           { en: "Packing",             ar: "التغليف" },
