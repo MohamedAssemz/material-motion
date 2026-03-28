@@ -1105,8 +1105,9 @@ export default function Boxes() {
                   <>
                     <Table>
                       <TableHeader>
-                        <TableRow>
+                         <TableRow>
                           <TableHead>{t("warehouse.box_code")}</TableHead>
+                          <TableHead>{t("warehouse.storehouse")}</TableHead>
                           <TableHead>{t("common.status")}</TableHead>
                           <TableHead>{t("warehouse.batches")}</TableHead>
                           <TableHead>{t("warehouse.total_qty")}</TableHead>
@@ -1122,6 +1123,37 @@ export default function Boxes() {
                             onClick={() => handleExtraBoxClick(box)}
                           >
                             <TableCell className="font-mono font-bold">{box.box_code}</TableCell>
+                            <TableCell>
+                              <Select
+                                value={String(box.storehouse)}
+                                onValueChange={async (v) => {
+                                  const newSh = Number(v);
+                                  if (newSh === box.storehouse) return;
+                                  try {
+                                    const { error } = await supabase
+                                      .from("extra_boxes")
+                                      .update({ storehouse: newSh } as any)
+                                      .eq("id", box.id);
+                                    if (error) throw error;
+                                    toast({ title: t("toast.success"), description: `${box.box_code} → ${t(`warehouse.storehouse_${newSh}`)}` });
+                                    fetchBoxes();
+                                  } catch (err: any) {
+                                    toast({ title: t("toast.error"), description: err.message, variant: "destructive" });
+                                  }
+                                }}
+                              >
+                                <SelectTrigger
+                                  className="w-[100px]"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="1">{t("warehouse.storehouse_1")}</SelectItem>
+                                  <SelectItem value="2">{t("warehouse.storehouse_2")}</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </TableCell>
                             <TableCell>
                               {box.batch_count > 0 && box.primary_state ? (
                                 <Badge className={getExtraStateColor(box.primary_state)}>
