@@ -616,6 +616,7 @@ export default function OrderDetail() {
 
   const activeBatches = order.batches;
   const totalItems = orderItems.reduce((sum, item) => sum + item.quantity, 0);
+  const deductedToExtra = orderItems.reduce((sum, item) => sum + (item.deducted_to_extra || 0), 0);
   const shippedItems = activeBatches
     .filter((b) => b.current_state === "shipped")
     .reduce((sum, b) => sum + b.quantity, 0);
@@ -749,7 +750,7 @@ export default function OrderDetail() {
 
   const orderState = (() => {
     if (order.status === "cancelled") return t("status.cancelled");
-    if (order.status === "completed" || (shippedItems === totalItems && totalItems > 0)) return t("status.fulfilled");
+    if (order.status === "completed" || (shippedItems + deductedToExtra >= totalItems && totalItems > 0)) return t("status.fulfilled");
     if (order.status === "in_progress") return t("status.in_progress");
     return t("status.pending");
   })();

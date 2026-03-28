@@ -155,7 +155,7 @@ export default function Orders() {
         let computed_status: OrderStatus = "pending";
         if (order.status === "cancelled") {
           computed_status = "cancelled";
-        } else if (order.status === "completed" || (unitCount > 0 && shippedCount >= unitCount)) {
+        } else if (order.status === "completed" || (unitCount > 0 && shippedCount + (extraCountsByOrder.get(order.id) || 0) >= unitCount)) {
           computed_status = "completed";
         } else if (order.status === "in_progress") {
           computed_status = "in_progress";
