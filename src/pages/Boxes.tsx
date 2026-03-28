@@ -742,14 +742,16 @@ export default function Boxes() {
 
       <div className="container mx-auto p-6 space-y-6">
         <Tabs defaultValue="order" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 max-w-md">
-            <TabsTrigger value="order">
-              {t("warehouse.order_boxes")} ({orderBoxes.length})
-            </TabsTrigger>
-            <TabsTrigger value="extra">
-              {t("warehouse.extra_boxes")} ({extraBoxes.length})
-            </TabsTrigger>
-          </TabsList>
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <TabsList className="grid grid-cols-2 max-w-md">
+              <TabsTrigger value="order">
+                {t("warehouse.order_boxes")} ({orderBoxes.length})
+              </TabsTrigger>
+              <TabsTrigger value="extra">
+                {t("warehouse.extra_boxes")} ({extraBoxes.length})
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
           {/* Order Boxes Tab */}
           <TabsContent value="order" className="space-y-6">
