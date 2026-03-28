@@ -1131,7 +1131,7 @@ export default function Boxes() {
                                 }}
                               >
                                 <SelectTrigger
-                                  className="w-[100px]"
+                                  className="w-[160px]"
                                   onClick={(e) => e.stopPropagation()}
                                 >
                                   <SelectValue />
