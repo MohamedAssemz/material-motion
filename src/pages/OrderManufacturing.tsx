@@ -129,6 +129,7 @@ export default function OrderManufacturing() {
 
   const canManage = hasRole("manufacturing_manager") || hasRole("admin");
   const isCancelled = order?.status === 'cancelled';
+  const { isInProgress, toggleProgress } = useOrderItemProgress(id, 'manufacturing', user?.id);
 
   // completedBatches already excludes retrieved-from-extra items via from_extra_state filter
   // Also exclude special items that skipped manufacturing (initial_state is not in_manufacturing)
