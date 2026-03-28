@@ -989,6 +989,18 @@ export default function Boxes() {
                         />
                         <p className="text-xs text-muted-foreground mt-1">{t("warehouse.ebox_auto_gen")}</p>
                       </div>
+                      <div>
+                        <Label>{t("warehouse.storehouse")}</Label>
+                        <Select value={String(newExtraStorehouse)} onValueChange={(v) => setNewExtraStorehouse(Number(v))}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="1">{t("warehouse.storehouse_1")}</SelectItem>
+                            <SelectItem value="2">{t("warehouse.storehouse_2")}</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
                       <div className="flex gap-2">
                         <Button type="submit" className="flex-1">
                           {t("common.create")}
@@ -1018,15 +1030,26 @@ export default function Boxes() {
               setExtraDateTo,
             )}
 
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-4">
               <Card>
                 <CardContent className="pt-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-muted-foreground">{t("warehouse.empty_boxes")}</p>
-                      <p className="text-2xl font-bold text-green-600">{emptyExtraBoxes.length}</p>
+                      <p className="text-sm text-muted-foreground">{t("warehouse.storehouse_1_empty")}</p>
+                      <p className="text-2xl font-bold text-green-600">{emptyExtraBoxesS1.length}</p>
                     </div>
                     <Box className="h-8 w-8 text-green-600 opacity-50" />
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">{t("warehouse.storehouse_2_empty")}</p>
+                      <p className="text-2xl font-bold text-blue-600">{emptyExtraBoxesS2.length}</p>
+                    </div>
+                    <Box className="h-8 w-8 text-blue-600 opacity-50" />
                   </div>
                 </CardContent>
               </Card>
