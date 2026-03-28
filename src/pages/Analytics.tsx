@@ -107,7 +107,7 @@ export default function Analytics() {
           current_state,
           quantity,
           lead_time_days,
-          product:products(name),
+          product:products(name_en),
           order:orders(order_number)
         `,
         )
@@ -128,7 +128,7 @@ export default function Analytics() {
           lead_time_days: batch.lead_time_days,
           is_late: etaDate < now,
           days_remaining: daysRemaining,
-          product_name: batch.product?.name || "Unknown",
+          product_name: (batch.product as any)?.name_en || "Unknown",
           order_number: batch.order?.order_number || "Unknown",
         };
       });

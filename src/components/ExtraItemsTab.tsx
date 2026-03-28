@@ -278,7 +278,7 @@ export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true, onC
     if (!groupMap.has(key)) {
       groupMap.set(key, {
         product_id: batch.product_id,
-        product_name: batch.product?.name || "Unknown",
+        product_name: batch.product?.name_en || "Unknown",
         product_sku: batch.product?.sku || "N/A",
         source_box_code: batch.box?.box_code || "No Box",
         quantity: 0,
@@ -653,7 +653,7 @@ export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true, onC
       } else {
         group.items.push({
           sku: batch.product?.sku || "N/A",
-          name: batch.product?.name || "Unknown",
+          name: batch.product?.name_en || "Unknown",
           qty: batch.quantity,
         });
       }

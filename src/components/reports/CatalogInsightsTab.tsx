@@ -121,7 +121,7 @@ export function CatalogInsightsTab({ orders, orderItems, products, customers }: 
     return Array.from(agg.entries())
       .map(([pid, { qty, orderIds }]) => ({
         id: pid,
-        name: productMap.get(pid)?.name || 'Unknown',
+        name: productMap.get(pid)?.name_en || 'Unknown',
         quantity: qty,
         orders: orderIds.size,
       }))
@@ -152,7 +152,7 @@ export function CatalogInsightsTab({ orders, orderItems, products, customers }: 
           quantity: qty,
           orders: orderIds.size,
           products: Array.from(prodMap.entries())
-            .map(([pid, q]) => ({ name: productMap.get(pid)?.name || 'Unknown', quantity: q }))
+            .map(([pid, q]) => ({ name: productMap.get(pid)?.name_en || 'Unknown', quantity: q }))
             .sort((a, b) => b.quantity - a.quantity),
         };
       })
@@ -182,7 +182,7 @@ export function CatalogInsightsTab({ orders, orderItems, products, customers }: 
           quantity: qty,
           orders: orderIds.size,
           products: Array.from(prodMap.entries())
-            .map(([pid, q]) => ({ name: productMap.get(pid)?.name || 'Unknown', quantity: q }))
+            .map(([pid, q]) => ({ name: productMap.get(pid)?.name_en || 'Unknown', quantity: q }))
             .sort((a, b) => b.quantity - a.quantity),
         };
       })

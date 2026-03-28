@@ -68,7 +68,7 @@ export default function BoxLookup() {
               product_id,
               quantity,
               current_state,
-              product:products(name, sku)
+              product:products(name_en, sku)
             `,
             )
             .eq("box_id", orderBox.id);
@@ -76,7 +76,7 @@ export default function BoxLookup() {
           const items =
             batches?.map((b) => ({
               product_id: b.product_id,
-              product_name: (b.product as any)?.name || "Unknown",
+              product_name: (b.product as any)?.name_en || "Unknown",
               product_sku: (b.product as any)?.sku || "N/A",
               quantity: b.quantity,
               state: b.current_state,
@@ -114,7 +114,7 @@ export default function BoxLookup() {
               quantity,
               current_state,
               inventory_state,
-              product:products(name, sku)
+              product:products(name_en, sku)
             `,
             )
             .eq("box_id", extraBox.id);
@@ -122,7 +122,7 @@ export default function BoxLookup() {
           const items =
             batches?.map((b) => ({
               product_id: b.product_id,
-              product_name: (b.product as any)?.name || "Unknown",
+              product_name: (b.product as any)?.name_en || "Unknown",
               product_sku: (b.product as any)?.sku || "N/A",
               quantity: b.quantity,
               state: b.current_state,
@@ -165,7 +165,7 @@ export default function BoxLookup() {
               product_id,
               quantity,
               current_state,
-              product:products(name, sku)
+              product:products(name_en, sku)
             `,
             )
             .eq("shipment_id", shipment.id);
@@ -173,7 +173,7 @@ export default function BoxLookup() {
           const items =
             batches?.map((b) => ({
               product_id: b.product_id,
-              product_name: (b.product as any)?.name || "Unknown",
+              product_name: (b.product as any)?.name_en || "Unknown",
               product_sku: (b.product as any)?.sku || "N/A",
               quantity: b.quantity,
               state: b.current_state,

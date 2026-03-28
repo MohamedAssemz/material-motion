@@ -20,7 +20,7 @@ interface BoxWithBatch {
     current_state: string;
     quantity: number;
     product: {
-      name: string;
+      name_en: string;
       sku: string;
     };
   } | null;
@@ -75,7 +75,7 @@ export function BoxScanDialog({
       // Match by product SKU or name (for receive mode)
       if (box.batch) {
         if (box.batch.product.sku.toUpperCase().includes(searchTerm)) return true;
-        if (box.batch.product.name.toUpperCase().includes(searchTerm)) return true;
+        if (box.batch.product.name_en.toUpperCase().includes(searchTerm)) return true;
       }
       return false;
     });
@@ -411,7 +411,7 @@ export function BoxScanDialog({
                           <span className="font-mono font-bold">{box.box_code}</span>
                           {box.batch && (
                             <div className="text-sm text-muted-foreground">
-                              {box.batch.product.sku} • {box.batch.product.name} • {box.batch.quantity} items
+                              {box.batch.product.sku} • {box.batch.product.name_en} • {box.batch.quantity} items
                             </div>
                           )}
                         </div>

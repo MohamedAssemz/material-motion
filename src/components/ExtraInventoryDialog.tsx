@@ -21,7 +21,7 @@ interface ExtraBatch {
   box_id: string | null;
   product: {
     id: string;
-    name: string;
+    name_en: string;
     sku: string;
   };
   box?: {
@@ -175,7 +175,7 @@ export function ExtraInventoryDialog({
           current_state,
           inventory_state,
           box_id,
-          product:products(id, name, sku)
+          product:products(id, name_en, sku)
         `)
         .eq('inventory_state', 'AVAILABLE')
         .eq('current_state', targetState)
@@ -223,7 +223,7 @@ export function ExtraInventoryDialog({
     if (!productMap.has(batch.product_id)) {
       productMap.set(batch.product_id, {
         product_id: batch.product_id,
-        product_name: batch.product?.name || 'Unknown',
+        product_name: batch.product?.name_en || 'Unknown',
         product_sku: batch.product?.sku || 'N/A',
         boxes: [],
         totalQty: 0,
