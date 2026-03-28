@@ -767,7 +767,7 @@ export default function OrderBoxing() {
     }
   };
 
-  const handleCreateKartona = async () => {
+  const handleCreateCartona = async () => {
     if (totalSelectedForShipment === 0) return;
     setSubmitting(true);
 
@@ -1866,7 +1866,7 @@ export default function OrderBoxing() {
             <Button variant="outline" onClick={() => setCartonaDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleCreateKartona} disabled={submitting}>
+            <Button onClick={handleCreateCartona} disabled={submitting}>
               {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Create & Print
             </Button>
