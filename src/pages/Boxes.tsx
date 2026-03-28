@@ -754,12 +754,15 @@ export default function Boxes() {
       <div className="container mx-auto p-6 space-y-6">
         <Tabs value={activeBoxTab} onValueChange={(v) => setActiveBoxTab(v as "order" | "extra" | "shipping")} className="w-full">
           <div className="flex items-center justify-between flex-wrap gap-3">
-            <TabsList className="grid grid-cols-2 max-w-md">
+            <TabsList className="grid grid-cols-3 max-w-lg">
               <TabsTrigger value="order">
                 {t("warehouse.order_boxes")} ({orderBoxes.length})
               </TabsTrigger>
               <TabsTrigger value="extra">
                 {t("warehouse.extra_inventory_boxes")} ({extraBoxes.length})
+              </TabsTrigger>
+              <TabsTrigger value="shipping">
+                {t("warehouse.shipping_cartons")} ({shippingCartons.length})
               </TabsTrigger>
             </TabsList>
             <div className="flex items-center gap-2">
