@@ -1783,32 +1783,73 @@ export default function OrderBoxing() {
         </DialogContent>
       </Dialog>
 
-      {/* Create Kartona Dialog */}
-      <Dialog open={kartonaDialogOpen} onOpenChange={setKartonaDialogOpen}>
+      {/* Create Cartona Dialog */}
+      <Dialog open={cartonaDialogOpen} onOpenChange={setCartonaDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Create Kartona (Shipment)</DialogTitle>
+            <DialogTitle>Create Cartona (Shipment)</DialogTitle>
           </DialogHeader>
           <div className="py-4 space-y-4">
             <p className="text-sm text-muted-foreground">
-              Creating a Kartona for {totalSelectedForShipment} item(s).
+              Creating a Cartona for {totalSelectedForShipment} item(s).
             </p>
+            
+            {/* Predefined carton selector */}
+            {shippingCartons.length > 0 && (
+              <div>
+                <Label>{t('warehouse.select_carton')}</Label>
+                <Select
+                  value={selectedCartonId || "custom"}
+                  onValueChange={(val) => {
+                    if (val === "custom") {
+                      setSelectedCartonId(null);
+                      setShipmentLength("");
+                      setShipmentWidth("");
+                      setShipmentHeight("");
+                      setShipmentWeight("");
+                    } else {
+                      setSelectedCartonId(val);
+                      const carton = shippingCartons.find(c => c.id === val);
+                      if (carton) {
+                        setShipmentLength(carton.length_cm ? String(carton.length_cm) : "");
+                        setShipmentWidth(carton.width_cm ? String(carton.width_cm) : "");
+                        setShipmentHeight(carton.height_cm ? String(carton.height_cm) : "");
+                        setShipmentWeight(carton.weight_kg ? String(carton.weight_kg) : "");
+                      }
+                    }
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="custom">{t('warehouse.custom_dimensions')}</SelectItem>
+                    {shippingCartons.map(c => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.name} ({c.length_cm}×{c.width_cm}×{c.height_cm} cm)
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>Length (cm)</Label>
-                <Input type="number" min={0} step="0.1" value={shipmentLength} onChange={(e) => setShipmentLength(e.target.value)} placeholder="Optional" />
+                <Input type="number" min={0} step="0.1" value={shipmentLength} onChange={(e) => setShipmentLength(e.target.value)} placeholder="Optional" disabled={!!selectedCartonId} />
               </div>
               <div>
                 <Label>Width (cm)</Label>
-                <Input type="number" min={0} step="0.1" value={shipmentWidth} onChange={(e) => setShipmentWidth(e.target.value)} placeholder="Optional" />
+                <Input type="number" min={0} step="0.1" value={shipmentWidth} onChange={(e) => setShipmentWidth(e.target.value)} placeholder="Optional" disabled={!!selectedCartonId} />
               </div>
               <div>
                 <Label>Height (cm)</Label>
-                <Input type="number" min={0} step="0.1" value={shipmentHeight} onChange={(e) => setShipmentHeight(e.target.value)} placeholder="Optional" />
+                <Input type="number" min={0} step="0.1" value={shipmentHeight} onChange={(e) => setShipmentHeight(e.target.value)} placeholder="Optional" disabled={!!selectedCartonId} />
               </div>
               <div>
                 <Label>Weight (kg)</Label>
-                <Input type="number" min={0} step="0.1" value={shipmentWeight} onChange={(e) => setShipmentWeight(e.target.value)} placeholder="Optional" />
+                <Input type="number" min={0} step="0.1" value={shipmentWeight} onChange={(e) => setShipmentWeight(e.target.value)} placeholder="Optional" disabled={!!selectedCartonId} />
               </div>
             </div>
             <div>
@@ -1822,7 +1863,7 @@ export default function OrderBoxing() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setKartonaDialogOpen(false)}>
+            <Button variant="outline" onClick={() => setCartonaDialogOpen(false)}>
               Cancel
             </Button>
             <Button onClick={handleCreateKartona} disabled={submitting}>
