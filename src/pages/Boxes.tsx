@@ -1065,69 +1065,6 @@ export default function Boxes() {
               </Card>
             </div>
 
-            <div className="flex justify-end gap-2">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setPrintBoxType("extra");
-                  setPrintDialogOpen(true);
-                }}
-                disabled={extraBoxes.length === 0}
-              >
-                <Printer className="mr-2 h-4 w-4" />
-                {t("warehouse.print_labels")}
-              </Button>
-              {canManage && (
-                <Dialog open={extraDialogOpen} onOpenChange={setExtraDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button>
-                      <Plus className="mr-2 h-4 w-4" />
-                      {t("warehouse.create_extra_boxes")}
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>{t("warehouse.create_extra_boxes")}</DialogTitle>
-                    </DialogHeader>
-                    <form onSubmit={handleCreateExtraBoxes} className="space-y-4">
-                      <div>
-                        <Label htmlFor="extra-count">{t("warehouse.num_boxes")}</Label>
-                        <NumericInput
-                          id="extra-count"
-                          min={1}
-                          max={100}
-                          value={newExtraBoxCount}
-                          onValueChange={(val) => setNewExtraBoxCount(val ?? 1)}
-                          required
-                        />
-                        <p className="text-xs text-muted-foreground mt-1">{t("warehouse.ebox_auto_gen")}</p>
-                      </div>
-                      <div>
-                        <Label>{t("warehouse.storehouse")}</Label>
-                        <Select value={String(newExtraStorehouse)} onValueChange={(v) => setNewExtraStorehouse(Number(v))}>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="1">{t("warehouse.storehouse_1")}</SelectItem>
-                            <SelectItem value="2">{t("warehouse.storehouse_2")}</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button type="submit" className="flex-1">
-                          {t("common.create")}
-                        </Button>
-                        <Button type="button" variant="outline" onClick={() => setExtraDialogOpen(false)}>
-                          {t("common.cancel")}
-                        </Button>
-                      </div>
-                    </form>
-                  </DialogContent>
-                </Dialog>
-              )}
-            </div>
-
             {renderFilterBar(
               extraSearch,
               setExtraSearch,
