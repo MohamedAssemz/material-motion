@@ -47,7 +47,9 @@ interface ExtraBatch {
   box?: {
     id: string;
     box_code: string;
+    storehouse?: number;
   } | null;
+  storehouse?: number;
 }
 
 const EXTRA_STATE_COLORS: Record<string, string> = {
@@ -85,6 +87,7 @@ export default function ExtraInventory() {
   const [searchQuery, setSearchQuery] = useState("");
   const [stateFilter, setStateFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [storehouseFilter, setStorehouseFilter] = useState("all");
 
   const canManage = hasRole("admin");
 
