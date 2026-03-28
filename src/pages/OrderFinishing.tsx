@@ -34,6 +34,7 @@ interface Batch {
   box_id: string | null;
   finishing_machine_id: string | null;
   manufacturing_machine_id: string | null;
+  production_date?: string | null;
   from_extra_state?: string | null;
   is_special?: boolean;
   product: {

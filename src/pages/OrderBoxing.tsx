@@ -40,6 +40,7 @@ interface Batch {
   product: { id: string; name_en: string; name_ar?: string | null; sku: string; needs_packing: boolean; color_en?: string | null; color_ar?: string | null };
   box?: { id: string; box_code: string } | null;
   order_item?: { id: string; needs_boxing: boolean; initial_state?: string | null; size?: string | null } | null;
+  production_date?: string | null;
   from_extra_state?: string | null;
   is_special?: boolean;
 }
