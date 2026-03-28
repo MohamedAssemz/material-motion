@@ -763,10 +763,11 @@ export default function Boxes() {
               </TabsTrigger>
             </TabsList>
             <div className="flex items-center gap-2">
+              {activeBoxTab !== "shipping" && (
               <Button
                 variant="outline"
                 onClick={() => {
-                  setPrintBoxType(activeBoxTab);
+                  setPrintBoxType(activeBoxTab as "order" | "extra");
                   setPrintDialogOpen(true);
                 }}
                 disabled={activeBoxTab === "order" ? orderBoxes.length === 0 : extraBoxes.length === 0}
@@ -774,6 +775,7 @@ export default function Boxes() {
                 <Printer className="mr-2 h-4 w-4" />
                 {t("warehouse.print_labels")}
               </Button>
+              )}
               {canManage && activeBoxTab === "order" && (
                 <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
                   <DialogTrigger asChild>
