@@ -1,29 +1,30 @@
 import { useEffect, useState, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
-import { Sparkles, Package } from 'lucide-react';
+import { Sparkles, Package, Search, CalendarIcon, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { format } from 'date-fns';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { cn } from '@/lib/utils';
 
 interface Order {
-  id: string;
-  order_number: string;
-  created_at: string;
-  status: string;
-  ready_for_finishing_count: number;
-  in_finishing_count: number;
-  extra_finishing_count: number;
-  total_units: number;
-  shipped_count: number;
+  id: string; order_number: string; reference_number: string | null; created_at: string; status: string;
+  ready_for_finishing_count: number; in_finishing_count: number; extra_finishing_count: number;
+  total_units: number; shipped_count: number;
+  _phaseCompleted: boolean;
 }
 
 type TabStatus = 'active' | 'completed';
+
+const FINISHING_ACTIVE_STATES = ['ready_for_finishing', 'in_finishing'];
+const FINISHING_PAST_STATES = ['ready_for_packaging', 'in_packaging', 'ready_for_boxing', 'in_boxing', 'ready_for_shipment', 'shipped'];
 
 export default function QueueFinishing() {
   const navigate = useNavigate();
@@ -31,11 +32,12 @@ export default function QueueFinishing() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabStatus>('active');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [dateFilter, setDateFilter] = useState<Date | undefined>();
 
   useEffect(() => {
     fetchOrders();
-    const channel = supabase
-      .channel('finishing-queue')
+    const channel = supabase.channel('finishing-queue')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'order_batches' }, () => fetchOrders())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'extra_batches' }, () => fetchOrders())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => fetchOrders())
@@ -45,64 +47,80 @@ export default function QueueFinishing() {
 
   const fetchOrders = async () => {
     try {
-      const { data: orderBatchesData, error: batchError } = await supabase
-        .from('order_batches').select('order_id, current_state, quantity');
+      const { data: orderBatchesData, error: batchError } = await supabase.from('order_batches').select('order_id, current_state, quantity');
       if (batchError) throw batchError;
-
-      const { data: extraBatchesData, error: extraError } = await supabase
-        .from('extra_batches').select('order_id, current_state, quantity')
-        .eq('current_state', 'extra_finishing').eq('inventory_state', 'RESERVED').not('order_id', 'is', null);
+      const { data: extraBatchesData, error: extraError } = await supabase.from('extra_batches').select('order_id, current_state, quantity').eq('current_state', 'extra_finishing').eq('inventory_state', 'RESERVED').not('order_id', 'is', null);
       if (extraError) throw extraError;
 
-      const activeFinishingOrderIds = new Set<string>();
+      const activeOrderIds = new Set<string>();
       const allOrderIds = new Set<string>();
+      const orderHasPastBatches = new Set<string>();
+
       orderBatchesData?.forEach(b => {
         if (b.order_id) {
           allOrderIds.add(b.order_id);
-          if (b.current_state === 'ready_for_finishing' || b.current_state === 'in_finishing') activeFinishingOrderIds.add(b.order_id);
+          if (FINISHING_ACTIVE_STATES.includes(b.current_state)) activeOrderIds.add(b.order_id);
+          if (FINISHING_PAST_STATES.includes(b.current_state)) orderHasPastBatches.add(b.order_id);
         }
       });
-      extraBatchesData?.forEach(b => { if (b.order_id) { activeFinishingOrderIds.add(b.order_id); allOrderIds.add(b.order_id); } });
+      extraBatchesData?.forEach(b => { if (b.order_id) { activeOrderIds.add(b.order_id); allOrderIds.add(b.order_id); } });
 
       if (allOrderIds.size === 0) { setOrders([]); setLoading(false); return; }
 
-      const { data: ordersData, error: ordersError } = await supabase
-        .from('orders').select('id, order_number, created_at, status').in('id', Array.from(allOrderIds));
+      const { data: ordersData, error: ordersError } = await supabase.from('orders').select('id, order_number, reference_number, created_at, status').in('id', Array.from(allOrderIds));
       if (ordersError) throw ordersError;
-
-      const { data: orderItemsData } = await supabase
-        .from('order_items').select('order_id, quantity').in('order_id', Array.from(allOrderIds));
+      const { data: orderItemsData } = await supabase.from('order_items').select('order_id, quantity').in('order_id', Array.from(allOrderIds));
       const orderUnitCounts = new Map<string, number>();
       orderItemsData?.forEach(item => { orderUnitCounts.set(item.order_id, (orderUnitCounts.get(item.order_id) || 0) + item.quantity); });
 
       const ordersWithCounts = (ordersData || []).map((order: any) => {
         const orderBatches = orderBatchesData?.filter(b => b.order_id === order.id) || [];
         const extraBatches = extraBatchesData?.filter(b => b.order_id === order.id) || [];
-        const shippedCount = orderBatches.filter((b: any) => b.current_state === 'shipped').reduce((sum: number, b: any) => sum + b.quantity, 0);
+        const shippedCount = orderBatches.filter((b: any) => b.current_state === 'shipped').reduce((s: number, b: any) => s + b.quantity, 0);
         const totalUnits = orderUnitCounts.get(order.id) || 0;
+        const hasActive = activeOrderIds.has(order.id);
+        const hasPast = orderHasPastBatches.has(order.id);
+        const phaseCompleted = !hasActive && hasPast;
+
         return {
-          id: order.id, order_number: order.order_number, created_at: order.created_at, status: order.status,
-          ready_for_finishing_count: orderBatches.filter((b: any) => b.current_state === 'ready_for_finishing').reduce((sum: number, b: any) => sum + b.quantity, 0),
-          in_finishing_count: orderBatches.filter((b: any) => b.current_state === 'in_finishing').reduce((sum: number, b: any) => sum + b.quantity, 0),
-          extra_finishing_count: extraBatches.reduce((sum: number, b: any) => sum + b.quantity, 0),
+          id: order.id, order_number: order.order_number, reference_number: order.reference_number,
+          created_at: order.created_at, status: order.status,
+          ready_for_finishing_count: orderBatches.filter((b: any) => b.current_state === 'ready_for_finishing').reduce((s: number, b: any) => s + b.quantity, 0),
+          in_finishing_count: orderBatches.filter((b: any) => b.current_state === 'in_finishing').reduce((s: number, b: any) => s + b.quantity, 0),
+          extra_finishing_count: extraBatches.reduce((s: number, b: any) => s + b.quantity, 0),
           total_units: totalUnits, shipped_count: shippedCount,
-          _isCompleted: order.status === 'completed' || (totalUnits > 0 && shippedCount >= totalUnits),
-          _hasActiveFinishing: activeFinishingOrderIds.has(order.id),
+          _phaseCompleted: phaseCompleted, _hasActive: hasActive,
         };
-      }).filter((order: any) => order._hasActiveFinishing || order._isCompleted);
+      }).filter((o: any) => o._hasActive || o._phaseCompleted);
       setOrders(ordersWithCounts);
     } catch (error) { console.error('Error fetching orders:', error); } finally { setLoading(false); }
   };
 
-  const isOrderCompleted = (order: Order) => order.status === 'completed' || (order.total_units > 0 && order.shipped_count >= order.total_units);
-  const activeOrders = useMemo(() => orders.filter(o => !isOrderCompleted(o) && o.status === 'in_progress'), [orders]);
-  const completedOrders = useMemo(() => orders.filter(o => isOrderCompleted(o)), [orders]);
+  const activeOrders = useMemo(() => orders.filter(o => !o._phaseCompleted && o.status === 'in_progress'), [orders]);
+  const completedOrders = useMemo(() => orders.filter(o => o._phaseCompleted), [orders]);
+
+  const applyFilters = (list: Order[]) => {
+    let filtered = list;
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      filtered = filtered.filter(o => o.order_number.toLowerCase().includes(term) || (o.reference_number && o.reference_number.toLowerCase().includes(term)));
+    }
+    if (dateFilter) {
+      const filterDate = format(dateFilter, 'yyyy-MM-dd');
+      filtered = filtered.filter(o => format(new Date(o.created_at), 'yyyy-MM-dd') === filterDate);
+    }
+    return filtered;
+  };
+
+  const filteredActive = useMemo(() => applyFilters(activeOrders), [activeOrders, searchTerm, dateFilter]);
+  const filteredCompleted = useMemo(() => applyFilters(completedOrders), [completedOrders, searchTerm, dateFilter]);
 
   const renderTable = (ordersList: Order[]) => (
     <Table>
       <TableHeader>
         <TableRow>
           <TableHead>{t('queue.order_number')}</TableHead>
+          <TableHead>{t('queue.reference')}</TableHead>
           <TableHead>{t('queue.ready_finishing')}</TableHead>
           <TableHead>{t('queue.in_finishing')}</TableHead>
           <TableHead>{t('queue.extra_items')}</TableHead>
@@ -113,6 +131,7 @@ export default function QueueFinishing() {
         {ordersList.map((order) => (
           <TableRow key={order.id} className="cursor-pointer hover:bg-muted/50" onClick={() => navigate(`/orders/${order.id}/finishing`)}>
             <TableCell className="font-medium">{order.order_number}</TableCell>
+            <TableCell className="text-muted-foreground">{order.reference_number || '—'}</TableCell>
             <TableCell>{order.ready_for_finishing_count > 0 && <Badge className="bg-blue-300">{order.ready_for_finishing_count} {t('common.items')}</Badge>}</TableCell>
             <TableCell>{order.in_finishing_count > 0 && <Badge className="bg-purple-500">{order.in_finishing_count} {t('common.items')}</Badge>}</TableCell>
             <TableCell>{order.extra_finishing_count > 0 && <Badge variant="outline" className="border-amber-500 text-amber-600"><Package className="h-3 w-3 mr-1" />{order.extra_finishing_count} {t('phase.extra').toLowerCase()}</Badge>}</TableCell>
@@ -129,6 +148,26 @@ export default function QueueFinishing() {
         <h1 className="text-3xl font-bold flex items-center gap-2"><Sparkles className="h-8 w-8" />{t('finishing.queue')}</h1>
         <p className="text-muted-foreground">{t('queue.finishing_desc')}</p>
       </div>
+
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input placeholder={t('queue.search_placeholder')} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-9" />
+        </div>
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" className={cn("w-[200px] justify-start text-left font-normal", !dateFilter && "text-muted-foreground")}>
+              <CalendarIcon className="mr-2 h-4 w-4" />
+              {dateFilter ? format(dateFilter, 'PPP') : t('queue.filter_by_date')}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="start">
+            <Calendar mode="single" selected={dateFilter} onSelect={setDateFilter} initialFocus className="p-3 pointer-events-auto" />
+          </PopoverContent>
+        </Popover>
+        {dateFilter && <Button variant="ghost" size="icon" onClick={() => setDateFilter(undefined)}><X className="h-4 w-4" /></Button>}
+      </div>
+
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabStatus)} className="space-y-4">
         <TabsList>
           <TabsTrigger value="active" className="gap-2">{t('common.active')}<Badge variant="secondary" className="ml-1">{activeOrders.length}</Badge></TabsTrigger>
@@ -137,15 +176,15 @@ export default function QueueFinishing() {
         <TabsContent value="active">
           <Card><CardContent className="pt-6">
             {loading ? <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div></div>
-            : activeOrders.length === 0 ? <div className="text-center py-8 text-muted-foreground">{t('queue.no_active_finishing')}</div>
-            : renderTable(activeOrders)}
+            : filteredActive.length === 0 ? <div className="text-center py-8 text-muted-foreground">{t('queue.no_active_finishing')}</div>
+            : renderTable(filteredActive)}
           </CardContent></Card>
         </TabsContent>
         <TabsContent value="completed">
           <Card><CardContent className="pt-6">
             {loading ? <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div></div>
-            : completedOrders.length === 0 ? <div className="text-center py-8 text-muted-foreground">{t('queue.no_completed_finishing')}</div>
-            : renderTable(completedOrders)}
+            : filteredCompleted.length === 0 ? <div className="text-center py-8 text-muted-foreground">{t('queue.no_completed_finishing')}</div>
+            : renderTable(filteredCompleted)}
           </CardContent></Card>
         </TabsContent>
       </Tabs>
