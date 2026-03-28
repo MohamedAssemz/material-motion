@@ -288,6 +288,7 @@ export const translations: Record<string, TranslationEntry> = {
   "warehouse.title":          { en: "Warehouse",            ar: "المستودع" },
   "warehouse.order_boxes":    { en: "Order Boxes",          ar: "صناديق الطلبات" },
   "warehouse.extra_boxes":    { en: "Extra Boxes",          ar: "صناديق المخزن الاضافي" },
+  "warehouse.extra_inventory_boxes": { en: "Extra Inventory Boxes", ar: "صناديق المخزن الاضافي" },
   "warehouse.create_boxes":   { en: "Create Boxes",         ar: "إنشاء صناديق" },
   "warehouse.box_code":       { en: "Box Code",             ar: "رمز الصندوق" },
   "warehouse.box_details":    { en: "Box Details",          ar: "تفاصيل الصندوق" },

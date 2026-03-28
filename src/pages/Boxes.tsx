@@ -856,54 +856,39 @@ export default function Boxes() {
           {/* Order Boxes Tab */}
           <TabsContent value="order" className="space-y-6">
             <div className="grid gap-4 md:grid-cols-3">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setPrintBoxType("order");
-                  setPrintDialogOpen(true);
-                }}
-                disabled={orderBoxes.length === 0}
-              >
-                <Printer className="mr-2 h-4 w-4" />
-                {t("warehouse.print_labels")}
-              </Button>
-              {canManage && (
-                <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button>
-                      <Plus className="mr-2 h-4 w-4" />
-                      {t("warehouse.create_order_boxes")}
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>{t("warehouse.create_order_boxes")}</DialogTitle>
-                    </DialogHeader>
-                    <form onSubmit={handleCreateOrderBoxes} className="space-y-4">
-                      <div>
-                        <Label htmlFor="count">{t("warehouse.num_boxes")}</Label>
-                        <NumericInput
-                          id="count"
-                          min={1}
-                          max={100}
-                          value={newBoxCount}
-                          onValueChange={(val) => setNewBoxCount(val ?? 1)}
-                          required
-                        />
-                        <p className="text-xs text-muted-foreground mt-1">{t("warehouse.box_auto_gen")}</p>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button type="submit" className="flex-1">
-                          {t("common.create")}
-                        </Button>
-                        <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
-                          {t("common.cancel")}
-                        </Button>
-                      </div>
-                    </form>
-                  </DialogContent>
-                </Dialog>
-              )}
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">{t("warehouse.empty_boxes")}</p>
+                      <p className="text-2xl font-bold text-green-600">{emptyOrderBoxes.length}</p>
+                    </div>
+                    <Box className="h-8 w-8 text-green-600 opacity-50" />
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">{t("warehouse.occupied_boxes")}</p>
+                      <p className="text-2xl font-bold text-blue-600">{occupiedOrderBoxes.length}</p>
+                    </div>
+                    <Package className="h-8 w-8 text-blue-600 opacity-50" />
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">{t("warehouse.inactive_boxes")}</p>
+                      <p className="text-2xl font-bold text-muted-foreground">{inactiveOrderBoxes.length}</p>
+                    </div>
+                    <Box className="h-8 w-8 text-muted-foreground opacity-50" />
+                  </div>
+                </CardContent>
+              </Card>
             </div>
 
             {renderFilterBar(
