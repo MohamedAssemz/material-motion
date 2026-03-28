@@ -675,6 +675,7 @@ export default function OrderPackaging() {
                 current_state: "ready_for_boxing",
                 box_id: selectedBox.id,
                 packaging_machine_id: machineId || batch.packaging_machine_id,
+                production_date: machineId ? new Date().toISOString().split('T')[0] : batch.production_date,
               })
               .eq("id", batch.id);
             newItems.push({
@@ -703,6 +704,7 @@ export default function OrderPackaging() {
                 manufacturing_machine_id: batch.manufacturing_machine_id,
                 finishing_machine_id: batch.finishing_machine_id,
                 packaging_machine_id: machineId || batch.packaging_machine_id,
+                production_date: machineId ? new Date().toISOString().split('T')[0] : batch.production_date,
                 from_extra_state: batch.from_extra_state,
                 is_special: batch.is_special || false,
               })

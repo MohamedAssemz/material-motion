@@ -712,6 +712,7 @@ export default function OrderFinishing() {
                 current_state: nextState,
                 box_id: selectedBox.id,
                 finishing_machine_id: machineId || batch.finishing_machine_id,
+                production_date: machineId ? new Date().toISOString().split('T')[0] : batch.production_date,
               })
               .eq("id", batch.id);
 
@@ -741,6 +742,7 @@ export default function OrderFinishing() {
                 created_by: user?.id,
                 manufacturing_machine_id: batch.manufacturing_machine_id,
                 finishing_machine_id: machineId || batch.finishing_machine_id,
+                production_date: machineId ? new Date().toISOString().split('T')[0] : batch.production_date,
                 from_extra_state: batch.from_extra_state,
                 is_special: batch.is_special || false,
               })
