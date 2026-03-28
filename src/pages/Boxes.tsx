@@ -417,7 +417,7 @@ export default function Boxes() {
           extraBatchStats.set(batch.box_id, existing);
         }
       });
-      const extraBoxesMapped: ExtraBoxData[] = (extraBoxesData || []).map((box) => {
+      const extraBoxesMapped: ExtraBoxData[] = (extraBoxesData || []).map((box: any) => {
         const stats = extraBatchStats.get(box.id) || { count: 0, total: 0, state: null };
         return {
           id: box.id,
@@ -429,6 +429,7 @@ export default function Boxes() {
           batch_count: stats.count,
           total_quantity: stats.total,
           primary_state: stats.state,
+          storehouse: box.storehouse || 1,
         };
       });
       setExtraBoxes(extraBoxesMapped);
