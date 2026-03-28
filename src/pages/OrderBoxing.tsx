@@ -163,11 +163,17 @@ export default function OrderBoxing() {
     } catch {}
   };
 
+  const fetchShippingCartons = async () => {
+    const { data } = await supabase.from('shipping_cartons').select('id, name, length_cm, width_cm, height_cm, weight_kg').eq('is_active', true).order('name');
+    if (data) setShippingCartons(data.map(c => ({ ...c, length_cm: Number(c.length_cm), width_cm: Number(c.width_cm), height_cm: Number(c.height_cm), weight_kg: Number(c.weight_kg) })));
+  };
+
   useEffect(() => {
     fetchData();
     fetchAddedToExtra();
     fetchRetrievedFromExtra();
     fetchExtraCount();
+    fetchShippingCartons();
     const channel = supabase
       .channel(`order-boxing-${id}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "order_batches", filter: `order_id=eq.${id}` }, () => {
