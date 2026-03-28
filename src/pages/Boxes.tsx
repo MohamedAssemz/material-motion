@@ -1269,7 +1269,93 @@ export default function Boxes() {
               </CardContent>
             </Card>
           </TabsContent>
+
+          {/* Shipping Cartons Tab */}
+          <TabsContent value="shipping" className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold">{t("warehouse.shipping_cartons")}</h3>
+              {canManage && (
+                <Button onClick={() => { resetCartonForm(); setCartonDialogOpen(true); }}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  {t("warehouse.add_carton")}
+                </Button>
+              )}
+            </div>
+            {shippingCartons.length === 0 ? (
+              <Card><CardContent className="p-8 text-center text-muted-foreground">{t("common.no_data")}</CardContent></Card>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {shippingCartons.map(carton => (
+                  <Card key={carton.id}>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="flex items-center justify-between">
+                        <span className="flex items-center gap-2">
+                          <Truck className="h-4 w-4" />
+                          {carton.name}
+                        </span>
+                        {canManage && (
+                          <div className="flex gap-1">
+                            <Button variant="ghost" size="icon" onClick={() => openEditCarton(carton)}>
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={() => handleDeleteCarton(carton.id)}>
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
+                        )}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <div><span className="text-muted-foreground">Length:</span> {carton.length_cm} cm</div>
+                        <div><span className="text-muted-foreground">Width:</span> {carton.width_cm} cm</div>
+                        <div><span className="text-muted-foreground">Height:</span> {carton.height_cm} cm</div>
+                        <div><span className="text-muted-foreground">Weight:</span> {carton.weight_kg} kg</div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </TabsContent>
         </Tabs>
+
+        {/* Add/Edit Carton Dialog */}
+        <Dialog open={cartonDialogOpen} onOpenChange={setCartonDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{editingCarton ? t("warehouse.edit_carton") : t("warehouse.add_carton")}</DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleSaveCarton} className="space-y-4">
+              <div>
+                <Label>{t("warehouse.carton_name")}</Label>
+                <Input value={cartonName} onChange={(e) => setCartonName(e.target.value)} required placeholder="e.g. Small, Medium, Large" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>Length (cm)</Label>
+                  <Input type="number" min={0} step="0.1" value={cartonLength} onChange={(e) => setCartonLength(e.target.value)} required />
+                </div>
+                <div>
+                  <Label>Width (cm)</Label>
+                  <Input type="number" min={0} step="0.1" value={cartonWidth} onChange={(e) => setCartonWidth(e.target.value)} required />
+                </div>
+                <div>
+                  <Label>Height (cm)</Label>
+                  <Input type="number" min={0} step="0.1" value={cartonHeight} onChange={(e) => setCartonHeight(e.target.value)} required />
+                </div>
+                <div>
+                  <Label>Weight (kg)</Label>
+                  <Input type="number" min={0} step="0.1" value={cartonWeight} onChange={(e) => setCartonWeight(e.target.value)} />
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button type="submit" className="flex-1">{editingCarton ? t("common.save") : t("common.create")}</Button>
+                <Button type="button" variant="outline" onClick={() => setCartonDialogOpen(false)}>{t("common.cancel")}</Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
 
       {selectedBox && (
