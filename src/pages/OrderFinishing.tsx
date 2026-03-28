@@ -1009,8 +1009,11 @@ export default function OrderFinishing() {
                 <CardContent className="p-8 text-center text-muted-foreground">{t('phase.no_items_finishing')}</CardContent>
               </Card>
             ) : (
-              inFinishingGroups.map((group) => (
-                <Card key={group.groupKey}>
+              inFinishingGroups.map((group) => {
+                const groupItemId = group.order_item_ids[0] || group.groupKey;
+                const itemInProgress = isInProgress(groupItemId);
+                return (
+                <Card key={group.groupKey} className={itemInProgress ? "border-green-500 dark:border-green-400" : ""}>
                   <CardContent className="p-4">
                     <div className="flex items-center justify-between">
                       <div>
@@ -1032,6 +1035,16 @@ export default function OrderFinishing() {
                       <div className="flex items-center gap-4">
                         <Badge variant="secondary">{group.quantity} {t('phase.available')}</Badge>
                         {canManage && !isCancelled && (
+                          <Button
+                            size="sm"
+                            variant={itemInProgress ? "default" : "outline"}
+                            className={itemInProgress ? "bg-green-600 hover:bg-green-700 text-white" : ""}
+                            onClick={() => toggleProgress(groupItemId)}
+                          >
+                            {itemInProgress ? t('phase.in_progress') : t('phase.mark_in_progress')}
+                          </Button>
+                        )}
+                        {canManage && !isCancelled && (
                           <div className="flex items-center gap-2">
                             <Label className="text-xs text-muted-foreground">{t('phase.select')}</Label>
                             <NumericInput
@@ -1049,7 +1062,8 @@ export default function OrderFinishing() {
                     </div>
                   </CardContent>
                 </Card>
-              ))
+                );
+              })
             )}
           </div>
         </TabsContent>

@@ -813,8 +813,11 @@ export default function OrderManufacturing() {
                 </CardContent>
               </Card>
             ) : (
-              productGroups.map((group) => (
-                <Card key={group.groupKey}>
+              productGroups.map((group) => {
+                const groupItemId = group.order_item_ids[0] || group.groupKey;
+                const itemInProgress = isInProgress(groupItemId);
+                return (
+                <Card key={group.groupKey} className={itemInProgress ? "border-green-500 dark:border-green-400" : ""}>
                   <CardContent className="p-4">
                     <div className="flex items-center justify-between">
                       <div className="flex-1">
@@ -849,6 +852,16 @@ export default function OrderManufacturing() {
                           <p className="text-lg font-semibold text-primary">{group.inManufacturing}</p>
                         </div>
                         {canManage && !isCancelled && (
+                          <Button
+                            size="sm"
+                            variant={itemInProgress ? "default" : "outline"}
+                            className={itemInProgress ? "bg-green-600 hover:bg-green-700 text-white" : ""}
+                            onClick={() => toggleProgress(groupItemId)}
+                          >
+                            {itemInProgress ? t('phase.in_progress') : t('phase.mark_in_progress')}
+                          </Button>
+                        )}
+                        {canManage && !isCancelled && (
                           <div className="flex items-center gap-2">
                             <Label className="text-xs text-muted-foreground">{t('phase.select_label')}</Label>
                             <NumericInput
@@ -866,7 +879,8 @@ export default function OrderManufacturing() {
                     </div>
                   </CardContent>
                 </Card>
-              ))
+                );
+              })
             )}
           </div>
         </TabsContent>
