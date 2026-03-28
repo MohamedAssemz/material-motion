@@ -921,6 +921,12 @@ export default function OrderBoxing() {
       }
 
       toast.success(`Created Cartona ${shipment.shipment_code} with ${shippedCount} items`);
+
+      // Capture print data BEFORE clearing state (so print is always correct)
+      const printItems = Array.from(readyForShipmentSelections.entries())
+        .map(([key, qty]) => {
+          const group = readyForShipmentGroups.find((g) => g.groupKey === key);
+          return group
             ? { sku: group.product_sku, name: group.product_name, qty, needsBoxing: group.needs_boxing }
             : null;
         })
