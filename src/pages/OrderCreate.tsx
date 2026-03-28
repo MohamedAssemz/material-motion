@@ -201,6 +201,7 @@ export default function OrderCreate() {
     try {
       const validation = orderSchema.safeParse({
         order_number: orderNumber,
+        reference_number: referenceNumber,
         notes,
         priority,
         shipping_type: shippingType,
@@ -253,6 +254,7 @@ export default function OrderCreate() {
         .from("orders")
         .insert({
           order_number: orderNumber.trim(),
+          reference_number: referenceNumber.trim() || null,
           notes: finalNotes || null,
           priority: priority,
           shipping_type: shippingType,
@@ -260,7 +262,7 @@ export default function OrderCreate() {
           created_by: user?.id,
           customer_id: selectedCustomerId,
           country: country || null,
-        })
+        } as any)
         .select()
         .single();
 
