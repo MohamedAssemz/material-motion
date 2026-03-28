@@ -125,6 +125,7 @@ export default function OrderPackaging() {
 
   const canManage = hasRole("packaging_manager") || hasRole("admin");
   const isCancelled = order?.status === 'cancelled';
+  const { isInProgress, toggleProgress } = useOrderItemProgress(id, 'packaging', user?.id);
 
   // completedBatches already excludes retrieved-from-extra items via from_extra_state filter
   // Only count special items if packaging is their actual initial phase

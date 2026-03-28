@@ -144,6 +144,7 @@ export default function OrderBoxing() {
 
   const canManage = hasRole("boxing_manager") || hasRole("admin");
   const isCancelled = order?.status === 'cancelled';
+  const { isInProgress, toggleProgress } = useOrderItemProgress(id, 'boxing', user?.id);
 
   const fetchExtraCount = async () => {
     if (!id) return;
