@@ -920,14 +920,7 @@ export default function OrderBoxing() {
         }
       }
 
-
-      toast.success(`Created Kartona ${shipment.shipment_code} with ${shippedCount} items`);
-
-      // Capture print data BEFORE clearing state (so print is always correct)
-      const printItems = Array.from(readyForShipmentSelections.entries())
-        .map(([key, qty]) => {
-          const group = readyForShipmentGroups.find((g) => g.groupKey === key);
-          return group
+      toast.success(`Created Cartona ${shipment.shipment_code} with ${shippedCount} items`);
             ? { sku: group.product_sku, name: group.product_name, qty, needsBoxing: group.needs_boxing }
             : null;
         })
@@ -937,24 +930,24 @@ export default function OrderBoxing() {
       const printNotes = shipmentNotes;
 
       // CLOSE + RESET UI FIRST (critical)
-      setKartonaDialogOpen(false);
+      setCartonaDialogOpen(false);
       setReadyForShipmentSelections(new Map());
       setShipmentNotes("");
       setShipmentLength("");
       setShipmentWidth("");
       setShipmentHeight("");
       setShipmentWeight("");
-      setSubmitting(false);
+      setSelectedCartonId(null);
 
       // Open printable tab WITHOUT auto-printing (prevents UI freeze while print dialog is open)
       setTimeout(() => {
-        printKartonaLabel(shipment.shipment_code, printItems, printTotal, printNotes);
+        printCartonaLabel(shipment.shipment_code, printItems, printTotal, printNotes);
       }, 0);
 
       // Refresh after
       await fetchData();
     } catch (error: any) {
-      console.error("Error creating kartona:", error);
+      console.error("Error creating cartona:", error);
       toast.error(error.message || "Failed to create shipment");
       setSubmitting(false);
     }
@@ -1013,7 +1006,7 @@ export default function OrderBoxing() {
     link.click();
   };
 
-  const printKartonaLabel = (
+  const printCartonaLabel = (
     shipmentCode: string,
     items: Array<{ sku: string; name: string; qty: number; needsBoxing: boolean }>,
     totalItems: number,
@@ -1485,9 +1478,9 @@ export default function OrderBoxing() {
                 <Badge variant="secondary" className="text-lg px-3 py-1">
                   {totalSelectedForShipment} selected
                 </Badge>
-                <Button onClick={() => setKartonaDialogOpen(true)} disabled={totalSelectedForShipment === 0}>
+                <Button onClick={() => setCartonaDialogOpen(true)} disabled={totalSelectedForShipment === 0}>
                   <Truck className="h-4 w-4 mr-2" />
-                  Create Kartona
+                  Create Cartona
                 </Button>
               </CardContent>
             </Card>
@@ -1604,7 +1597,7 @@ export default function OrderBoxing() {
           <Card>
             <CardContent className="p-4 flex items-center justify-between">
               <p className="text-sm text-muted-foreground">
-                {shipments.length} Kartona(s) created for this order
+                {shipments.length} Cartona(s) created for this order
               </p>
               <Button variant="outline" onClick={exportShipments} disabled={shipments.length === 0}>
                 <Download className="h-4 w-4 mr-2" />
@@ -1645,7 +1638,7 @@ export default function OrderBoxing() {
                               needsBoxing: batch.order_item?.needs_boxing ?? true,
                             }));
                             const total = items.reduce((sum, i) => sum + i.qty, 0);
-                            printKartonaLabel(shipment.shipment_code, items, total, shipment.notes || '');
+                            printCartonaLabel(shipment.shipment_code, items, total, shipment.notes || '');
                           }}
                         >
                           <Printer className="h-4 w-4 mr-1" />
