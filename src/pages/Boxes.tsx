@@ -83,6 +83,7 @@ export default function Boxes() {
   const canManage = hasRole("admin");
   const [activeBoxTab, setActiveBoxTab] = useState<"order" | "extra">("order");
   const [orderPage, setOrderPage] = useState(1);
+  const [extraPage, setExtraPage] = useState(1);
   const PAGE_SIZE = 25;
 
   const [orderSearch, setOrderSearch] = useState("");
