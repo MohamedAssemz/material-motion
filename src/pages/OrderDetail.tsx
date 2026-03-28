@@ -125,6 +125,7 @@ interface OrderItem {
   id: string;
   product_id: string;
   quantity: number;
+  deducted_to_extra: number;
   needs_boxing: boolean;
   is_special?: boolean;
   initial_state?: string | null;
@@ -220,7 +221,7 @@ export default function OrderDetail() {
         supabase.from("orders").select(`*, customer:customers(name, code)`).eq("id", id).maybeSingle(),
         supabase
           .from("order_items")
-          .select("id, product_id, quantity, needs_boxing, is_special, initial_state, size, product:products(id, name_en, name_ar, sku, needs_packing, color_en, color_ar)")
+          .select("id, product_id, quantity, deducted_to_extra, needs_boxing, is_special, initial_state, size, product:products(id, name_en, name_ar, sku, needs_packing, color_en, color_ar)")
           .eq("order_id", id),
       ]);
 
@@ -616,6 +617,7 @@ export default function OrderDetail() {
 
   const activeBatches = order.batches;
   const totalItems = orderItems.reduce((sum, item) => sum + item.quantity, 0);
+  const deductedToExtra = orderItems.reduce((sum, item) => sum + (item.deducted_to_extra || 0), 0);
   const shippedItems = activeBatches
     .filter((b) => b.current_state === "shipped")
     .reduce((sum, b) => sum + b.quantity, 0);
@@ -749,7 +751,7 @@ export default function OrderDetail() {
 
   const orderState = (() => {
     if (order.status === "cancelled") return t("status.cancelled");
-    if (order.status === "completed" || (shippedItems === totalItems && totalItems > 0)) return t("status.fulfilled");
+    if (order.status === "completed" || (shippedItems + deductedToExtra >= totalItems && totalItems > 0)) return t("status.fulfilled");
     if (order.status === "in_progress") return t("status.in_progress");
     return t("status.pending");
   })();
