@@ -1158,6 +1158,10 @@ export const translations: Record<string, TranslationEntry> = {
   "queue.all_statuses":         { en: "All Statuses",   ar: "جميع الحالات" },
   "queue.has_shipped":          { en: "Has Shipped Items", ar: "يحتوي عناصر مشحونة" },
   "queue.has_extra":            { en: "Has Extra Items", ar: "يحتوي عناصر إضافية" },
+  "queue.search_placeholder":   { en: "Search by order number or reference...", ar: "البحث برقم الطلب أو المرجع..." },
+  "queue.reference":            { en: "Reference", ar: "المرجع" },
+  "queue.filter_by_date":       { en: "Filter by date", ar: "تصفية حسب التاريخ" },
+  "queue.clear_date":           { en: "Clear date", ar: "مسح التاريخ" },
 
   // ══════════════════════════════════════════
   //  MACHINES PAGE (additional)
