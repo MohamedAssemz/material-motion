@@ -338,6 +338,7 @@ export type Database = {
           id: string
           is_active: boolean
           items_list: Json | null
+          storehouse: number
         }
         Insert: {
           box_code: string
@@ -346,6 +347,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           items_list?: Json | null
+          storehouse?: number
         }
         Update: {
           box_code?: string
@@ -354,6 +356,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           items_list?: Json | null
+          storehouse?: number
         }
         Relationships: []
       }
@@ -611,6 +614,7 @@ export type Database = {
           notes: string | null
           order_number: string
           priority: string | null
+          reference_number: string | null
           shipping_type: string | null
           status: string
           updated_at: string | null
@@ -625,6 +629,7 @@ export type Database = {
           notes?: string | null
           order_number: string
           priority?: string | null
+          reference_number?: string | null
           shipping_type?: string | null
           status?: string
           updated_at?: string | null
@@ -639,6 +644,7 @@ export type Database = {
           notes?: string | null
           order_number?: string
           priority?: string | null
+          reference_number?: string | null
           shipping_type?: string | null
           status?: string
           updated_at?: string | null
@@ -983,6 +989,7 @@ export type Database = {
       generate_box_code: { Args: never; Returns: string }
       generate_extra_batch_code: { Args: never; Returns: string }
       generate_extra_box_code: { Args: never; Returns: string }
+      generate_order_number: { Args: never; Returns: string }
       generate_shipment_code: { Args: never; Returns: string }
       has_role: {
         Args: {

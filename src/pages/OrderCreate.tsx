@@ -60,6 +60,7 @@ interface OrderItem {
 
 const orderSchema = z.object({
   order_number: z.string().trim().min(1, "Order number is required").max(50, "Order number too long"),
+  reference_number: z.string().trim().max(50, "Reference number too long").optional(),
   notes: z.string().trim().max(500, "Notes must be less than 500 characters").optional(),
   priority: z.enum(["low", "normal", "high"]),
   shipping_type: z.enum(["domestic", "international"]),
@@ -76,6 +77,8 @@ export default function OrderCreate() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [orderNumber, setOrderNumber] = useState("");
+  const [referenceNumber, setReferenceNumber] = useState("");
+  const [orderNumberLoading, setOrderNumberLoading] = useState(true);
   const [notes, setNotes] = useState("");
   const [priority, setPriority] = useState<"low" | "normal" | "high">("normal");
   const [shippingType, setShippingType] = useState<"domestic" | "international">("domestic");
@@ -94,6 +97,7 @@ export default function OrderCreate() {
 
   useEffect(() => {
     fetchData();
+    generateOrderNumber();
   }, []);
 
   const fetchData = async () => {
@@ -127,6 +131,20 @@ export default function OrderCreate() {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const generateOrderNumber = async () => {
+    try {
+      setOrderNumberLoading(true);
+      const { data, error } = await supabase.rpc('generate_order_number');
+      if (error) throw error;
+      setOrderNumber(data || `ORD-${Date.now()}`);
+    } catch (error: any) {
+      console.error('Failed to generate order number:', error);
+      setOrderNumber(`ORD-${Date.now()}`);
+    } finally {
+      setOrderNumberLoading(false);
     }
   };
 
@@ -183,6 +201,7 @@ export default function OrderCreate() {
     try {
       const validation = orderSchema.safeParse({
         order_number: orderNumber,
+        reference_number: referenceNumber,
         notes,
         priority,
         shipping_type: shippingType,
@@ -235,6 +254,7 @@ export default function OrderCreate() {
         .from("orders")
         .insert({
           order_number: orderNumber.trim(),
+          reference_number: referenceNumber.trim() || null,
           notes: finalNotes || null,
           priority: priority,
           shipping_type: shippingType,
@@ -242,7 +262,7 @@ export default function OrderCreate() {
           created_by: user?.id,
           customer_id: selectedCustomerId,
           country: country || null,
-        })
+        } as any)
         .select()
         .single();
 
@@ -392,10 +412,20 @@ export default function OrderCreate() {
                 <Label htmlFor="order_number">{t('order.order_number')} *</Label>
                 <Input
                   id="order_number"
-                  value={orderNumber}
-                  onChange={(e) => setOrderNumber(e.target.value)}
-                  placeholder="ORD-001"
-                  required
+                  value={orderNumberLoading ? '...' : orderNumber}
+                  readOnly
+                  disabled
+                  className="bg-muted font-mono"
+                />
+                <p className="text-xs text-muted-foreground mt-1">{t('order.auto_generated')}</p>
+              </div>
+              <div>
+                <Label htmlFor="reference_number">{t('order.reference_number')}</Label>
+                <Input
+                  id="reference_number"
+                  value={referenceNumber}
+                  onChange={(e) => setReferenceNumber(e.target.value)}
+                  placeholder={t('order.reference_number_placeholder')}
                   maxLength={50}
                 />
               </div>

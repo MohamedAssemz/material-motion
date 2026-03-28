@@ -48,6 +48,7 @@ interface ExtraBoxData {
   batch_count: number;
   total_quantity: number;
   primary_state: string | null;
+  storehouse: number;
 }
 
 export default function Boxes() {
@@ -62,6 +63,7 @@ export default function Boxes() {
   const [extraDialogOpen, setExtraDialogOpen] = useState(false);
   const [newBoxCount, setNewBoxCount] = useState(1);
   const [newExtraBoxCount, setNewExtraBoxCount] = useState(1);
+  const [newExtraStorehouse, setNewExtraStorehouse] = useState(1);
 
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [selectedBox, setSelectedBox] = useState<{
@@ -415,7 +417,7 @@ export default function Boxes() {
           extraBatchStats.set(batch.box_id, existing);
         }
       });
-      const extraBoxesMapped: ExtraBoxData[] = (extraBoxesData || []).map((box) => {
+      const extraBoxesMapped: ExtraBoxData[] = (extraBoxesData || []).map((box: any) => {
         const stats = extraBatchStats.get(box.id) || { count: 0, total: 0, state: null };
         return {
           id: box.id,
@@ -427,6 +429,7 @@ export default function Boxes() {
           batch_count: stats.count,
           total_quantity: stats.total,
           primary_state: stats.state,
+          storehouse: box.storehouse || 1,
         };
       });
       setExtraBoxes(extraBoxesMapped);
@@ -463,12 +466,13 @@ export default function Boxes() {
         const { data: boxCode } = await supabase.rpc("generate_extra_box_code");
         const { error } = await supabase
           .from("extra_boxes")
-          .insert({ box_code: boxCode || `EBOX-${Date.now()}-${i}`, is_active: true });
+          .insert({ box_code: boxCode || `EBOX-${Date.now()}-${i}`, is_active: true, storehouse: newExtraStorehouse } as any);
         if (error) throw error;
       }
       toast({ title: t("toast.success"), description: `${t("toast.created_successfully")} (${newExtraBoxCount})` });
       setExtraDialogOpen(false);
       setNewExtraBoxCount(1);
+      setNewExtraStorehouse(1);
       fetchBoxes();
     } catch (error: any) {
       toast({ title: t("toast.error"), description: error.message, variant: "destructive" });
@@ -566,6 +570,8 @@ export default function Boxes() {
   const occupiedOrderBoxes = orderBoxes.filter((b) => b.batch_count > 0);
   const inactiveOrderBoxes = orderBoxes.filter((b) => !b.is_active);
   const emptyExtraBoxes = extraBoxes.filter((b) => b.batch_count === 0 && b.is_active);
+  const emptyExtraBoxesS1 = emptyExtraBoxes.filter((b) => b.storehouse === 1);
+  const emptyExtraBoxesS2 = emptyExtraBoxes.filter((b) => b.storehouse === 2);
   const occupiedExtraBoxes = extraBoxes.filter((b) => b.batch_count > 0);
   const inactiveExtraBoxes = extraBoxes.filter((b) => !b.is_active);
 
@@ -983,6 +989,18 @@ export default function Boxes() {
                         />
                         <p className="text-xs text-muted-foreground mt-1">{t("warehouse.ebox_auto_gen")}</p>
                       </div>
+                      <div>
+                        <Label>{t("warehouse.storehouse")}</Label>
+                        <Select value={String(newExtraStorehouse)} onValueChange={(v) => setNewExtraStorehouse(Number(v))}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="1">{t("warehouse.storehouse_1")}</SelectItem>
+                            <SelectItem value="2">{t("warehouse.storehouse_2")}</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
                       <div className="flex gap-2">
                         <Button type="submit" className="flex-1">
                           {t("common.create")}
@@ -1012,15 +1030,26 @@ export default function Boxes() {
               setExtraDateTo,
             )}
 
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-4">
               <Card>
                 <CardContent className="pt-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-muted-foreground">{t("warehouse.empty_boxes")}</p>
-                      <p className="text-2xl font-bold text-green-600">{emptyExtraBoxes.length}</p>
+                      <p className="text-sm text-muted-foreground">{t("warehouse.storehouse_1_empty")}</p>
+                      <p className="text-2xl font-bold text-green-600">{emptyExtraBoxesS1.length}</p>
                     </div>
                     <Box className="h-8 w-8 text-green-600 opacity-50" />
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">{t("warehouse.storehouse_2_empty")}</p>
+                      <p className="text-2xl font-bold text-blue-600">{emptyExtraBoxesS2.length}</p>
+                    </div>
+                    <Box className="h-8 w-8 text-blue-600 opacity-50" />
                   </div>
                 </CardContent>
               </Card>
@@ -1076,8 +1105,9 @@ export default function Boxes() {
                   <>
                     <Table>
                       <TableHeader>
-                        <TableRow>
+                         <TableRow>
                           <TableHead>{t("warehouse.box_code")}</TableHead>
+                          <TableHead>{t("warehouse.storehouse")}</TableHead>
                           <TableHead>{t("common.status")}</TableHead>
                           <TableHead>{t("warehouse.batches")}</TableHead>
                           <TableHead>{t("warehouse.total_qty")}</TableHead>
@@ -1093,6 +1123,37 @@ export default function Boxes() {
                             onClick={() => handleExtraBoxClick(box)}
                           >
                             <TableCell className="font-mono font-bold">{box.box_code}</TableCell>
+                            <TableCell>
+                              <Select
+                                value={String(box.storehouse)}
+                                onValueChange={async (v) => {
+                                  const newSh = Number(v);
+                                  if (newSh === box.storehouse) return;
+                                  try {
+                                    const { error } = await supabase
+                                      .from("extra_boxes")
+                                      .update({ storehouse: newSh } as any)
+                                      .eq("id", box.id);
+                                    if (error) throw error;
+                                    toast({ title: t("toast.success"), description: `${box.box_code} → ${t(`warehouse.storehouse_${newSh}`)}` });
+                                    fetchBoxes();
+                                  } catch (err: any) {
+                                    toast({ title: t("toast.error"), description: err.message, variant: "destructive" });
+                                  }
+                                }}
+                              >
+                                <SelectTrigger
+                                  className="w-[100px]"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="1">{t("warehouse.storehouse_1")}</SelectItem>
+                                  <SelectItem value="2">{t("warehouse.storehouse_2")}</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </TableCell>
                             <TableCell>
                               {box.batch_count > 0 && box.primary_state ? (
                                 <Badge className={getExtraStateColor(box.primary_state)}>
