@@ -15,6 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { format } from 'date-fns';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { cn } from '@/lib/utils';
+import type { DateRange } from 'react-day-picker';
 
 interface Order {
   id: string; order_number: string; reference_number: string | null; created_at: string; status: string;
@@ -36,7 +37,7 @@ export default function QueueBoxing() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [activeTab, setActiveTab] = useState<TabStatus>('active');
   const [searchTerm, setSearchTerm] = useState('');
-  const [dateFilter, setDateFilter] = useState<Date | undefined>();
+  const [dateRange, setDateRange] = useState<DateRange | undefined>();
 
   useEffect(() => {
     fetchOrders();
@@ -84,7 +85,6 @@ export default function QueueBoxing() {
         const totalUnits = orderUnitCounts.get(order.id) || 0;
         const hasActive = activeOrderIds.has(order.id);
         const hasPast = orderHasPastBatches.has(order.id);
-        // Boxing completed: all batches shipped (no active boxing states), and has shipped items
         const phaseCompleted = !hasActive && hasPast;
 
         return {
@@ -112,9 +112,11 @@ export default function QueueBoxing() {
       const term = searchTerm.toLowerCase();
       filtered = filtered.filter(o => o.order_number.toLowerCase().includes(term) || (o.reference_number && o.reference_number.toLowerCase().includes(term)));
     }
-    if (dateFilter) {
-      const filterDate = format(dateFilter, 'yyyy-MM-dd');
-      filtered = filtered.filter(o => format(new Date(o.created_at), 'yyyy-MM-dd') === filterDate);
+    if (dateRange?.from) {
+      const from = new Date(dateRange.from); from.setHours(0, 0, 0, 0);
+      const to = dateRange.to ? new Date(dateRange.to) : new Date(from);
+      to.setHours(23, 59, 59, 999);
+      filtered = filtered.filter(o => { const d = new Date(o.created_at); return d >= from && d <= to; });
     }
     if (statusFilter !== 'all') {
       filtered = filtered.filter(order => {
@@ -131,8 +133,14 @@ export default function QueueBoxing() {
     return filtered;
   };
 
-  const filteredActive = useMemo(() => applyFilters(activeOrders), [activeOrders, searchTerm, dateFilter, statusFilter]);
-  const filteredCompleted = useMemo(() => applyFilters(completedOrders), [completedOrders, searchTerm, dateFilter, statusFilter]);
+  const filteredActive = useMemo(() => applyFilters(activeOrders), [activeOrders, searchTerm, dateRange, statusFilter]);
+  const filteredCompleted = useMemo(() => applyFilters(completedOrders), [completedOrders, searchTerm, dateRange, statusFilter]);
+
+  const dateLabel = dateRange?.from
+    ? dateRange.to
+      ? `${format(dateRange.from, 'dd/MM/yyyy')} - ${format(dateRange.to, 'dd/MM/yyyy')}`
+      : format(dateRange.from, 'dd/MM/yyyy')
+    : t('queue.filter_by_date');
 
   const renderTable = (ordersList: Order[]) => (
     <Table>
@@ -172,23 +180,23 @@ export default function QueueBoxing() {
         <p className="text-muted-foreground">{t('queue.boxing_desc')}</p>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
+      <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
+        <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input placeholder={t('queue.search_placeholder')} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-9" />
         </div>
         <Popover>
           <PopoverTrigger asChild>
-            <Button variant="outline" className={cn("w-[200px] justify-start text-left font-normal", !dateFilter && "text-muted-foreground")}>
+            <Button variant="outline" className={cn("min-w-[240px] justify-start text-left font-normal", !dateRange?.from && "text-muted-foreground")}>
               <CalendarIcon className="mr-2 h-4 w-4" />
-              {dateFilter ? format(dateFilter, 'PPP') : t('queue.filter_by_date')}
+              {dateLabel}
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-auto p-0" align="start">
-            <Calendar mode="single" selected={dateFilter} onSelect={setDateFilter} initialFocus className="p-3 pointer-events-auto" />
+            <Calendar mode="range" selected={dateRange} onSelect={setDateRange} numberOfMonths={2} initialFocus className="p-3 pointer-events-auto" />
           </PopoverContent>
         </Popover>
-        {dateFilter && <Button variant="ghost" size="icon" onClick={() => setDateFilter(undefined)}><X className="h-4 w-4" /></Button>}
+        {dateRange?.from && <Button variant="ghost" size="icon" onClick={() => setDateRange(undefined)}><X className="h-4 w-4" /></Button>}
         <div className="flex items-center gap-2">
           <Label className="text-sm text-muted-foreground">{t('common.status')}:</Label>
           <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
