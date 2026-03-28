@@ -35,7 +35,7 @@ interface ExtraBatch {
   is_special?: boolean;
   product: {
     id: string;
-    name: string;
+    name_en: string;
     sku: string;
   };
   box?: {

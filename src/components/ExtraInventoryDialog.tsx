@@ -203,7 +203,7 @@ export function ExtraInventoryDialog({
         current_state: batch.current_state,
         inventory_state: batch.inventory_state,
         box_id: batch.box_id,
-        product: batch.product as unknown as { id: string; name: string; sku: string },
+        product: batch.product as unknown as { id: string; name_en: string; sku: string },
         box: batch.box_id ? boxMap.get(batch.box_id) : null,
       }));
 
@@ -617,7 +617,7 @@ export function ExtraInventoryDialog({
         boxGroups.set(boxKey, { box_code: boxKey, items: [] });
       }
       boxGroups.get(boxKey)!.items.push({
-        product_name: batch.product.name,
+        product_name: batch.product.name_en,
         product_sku: batch.product.sku,
         quantity: selections.get(batch.id) || 0,
       });
