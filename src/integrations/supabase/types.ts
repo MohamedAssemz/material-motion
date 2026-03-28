@@ -229,6 +229,7 @@ export type Database = {
           order_item_id: string | null
           packaging_machine_id: string | null
           product_id: string
+          production_date: string | null
           qr_code_data: string | null
           quantity: number
           updated_at: string
@@ -248,6 +249,7 @@ export type Database = {
           order_item_id?: string | null
           packaging_machine_id?: string | null
           product_id: string
+          production_date?: string | null
           qr_code_data?: string | null
           quantity?: number
           updated_at?: string
@@ -267,6 +269,7 @@ export type Database = {
           order_item_id?: string | null
           packaging_machine_id?: string | null
           product_id?: string
+          production_date?: string | null
           qr_code_data?: string | null
           quantity?: number
           updated_at?: string
@@ -402,6 +405,7 @@ export type Database = {
           order_item_id: string | null
           packaging_machine_id: string | null
           product_id: string
+          production_date: string | null
           qr_code_data: string | null
           quantity: number
           shipment_id: string | null
@@ -424,6 +428,7 @@ export type Database = {
           order_item_id?: string | null
           packaging_machine_id?: string | null
           product_id: string
+          production_date?: string | null
           qr_code_data?: string | null
           quantity?: number
           shipment_id?: string | null
@@ -446,6 +451,7 @@ export type Database = {
           order_item_id?: string | null
           packaging_machine_id?: string | null
           product_id?: string
+          production_date?: string | null
           qr_code_data?: string | null
           quantity?: number
           shipment_id?: string | null
@@ -999,15 +1005,26 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      assign_machine_to_batches: {
-        Args: {
-          p_batch_ids: string[]
-          p_machine_column: string
-          p_machine_id: string
-          p_requested_qty: number
-        }
-        Returns: Json
-      }
+      assign_machine_to_batches:
+        | {
+            Args: {
+              p_batch_ids: string[]
+              p_machine_column: string
+              p_machine_id: string
+              p_requested_qty: number
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_batch_ids: string[]
+              p_machine_column: string
+              p_machine_id: string
+              p_production_date?: string
+              p_requested_qty: number
+            }
+            Returns: Json
+          }
       commit_extra_inventory: {
         Args: { p_order_id: string; p_user_id: string }
         Returns: Json
