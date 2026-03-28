@@ -125,6 +125,7 @@ interface OrderItem {
   id: string;
   product_id: string;
   quantity: number;
+  deducted_to_extra: number;
   needs_boxing: boolean;
   is_special?: boolean;
   initial_state?: string | null;
