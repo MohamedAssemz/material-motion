@@ -17,7 +17,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Plus, Box, Loader2, Package, Printer, QrCode, Search, CalendarIcon, X } from "lucide-react";
+import { ArrowLeft, Plus, Box, Loader2, Package, Printer, QrCode, Search, CalendarIcon, X, Pencil, Trash2, Truck } from "lucide-react";
 import { format, isWithinInterval, startOfDay, endOfDay } from "date-fns";
 import { BoxDetailsDialog } from "@/components/BoxDetailsDialog";
 import { BoxLabelPrintDialog } from "@/components/BoxLabelPrintDialog";
@@ -81,7 +81,17 @@ export default function Boxes() {
   const [scanDialogOpen, setScanDialogOpen] = useState(false);
 
   const canManage = hasRole("admin");
-  const [activeBoxTab, setActiveBoxTab] = useState<"order" | "extra">("order");
+  const [activeBoxTab, setActiveBoxTab] = useState<"order" | "extra" | "shipping">("order");
+  
+  // Shipping cartons state
+  const [shippingCartons, setShippingCartons] = useState<Array<{ id: string; name: string; length_cm: number; width_cm: number; height_cm: number; weight_kg: number; is_active: boolean; created_at: string }>>([]);
+  const [cartonDialogOpen, setCartonDialogOpen] = useState(false);
+  const [editingCarton, setEditingCarton] = useState<{ id: string; name: string; length_cm: number; width_cm: number; height_cm: number; weight_kg: number } | null>(null);
+  const [cartonName, setCartonName] = useState("");
+  const [cartonLength, setCartonLength] = useState("");
+  const [cartonWidth, setCartonWidth] = useState("");
+  const [cartonHeight, setCartonHeight] = useState("");
+  const [cartonWeight, setCartonWeight] = useState("");
   const [orderPage, setOrderPage] = useState(1);
   const [extraPage, setExtraPage] = useState(1);
   const PAGE_SIZE = 25;
