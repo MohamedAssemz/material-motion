@@ -752,7 +752,7 @@ export default function Boxes() {
       </header>
 
       <div className="container mx-auto p-6 space-y-6">
-        <Tabs value={activeBoxTab} onValueChange={(v) => setActiveBoxTab(v as "order" | "extra")} className="w-full">
+        <Tabs value={activeBoxTab} onValueChange={(v) => setActiveBoxTab(v as "order" | "extra" | "shipping")} className="w-full">
           <div className="flex items-center justify-between flex-wrap gap-3">
             <TabsList className="grid grid-cols-2 max-w-md">
               <TabsTrigger value="order">
