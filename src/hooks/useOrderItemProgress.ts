@@ -46,5 +46,5 @@ export function useOrderItemProgress(orderId: string | undefined, phase: string,
     return inProgressItems.has(orderItemId);
   }, [inProgressItems]);
 
-  return { isInProgress, toggleProgress, inProgressItems };
+  return { isInProgress, markInProgress, inProgressItems };
 }
