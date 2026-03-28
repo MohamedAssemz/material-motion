@@ -22,51 +22,29 @@ export function useOrderItemProgress(orderId: string | undefined, phase: string,
     fetchProgress();
   }, [fetchProgress]);
 
-  const toggleProgress = useCallback(async (orderItemId: string) => {
+  const markInProgress = useCallback(async (orderItemId: string) => {
     if (!orderId || !userId) return;
+    if (inProgressItems.has(orderItemId)) return; // Already in progress, no toggle back
 
-    const isCurrentlyInProgress = inProgressItems.has(orderItemId);
-
-    if (isCurrentlyInProgress) {
-      // Remove
-      const { error } = await supabase
-        .from('order_item_progress')
-        .delete()
-        .eq('order_id', orderId)
-        .eq('order_item_id', orderItemId)
-        .eq('phase', phase);
-
-      if (error) {
-        toast.error(error.message);
-        return;
-      }
-      setInProgressItems((prev) => {
-        const next = new Set(prev);
-        next.delete(orderItemId);
-        return next;
+    const { error } = await supabase
+      .from('order_item_progress')
+      .insert({
+        order_id: orderId,
+        order_item_id: orderItemId,
+        phase,
+        marked_by: userId,
       });
-    } else {
-      // Add
-      const { error } = await supabase
-        .from('order_item_progress')
-        .insert({
-          order_id: orderId,
-          order_item_id: orderItemId,
-          phase,
-          marked_by: userId,
-        });
 
-      if (error) {
-        toast.error(error.message);
-        return;
-      }
-      setInProgressItems((prev) => new Set(prev).add(orderItemId));
+    if (error) {
+      toast.error(error.message);
+      return;
     }
+    setInProgressItems((prev) => new Set(prev).add(orderItemId));
   }, [orderId, userId, phase, inProgressItems]);
 
   const isInProgress = useCallback((orderItemId: string) => {
     return inProgressItems.has(orderItemId);
   }, [inProgressItems]);
 
-  return { isInProgress, toggleProgress, inProgressItems };
+  return { isInProgress, markInProgress, inProgressItems };
 }

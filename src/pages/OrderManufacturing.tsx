@@ -129,7 +129,7 @@ export default function OrderManufacturing() {
 
   const canManage = hasRole("manufacturing_manager") || hasRole("admin");
   const isCancelled = order?.status === 'cancelled';
-  const { isInProgress, toggleProgress } = useOrderItemProgress(id, 'manufacturing', user?.id);
+  const { isInProgress, markInProgress } = useOrderItemProgress(id, 'manufacturing', user?.id);
 
   // completedBatches already excludes retrieved-from-extra items via from_extra_state filter
   // Also exclude special items that skipped manufacturing (initial_state is not in_manufacturing)
@@ -852,16 +852,6 @@ export default function OrderManufacturing() {
                           <p className="text-lg font-semibold text-primary">{group.inManufacturing}</p>
                         </div>
                         {canManage && !isCancelled && (
-                          <Button
-                            size="sm"
-                            variant={itemInProgress ? "default" : "outline"}
-                            className={itemInProgress ? "bg-green-600 hover:bg-green-700 text-white" : ""}
-                            onClick={() => toggleProgress(groupItemId)}
-                          >
-                            {itemInProgress ? t('phase.in_progress') : t('phase.mark_in_progress')}
-                          </Button>
-                        )}
-                        {canManage && !isCancelled && (
                           <div className="flex items-center gap-2">
                             <Label className="text-xs text-muted-foreground">{t('phase.select_label')}</Label>
                             <NumericInput
@@ -874,6 +864,15 @@ export default function OrderManufacturing() {
                               className="w-20 h-8"
                             />
                           </div>
+                        )}
+                        {canManage && !isCancelled && (
+                          itemInProgress ? (
+                            <Badge className="bg-green-600 text-white px-3 py-1.5">{t('phase.in_progress')}</Badge>
+                          ) : (
+                            <Button size="sm" variant="outline" onClick={() => markInProgress(groupItemId)}>
+                              {t('phase.start_working')}
+                            </Button>
+                          )
                         )}
                       </div>
                     </div>
