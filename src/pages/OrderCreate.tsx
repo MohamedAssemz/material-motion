@@ -412,12 +412,23 @@ export default function OrderCreate() {
                 <Label htmlFor="order_number">{t('order.order_number')} *</Label>
                 <Input
                   id="order_number"
-                  value={orderNumber}
-                  onChange={(e) => setOrderNumber(e.target.value)}
-                  placeholder="ORD-001"
-                  required
+                  value={orderNumberLoading ? '...' : orderNumber}
+                  readOnly
+                  disabled
+                  className="bg-muted font-mono"
+                />
+                <p className="text-xs text-muted-foreground mt-1">{t('order.auto_generated')}</p>
+              </div>
+              <div>
+                <Label htmlFor="reference_number">{t('order.reference_number')}</Label>
+                <Input
+                  id="reference_number"
+                  value={referenceNumber}
+                  onChange={(e) => setReferenceNumber(e.target.value)}
+                  placeholder={t('order.reference_number_placeholder')}
                   maxLength={50}
                 />
+              </div>
               </div>
               <div>
                 <Label>{t('order.customer')}</Label>
