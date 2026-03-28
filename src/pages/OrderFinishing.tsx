@@ -130,7 +130,7 @@ export default function OrderFinishing() {
 
   const canManage = hasRole("finishing_manager") || hasRole("admin");
   const isCancelled = order?.status === 'cancelled';
-  const { isInProgress, toggleProgress } = useOrderItemProgress(id, 'finishing', user?.id);
+  const { isInProgress, markInProgress } = useOrderItemProgress(id, 'finishing', user?.id);
 
   // completedBatches already excludes retrieved-from-extra items via from_extra_state filter
   // Exclude special items that skipped finishing (initial_state must be in_manufacturing or in_finishing)
