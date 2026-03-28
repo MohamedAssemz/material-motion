@@ -596,6 +596,7 @@ export default function OrderManufacturing() {
                 current_state: nextState,
                 box_id: selectedBox.id,
                 manufacturing_machine_id: machineId || batch.manufacturing_machine_id,
+                production_date: machineId ? new Date().toISOString().split('T')[0] : batch.production_date,
               })
               .eq("id", batch.id);
 
@@ -630,6 +631,7 @@ export default function OrderManufacturing() {
                 box_id: selectedBox.id,
                 created_by: user?.id,
                 manufacturing_machine_id: machineId || batch.manufacturing_machine_id,
+                production_date: machineId ? new Date().toISOString().split('T')[0] : batch.production_date,
                 from_extra_state: batch.from_extra_state,
                 is_special: batch.is_special || false,
               })
