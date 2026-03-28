@@ -193,7 +193,7 @@ export default function OrderBoxing() {
         supabase
           .from("order_batches")
           .select(
-            "id, qr_code_data, current_state, quantity, product_id, order_item_id, box_id, manufacturing_machine_id, finishing_machine_id, packaging_machine_id, boxing_machine_id, from_extra_state, is_special, product:products(id, name_en, name_ar, sku, needs_packing, color_en, color_ar)",
+            "id, qr_code_data, current_state, quantity, product_id, order_item_id, box_id, manufacturing_machine_id, finishing_machine_id, packaging_machine_id, boxing_machine_id, production_date, from_extra_state, is_special, product:products(id, name_en, name_ar, sku, needs_packing, color_en, color_ar)",
           )
           .eq("order_id", id)
           .in("current_state", ["ready_for_boxing", "in_boxing", "ready_for_shipment", "shipped"]),
@@ -1565,6 +1565,7 @@ export default function OrderBoxing() {
                 product_sku: b.product?.sku || 'N/A',
                 quantity: b.quantity,
                 machine_id: b.boxing_machine_id,
+                production_date: b.production_date || null,
                 needs_boxing: b.order_item?.needs_boxing ?? true,
                 order_item_id: b.order_item_id || null,
               })),
@@ -1575,6 +1576,7 @@ export default function OrderBoxing() {
                 product_sku: eb.product_sku,
                 quantity: eb.quantity,
                 machine_id: eb.boxing_machine_id,
+                production_date: null,
                 needs_boxing: true,
                 order_item_id: null,
                 isExtraBatch: true,
