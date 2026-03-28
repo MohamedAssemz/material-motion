@@ -134,6 +134,20 @@ export default function OrderCreate() {
     }
   };
 
+  const generateOrderNumber = async () => {
+    try {
+      setOrderNumberLoading(true);
+      const { data, error } = await supabase.rpc('generate_order_number');
+      if (error) throw error;
+      setOrderNumber(data || `ORD-${Date.now()}`);
+    } catch (error: any) {
+      console.error('Failed to generate order number:', error);
+      setOrderNumber(`ORD-${Date.now()}`);
+    } finally {
+      setOrderNumberLoading(false);
+    }
+  };
+
   const addItem = () => {
     setItems([...items, { product_id: "", sizeQuantities: {}, needs_boxing: true, is_special: false, initial_state: "in_manufacturing" }]);
   };
