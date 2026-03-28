@@ -1,64 +1,24 @@
 
 
-# Edit Order Items & EFT — Revised Plan
+# Fix "column products_1.name does not exist" Error
 
-## Change from Previous Plan
-The "Edit Order" button moves from the header area into the **Order Items table card header**, next to the title. This keeps the editing action contextually close to the items being edited.
+## Root Cause
+The `products` table has columns `name_en` and `name_ar` — not `name`. Several files still reference `products(name, sku)` or `products(name)` in Supabase queries, and use `product.name` in code.
 
-## UI Placement
+## Files to Fix
 
-In `OrderDetail.tsx`, the Order Items `<Card>` (line ~1096) currently has:
-```
-<CardHeader>
-  <CardTitle>{t("orders.order_items")}</CardTitle>
-  <CardDescription>{t("orders.products_in_order")}</CardDescription>
-</CardHeader>
-```
+| File | Issue |
+|------|-------|
+| `src/components/ExtraInventoryDialog.tsx` | Query uses `products(id, name, sku)` → change to `products(id, name_en, name_ar, sku)`. Code references `batch.product.name` → `batch.product.name_en` |
+| `src/components/BoxScanPopup.tsx` | Query uses `products(id, name, sku)` → `products(id, name_en, sku)`. Code uses `product.name` → `product.name_en` |
+| `src/components/BoxReceiveDialog.tsx` | Multiple queries use `products(id, name, sku)` → `products(id, name_en, sku)`. Code uses `product.name` → `product.name_en` |
+| `src/components/BoxScanDialog.tsx` | Code uses `product.name` → `product.name_en` (need to check query too) |
+| `src/pages/BoxLookup.tsx` | Three queries use `products(name, sku)` → `products(name_en, sku)`. Code uses `product.name` → `product.name_en` |
+| `src/pages/Analytics.tsx` | Query uses `products(name)` → `products(name_en)`. Code uses `product.name` → `product.name_en` |
 
-This becomes a flex row with an "Edit Order" button on the right side (admin-only, non-cancelled orders only):
-```
-<CardHeader className="flex flex-row items-center justify-between">
-  <div>
-    <CardTitle>...</CardTitle>
-    <CardDescription>...</CardDescription>
-  </div>
-  {canUpdate && order.status !== 'cancelled' && (
-    <Button variant="outline" size="sm" onClick={() => setEditOrderOpen(true)}>
-      <Pencil /> {t("orders.edit_order")}
-    </Button>
-  )}
-</CardHeader>
-```
-
-## Components
-
-### 1. `EditOrderDialog.tsx` (new file)
-A dialog with two sections:
-
-**EFT Section** — Date picker for `estimated_fulfillment_time`
-
-**Order Items Section** — Table listing current items (product, size, color, qty) with:
-- `NumericInput` to adjust quantity per item
-- Trash button to delete an item
-- "Add Item" button to add new products (product selector + size picker, similar to OrderCreate pattern)
-
-**On Save**, computes diffs per item:
-- **New items**: Insert `order_items` row; if order is `in_progress`, create `order_batches` in `in_manufacturing`
-- **Increased qty**: Update `order_items.quantity`; if `in_progress`, create new batches
-- **Decreased qty**: Pre-check for box-assigned batches → block if found. Otherwise delete batches in state priority order (manufacturing first → shipped last), then update quantity
-- **Deleted items**: Same box check → delete all batches for item → release reserved extra_batches → delete order_item row
-
-### 2. Files to modify
-| File | Change |
-|------|--------|
-| `src/components/EditOrderDialog.tsx` | Create — full dialog component |
-| `src/pages/OrderDetail.tsx` | Add Edit button in items card header, dialog state, import |
-| `src/lib/translations.ts` | Add keys: `edit_order`, `edit_order_desc`, `add_item`, `boxes_must_be_emptied`, `save_changes` |
-
-### 3. Batch deletion priority
-When decreasing quantity, batches are deleted in this order (earliest phase first):
-1. `in_manufacturing` → 2. `ready_for_finishing` → 3. `in_finishing` → 4. `ready_for_packaging` → 5. `in_packaging` → 6. `ready_for_boxing` → 7. `in_boxing` → 8. `ready_for_shipment` → 9. `shipped`
-
-### 4. Box occupancy guard
-Before any decrease/delete: query `order_batches WHERE order_item_id = ? AND box_id IS NOT NULL`. If any exist, show alert blocking the action until boxes are emptied.
+## Changes Per File
+For each file:
+1. Update the Supabase `.select()` string: replace `name` with `name_en` (and add `name_ar` where bilingual display is needed)
+2. Update all TypeScript references from `.name` to `.name_en`
+3. Update any interfaces/types that have `name: string` to `name_en: string`
 
