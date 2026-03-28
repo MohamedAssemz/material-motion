@@ -45,6 +45,7 @@ interface Batch {
   lead_time_days: number | null;
   box_id: string | null;
   manufacturing_machine_id?: string | null;
+  production_date?: string | null;
   from_extra_state?: string | null;
   is_special?: boolean;
   product: {
@@ -190,7 +191,7 @@ export default function OrderManufacturing() {
         supabase
           .from("order_batches")
           .select(
-            "id, qr_code_data, current_state, quantity, product_id, order_item_id, eta, lead_time_days, box_id, manufacturing_machine_id, from_extra_state, is_special, product:products(id, name_en, name_ar, sku, needs_packing, color_en, color_ar), order_item:order_items(needs_boxing, initial_state, size)",
+            "id, qr_code_data, current_state, quantity, product_id, order_item_id, eta, lead_time_days, box_id, manufacturing_machine_id, production_date, from_extra_state, is_special, product:products(id, name_en, name_ar, sku, needs_packing, color_en, color_ar), order_item:order_items(needs_boxing, initial_state, size)",
           )
           .eq("order_id", id)
           .in("current_state", ["in_manufacturing"]),
@@ -198,7 +199,7 @@ export default function OrderManufacturing() {
         supabase
           .from("order_batches")
           .select(
-            "id, qr_code_data, current_state, quantity, product_id, order_item_id, eta, lead_time_days, box_id, manufacturing_machine_id, from_extra_state, is_special, product:products(id, name_en, name_ar, sku, needs_packing, color_en, color_ar), order_item:order_items(needs_boxing, initial_state, size)",
+            "id, qr_code_data, current_state, quantity, product_id, order_item_id, eta, lead_time_days, box_id, manufacturing_machine_id, production_date, from_extra_state, is_special, product:products(id, name_en, name_ar, sku, needs_packing, color_en, color_ar), order_item:order_items(needs_boxing, initial_state, size)",
           )
           .eq("order_id", id)
           .in("current_state", [
@@ -925,6 +926,7 @@ export default function OrderManufacturing() {
                 product_sku: batch.product?.sku || "N/A",
                 quantity: batch.quantity,
                 machine_id: batch.manufacturing_machine_id || null,
+                production_date: batch.production_date || null,
                 needs_boxing: batch.order_item?.needs_boxing ?? true,
                 order_item_id: batch.order_item_id || null,
               })),
@@ -935,6 +937,7 @@ export default function OrderManufacturing() {
                 product_sku: eb.product_sku,
                 quantity: eb.quantity,
                 machine_id: eb.manufacturing_machine_id,
+                production_date: null,
                 needs_boxing: true,
                 order_item_id: null,
                 isExtraBatch: true,
