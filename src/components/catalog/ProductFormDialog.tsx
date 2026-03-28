@@ -6,11 +6,11 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Loader2, Search } from 'lucide-react';
+import { Loader2, Search, Plus } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { SIZE_OPTIONS } from '@/lib/catalogConstants';
+import { useDynamicSizes } from '@/lib/catalogConstants';
 import { ProductImageUpload } from './ProductImageUpload';
 import { CountrySelect } from './CountrySelect';
 import { SearchableSelect } from '@/components/ui/searchable-select';
@@ -160,6 +160,10 @@ export function ProductFormDialog({
   const [brands, setBrands] = useState<Brand[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [previewSku, setPreviewSku] = useState<string>('');
+  const { sizes: dynamicSizes, refetch: refetchSizes } = useDynamicSizes();
+  const [newSizeInput, setNewSizeInput] = useState('');
+  const [addingSizeOpen, setAddingSizeOpen] = useState(false);
+  const [addingSizeLoading, setAddingSizeLoading] = useState(false);
 
   // Generate preview SKU for new products
   useEffect(() => {
@@ -481,19 +485,82 @@ export function ProductFormDialog({
 
                 {/* Sizes: multi-select checkboxes */}
                 <div>
-                  <Label className="mb-2 block">{t('catalog.size')}</Label>
+                  <div className="flex items-center justify-between mb-2">
+                    <Label>{t('catalog.size')}</Label>
+                    {!addingSizeOpen ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={() => setAddingSizeOpen(true)}
+                      >
+                        <Plus className="h-3 w-3 me-1" />
+                        {t('catalog.add_size')}
+                      </Button>
+                    ) : (
+                      <div className="flex items-center gap-1">
+                        <Input
+                          value={newSizeInput}
+                          onChange={(e) => setNewSizeInput(e.target.value)}
+                          placeholder={t('catalog.new_size_placeholder')}
+                          className="h-7 w-32 text-xs"
+                          autoFocus
+                        />
+                        <Button
+                          type="button"
+                          size="sm"
+                          className="h-7 text-xs"
+                          disabled={!newSizeInput.trim() || addingSizeLoading}
+                          onClick={async () => {
+                            const label = newSizeInput.trim();
+                            if (!label) return;
+                            if (dynamicSizes.some(s => s.label.toLowerCase() === label.toLowerCase())) {
+                              toast({ title: t('catalog.size_exists'), variant: 'destructive' });
+                              return;
+                            }
+                            setAddingSizeLoading(true);
+                            try {
+                              const maxOrder = dynamicSizes.length > 0 ? Math.max(...dynamicSizes.map(s => s.sort_order)) : 0;
+                              const { error } = await supabase.from('product_sizes').insert({ label, sort_order: maxOrder + 1 });
+                              if (error) throw error;
+                              await refetchSizes();
+                              setNewSizeInput('');
+                              setAddingSizeOpen(false);
+                              toast({ title: t('catalog.size_added') });
+                            } catch (err: any) {
+                              toast({ title: 'Error', description: err.message, variant: 'destructive' });
+                            } finally {
+                              setAddingSizeLoading(false);
+                            }
+                          }}
+                        >
+                          {addingSizeLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : t('common.save')}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 text-xs"
+                          onClick={() => { setAddingSizeOpen(false); setNewSizeInput(''); }}
+                        >
+                          {t('common.cancel')}
+                        </Button>
+                      </div>
+                    )}
+                  </div>
                   <div className="border rounded-lg p-3">
                     <div className="flex flex-wrap gap-3">
-                      {SIZE_OPTIONS.map(size => (
+                      {dynamicSizes.map(size => (
                         <label 
-                          key={size} 
+                          key={size.id} 
                           className="flex items-center gap-1.5 cursor-pointer text-sm"
                         >
                           <Checkbox
-                            checked={formData.sizes.includes(size)}
-                            onCheckedChange={() => toggleSize(size)}
+                            checked={formData.sizes.includes(size.label)}
+                            onCheckedChange={() => toggleSize(size.label)}
                           />
-                          {size}
+                          {size.label}
                         </label>
                       ))}
                     </div>
