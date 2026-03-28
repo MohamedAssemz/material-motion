@@ -111,12 +111,13 @@ export default function ExtraInventory() {
     }
     if (stateFilter !== "all") result = result.filter((b) => b.current_state === stateFilter);
     if (statusFilter !== "all") result = result.filter((b) => b.inventory_state === statusFilter);
+    if (storehouseFilter !== "all") result = result.filter((b) => String(b.storehouse) === storehouseFilter);
     return result;
-  }, [batches, searchQuery, stateFilter, statusFilter]);
+  }, [batches, searchQuery, stateFilter, statusFilter, storehouseFilter]);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, stateFilter, statusFilter]);
+  }, [searchQuery, stateFilter, statusFilter, storehouseFilter]);
 
   useEffect(() => {
     fetchData();
