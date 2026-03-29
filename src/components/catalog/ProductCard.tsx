@@ -17,6 +17,7 @@ interface ProductCategory {
   category: {
     id: string;
     name_en: string;
+    name_ar?: string | null;
   } | null;
 }
 
@@ -153,7 +154,7 @@ export function ProductCard({
           <div className="flex flex-wrap gap-1">
             {product.categories.slice(0, 3).map((pc, idx) => pc.category && (
               <Badge key={pc.category.id || idx} variant="secondary" className="text-xs">
-                {pc.category.name_en}
+                {language === 'ar' ? (pc.category.name_ar || pc.category.name_en) : pc.category.name_en}
               </Badge>
             ))}
             {product.categories.filter(pc => pc.category).length > 3 && (
@@ -164,11 +165,16 @@ export function ProductCard({
           </div>
         )}
         
-        {product.brand && (
-          <p className="text-xs text-muted-foreground">
-            {t('catalog.brands')}: <span className="font-medium">{getBrandDisplayName(product.brand, language)}</span>
-          </p>
-        )}
+        {product.country && (() => {
+          const countryData = getCountryByCode(product.country);
+          return countryData ? (
+            <p className="text-xs text-muted-foreground">
+              {countryData.flag} {countryData.name}
+            </p>
+          ) : (
+            <p className="text-xs text-muted-foreground">{product.country}</p>
+          );
+        })()}
       </CardContent>
     </Card>
   );
