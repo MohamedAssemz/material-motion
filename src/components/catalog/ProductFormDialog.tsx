@@ -84,6 +84,7 @@ interface Category {
 interface Brand {
   id: string;
   name_en: string;
+  name_ar?: string | null;
 }
 
 interface Customer {
@@ -193,7 +194,7 @@ export function ProductFormDialog({
     try {
       const [categoriesRes, brandsRes, customersRes] = await Promise.all([
         supabase.from('categories').select('id, name_en').order('name_en'),
-        supabase.from('brands').select('id, name_en').order('name_en'),
+        supabase.from('brands').select('id, name_en, name_ar').order('name_en'),
         supabase.from('customers').select('id, name, code').order('name'),
       ]);
 
@@ -572,7 +573,7 @@ export function ProductFormDialog({
                   <div>
                     <Label htmlFor="brand">{t('catalog.brands')}</Label>
                     <SearchableSelect
-                      options={brands.map(b => ({ value: b.id, label: b.name_en }))}
+                      options={brands.map(b => ({ value: b.id, label: b.name_ar ? `${b.name_en} - ${b.name_ar}` : b.name_en }))}
                       value={formData.brand_id || null}
                       onValueChange={(value) => setFormData(prev => ({ ...prev, brand_id: value || '' }))}
                       placeholder={t('catalog.select_brand')}
