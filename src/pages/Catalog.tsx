@@ -126,7 +126,7 @@ export default function Catalog() {
           .select(
             `
           *,
-          brand:brands(id, name_en),
+          brand:brands(id, name_en, name_ar),
           categories:product_categories(category:categories(id, name_en, name_ar)),
           images:product_images(id, image_url, is_main, sort_order),
           product_customers:product_customers(customer:customers(id, name, code))
