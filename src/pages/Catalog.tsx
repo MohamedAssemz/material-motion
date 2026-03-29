@@ -33,7 +33,7 @@ import { CategoryListDialog } from "@/components/catalog/CategoryListDialog";
 import { BrandListDialog } from "@/components/catalog/BrandListDialog";
 import { BulkUploadDialog } from "@/components/catalog/BulkUploadDialog";
 import { CountrySelect } from "@/components/catalog/CountrySelect";
-import { SIZE_OPTIONS } from "@/lib/catalogConstants";
+import { useDynamicSizes } from "@/lib/catalogConstants";
 
 interface Category {
   id: string;
@@ -82,6 +82,7 @@ export default function Catalog() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
   const [loading, setLoading] = useState(true);
+  const { sizes: dynamicSizes } = useDynamicSizes();
 
   // Filters
   const [searchTerm, setSearchTerm] = useState("");
@@ -491,9 +492,9 @@ export default function Catalog() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">{t("catalog.all_sizes")}</SelectItem>
-                {SIZE_OPTIONS.map((s) => (
-                  <SelectItem key={s} value={s}>
-                    {s}
+                {dynamicSizes.map((s) => (
+                  <SelectItem key={s.id} value={s.label}>
+                    {s.label}
                   </SelectItem>
                 ))}
               </SelectContent>
