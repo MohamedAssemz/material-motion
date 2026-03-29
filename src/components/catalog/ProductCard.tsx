@@ -10,8 +10,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Package, MoreVertical, Eye, Trash2, Copy } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { getBrandDisplayName } from '@/lib/catalogHelpers';
 import { getSizesLabel } from '@/lib/catalogConstants';
+import { getCountryByCode } from '@/lib/countries';
 
 interface ProductCategory {
   category: {
