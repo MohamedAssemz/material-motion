@@ -33,7 +33,7 @@ import { CategoryListDialog } from "@/components/catalog/CategoryListDialog";
 import { BrandListDialog } from "@/components/catalog/BrandListDialog";
 import { BulkUploadDialog } from "@/components/catalog/BulkUploadDialog";
 import { CountrySelect } from "@/components/catalog/CountrySelect";
-import { SIZE_OPTIONS } from "@/lib/catalogConstants";
+import { useDynamicSizes } from "@/lib/catalogConstants";
 
 interface Category {
   id: string;
