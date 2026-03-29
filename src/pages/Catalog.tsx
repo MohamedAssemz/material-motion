@@ -67,7 +67,7 @@ interface Product {
   needs_packing: boolean | null;
   brand_id: string | null;
   created_at: string | null;
-  brand?: { id: string; name_en: string } | null;
+  brand?: { id: string; name_en: string; name_ar?: string | null } | null;
   categories?: { category: { id: string; name_en: string; name_ar?: string | null } }[];
   images?: { id: string; image_url: string; is_main: boolean | null; sort_order: number | null }[];
   potential_customers?: { customer: { id: string; name: string; code: string | null } }[];
@@ -126,7 +126,7 @@ export default function Catalog() {
           .select(
             `
           *,
-          brand:brands(id, name_en),
+          brand:brands(id, name_en, name_ar),
           categories:product_categories(category:categories(id, name_en, name_ar)),
           images:product_images(id, image_url, is_main, sort_order),
           product_customers:product_customers(customer:customers(id, name, code))
