@@ -180,7 +180,7 @@ export function ProductDetailDialog({
                   <h4 className="text-sm font-medium text-muted-foreground mb-1">{t('catalog.brands')}</h4>
                   <span className="text-sm font-medium">
                     {product.brand.name_en}
-                    {product.brand.name_ar && ` / ${product.brand.name_ar}`}
+                    {product.brand.name_ar && ` - ${product.brand.name_ar}`}
                   </span>
                 </div>
               )}
