@@ -164,17 +164,6 @@ export function ProductCard({
             )}
           </div>
         )}
-        
-        {product.country && (() => {
-          const countryData = getCountryByCode(product.country);
-          return countryData ? (
-            <p className="text-xs text-muted-foreground">
-              {countryData.flag} {countryData.name}
-            </p>
-          ) : (
-            <p className="text-xs text-muted-foreground">{product.country}</p>
-          );
-        })()}
       </CardContent>
     </Card>
   );
