@@ -3,12 +3,13 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Package, Edit, Check, X, BarChart3, Loader2 } from 'lucide-react';
+import { Package, Edit, Check, X, BarChart3, Loader2, Globe } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { ProductCardData } from './ProductCard';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { getProductDisplayDescription, getBrandDisplayName } from '@/lib/catalogHelpers';
+import { getProductDisplayDescription } from '@/lib/catalogHelpers';
 import { supabase } from '@/integrations/supabase/client';
+import { getCountryByCode } from '@/lib/countries';
 
 interface ProductPotentialCustomer {
   customer: {
@@ -177,16 +178,24 @@ export function ProductDetailDialog({
               {product.brand && (
                 <div>
                   <h4 className="text-sm font-medium text-muted-foreground mb-1">{t('catalog.brands')}</h4>
-                  <span className="text-sm font-medium">{getBrandDisplayName(product.brand, language)}</span>
+                  <span className="text-sm font-medium">
+                    {product.brand.name_en}
+                    {product.brand.name_ar && ` / ${product.brand.name_ar}`}
+                  </span>
                 </div>
               )}
 
-              {product.country && (
-                <div>
-                  <h4 className="text-sm font-medium text-muted-foreground mb-1">{t('catalog.target_market')}</h4>
-                  <span className="text-sm">{product.country}</span>
-                </div>
-              )}
+              {product.country && (() => {
+                const countryData = getCountryByCode(product.country);
+                return (
+                  <div>
+                    <h4 className="text-sm font-medium text-muted-foreground mb-1">{t('catalog.target_market')}</h4>
+                    <span className="text-sm">
+                      {countryData ? `${countryData.flag} ${countryData.name}` : product.country}
+                    </span>
+                  </div>
+                );
+              })()}
 
               <div>
                 <h4 className="text-sm font-medium text-muted-foreground mb-1">{t('catalog.packaging_required')}</h4>
@@ -206,7 +215,9 @@ export function ProductDetailDialog({
                   <h4 className="text-sm font-medium text-muted-foreground mb-2">{t('catalog.categories')}</h4>
                   <div className="flex flex-wrap gap-1.5">
                     {product.categories.map((pc, idx) => pc.category && (
-                      <Badge key={pc.category.id || idx} variant="secondary">{pc.category.name_en}</Badge>
+                      <Badge key={pc.category.id || idx} variant="secondary">
+                        {language === 'ar' ? (pc.category.name_ar || pc.category.name_en) : pc.category.name_en}
+                      </Badge>
                     ))}
                   </div>
                 </div>
