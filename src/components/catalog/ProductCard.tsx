@@ -11,7 +11,6 @@ import {
 import { Package, MoreVertical, Eye, Trash2, Copy } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { getSizesLabel } from '@/lib/catalogConstants';
-import { getCountryByCode } from '@/lib/countries';
 
 interface ProductCategory {
   category: {
