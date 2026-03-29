@@ -67,7 +67,7 @@ interface Product {
   needs_packing: boolean | null;
   brand_id: string | null;
   created_at: string | null;
-  brand?: { id: string; name_en: string } | null;
+  brand?: { id: string; name_en: string; name_ar?: string | null } | null;
   categories?: { category: { id: string; name_en: string; name_ar?: string | null } }[];
   images?: { id: string; image_url: string; is_main: boolean | null; sort_order: number | null }[];
   potential_customers?: { customer: { id: string; name: string; code: string | null } }[];
