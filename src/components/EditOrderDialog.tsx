@@ -300,25 +300,18 @@ export function EditOrderDialog({
             .eq("id", item.id!);
 
           if (isInProgress) {
-            // Create new batches for the delta
-            const batchInserts = [];
-            for (let i = 0; i < delta; i++) {
-              const { data: codeData } = await supabase.rpc("generate_batch_code");
-              batchInserts.push({
-                order_id: orderId,
-                product_id: item.product_id,
-                order_item_id: item.id!,
-                current_state: "in_manufacturing",
-                quantity: 1,
-                created_by: user?.id,
-                qr_code_data: codeData || `B-${Math.random().toString(36).slice(2, 10).toUpperCase()}`,
-                is_special: item.is_special,
-              });
-            }
-            if (batchInserts.length > 0) {
-              const { error } = await supabase.from("order_batches").insert(batchInserts);
-              if (error) throw error;
-            }
+            const { data: codeData } = await supabase.rpc("generate_batch_code");
+            const { error } = await supabase.from("order_batches").insert({
+              order_id: orderId,
+              product_id: item.product_id,
+              order_item_id: item.id!,
+              current_state: "in_manufacturing",
+              quantity: delta,
+              created_by: user?.id,
+              qr_code_data: codeData || `B-${Math.random().toString(36).slice(2, 10).toUpperCase()}`,
+              is_special: item.is_special,
+            });
+            if (error) throw error;
           }
         } else {
           // Decrease: check box occupancy first
@@ -369,23 +362,17 @@ export function EditOrderDialog({
         if (itemError) throw itemError;
 
         if (isInProgress && newItem) {
-          const batchInserts = [];
-          for (let i = 0; i < item.quantity; i++) {
-            const { data: codeData } = await supabase.rpc("generate_batch_code");
-            batchInserts.push({
-              order_id: orderId,
-              product_id: item.product_id,
-              order_item_id: newItem.id,
-              current_state: "in_manufacturing",
-              quantity: 1,
-              created_by: user?.id,
-              qr_code_data: codeData || `B-${Math.random().toString(36).slice(2, 10).toUpperCase()}`,
-            });
-          }
-          if (batchInserts.length > 0) {
-            const { error } = await supabase.from("order_batches").insert(batchInserts);
-            if (error) throw error;
-          }
+          const { data: codeData } = await supabase.rpc("generate_batch_code");
+          const { error } = await supabase.from("order_batches").insert({
+            order_id: orderId,
+            product_id: item.product_id,
+            order_item_id: newItem.id,
+            current_state: "in_manufacturing",
+            quantity: item.quantity,
+            created_by: user?.id,
+            qr_code_data: codeData || `B-${Math.random().toString(36).slice(2, 10).toUpperCase()}`,
+          });
+          if (error) throw error;
         }
       }
 
