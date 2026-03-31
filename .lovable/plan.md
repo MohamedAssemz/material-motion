@@ -1,24 +1,56 @@
 
 
-# Fix "column products_1.name does not exist" Error
+# Fix: Batch creation on order item quantity increase
 
-## Root Cause
-The `products` table has columns `name_en` and `name_ar` — not `name`. Several files still reference `products(name, sku)` or `products(name)` in Supabase queries, and use `product.name` in code.
+## Problem
+When editing an order and increasing an item's quantity (e.g., from 10 to 100), the code creates **90 individual batches each with quantity=1** instead of **one batch with quantity=90**. This is caused by a loop in `EditOrderDialog.tsx` (line 305): `for (let i = 0; i < delta; i++)`.
 
-## Files to Fix
+## Solution
+Replace the loop with a single batch insert containing `quantity: delta`.
 
-| File | Issue |
-|------|-------|
-| `src/components/ExtraInventoryDialog.tsx` | Query uses `products(id, name, sku)` → change to `products(id, name_en, name_ar, sku)`. Code references `batch.product.name` → `batch.product.name_en` |
-| `src/components/BoxScanPopup.tsx` | Query uses `products(id, name, sku)` → `products(id, name_en, sku)`. Code uses `product.name` → `product.name_en` |
-| `src/components/BoxReceiveDialog.tsx` | Multiple queries use `products(id, name, sku)` → `products(id, name_en, sku)`. Code uses `product.name` → `product.name_en` |
-| `src/components/BoxScanDialog.tsx` | Code uses `product.name` → `product.name_en` (need to check query too) |
-| `src/pages/BoxLookup.tsx` | Three queries use `products(name, sku)` → `products(name_en, sku)`. Code uses `product.name` → `product.name_en` |
-| `src/pages/Analytics.tsx` | Query uses `products(name)` → `products(name_en)`. Code uses `product.name` → `product.name_en` |
+## File: `src/components/EditOrderDialog.tsx` (lines 302-321)
 
-## Changes Per File
-For each file:
-1. Update the Supabase `.select()` string: replace `name` with `name_en` (and add `name_ar` where bilingual display is needed)
-2. Update all TypeScript references from `.name` to `.name_en`
-3. Update any interfaces/types that have `name: string` to `name_en: string`
+**Current code:**
+```typescript
+if (isInProgress) {
+  const batchInserts = [];
+  for (let i = 0; i < delta; i++) {
+    const { data: codeData } = await supabase.rpc("generate_batch_code");
+    batchInserts.push({
+      order_id: orderId,
+      product_id: item.product_id,
+      order_item_id: item.id!,
+      current_state: "in_manufacturing",
+      quantity: 1,
+      created_by: user?.id,
+      qr_code_data: codeData || `B-...`,
+      is_special: item.is_special,
+    });
+  }
+  if (batchInserts.length > 0) {
+    const { error } = await supabase.from("order_batches").insert(batchInserts);
+    if (error) throw error;
+  }
+}
+```
+
+**Fixed code:**
+```typescript
+if (isInProgress) {
+  const { data: codeData } = await supabase.rpc("generate_batch_code");
+  const { error } = await supabase.from("order_batches").insert({
+    order_id: orderId,
+    product_id: item.product_id,
+    order_item_id: item.id!,
+    current_state: "in_manufacturing",
+    quantity: delta,
+    created_by: user?.id,
+    qr_code_data: codeData || `B-${Math.random().toString(36).slice(2, 10).toUpperCase()}`,
+    is_special: item.is_special,
+  });
+  if (error) throw error;
+}
+```
+
+This also applies the same fix to **new item creation** (lines ~370-400) — need to verify that path uses the same pattern.
 
