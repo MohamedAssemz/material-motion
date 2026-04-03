@@ -377,7 +377,7 @@ export function EditOrderDialog({
       }
 
       // Log activity
-      const eftChanged = (eft ? eft.toISOString() : null) !== currentEft;
+      const logEftChanged = (eft ? eft.toISOString() : null) !== currentEft;
       const itemsAdded = items.filter(i => i.isNew && !i.isDeleted).length;
       const itemsDeleted = items.filter(i => i.isDeleted && !i.isNew).length;
       const itemsQtyChanged = items.filter(i => !i.isNew && !i.isDeleted && i.id && i.quantity !== i.originalQuantity).length;
