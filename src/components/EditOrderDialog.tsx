@@ -25,23 +25,11 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { NumericInput } from "@/components/ui/numeric-input";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { CalendarIcon, Plus, Trash2 } from "lucide-react";
+import { CalendarIcon, Plus, Trash2, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-// State priority for batch deletion (earliest phase first)
-const STATE_DELETION_PRIORITY = [
-  "in_manufacturing",
-  "ready_for_finishing",
-  "in_finishing",
-  "ready_for_packaging",
-  "in_packaging",
-  "ready_for_boxing",
-  "in_boxing",
-  "ready_for_shipment",
-  "shipped",
-];
 
 interface OrderItem {
   id: string;
@@ -120,6 +108,9 @@ export function EditOrderDialog({
   const [boxWarningOpen, setBoxWarningOpen] = useState(false);
   const [boxWarningMessage, setBoxWarningMessage] = useState("");
 
+  // Removable quantities per item (only for in_progress orders)
+  const [removableMap, setRemovableMap] = useState<Record<string, number>>({});
+
   // New item form state
   const [addingItem, setAddingItem] = useState(false);
   const [newProductId, setNewProductId] = useState<string | null>(null);
@@ -151,7 +142,11 @@ export function EditOrderDialog({
       setNewProductId(null);
       setNewSize(null);
       setNewQty(1);
+      setRemovableMap({});
       fetchProducts();
+      if (orderStatus === "in_progress") {
+        fetchRemovableQuantities();
+      }
     }
   }, [open, orderItems, currentEft]);
 
@@ -163,15 +158,68 @@ export function EditOrderDialog({
     if (data) setProducts(data);
   };
 
+  const fetchRemovableQuantities = async () => {
+    const map: Record<string, number> = {};
+
+    // Get all progress entries for this order in manufacturing phase
+    const { data: progressData } = await supabase
+      .from("order_item_progress")
+      .select("order_item_id")
+      .eq("order_id", orderId)
+      .eq("phase", "manufacturing");
+
+    const startedItems = new Set(progressData?.map((p) => p.order_item_id) || []);
+
+    // Get manufacturing batch quantities per order item
+    const { data: batchData } = await supabase
+      .from("order_batches")
+      .select("order_item_id, quantity")
+      .eq("order_id", orderId)
+      .eq("current_state", "in_manufacturing");
+
+    // Sum quantities per order_item_id
+    const mfgQtyMap: Record<string, number> = {};
+    for (const b of batchData || []) {
+      if (b.order_item_id) {
+        mfgQtyMap[b.order_item_id] = (mfgQtyMap[b.order_item_id] || 0) + b.quantity;
+      }
+    }
+
+    for (const oi of orderItems) {
+      if (startedItems.has(oi.id)) {
+        map[oi.id] = 0; // Work started, cannot remove any
+      } else {
+        map[oi.id] = mfgQtyMap[oi.id] || 0;
+      }
+    }
+
+    setRemovableMap(map);
+  };
+
   const getProductSizes = (productId: string): string[] => {
     const product = products.find((p) => p.id === productId);
     return product?.sizes || [];
   };
 
+  const getMinQuantity = (item: EditableItem): number => {
+    if (item.isNew || !item.id) return 1;
+    if (orderStatus !== "in_progress") return 1;
+    const removable = removableMap[item.id] ?? 0;
+    return Math.max(1, item.originalQuantity - removable);
+  };
+
+  const canDeleteItem = (item: EditableItem): boolean => {
+    if (item.isNew) return true;
+    if (!item.id) return true;
+    if (orderStatus !== "in_progress") return true;
+    // Can only delete if ALL quantity is removable (in manufacturing and not started)
+    const removable = removableMap[item.id] ?? 0;
+    return removable >= item.originalQuantity;
+  };
+
   const handleDeleteItem = (index: number) => {
     const newItems = [...items];
     if (newItems[index].isNew) {
-      // Just remove new items entirely
       newItems.splice(index, 1);
     } else {
       newItems[index] = { ...newItems[index], isDeleted: true };
@@ -202,7 +250,6 @@ export function EditOrderDialog({
       return;
     }
 
-    // Check for duplicate
     const duplicate = items.find(
       (i) => !i.isDeleted && i.product_id === newProductId && i.size === (newSize || null)
     );
@@ -237,9 +284,63 @@ export function EditOrderDialog({
     setNewNeedsBoxing(true);
   };
 
+  // Re-validate removable quantities server-side before save
+  const revalidateConstraints = async (): Promise<boolean> => {
+    if (orderStatus !== "in_progress") return true;
+
+    const { data: progressData } = await supabase
+      .from("order_item_progress")
+      .select("order_item_id")
+      .eq("order_id", orderId)
+      .eq("phase", "manufacturing");
+
+    const startedItems = new Set(progressData?.map((p) => p.order_item_id) || []);
+
+    const { data: batchData } = await supabase
+      .from("order_batches")
+      .select("order_item_id, quantity")
+      .eq("order_id", orderId)
+      .eq("current_state", "in_manufacturing");
+
+    const mfgQtyMap: Record<string, number> = {};
+    for (const b of batchData || []) {
+      if (b.order_item_id) {
+        mfgQtyMap[b.order_item_id] = (mfgQtyMap[b.order_item_id] || 0) + b.quantity;
+      }
+    }
+
+    for (const item of items) {
+      if (item.isNew || !item.id) continue;
+
+      const removable = startedItems.has(item.id) ? 0 : (mfgQtyMap[item.id] || 0);
+
+      if (item.isDeleted) {
+        if (removable < item.originalQuantity) {
+          toast.error(`${item.productName}: ${language === "ar" ? "لا يمكن حذف هذا المنتج - تم بدء العمل عليه" : "Cannot delete - work has started on this item"}`);
+          return false;
+        }
+      } else if (item.quantity < item.originalQuantity) {
+        const decreaseAmount = item.originalQuantity - item.quantity;
+        if (decreaseAmount > removable) {
+          toast.error(`${item.productName}: ${language === "ar" ? "لا يمكن تقليل الكمية بهذا المقدار - تم بدء العمل" : "Cannot decrease by this amount - work has progressed"}`);
+          return false;
+        }
+      }
+    }
+
+    return true;
+  };
+
   const handleSave = async () => {
     setSaving(true);
     try {
+      // Re-validate constraints before proceeding
+      const valid = await revalidateConstraints();
+      if (!valid) {
+        setSaving(false);
+        return;
+      }
+
       // 1. Update EFT
       const eftChanged =
         (eft ? eft.toISOString() : null) !== currentEft;
@@ -333,9 +434,9 @@ export function EditOrderDialog({
             return;
           }
 
-          // Delete batches in state priority order
+          // Delete batches only from in_manufacturing state
           if (isInProgress) {
-            await deleteBatchesByPriority(item.id!, decreaseAmount);
+            await deleteManufacturingBatches(item.id!, decreaseAmount);
           }
 
           await supabase
@@ -407,36 +508,31 @@ export function EditOrderDialog({
     }
   };
 
-  const deleteBatchesByPriority = async (orderItemId: string, amount: number) => {
+  // Only delete batches in in_manufacturing state
+  const deleteManufacturingBatches = async (orderItemId: string, amount: number) => {
     let remaining = amount;
 
-    for (const state of STATE_DELETION_PRIORITY) {
+    const { data: batches } = await supabase
+      .from("order_batches")
+      .select("id, quantity")
+      .eq("order_item_id", orderItemId)
+      .eq("current_state", "in_manufacturing")
+      .order("quantity", { ascending: true });
+
+    if (!batches) return;
+
+    for (const batch of batches) {
       if (remaining <= 0) break;
 
-      const { data: batches } = await supabase
-        .from("order_batches")
-        .select("id, quantity")
-        .eq("order_item_id", orderItemId)
-        .eq("current_state", state)
-        .order("quantity", { ascending: true });
-
-      if (!batches) continue;
-
-      for (const batch of batches) {
-        if (remaining <= 0) break;
-
-        if (batch.quantity <= remaining) {
-          // Delete entire batch
-          await supabase.from("order_batches").delete().eq("id", batch.id);
-          remaining -= batch.quantity;
-        } else {
-          // Partially reduce batch
-          await supabase
-            .from("order_batches")
-            .update({ quantity: batch.quantity - remaining })
-            .eq("id", batch.id);
-          remaining = 0;
-        }
+      if (batch.quantity <= remaining) {
+        await supabase.from("order_batches").delete().eq("id", batch.id);
+        remaining -= batch.quantity;
+      } else {
+        await supabase
+          .from("order_batches")
+          .update({ quantity: batch.quantity - remaining })
+          .eq("id", batch.id);
+        remaining = 0;
       }
     }
   };
@@ -500,6 +596,8 @@ export function EditOrderDialog({
             <div className="space-y-2">
               {activeItems.map((item) => {
                 const idx = items.indexOf(item);
+                const minQty = getMinQuantity(item);
+                const deletable = canDeleteItem(item);
                 return (
                   <div
                     key={item.id || `new-${idx}`}
@@ -529,17 +627,41 @@ export function EditOrderDialog({
                     <NumericInput
                       value={item.quantity}
                       onValueChange={(val) => handleQtyChange(idx, val)}
-                      min={1}
+                      min={minQty}
                       className="w-20"
                     />
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="text-destructive hover:text-destructive"
-                      onClick={() => handleDeleteItem(idx)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    {deletable ? (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => handleDeleteItem(idx)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    ) : (
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-muted-foreground cursor-not-allowed"
+                              disabled
+                            >
+                              <Lock className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="text-xs">
+                              {language === "ar"
+                                ? "لا يمكن حذف هذا المنتج - بعض الوحدات تجاوزت مرحلة التصنيع أو تم بدء العمل عليها"
+                                : "Cannot delete - some units have progressed beyond manufacturing or work has started"}
+                            </p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    )}
                   </div>
                 );
               })}
