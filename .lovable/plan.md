@@ -1,76 +1,56 @@
 
 
-# Order Activity Log
+# Enforce Editing Constraints: Decrease/Delete Limited to Idle Manufacturing Batches
 
-## Overview
-Add an audit trail system that records key actions taken on orders and displays them in a timeline below the order items table. Admins can see who did what and when.
+## Problem
+Currently, admins can decrease or delete any order item without restriction on batch states. The new rules are:
+1. **Decrease**: Only allowed by the amount of units still in `in_manufacturing` state AND not marked as "started working" (no entry in `order_item_progress` for the manufacturing phase).
+2. **Delete**: Only allowed if the item's **entire** quantity is in `in_manufacturing` AND not started working.
 
-## Database Changes
+## Changes
 
-### New table: `order_activity_logs`
-| Column | Type | Notes |
-|--------|------|-------|
-| id | uuid | PK, default gen_random_uuid() |
-| order_id | uuid | NOT NULL |
-| action | text | NOT NULL (e.g. 'created', 'started', 'edited', 'cancelled', 'reserved_extra', 'committed_extra', 'shipment_created') |
-| performed_by | uuid | NOT NULL |
-| details | jsonb | nullable, stores action-specific metadata |
-| created_at | timestamptz | default now() |
+### File: `src/components/EditOrderDialog.tsx`
 
-RLS: authenticated SELECT for all, INSERT for admin + phase managers.
+**1. Fetch constraints on dialog open**
 
-### Actions to log (inserted from frontend code)
-1. **Order Created** - in `OrderCreate.tsx` after insert
-2. **Order Started** - in `StartOrderDialog.tsx` after status update
-3. **Order Edited** - in `EditOrderDialog.tsx` after save (details: what changed)
-4. **Order Cancelled** - in `OrderDetail.tsx` handleCancelOrder
-5. **Extra Reserved** - in `ExtraInventoryDialog.tsx` after reservation
-6. **Extra Committed** - in `OrderDetail.tsx` handleCommitExtra
-7. **Shipment Created** - in `ShipmentDialog.tsx` after insert
+When the dialog opens for an `in_progress` order, query two things per existing item:
+- Count of batches in `in_manufacturing` state (sum of quantities) → `removableQty`
+- Whether the item has an entry in `order_item_progress` with `phase = 'manufacturing'` → if yes, `removableQty = 0`
 
-## New Component: `OrderActivityLog`
-- Placed below the Order Items table in `OrderDetail.tsx`
-- Card with vertical timeline layout (similar to OrderCommentsDrawer style)
-- Each entry shows: icon per action type, action label, performer name, timestamp
-- Fetches from `order_activity_logs` joined with `profiles` for performer names
-- Only visible to admins (`hasRole('admin')`)
+Store this as a map: `Record<itemId, { removableQty: number }>`.
 
-## Files to Create/Edit
-1. **Migration** - create `order_activity_logs` table with RLS
-2. **New**: `src/components/OrderActivityLog.tsx` - timeline display component
-3. **Edit**: `src/pages/OrderDetail.tsx` - add component below order items table
-4. **Edit**: `src/pages/OrderCreate.tsx` - log 'created' action
-5. **Edit**: `src/components/StartOrderDialog.tsx` - log 'started' action
-6. **Edit**: `src/components/EditOrderDialog.tsx` - log 'edited' action
-7. **Edit**: `src/pages/OrderDetail.tsx` - log 'cancelled' and 'committed_extra' actions
-8. **Edit**: `src/components/ExtraInventoryDialog.tsx` - log 'reserved_extra' action
-9. **Edit**: `src/components/ShipmentDialog.tsx` - log 'shipment_created' action
+**2. Enforce minimum quantity on the input**
 
-## Technical Details
+For each existing item, set `min` on `NumericInput` to `item.originalQuantity - removableQty` (i.e., the quantity that has already progressed beyond manufacturing or is being worked on). This prevents decreasing below what's removable.
 
-### Timeline UI
+**3. Block delete button**
+
+Disable the delete (trash) button for items where `removableQty < item.originalQuantity`. Show a tooltip or visual cue explaining the item can't be deleted because some units have progressed.
+
+**4. Validate on save**
+
+Before processing decreases/deletions in `handleSave`, re-validate the constraints server-side (re-fetch manufacturing batch counts and progress status) to prevent race conditions.
+
+**5. Update `deleteBatchesByPriority`**
+
+Restrict it to only delete batches in `in_manufacturing` state (remove the loop over other states for decrease scenarios). The priority list is no longer relevant for decreases — only `in_manufacturing` batches without "started working" are eligible.
+
+### UI Behavior Summary
+
+- Quantity input minimum is dynamically calculated: `originalQty - removableQty`
+- If `removableQty === 0`, the input is effectively locked at original quantity (increase only)
+- Delete button grayed out with indicator when item can't be fully removed
+- Error toast if validation fails on save (e.g., someone started working between dialog open and save)
+
+### Technical Detail
+
 ```text
-  [icon] Order Created
-         by Ahmed Mohamed - 2 days ago
-  |
-  [icon] Order Started
-         by Ahmed Mohamed - 1 day ago
-  |
-  [icon] Order Edited
-         by Sarah Ali - 5 hours ago
-         Changed: EFT updated, Item qty increased
-  |
-  [icon] Shipment Created (SHP-0012)
-         by Hassan Mahmoud - 1 hour ago
-```
-
-### Log insertion pattern (added to each action handler)
-```typescript
-await supabase.from('order_activity_logs').insert({
-  order_id: orderId,
-  action: 'started',
-  performed_by: user.id,
-  details: { /* optional context */ }
-});
+fetchRemovableQuantities():
+  For each order item:
+    1. Check order_item_progress for (order_id, order_item_id, phase='manufacturing')
+       → if exists: removableQty = 0
+    2. Else: SELECT SUM(quantity) FROM order_batches 
+             WHERE order_item_id = X AND current_state = 'in_manufacturing'
+       → removableQty = result
 ```
 
