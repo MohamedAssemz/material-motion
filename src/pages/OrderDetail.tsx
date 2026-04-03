@@ -515,6 +515,15 @@ export default function OrderDetail() {
       const { error } = await supabase.from("orders").update({ status: "cancelled" }).eq("id", id);
       if (error) throw error;
 
+      // Log activity
+      if (user) {
+        await supabase.from("order_activity_logs").insert({
+          order_id: id,
+          action: "cancelled",
+          performed_by: user.id,
+        });
+      }
+
       toast.success(t("toast.success"));
       navigate("/orders");
     } catch (error) {
