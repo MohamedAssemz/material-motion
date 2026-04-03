@@ -487,6 +487,15 @@ export default function OrderDetail() {
       if (error) throw error;
 
       const result = data as any;
+
+      // Log activity
+      await supabase.from("order_activity_logs").insert({
+        order_id: id,
+        action: "committed_extra",
+        performed_by: user.id,
+        details: { total_released: result.total_released, total_requeued: result.total_requeued },
+      });
+
       toast.success(`${t("orders.commit_success")}: ${result.total_released} ${t("orders.commit_released")}, ${result.total_requeued} ${t("orders.commit_requeued")}`);
       setCommitDialogOpen(false);
       fetchOrder();

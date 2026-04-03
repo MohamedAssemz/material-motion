@@ -359,6 +359,14 @@ export default function OrderCreate() {
         }
       }
 
+      // Log activity
+      await supabase.from("order_activity_logs").insert({
+        order_id: order.id,
+        action: "created",
+        performed_by: user?.id,
+        details: { total_items: items.filter(i => i.product_id).length, total_units: totalBatchQuantity },
+      });
+
       toast({
         title: "Success",
         description: `Order ${orderNumber} created with ${totalBatchQuantity} total units`,

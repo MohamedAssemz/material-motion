@@ -534,6 +534,17 @@ export function ExtraInventoryDialog({
         }
       }
 
+      // Log activity
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (currentUser) {
+        await supabase.from("order_activity_logs").insert({
+          order_id: orderId,
+          action: "reserved_extra",
+          performed_by: currentUser.id,
+          details: { total_reserved: totalSelected, phase },
+        });
+      }
+
       toast.success(`Reserved ${totalSelected} extra items for order`);
       onItemsSelected(selectedItems);
       onOpenChange(false);
