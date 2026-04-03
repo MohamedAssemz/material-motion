@@ -387,6 +387,41 @@ export type Database = {
         }
         Relationships: []
       }
+      order_activity_logs: {
+        Row: {
+          action: string
+          created_at: string
+          details: Json | null
+          id: string
+          order_id: string
+          performed_by: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          details?: Json | null
+          id?: string
+          order_id: string
+          performed_by: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          details?: Json | null
+          id?: string
+          order_id?: string
+          performed_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_activity_logs_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_batches: {
         Row: {
           box_id: string | null
