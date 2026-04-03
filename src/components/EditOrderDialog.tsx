@@ -376,6 +376,26 @@ export function EditOrderDialog({
         }
       }
 
+      // Log activity
+      const logEftChanged = (eft ? eft.toISOString() : null) !== currentEft;
+      const itemsAdded = items.filter(i => i.isNew && !i.isDeleted).length;
+      const itemsDeleted = items.filter(i => i.isDeleted && !i.isNew).length;
+      const itemsQtyChanged = items.filter(i => !i.isNew && !i.isDeleted && i.id && i.quantity !== i.originalQuantity).length;
+
+      if (user) {
+        await supabase.from("order_activity_logs").insert({
+          order_id: orderId,
+          action: "edited",
+          performed_by: user.id,
+          details: {
+            eft_changed: logEftChanged,
+            items_added: itemsAdded || undefined,
+            items_deleted: itemsDeleted || undefined,
+            items_qty_changed: itemsQtyChanged || undefined,
+          },
+        });
+      }
+
       toast.success(t("toast.success"));
       onSaved();
       onOpenChange(false);

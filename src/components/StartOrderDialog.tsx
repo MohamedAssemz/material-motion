@@ -135,6 +135,16 @@ export function StartOrderDialog({
         .update({ status: 'in_progress' })
         .eq('id', orderId);
 
+      // Log activity
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await supabase.from("order_activity_logs").insert({
+          order_id: orderId,
+          action: "started",
+          performed_by: user.id,
+        });
+      }
+
       toast.success('Order started successfully');
       onOrderStarted();
       onOpenChange(false);

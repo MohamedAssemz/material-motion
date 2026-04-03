@@ -174,6 +174,17 @@ export function ShipmentDialog({
       }
 
       const totalQty = selectedProducts.reduce((sum, p) => sum + p.selected_quantity, 0);
+
+      // Log activity
+      if (user) {
+        await supabase.from("order_activity_logs").insert({
+          order_id: orderId,
+          action: "shipment_created",
+          performed_by: user.id,
+          details: { shipment_code: shipmentCode, total_qty: totalQty },
+        });
+      }
+
       toast.success(`Shipment ${shipmentCode} created with ${totalQty} items`);
       
       // Open print dialog
