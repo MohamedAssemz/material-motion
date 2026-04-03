@@ -1252,6 +1252,11 @@ export default function OrderDetail() {
         </CardContent>
       </Card>
 
+      {/* Activity Log - Admin only */}
+      {hasRole('admin') && (
+        <OrderActivityLog orderId={id!} />
+      )}
+
       {/* Dialogs */}
       <RawMaterialsDrawer
         open={rawMaterialsOpen}

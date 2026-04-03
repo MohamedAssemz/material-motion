@@ -388,7 +388,7 @@ export function EditOrderDialog({
           action: "edited",
           performed_by: user.id,
           details: {
-            eft_changed: eftChanged,
+            eft_changed: logEftChanged,
             items_added: itemsAdded || undefined,
             items_deleted: itemsDeleted || undefined,
             items_qty_changed: itemsQtyChanged || undefined,
