@@ -59,6 +59,7 @@ import {
   Download,
 } from "lucide-react";
 import { EditOrderDialog } from "@/components/EditOrderDialog";
+import { OrderActivityLog } from "@/components/OrderActivityLog";
 import { generatePackingInvoice } from "@/lib/packingInvoiceGenerator";
 import {
   getNextState,
