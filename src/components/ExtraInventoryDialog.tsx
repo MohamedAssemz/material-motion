@@ -49,6 +49,7 @@ interface OrderItem {
   product_id: string;
   quantity: number;
   needs_boxing: boolean;
+  size?: string | null;
 }
 
 interface ExtraInventoryDialogProps {
