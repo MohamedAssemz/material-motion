@@ -167,7 +167,7 @@ export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true, onC
         .from("extra_batches")
         .select(
           `
-          id, qr_code_data, product_id, quantity, current_state, box_id, order_item_id, is_special,
+          id, qr_code_data, product_id, quantity, current_state, box_id, order_item_id, is_special, size,
           product:products(id, name_en, sku)
         `,
         )
