@@ -283,6 +283,7 @@ export default function ExtraInventory() {
         .eq("box_id", boxId)
         .eq("current_state", batch.current_state)
         .eq("inventory_state", batch.inventory_state)
+        .filter("size", (batch as any).size ? "eq" : "is", (batch as any).size || null)
         .neq("id", batch.id)
         .maybeSingle();
 
