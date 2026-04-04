@@ -681,7 +681,8 @@ export default function ExtraInventory() {
                   <TableHeader>
                      <TableRow>
                       <TableHead>{t("table.box")}</TableHead>
-                      <TableHead>{t("common.product")}</TableHead>
+                       <TableHead>{t("common.product")}</TableHead>
+                      <TableHead>{t("common.size") || "Size"}</TableHead>
                       <TableHead>{t("common.quantity")}</TableHead>
                       <TableHead>{t("warehouse.storehouse")}</TableHead>
                       <TableHead>{t("extra.current_state")}</TableHead>
