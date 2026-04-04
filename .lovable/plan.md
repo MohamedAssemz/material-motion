@@ -1,72 +1,52 @@
 
 
-# Add Size to Extra Batches
+# Fix Extra Inventory Counts to Respect Size
 
-## Overview
-Add a `size` column to `extra_batches` so that surplus inventory is tracked per product-size combination. When creating extra batches, users must select a size. The extra inventory table displays size. Reservation filtering matches extra batches to order items by both product AND size.
+## Problem
+The "Available in Extra" count on the Order Detail page currently sums all extra batches matching the product, regardless of size. If extra inventory has 100 size S and 100 size L of item A, but the order only needs size S, the count incorrectly shows 200 instead of 100.
 
-## Database Changes
+## Change
 
-### Migration: Add `size` column to `extra_batches`
-```sql
-ALTER TABLE public.extra_batches ADD COLUMN size text;
-```
-No default needed — existing rows will have NULL (legacy data without size tracking).
+### File: `src/pages/OrderDetail.tsx` — `fetchExtraInventoryCounts()`
 
-### Update `move_order_batches_to_extra` RPC
-The RPC creates extra batches from order batches. Order batches are linked to `order_items` which have a `size` column. The RPC must:
-- Look up the `size` from `order_items` via `order_item_id` on the source batch
-- Set `size` on the created/merged extra batch
-- Merge logic must also match on `size` (same product + box + state + size + is_special)
+Currently the function:
+1. Collects all `product_id`s from order items
+2. Queries `extra_batches` filtering by `product_id IN (...)` and `inventory_state = 'AVAILABLE'`
+3. Sums all quantities
 
-### Update `commit_extra_inventory` RPC
-When creating replacement order batches from unretrieved reserved extra batches, no size change needed (order_item_id already carries size).
+**Fix**: Instead of just filtering by product_id, also match on size. Since different order items for the same product can have different sizes, the logic needs to:
 
-### Update `sync_extra_box_items_list` trigger
-Include `size` in the items_list aggregation (group by product_id AND size).
+1. Build a list of unique `(product_id, size)` pairs from `orderItems`
+2. Fetch all AVAILABLE extra batches for those product IDs
+3. Only count batches where both `product_id` AND `size` match an order item's `(product_id, size)` pair (using `null === null` for items without sizes)
 
-## Frontend Changes
+```typescript
+// Build product+size pairs from order items
+const orderProductSizePairs = orderItems.map(oi => ({
+  product_id: oi.product_id,
+  size: oi.size || null,
+}));
 
-### 1. `src/pages/ExtraInventory.tsx` — Create batch form + table display
-- Add `size` to `formData` state
-- After product is selected, fetch product's `sizes` array and show a size selector
-- Pass `size` to the insert query and to the merge-check query (match on size too)
-- Add "Size" column to the batches table
-- Update `ExtraBatch` interface to include `size`
-- Fetch `sizes` from products in the product query
+// Fetch extra batches for relevant products
+const { data } = await supabase
+  .from("extra_batches")
+  .select("quantity, product_id, size")
+  .eq("inventory_state", "AVAILABLE")
+  .eq("current_state", state)
+  .in("product_id", productIds);
 
-### 2. `src/components/ExtraInventoryDialog.tsx` — Reservation filtering
-- Add `size` to `OrderItem` interface and `ExtraInventoryDialogProps.orderItems`
-- Add `size` to `ExtraBatch` interface
-- Fetch `size` in the extra_batches query
-- Filter available batches: only show batches where `batch.size === orderItem.size` (or both null)
-- Update `getMaxForProduct` → `getMaxForProductAndSize` to also match on size
-- Update grouping to group by product_id + size
-- When reserving, set `size` on new reserved extra batches
-
-### 3. `src/pages/OrderDetail.tsx` — Pass size to dialog
-- Include `size` in the `orderItems` mapping passed to `ExtraInventoryDialog`
-
-### 4. `src/components/ExtraItemsTab.tsx` — Show size
-- Add `size` to ExtraBatch interface and fetch query
-- Display size in the UI
-
-### 5. `src/components/MoveToExtraDialog.tsx` — Include size in selections
-- The RPC handles size lookup from order_item, so no major frontend change needed here
-
-### 6. Update `move_order_batches_to_extra` RPC (SQL migration)
-```sql
--- Key change in the RPC: lookup size from order_items, merge by size
-v_size := (SELECT oi.size FROM order_items oi WHERE oi.id = v_batch.order_item_id);
-
--- Merge check adds: AND size IS NOT DISTINCT FROM v_size
--- Insert adds: size = v_size
+// Filter client-side to match product+size pairs
+const matched = (data || []).filter(b =>
+  orderProductSizePairs.some(p =>
+    p.product_id === b.product_id &&
+    (p.size || null) === (b.size || null)
+  )
+);
+counts[phase] = matched.reduce((sum, b) => sum + b.quantity, 0);
 ```
 
-## Files to Create/Edit
-1. **Migration** — add `size` column + update RPCs
-2. **Edit**: `src/pages/ExtraInventory.tsx` — size in form + table
-3. **Edit**: `src/components/ExtraInventoryDialog.tsx` — size-based filtering
-4. **Edit**: `src/pages/OrderDetail.tsx` — pass size to dialog
-5. **Edit**: `src/components/ExtraItemsTab.tsx` — display size
+This ensures only size-compatible extra inventory is counted.
+
+## Files to Edit
+1. `src/pages/OrderDetail.tsx` — update `fetchExtraInventoryCounts` to filter by size
 
