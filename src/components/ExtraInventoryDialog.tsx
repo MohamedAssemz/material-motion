@@ -229,21 +229,23 @@ export function ExtraInventoryDialog({
     }
   };
 
-  // Group batches by product, then by box
+  // Group batches by product + size, then by box
   const productGroups: ProductGroup[] = [];
   const productMap = new Map<string, ProductGroup>();
 
   batches.forEach(batch => {
-    if (!productMap.has(batch.product_id)) {
-      productMap.set(batch.product_id, {
+    const groupKey = `${batch.product_id}::${batch.size || ''}`;
+    if (!productMap.has(groupKey)) {
+      productMap.set(groupKey, {
         product_id: batch.product_id,
         product_name: batch.product?.name_en || 'Unknown',
         product_sku: batch.product?.sku || 'N/A',
+        size: batch.size || null,
         boxes: [],
         totalQty: 0,
       });
     }
-    const group = productMap.get(batch.product_id)!;
+    const group = productMap.get(groupKey)!;
     group.totalQty += batch.quantity;
 
     // Group by box
