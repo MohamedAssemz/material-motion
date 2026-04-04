@@ -784,7 +784,8 @@ export function ExtraInventoryDialog({
                                       val ?? 0, 
                                       batch.quantity,
                                       batch.product_id,
-                                      batch.current_state
+                                      batch.current_state,
+                                      batch.size
                                     )}
                                     className="w-20 h-8"
                                     placeholder="0"
