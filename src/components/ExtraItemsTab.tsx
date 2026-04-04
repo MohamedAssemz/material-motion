@@ -196,6 +196,7 @@ export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true, onC
         box_id: batch.box_id,
         order_item_id: batch.order_item_id,
         is_special: (batch as any).is_special || false,
+        size: (batch as any).size || null,
         product: { id: (batch.product as any)?.id, name_en: (batch.product as any)?.name_en, sku: (batch.product as any)?.sku } as ExtraBatch["product"],
         box: batch.box_id ? boxMap.get(batch.box_id) : null,
       }));
