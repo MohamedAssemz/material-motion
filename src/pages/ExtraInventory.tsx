@@ -407,7 +407,7 @@ export default function ExtraInventory() {
                     <Label>{t("common.product")} *</Label>
                     <Select
                       value={formData.product_id}
-                      onValueChange={(value) => setFormData({ ...formData, product_id: value })}
+                      onValueChange={(value) => setFormData({ ...formData, product_id: value, size: "" })}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder={t("extra.select_product")} />
@@ -420,6 +420,32 @@ export default function ExtraInventory() {
                         ))}
                       </SelectContent>
                     </Select>
+                  </div>
+                  {(() => {
+                    const selectedProduct = products.find(p => p.id === formData.product_id);
+                    const availableSizes = selectedProduct?.sizes || [];
+                    if (availableSizes.length === 0) return null;
+                    return (
+                      <div>
+                        <Label>{t("common.size")} *</Label>
+                        <Select
+                          value={formData.size}
+                          onValueChange={(value) => setFormData({ ...formData, size: value })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder={t("extra.select_size") || "Select size"} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {availableSizes.map((size) => (
+                              <SelectItem key={size} value={size}>
+                                {size}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    );
+                  })()
                   </div>
                   <div>
                     <Label>{t("common.quantity")} *</Label>
