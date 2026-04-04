@@ -19,6 +19,7 @@ interface ExtraBatch {
   current_state: string;
   inventory_state: string;
   box_id: string | null;
+  size: string | null;
   product: {
     id: string;
     name_en: string;
