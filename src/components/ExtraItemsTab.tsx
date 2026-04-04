@@ -654,13 +654,15 @@ export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true, onC
         boxGroups.set(boxCode, { box_code: boxCode, items: [] });
       }
       const group = boxGroups.get(boxCode)!;
-      const existing = group.items.find((i) => i.sku === batch.product?.sku);
+      const sizeLabel = batch.size ? ` (${batch.size})` : '';
+      const itemKey = `${batch.product?.sku || 'N/A'}${sizeLabel}`;
+      const existing = group.items.find((i) => i.sku === itemKey);
       if (existing) {
         existing.qty += batch.quantity;
       } else {
         group.items.push({
-          sku: batch.product?.sku || "N/A",
-          name: batch.product?.name_en || "Unknown",
+          sku: itemKey,
+          name: `${batch.product?.name_en || "Unknown"}${sizeLabel}`,
           qty: batch.quantity,
         });
       }
