@@ -177,6 +177,7 @@ export function ExtraInventoryDialog({
           current_state,
           inventory_state,
           box_id,
+          size,
           product:products(id, name_en, sku)
         `)
         .eq('inventory_state', 'AVAILABLE')
