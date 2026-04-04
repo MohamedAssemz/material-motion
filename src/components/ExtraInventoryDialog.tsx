@@ -35,6 +35,7 @@ interface ProductGroup {
   product_id: string;
   product_name: string;
   product_sku: string;
+  size: string | null;
   boxes: Array<{
     box_id: string | null;
     box_code: string;
