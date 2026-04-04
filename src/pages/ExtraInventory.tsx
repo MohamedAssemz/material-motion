@@ -138,7 +138,7 @@ export default function ExtraInventory() {
   const fetchData = async () => {
     try {
       const [productsRes, batchesRes] = await Promise.all([
-        supabase.from("products").select("id, sku, name_en").order("sku"),
+        supabase.from("products").select("id, sku, name_en, sizes").order("sku"),
         supabase
           .from("extra_batches")
           .select(
