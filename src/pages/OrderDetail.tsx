@@ -288,8 +288,14 @@ export default function OrderDetail() {
         { phase: "boxing", state: "extra_boxing" },
       ];
 
-      const orderProductIds = orderItems.map((oi) => oi.product_id);
-      const boxingEligibleProductIds = orderItems.filter((oi) => oi.needs_boxing).map((oi) => oi.product_id);
+      const orderProductSizePairs = orderItems.map((oi) => ({
+        product_id: oi.product_id,
+        size: oi.size || null,
+        needs_boxing: oi.needs_boxing,
+      }));
+
+      const orderProductIds = [...new Set(orderItems.map((oi) => oi.product_id))];
+      const boxingEligibleProductIds = [...new Set(orderItems.filter((oi) => oi.needs_boxing).map((oi) => oi.product_id))];
 
       if (orderProductIds.length === 0) {
         setExtraInventoryCounts({});
@@ -300,6 +306,9 @@ export default function OrderDetail() {
 
       for (const { phase, state } of states) {
         const productIds = state === "extra_boxing" ? boxingEligibleProductIds : orderProductIds;
+        const relevantPairs = state === "extra_boxing"
+          ? orderProductSizePairs.filter((p) => p.needs_boxing)
+          : orderProductSizePairs;
 
         if (productIds.length === 0) {
           counts[phase] = 0;
@@ -308,13 +317,18 @@ export default function OrderDetail() {
 
         const { data, error } = await supabase
           .from("extra_batches")
-          .select("quantity")
+          .select("quantity, product_id, size")
           .eq("inventory_state", "AVAILABLE")
           .eq("current_state", state)
           .in("product_id", productIds);
 
         if (!error && data) {
-          counts[phase] = data.reduce((sum, b) => sum + b.quantity, 0);
+          const matched = data.filter((b) =>
+            relevantPairs.some(
+              (p) => p.product_id === b.product_id && (p.size || null) === (b.size || null)
+            )
+          );
+          counts[phase] = matched.reduce((sum, b) => sum + b.quantity, 0);
         }
       }
 
