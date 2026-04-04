@@ -44,6 +44,7 @@ interface ExtraBatch {
   created_at: string;
   box_id: string | null;
   qr_code_data: string | null;
+  size: string | null;
   product: Product;
   box?: {
     id: string;
