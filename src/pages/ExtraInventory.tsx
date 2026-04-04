@@ -238,6 +238,7 @@ export default function ExtraInventory() {
           qr_code_data: qrCode || `EB-${Date.now()}`,
           box_id: formData.box_id,
           created_by: user?.id,
+          size: formData.size || null,
         });
         if (error) throw error;
         toast({ title: t("toast.success"), description: t("toast.created_successfully") });
