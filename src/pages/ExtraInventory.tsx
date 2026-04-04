@@ -721,6 +721,13 @@ export default function ExtraInventory() {
                             <p className="text-xs text-muted-foreground">{batch.product.sku}</p>
                           </div>
                         </TableCell>
+                        <TableCell>
+                          {batch.size ? (
+                            <Badge variant="outline">{batch.size}</Badge>
+                          ) : (
+                            <span className="text-muted-foreground text-xs">—</span>
+                          )}
+                        </TableCell>
                         <TableCell className="font-bold">{batch.quantity}</TableCell>
                         <TableCell>
                           <Badge variant="outline">
