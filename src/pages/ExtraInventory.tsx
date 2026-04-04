@@ -490,7 +490,7 @@ export default function ExtraInventory() {
                       variant="outline"
                       onClick={() => {
                         setDialogOpen(false);
-                        setFormData({ product_id: "", quantity: 1, current_state: "extra_manufacturing", box_id: "" });
+                        setFormData({ product_id: "", quantity: 1, current_state: "extra_manufacturing", box_id: "", size: "" });
                         setSelectedBoxCode("");
                       }}
                     >
