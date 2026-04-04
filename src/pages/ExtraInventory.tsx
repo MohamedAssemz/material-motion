@@ -434,7 +434,7 @@ export default function ExtraInventory() {
                           onValueChange={(value) => setFormData({ ...formData, size: value })}
                         >
                           <SelectTrigger>
-                            <SelectValue placeholder={t("extra.select_size") || "Select size"} />
+                            <SelectValue placeholder="Select size" />
                           </SelectTrigger>
                           <SelectContent>
                             {availableSizes.map((size) => (
@@ -446,8 +446,7 @@ export default function ExtraInventory() {
                         </Select>
                       </div>
                     );
-                  })()
-                  </div>
+                  })()}
                   <div>
                     <Label>{t("common.quantity")} *</Label>
                     <NumericInput
