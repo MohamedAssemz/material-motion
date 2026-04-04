@@ -401,7 +401,7 @@ export function ExtraInventoryDialog({
         
         // Find order items for this product that can use this batch and have remaining capacity
         // Sorted with needs_boxing=true first (priority deduction)
-        const matchingOrderItems = getOrderItemsForProduct(batch.product_id, batch.current_state);
+        const matchingOrderItems = getOrderItemsForProduct(batch.product_id, batch.current_state, batch.size);
         
         let remainingToAssign = quantity;
         
