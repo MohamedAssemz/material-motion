@@ -78,6 +78,7 @@ export default function ExtraInventory() {
     quantity: 1,
     current_state: "extra_manufacturing",
     box_id: "",
+    size: "",
   });
   const [selectedBoxCode, setSelectedBoxCode] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
