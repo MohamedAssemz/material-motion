@@ -429,9 +429,9 @@ export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true, onC
     try {
       const operations: Array<{ batch: ExtraBatch; useQty: number }> = [];
 
-      for (const [productId, quantity] of productSelections.entries()) {
+      for (const [groupKey, quantity] of productSelections.entries()) {
         if (quantity <= 0) continue;
-        const group = productGroups.find((g) => g.product_id === productId);
+        const group = productGroups.find((g) => `${g.product_id}::${g.size || ''}` === groupKey);
         if (!group) continue;
 
         let remainingQty = quantity;
