@@ -733,17 +733,20 @@ export function ExtraInventoryDialog({
             <ScrollArea className="h-[400px] pr-4">
               <div className="space-y-4">
                 {filteredGroups.map(group => {
-                  const maxOrder = getMaxForProduct(group.product_id, PHASE_CURRENT_STATE_MAP[phase]);
+                  const maxOrder = getMaxForProduct(group.product_id, PHASE_CURRENT_STATE_MAP[phase], group.size);
                   const currentProductSelected = group.boxes.reduce((sum, box) => 
                     sum + box.batches.reduce((s, b) => s + (selections.get(b.id) || 0), 0), 0
                   );
                   
                   return (
-                    <div key={group.product_id} className="border rounded-lg p-4">
+                    <div key={`${group.product_id}-${group.size || ''}`} className="border rounded-lg p-4">
                       <div className="flex items-center justify-between mb-3">
                         <div>
                           <p className="font-medium">{group.product_name}</p>
-                          <p className="text-sm text-muted-foreground">{group.product_sku}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {group.product_sku}
+                            {group.size && <Badge variant="outline" className="ml-2">{group.size}</Badge>}
+                          </p>
                         </div>
                         <div className="text-right">
                           <Badge variant="secondary">{group.totalQty} available</Badge>
