@@ -325,9 +325,7 @@ export function ExtraInventoryDialog({
     // We need to consider that extra_boxing batches can only be used by needs_boxing=true items
     let currentProductTotal = 0;
     batches.forEach(b => {
-      if (b.product_id === productId && b.id !== batchId) {
-        // For extra_boxing batches, only count against needs_boxing=true capacity
-        // For other batches, count against all
+      if (b.product_id === productId && b.id !== batchId && (b.size || null) === (batchSize === undefined ? null : batchSize)) {
         if (batchState === 'extra_boxing' && b.current_state === 'extra_boxing') {
           currentProductTotal += selections.get(b.id) || 0;
         } else if (batchState !== 'extra_boxing' && b.current_state !== 'extra_boxing') {
