@@ -215,6 +215,7 @@ export default function ExtraInventory() {
         .eq("box_id", formData.box_id)
         .eq("current_state", formData.current_state)
         .eq("inventory_state", "AVAILABLE")
+        .filter("size", formData.size ? "eq" : "is", formData.size || null)
         .maybeSingle();
 
       if (existingBatch) {
