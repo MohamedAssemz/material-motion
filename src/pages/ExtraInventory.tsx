@@ -32,6 +32,7 @@ interface Product {
   id: string;
   sku: string;
   name_en: string;
+  sizes: string[] | null;
 }
 
 interface ExtraBatch {
@@ -43,6 +44,7 @@ interface ExtraBatch {
   created_at: string;
   box_id: string | null;
   qr_code_data: string | null;
+  size: string | null;
   product: Product;
   box?: {
     id: string;
@@ -76,6 +78,7 @@ export default function ExtraInventory() {
     quantity: 1,
     current_state: "extra_manufacturing",
     box_id: "",
+    size: "",
   });
   const [selectedBoxCode, setSelectedBoxCode] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
@@ -135,11 +138,11 @@ export default function ExtraInventory() {
   const fetchData = async () => {
     try {
       const [productsRes, batchesRes] = await Promise.all([
-        supabase.from("products").select("id, sku, name_en").order("sku"),
+        supabase.from("products").select("id, sku, name_en, sizes").order("sku"),
         supabase
           .from("extra_batches")
           .select(
-            `id, product_id, quantity, current_state, inventory_state, created_at, box_id, qr_code_data, product:products(id, sku, name_en)`,
+            `id, product_id, quantity, current_state, inventory_state, created_at, box_id, qr_code_data, size, product:products(id, sku, name_en, sizes)`,
           )
           .order("created_at", { ascending: false }),
       ]);
@@ -212,6 +215,7 @@ export default function ExtraInventory() {
         .eq("box_id", formData.box_id)
         .eq("current_state", formData.current_state)
         .eq("inventory_state", "AVAILABLE")
+        .filter("size", formData.size ? "eq" : "is", formData.size || null)
         .maybeSingle();
 
       if (existingBatch) {
@@ -234,13 +238,14 @@ export default function ExtraInventory() {
           qr_code_data: qrCode || `EB-${Date.now()}`,
           box_id: formData.box_id,
           created_by: user?.id,
+          size: formData.size || null,
         });
         if (error) throw error;
         toast({ title: t("toast.success"), description: t("toast.created_successfully") });
       }
 
       setDialogOpen(false);
-      setFormData({ product_id: "", quantity: 1, current_state: "extra_manufacturing", box_id: "" });
+      setFormData({ product_id: "", quantity: 1, current_state: "extra_manufacturing", box_id: "", size: "" });
       setSelectedBoxCode("");
       fetchData();
     } catch (error: any) {
@@ -278,6 +283,7 @@ export default function ExtraInventory() {
         .eq("box_id", boxId)
         .eq("current_state", batch.current_state)
         .eq("inventory_state", batch.inventory_state)
+        .filter("size", (batch as any).size ? "eq" : "is", (batch as any).size || null)
         .neq("id", batch.id)
         .maybeSingle();
 
@@ -402,7 +408,7 @@ export default function ExtraInventory() {
                     <Label>{t("common.product")} *</Label>
                     <Select
                       value={formData.product_id}
-                      onValueChange={(value) => setFormData({ ...formData, product_id: value })}
+                      onValueChange={(value) => setFormData({ ...formData, product_id: value, size: "" })}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder={t("extra.select_product")} />
@@ -416,6 +422,31 @@ export default function ExtraInventory() {
                       </SelectContent>
                     </Select>
                   </div>
+                  {(() => {
+                    const selectedProduct = products.find(p => p.id === formData.product_id);
+                    const availableSizes = selectedProduct?.sizes || [];
+                    if (availableSizes.length === 0) return null;
+                    return (
+                      <div>
+                        <Label>{t("common.size")} *</Label>
+                        <Select
+                          value={formData.size}
+                          onValueChange={(value) => setFormData({ ...formData, size: value })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select size" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {availableSizes.map((size) => (
+                              <SelectItem key={size} value={size}>
+                                {size}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    );
+                  })()}
                   <div>
                     <Label>{t("common.quantity")} *</Label>
                     <NumericInput
@@ -485,7 +516,7 @@ export default function ExtraInventory() {
                       variant="outline"
                       onClick={() => {
                         setDialogOpen(false);
-                        setFormData({ product_id: "", quantity: 1, current_state: "extra_manufacturing", box_id: "" });
+                        setFormData({ product_id: "", quantity: 1, current_state: "extra_manufacturing", box_id: "", size: "" });
                         setSelectedBoxCode("");
                       }}
                     >
@@ -650,7 +681,8 @@ export default function ExtraInventory() {
                   <TableHeader>
                      <TableRow>
                       <TableHead>{t("table.box")}</TableHead>
-                      <TableHead>{t("common.product")}</TableHead>
+                       <TableHead>{t("common.product")}</TableHead>
+                      <TableHead>{t("common.size") || "Size"}</TableHead>
                       <TableHead>{t("common.quantity")}</TableHead>
                       <TableHead>{t("warehouse.storehouse")}</TableHead>
                       <TableHead>{t("extra.current_state")}</TableHead>
@@ -688,6 +720,13 @@ export default function ExtraInventory() {
                             <p className="font-medium">{batch.product.name_en}</p>
                             <p className="text-xs text-muted-foreground">{batch.product.sku}</p>
                           </div>
+                        </TableCell>
+                        <TableCell>
+                          {batch.size ? (
+                            <Badge variant="outline">{batch.size}</Badge>
+                          ) : (
+                            <span className="text-muted-foreground text-xs">—</span>
+                          )}
                         </TableCell>
                         <TableCell className="font-bold">{batch.quantity}</TableCell>
                         <TableCell>

@@ -33,6 +33,7 @@ interface ExtraBatch {
   box_id: string | null;
   order_item_id: string | null;
   is_special?: boolean;
+  size: string | null;
   product: {
     id: string;
     name_en: string;
@@ -49,6 +50,7 @@ interface ProductGroup {
   product_name: string;
   product_sku: string;
   source_box_code: string;
+  size: string | null;
   quantity: number;
   batches: ExtraBatch[];
 }
@@ -166,7 +168,7 @@ export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true, onC
         .from("extra_batches")
         .select(
           `
-          id, qr_code_data, product_id, quantity, current_state, box_id, order_item_id, is_special,
+          id, qr_code_data, product_id, quantity, current_state, box_id, order_item_id, is_special, size,
           product:products(id, name_en, sku)
         `,
         )
@@ -195,6 +197,7 @@ export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true, onC
         box_id: batch.box_id,
         order_item_id: batch.order_item_id,
         is_special: (batch as any).is_special || false,
+        size: (batch as any).size || null,
         product: { id: (batch.product as any)?.id, name_en: (batch.product as any)?.name_en, sku: (batch.product as any)?.sku } as ExtraBatch["product"],
         box: batch.box_id ? boxMap.get(batch.box_id) : null,
       }));
@@ -269,18 +272,19 @@ export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true, onC
     }
   };
 
-  // Group batches by product
+  // Group batches by product + size
   const productGroups: ProductGroup[] = [];
   const groupMap = new Map<string, ProductGroup>();
 
   extraBatches.forEach((batch) => {
-    const key = batch.product_id;
+    const key = `${batch.product_id}::${batch.size || ''}`;
     if (!groupMap.has(key)) {
       groupMap.set(key, {
         product_id: batch.product_id,
         product_name: batch.product?.name_en || "Unknown",
         product_sku: batch.product?.sku || "N/A",
         source_box_code: batch.box?.box_code || "No Box",
+        size: batch.size || null,
         quantity: 0,
         batches: [],
       });
@@ -303,7 +307,10 @@ export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true, onC
     const selectedProductIds = new Set(
       Array.from(productSelections.entries())
         .filter(([_, qty]) => qty > 0)
-        .map(([key]) => productGroups.find(g => g.product_id === key)?.product_id)
+        .map(([key]) => {
+          const group = productGroups.find(g => `${g.product_id}::${g.size || ''}` === key);
+          return group?.product_id;
+        })
         .filter(Boolean)
     );
     if (selectedProductIds.size > 1) {
@@ -334,10 +341,10 @@ export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true, onC
       }> = [];
 
       // First pass: determine which batches to process and how much from each
-      for (const [productId, quantity] of productSelections.entries()) {
+      for (const [groupKey, quantity] of productSelections.entries()) {
         if (quantity <= 0) continue;
 
-        const group = productGroups.find((g) => g.product_id === productId);
+        const group = productGroups.find((g) => `${g.product_id}::${g.size || ''}` === groupKey);
         if (!group) continue;
 
         let remainingQty = quantity;
@@ -422,9 +429,9 @@ export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true, onC
     try {
       const operations: Array<{ batch: ExtraBatch; useQty: number }> = [];
 
-      for (const [productId, quantity] of productSelections.entries()) {
+      for (const [groupKey, quantity] of productSelections.entries()) {
         if (quantity <= 0) continue;
-        const group = productGroups.find((g) => g.product_id === productId);
+        const group = productGroups.find((g) => `${g.product_id}::${g.size || ''}` === groupKey);
         if (!group) continue;
 
         let remainingQty = quantity;
@@ -529,10 +536,10 @@ export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true, onC
         group: ProductGroup;
       }> = [];
 
-      for (const [productId, quantity] of productSelections.entries()) {
+      for (const [groupKey, quantity] of productSelections.entries()) {
         if (quantity <= 0) continue;
 
-        const group = productGroups.find((g) => g.product_id === productId);
+        const group = productGroups.find((g) => `${g.product_id}::${g.size || ''}` === groupKey);
         if (!group) continue;
 
         let remainingQty = quantity;
@@ -647,13 +654,15 @@ export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true, onC
         boxGroups.set(boxCode, { box_code: boxCode, items: [] });
       }
       const group = boxGroups.get(boxCode)!;
-      const existing = group.items.find((i) => i.sku === batch.product?.sku);
+      const sizeLabel = batch.size ? ` (${batch.size})` : '';
+      const itemKey = `${batch.product?.sku || 'N/A'}${sizeLabel}`;
+      const existing = group.items.find((i) => i.sku === itemKey);
       if (existing) {
         existing.qty += batch.quantity;
       } else {
         group.items.push({
-          sku: batch.product?.sku || "N/A",
-          name: batch.product?.name_en || "Unknown",
+          sku: itemKey,
+          name: `${batch.product?.name_en || "Unknown"}${sizeLabel}`,
           qty: batch.quantity,
         });
       }
@@ -797,12 +806,13 @@ export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true, onC
           </Card>
         ) : (
           productGroups.map((group) => (
-            <Card key={group.product_id}>
+            <Card key={`${group.product_id}-${group.size || ''}`}>
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
                       <p className="font-medium">{group.product_name}</p>
+                      {group.size && <Badge variant="outline">{group.size}</Badge>}
                       <Badge
                         variant="outline"
                         className="text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400"
@@ -837,14 +847,15 @@ export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true, onC
                         <NumericInput
                           min={0}
                           max={group.quantity}
-                          value={productSelections.get(group.product_id) || undefined}
+                          value={productSelections.get(`${group.product_id}::${group.size || ''}`) || undefined}
                           onValueChange={(val) => {
                             setProductSelections((prev) => {
                               const newMap = new Map(prev);
+                              const key = `${group.product_id}::${group.size || ''}`;
                               if (val && val > 0) {
-                                newMap.set(group.product_id, val);
+                                newMap.set(key, val);
                               } else {
-                                newMap.delete(group.product_id);
+                                newMap.delete(key);
                               }
                               return newMap;
                             });

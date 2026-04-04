@@ -19,6 +19,7 @@ interface ExtraBatch {
   current_state: string;
   inventory_state: string;
   box_id: string | null;
+  size: string | null;
   product: {
     id: string;
     name_en: string;
@@ -34,6 +35,7 @@ interface ProductGroup {
   product_id: string;
   product_name: string;
   product_sku: string;
+  size: string | null;
   boxes: Array<{
     box_id: string | null;
     box_code: string;
@@ -48,6 +50,7 @@ interface OrderItem {
   product_id: string;
   quantity: number;
   needs_boxing: boolean;
+  size?: string | null;
 }
 
 interface ExtraInventoryDialogProps {
@@ -175,6 +178,7 @@ export function ExtraInventoryDialog({
           current_state,
           inventory_state,
           box_id,
+          size,
           product:products(id, name_en, sku)
         `)
         .eq('inventory_state', 'AVAILABLE')
@@ -203,11 +207,21 @@ export function ExtraInventoryDialog({
         current_state: batch.current_state,
         inventory_state: batch.inventory_state,
         box_id: batch.box_id,
+        size: (batch as any).size || null,
         product: batch.product as unknown as { id: string; name_en: string; sku: string },
         box: batch.box_id ? boxMap.get(batch.box_id) : null,
       }));
 
-      setBatches(batchesWithBoxes);
+      // Filter batches to only show ones matching order item sizes
+      const filteredBySize = batchesWithBoxes.filter(batch => {
+        // Find order items for this product that match the batch's size
+        return orderItems.some(oi => 
+          oi.product_id === batch.product_id &&
+          (oi.size || null) === (batch.size || null)
+        );
+      });
+
+      setBatches(filteredBySize);
     } catch (error: any) {
       toast.error(error.message);
     } finally {
@@ -215,21 +229,23 @@ export function ExtraInventoryDialog({
     }
   };
 
-  // Group batches by product, then by box
+  // Group batches by product + size, then by box
   const productGroups: ProductGroup[] = [];
   const productMap = new Map<string, ProductGroup>();
 
   batches.forEach(batch => {
-    if (!productMap.has(batch.product_id)) {
-      productMap.set(batch.product_id, {
+    const groupKey = `${batch.product_id}::${batch.size || ''}`;
+    if (!productMap.has(groupKey)) {
+      productMap.set(groupKey, {
         product_id: batch.product_id,
         product_name: batch.product?.name_en || 'Unknown',
         product_sku: batch.product?.sku || 'N/A',
+        size: batch.size || null,
         boxes: [],
         totalQty: 0,
       });
     }
-    const group = productMap.get(batch.product_id)!;
+    const group = productMap.get(groupKey)!;
     group.totalQty += batch.quantity;
 
     // Group by box
@@ -266,12 +282,12 @@ export function ExtraInventoryDialog({
     return allowed.includes(batchState);
   };
 
-  // Get max quantity for a product considering the batch state
-  // extra_boxing batches can only be used by needs_boxing=true items
-  const getMaxForProduct = (productId: string, batchState?: string): number => {
+  // Get max quantity for a product+size considering the batch state
+  const getMaxForProduct = (productId: string, batchState?: string, batchSize?: string | null): number => {
     return orderItems
       .filter(oi => {
         if (oi.product_id !== productId) return false;
+        if ((oi.size || null) !== (batchSize === undefined ? null : batchSize)) return false;
         if (batchState) {
           return canOrderItemUseBatch(oi, batchState);
         }
@@ -283,36 +299,33 @@ export function ExtraInventoryDialog({
       }, 0);
   };
 
-  // Get order items for a product sorted with needs_boxing=true first (priority deduction)
-  // Also filters by batch state compatibility
-  const getOrderItemsForProduct = (productId: string, batchState?: string): OrderItem[] => {
+  // Get order items for a product+size sorted with needs_boxing=true first
+  const getOrderItemsForProduct = (productId: string, batchState?: string, batchSize?: string | null): OrderItem[] => {
     return orderItems
       .filter(oi => {
         if (oi.product_id !== productId) return false;
+        if ((oi.size || null) !== (batchSize === undefined ? null : batchSize)) return false;
         if (batchState) {
           return canOrderItemUseBatch(oi, batchState);
         }
         return true;
       })
       .sort((a, b) => {
-        // needs_boxing=true first (they're more flexible, can use any state)
         if (a.needs_boxing && !b.needs_boxing) return -1;
         if (!a.needs_boxing && b.needs_boxing) return 1;
         return 0;
       });
   };
 
-  const handleQuantityChange = (batchId: string, value: number, maxAvailable: number, productId: string, batchState: string) => {
-    // Get max for this product considering the batch state restrictions
-    const maxOrder = getMaxForProduct(productId, batchState);
+  const handleQuantityChange = (batchId: string, value: number, maxAvailable: number, productId: string, batchState: string, batchSize?: string | null) => {
+    // Get max for this product+size considering the batch state restrictions
+    const maxOrder = getMaxForProduct(productId, batchState, batchSize);
     
     // Get current total selected for this product from batches with the same state restriction
     // We need to consider that extra_boxing batches can only be used by needs_boxing=true items
     let currentProductTotal = 0;
     batches.forEach(b => {
-      if (b.product_id === productId && b.id !== batchId) {
-        // For extra_boxing batches, only count against needs_boxing=true capacity
-        // For other batches, count against all
+      if (b.product_id === productId && b.id !== batchId && (b.size || null) === (batchSize === undefined ? null : batchSize)) {
         if (batchState === 'extra_boxing' && b.current_state === 'extra_boxing') {
           currentProductTotal += selections.get(b.id) || 0;
         } else if (batchState !== 'extra_boxing' && b.current_state !== 'extra_boxing') {
@@ -388,7 +401,7 @@ export function ExtraInventoryDialog({
         
         // Find order items for this product that can use this batch and have remaining capacity
         // Sorted with needs_boxing=true first (priority deduction)
-        const matchingOrderItems = getOrderItemsForProduct(batch.product_id, batch.current_state);
+        const matchingOrderItems = getOrderItemsForProduct(batch.product_id, batch.current_state, batch.size);
         
         let remainingToAssign = quantity;
         
@@ -720,17 +733,20 @@ export function ExtraInventoryDialog({
             <ScrollArea className="h-[400px] pr-4">
               <div className="space-y-4">
                 {filteredGroups.map(group => {
-                  const maxOrder = getMaxForProduct(group.product_id, PHASE_CURRENT_STATE_MAP[phase]);
+                  const maxOrder = getMaxForProduct(group.product_id, PHASE_CURRENT_STATE_MAP[phase], group.size);
                   const currentProductSelected = group.boxes.reduce((sum, box) => 
                     sum + box.batches.reduce((s, b) => s + (selections.get(b.id) || 0), 0), 0
                   );
                   
                   return (
-                    <div key={group.product_id} className="border rounded-lg p-4">
+                    <div key={`${group.product_id}-${group.size || ''}`} className="border rounded-lg p-4">
                       <div className="flex items-center justify-between mb-3">
                         <div>
                           <p className="font-medium">{group.product_name}</p>
-                          <p className="text-sm text-muted-foreground">{group.product_sku}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {group.product_sku}
+                            {group.size && <Badge variant="outline" className="ml-2">{group.size}</Badge>}
+                          </p>
                         </div>
                         <div className="text-right">
                           <Badge variant="secondary">{group.totalQty} available</Badge>
@@ -768,7 +784,8 @@ export function ExtraInventoryDialog({
                                       val ?? 0, 
                                       batch.quantity,
                                       batch.product_id,
-                                      batch.current_state
+                                      batch.current_state,
+                                      batch.size
                                     )}
                                     className="w-20 h-8"
                                     placeholder="0"
