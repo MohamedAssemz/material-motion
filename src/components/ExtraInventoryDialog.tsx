@@ -282,12 +282,12 @@ export function ExtraInventoryDialog({
     return allowed.includes(batchState);
   };
 
-  // Get max quantity for a product considering the batch state
-  // extra_boxing batches can only be used by needs_boxing=true items
-  const getMaxForProduct = (productId: string, batchState?: string): number => {
+  // Get max quantity for a product+size considering the batch state
+  const getMaxForProduct = (productId: string, batchState?: string, batchSize?: string | null): number => {
     return orderItems
       .filter(oi => {
         if (oi.product_id !== productId) return false;
+        if ((oi.size || null) !== (batchSize === undefined ? null : batchSize)) return false;
         if (batchState) {
           return canOrderItemUseBatch(oi, batchState);
         }
@@ -299,19 +299,18 @@ export function ExtraInventoryDialog({
       }, 0);
   };
 
-  // Get order items for a product sorted with needs_boxing=true first (priority deduction)
-  // Also filters by batch state compatibility
-  const getOrderItemsForProduct = (productId: string, batchState?: string): OrderItem[] => {
+  // Get order items for a product+size sorted with needs_boxing=true first
+  const getOrderItemsForProduct = (productId: string, batchState?: string, batchSize?: string | null): OrderItem[] => {
     return orderItems
       .filter(oi => {
         if (oi.product_id !== productId) return false;
+        if ((oi.size || null) !== (batchSize === undefined ? null : batchSize)) return false;
         if (batchState) {
           return canOrderItemUseBatch(oi, batchState);
         }
         return true;
       })
       .sort((a, b) => {
-        // needs_boxing=true first (they're more flexible, can use any state)
         if (a.needs_boxing && !b.needs_boxing) return -1;
         if (!a.needs_boxing && b.needs_boxing) return 1;
         return 0;
