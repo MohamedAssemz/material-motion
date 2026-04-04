@@ -206,11 +206,21 @@ export function ExtraInventoryDialog({
         current_state: batch.current_state,
         inventory_state: batch.inventory_state,
         box_id: batch.box_id,
+        size: (batch as any).size || null,
         product: batch.product as unknown as { id: string; name_en: string; sku: string },
         box: batch.box_id ? boxMap.get(batch.box_id) : null,
       }));
 
-      setBatches(batchesWithBoxes);
+      // Filter batches to only show ones matching order item sizes
+      const filteredBySize = batchesWithBoxes.filter(batch => {
+        // Find order items for this product that match the batch's size
+        return orderItems.some(oi => 
+          oi.product_id === batch.product_id &&
+          (oi.size || null) === (batch.size || null)
+        );
+      });
+
+      setBatches(filteredBySize);
     } catch (error: any) {
       toast.error(error.message);
     } finally {
