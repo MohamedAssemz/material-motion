@@ -272,18 +272,19 @@ export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true, onC
     }
   };
 
-  // Group batches by product
+  // Group batches by product + size
   const productGroups: ProductGroup[] = [];
   const groupMap = new Map<string, ProductGroup>();
 
   extraBatches.forEach((batch) => {
-    const key = batch.product_id;
+    const key = `${batch.product_id}::${batch.size || ''}`;
     if (!groupMap.has(key)) {
       groupMap.set(key, {
         product_id: batch.product_id,
         product_name: batch.product?.name_en || "Unknown",
         product_sku: batch.product?.sku || "N/A",
         source_box_code: batch.box?.box_code || "No Box",
+        size: batch.size || null,
         quantity: 0,
         batches: [],
       });
