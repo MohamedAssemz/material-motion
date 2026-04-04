@@ -317,9 +317,9 @@ export function ExtraInventoryDialog({
       });
   };
 
-  const handleQuantityChange = (batchId: string, value: number, maxAvailable: number, productId: string, batchState: string) => {
-    // Get max for this product considering the batch state restrictions
-    const maxOrder = getMaxForProduct(productId, batchState);
+  const handleQuantityChange = (batchId: string, value: number, maxAvailable: number, productId: string, batchState: string, batchSize?: string | null) => {
+    // Get max for this product+size considering the batch state restrictions
+    const maxOrder = getMaxForProduct(productId, batchState, batchSize);
     
     // Get current total selected for this product from batches with the same state restriction
     // We need to consider that extra_boxing batches can only be used by needs_boxing=true items
