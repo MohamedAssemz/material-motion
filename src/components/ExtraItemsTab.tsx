@@ -50,6 +50,7 @@ interface ProductGroup {
   product_name: string;
   product_sku: string;
   source_box_code: string;
+  size: string | null;
   quantity: number;
   batches: ExtraBatch[];
 }
