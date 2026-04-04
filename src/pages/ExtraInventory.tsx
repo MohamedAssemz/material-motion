@@ -142,7 +142,7 @@ export default function ExtraInventory() {
         supabase
           .from("extra_batches")
           .select(
-            `id, product_id, quantity, current_state, inventory_state, created_at, box_id, qr_code_data, product:products(id, sku, name_en)`,
+            `id, product_id, quantity, current_state, inventory_state, created_at, box_id, qr_code_data, size, product:products(id, sku, name_en, sizes)`,
           )
           .order("created_at", { ascending: false }),
       ]);
