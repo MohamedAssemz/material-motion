@@ -245,7 +245,7 @@ export default function ExtraInventory() {
       }
 
       setDialogOpen(false);
-      setFormData({ product_id: "", quantity: 1, current_state: "extra_manufacturing", box_id: "" });
+      setFormData({ product_id: "", quantity: 1, current_state: "extra_manufacturing", box_id: "", size: "" });
       setSelectedBoxCode("");
       fetchData();
     } catch (error: any) {
