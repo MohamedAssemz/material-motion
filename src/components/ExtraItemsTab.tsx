@@ -33,6 +33,7 @@ interface ExtraBatch {
   box_id: string | null;
   order_item_id: string | null;
   is_special?: boolean;
+  size: string | null;
   product: {
     id: string;
     name_en: string;
