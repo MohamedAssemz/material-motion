@@ -32,6 +32,7 @@ interface Product {
   id: string;
   sku: string;
   name_en: string;
+  sizes: string[] | null;
 }
 
 interface ExtraBatch {
