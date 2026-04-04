@@ -1292,6 +1292,7 @@ export default function OrderDetail() {
           quantity: oi.quantity,
           needs_boxing: oi.needs_boxing,
           needs_packing: oi.product?.needs_packing ?? true,
+          size: oi.size || null,
         }))}
         onItemsSelected={() => {
           fetchOrder();
