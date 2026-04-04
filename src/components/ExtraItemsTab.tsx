@@ -801,12 +801,13 @@ export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true, onC
           </Card>
         ) : (
           productGroups.map((group) => (
-            <Card key={group.product_id}>
+            <Card key={`${group.product_id}-${group.size || ''}`}>
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
                       <p className="font-medium">{group.product_name}</p>
+                      {group.size && <Badge variant="outline">{group.size}</Badge>}
                       <Badge
                         variant="outline"
                         className="text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400"
