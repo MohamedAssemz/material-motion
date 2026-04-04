@@ -845,14 +845,15 @@ export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true, onC
                         <NumericInput
                           min={0}
                           max={group.quantity}
-                          value={productSelections.get(group.product_id) || undefined}
+                          value={productSelections.get(`${group.product_id}::${group.size || ''}`) || undefined}
                           onValueChange={(val) => {
                             setProductSelections((prev) => {
                               const newMap = new Map(prev);
+                              const key = `${group.product_id}::${group.size || ''}`;
                               if (val && val > 0) {
-                                newMap.set(group.product_id, val);
+                                newMap.set(key, val);
                               } else {
-                                newMap.delete(group.product_id);
+                                newMap.delete(key);
                               }
                               return newMap;
                             });
