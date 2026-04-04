@@ -307,7 +307,10 @@ export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true, onC
     const selectedProductIds = new Set(
       Array.from(productSelections.entries())
         .filter(([_, qty]) => qty > 0)
-        .map(([key]) => productGroups.find(g => g.product_id === key)?.product_id)
+        .map(([key]) => {
+          const group = productGroups.find(g => `${g.product_id}::${g.size || ''}` === key);
+          return group?.product_id;
+        })
         .filter(Boolean)
     );
     if (selectedProductIds.size > 1) {
