@@ -30,6 +30,7 @@ export interface BatchData {
   needs_boxing?: boolean;
   order_item_id: string | null;
   isExtraBatch?: boolean;
+  size?: string | null;
 }
 
 interface MachineGroup {
