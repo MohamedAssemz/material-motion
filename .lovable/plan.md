@@ -1,52 +1,71 @@
 
 
-# Fix Extra Inventory Counts to Respect Size
+# UI Improvements: Tab Names, Size Display, and Numeric Visuals
 
-## Problem
-The "Available in Extra" count on the Order Detail page currently sums all extra batches matching the product, regardless of size. If extra inventory has 100 size S and 100 size L of item A, but the order only needs size S, the count incorrectly shows 200 instead of 100.
+## Changes Overview
 
-## Change
+### 1. Rename last tab to "Completed" in Manufacturing phase
+- **File**: `src/pages/OrderManufacturing.tsx` (line 780)
+- Change `t('phase.processed_tab')` → `t('phase.completed')` to match Finishing/Packaging which already use `t('phase.completed')`
 
-### File: `src/pages/OrderDetail.tsx` — `fetchExtraInventoryCounts()`
+### 2. Add `size` to `BatchData` and display in ProductionRateSection
+- **File**: `src/components/ProductionRateSection.tsx`
+  - Add `size?: string | null` to `BatchData` interface and `OrderItemGroup` interface
+  - Pass size through during grouping
+  - Update display: show product name + size (e.g. "Product Name - S") as primary, SKU as secondary text below
+  - Currently: `<p class="font-medium">{group.product_name}</p> <Badge>{group.product_sku}</Badge>`
+  - New: `<p class="font-medium">{group.product_name}{group.size ? ` - ${group.size}` : ''}</p>` with `<p class="text-sm text-muted-foreground">{group.product_sku}</p>` below
 
-Currently the function:
-1. Collects all `product_id`s from order items
-2. Queries `extra_batches` filtering by `product_id IN (...)` and `inventory_state = 'AVAILABLE'`
-3. Sums all quantities
+### 3. Add `size` to RetrievedFromExtraSection
+- **File**: `src/components/RetrievedFromExtraSection.tsx`
+  - Add `size?: string | null` to `RetrievedBatch` interface and group data
+  - Use compound key `order_item_id || product_id` + size for grouping
+  - Display: product name + size as primary, SKU as secondary text below (same pattern as ProductionRateSection)
 
-**Fix**: Instead of just filtering by product_id, also match on size. Since different order items for the same product can have different sizes, the logic needs to:
+### 4. Pass `size` from all phase pages when mapping batches
+- **Files**: `src/pages/OrderManufacturing.tsx`, `OrderFinishing.tsx`, `OrderPackaging.tsx`, `OrderBoxing.tsx`
+  - Add `size: batch.order_item?.size || null` to the mapped batch objects passed to `ProductionRateSection`
+  - Add `size` to retrieved-from-extra data (from `extra_batch_history` — need to join with `order_items` via `consuming_order_item_id` to get size)
 
-1. Build a list of unique `(product_id, size)` pairs from `orderItems`
-2. Fetch all AVAILABLE extra batches for those product IDs
-3. Only count batches where both `product_id` AND `size` match an order item's `(product_id, size)` pair (using `null === null` for items without sizes)
+### 5. Add numeric summary visuals to Completed tab
+- **Files**: All four phase pages (Manufacturing, Finishing, Packaging, Boxing)
+- Add two stat cards at the top of the Completed tab content:
+  - **"Total Produced"**: items moved to next phase + items added to extra inventory (already calculated as `totalCompleted`)
+  - **"Total Moved to Next Phase"**: items moved to next phase + items retrieved from extra (i.e., `completedBatchesQty + retrievedFromExtraQty`)
+- These will be compact cards similar to the existing stats cards pattern
 
-```typescript
-// Build product+size pairs from order items
-const orderProductSizePairs = orderItems.map(oi => ({
-  product_id: oi.product_id,
-  size: oi.size || null,
-}));
+## Technical Details
 
-// Fetch extra batches for relevant products
-const { data } = await supabase
-  .from("extra_batches")
-  .select("quantity, product_id, size")
-  .eq("inventory_state", "AVAILABLE")
-  .eq("current_state", state)
-  .in("product_id", productIds);
-
-// Filter client-side to match product+size pairs
-const matched = (data || []).filter(b =>
-  orderProductSizePairs.some(p =>
-    p.product_id === b.product_id &&
-    (p.size || null) === (b.size || null)
-  )
-);
-counts[phase] = matched.reduce((sum, b) => sum + b.quantity, 0);
+**ProductionRateSection display change** (applies to both assigned and "no boxing" cards):
+```
+Before:  [Product Name]  [SKU badge]
+After:   [Product Name - Size]
+         SKU: ABC123
 ```
 
-This ensures only size-compatible extra inventory is counted.
+**RetrievedFromExtraSection display change**:
+```
+Before:  [Product Name]  [SKU badge]  [qty]
+After:   [Product Name - Size]        [qty]
+         SKU: ABC123
+```
+
+**Completed tab numeric visuals** (added before ProductionRateSection):
+```
+┌──────────────────┐  ┌──────────────────────┐
+│ Total Produced   │  │ Moved to Next Phase  │
+│ 150              │  │ 130                  │
+│ (next + extra)   │  │ (processed+retrieved)│
+└──────────────────┘  └──────────────────────┘
+```
+
+**Size in retrieved-from-extra**: The `fetchRetrievedFromExtra` functions query `extra_batch_history` with `consuming_order_item_id`. We need to also fetch the size from `order_items` for that consuming_order_item_id, or query it separately. The simplest approach: after fetching history records, batch-fetch the `order_items` by `consuming_order_item_id` to get sizes.
 
 ## Files to Edit
-1. `src/pages/OrderDetail.tsx` — update `fetchExtraInventoryCounts` to filter by size
+1. `src/components/ProductionRateSection.tsx` — add size to interface + display
+2. `src/components/RetrievedFromExtraSection.tsx` — add size to interface + display
+3. `src/pages/OrderManufacturing.tsx` — tab name, pass size, add numeric visuals, fetch size for retrieved
+4. `src/pages/OrderFinishing.tsx` — pass size, add numeric visuals, fetch size for retrieved
+5. `src/pages/OrderPackaging.tsx` — pass size, add numeric visuals, fetch size for retrieved
+6. `src/pages/OrderBoxing.tsx` — pass size, add numeric visuals, fetch size for retrieved
 
