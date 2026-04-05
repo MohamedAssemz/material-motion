@@ -10,6 +10,7 @@ interface RetrievedBatch {
   product_sku: string;
   quantity: number;
   order_item_id?: string | null;
+  size?: string | null;
 }
 
 interface RetrievedFromExtraSectionProps {
@@ -23,6 +24,7 @@ export function RetrievedFromExtraSection({ batches }: RetrievedFromExtraSection
       product_name: string;
       product_sku: string;
       totalQty: number;
+      size?: string | null;
     }>();
 
     batches.forEach(b => {
@@ -36,6 +38,7 @@ export function RetrievedFromExtraSection({ batches }: RetrievedFromExtraSection
           product_name: b.product_name,
           product_sku: b.product_sku,
           totalQty: b.quantity,
+          size: b.size,
         });
       }
     });
@@ -60,10 +63,8 @@ export function RetrievedFromExtraSection({ batches }: RetrievedFromExtraSection
           <CardContent className="p-4">
             <div className="flex items-center justify-between gap-4">
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <p className="font-medium truncate">{group.product_name}</p>
-                  <Badge variant="secondary">{group.product_sku}</Badge>
-                </div>
+                <p className="font-medium truncate">{group.product_name}{group.size ? ` - ${group.size}` : ''}</p>
+                <p className="text-xs text-muted-foreground">{group.product_sku}</p>
               </div>
               <Badge variant="outline">{group.totalQty}</Badge>
             </div>
