@@ -51,6 +51,7 @@ interface OrderItemGroup {
   assignedByMachine: MachineGroup[];
   needs_boxing: boolean;
   allBatchIds: string[];
+  size?: string | null;
 }
 
 interface ProductionRateSectionProps {
@@ -112,6 +113,7 @@ export function ProductionRateSection({
           assignedByMachine: [],
           needs_boxing: needsBoxing,
           allBatchIds: [],
+          size: batch.size,
         });
       }
 
