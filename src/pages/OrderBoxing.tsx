@@ -115,7 +115,7 @@ export default function OrderBoxing() {
     Array<{ id: string; product_id: string; product_name: string; product_sku: string; quantity: number; boxing_machine_id: string | null }>
   >([]);
   const [retrievedFromExtraBatches, setRetrievedFromExtraBatches] = useState<
-    Array<{ id: string; product_id: string; product_name: string; product_sku: string; quantity: number; order_item_id?: string | null }>
+    Array<{ id: string; product_id: string; product_name: string; product_sku: string; quantity: number; order_item_id?: string | null; size?: string | null }>
   >([]);
   const [extraCount, setExtraCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -321,7 +321,14 @@ export default function OrderBoxing() {
 
       if (error) throw error;
 
-      const productMap = new Map<string, { id: string; product_id: string; product_name: string; product_sku: string; quantity: number; order_item_id: string | null }>();
+      const orderItemIds = [...new Set((data || []).map((r: any) => r.consuming_order_item_id).filter(Boolean))];
+      let sizeMap = new Map<string, string | null>();
+      if (orderItemIds.length > 0) {
+        const { data: oiData } = await supabase.from('order_items').select('id, size').in('id', orderItemIds);
+        (oiData || []).forEach((oi: any) => sizeMap.set(oi.id, oi.size));
+      }
+
+      const productMap = new Map<string, { id: string; product_id: string; product_name: string; product_sku: string; quantity: number; order_item_id: string | null; size: string | null }>();
       (data || []).forEach((record: any) => {
         const key = record.consuming_order_item_id || record.product_id;
         const existing = productMap.get(key);
@@ -335,6 +342,7 @@ export default function OrderBoxing() {
             product_sku: record.products?.sku || 'N/A',
             quantity: record.quantity,
             order_item_id: record.consuming_order_item_id || null,
+            size: record.consuming_order_item_id ? (sizeMap.get(record.consuming_order_item_id) || null) : null,
           });
         }
       });
@@ -1563,6 +1571,33 @@ export default function OrderBoxing() {
         </TabsContent>
 
         <TabsContent value="shipments" className="space-y-4">
+          {/* Numeric Summary */}
+          {(() => {
+            const shippedBatchesQty = batches.filter(b => b.current_state === 'shipped' && b.from_extra_state !== 'extra_boxing' && !b.is_special && b.order_item?.needs_boxing !== false).reduce((s, b) => s + b.quantity, 0);
+            const extraRateQty = extraBatchesForRate.reduce((s, b) => s + b.quantity, 0);
+            const addedExtraQty = addedToExtraItems.reduce((s, i) => s + i.quantity, 0);
+            const retrievedQty = retrievedFromExtraBatches.reduce((s, b) => s + b.quantity, 0);
+            if (shippedBatchesQty + extraRateQty + addedExtraQty + retrievedQty === 0) return null;
+            return (
+              <div className="grid grid-cols-2 gap-4">
+                <Card>
+                  <CardContent className="p-4 text-center">
+                    <p className="text-sm text-muted-foreground">{t('phase.total_produced')}</p>
+                    <p className="text-2xl font-bold">{shippedBatchesQty + extraRateQty + addedExtraQty}</p>
+                    <p className="text-xs text-muted-foreground">{t('phase.next_phase_plus_extra')}</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4 text-center">
+                    <p className="text-sm text-muted-foreground">{t('phase.moved_to_next')}</p>
+                    <p className="text-2xl font-bold text-primary">{shippedBatchesQty + extraRateQty + retrievedQty}</p>
+                    <p className="text-xs text-muted-foreground">{t('phase.processed_plus_retrieved')}</p>
+                  </CardContent>
+                </Card>
+              </div>
+            );
+          })()}
+
           {/* Production Rate Section - for shipped batches that were processed in boxing */}
           <ProductionRateSection
             batches={[
@@ -1576,6 +1611,7 @@ export default function OrderBoxing() {
                 production_date: b.production_date || null,
                 needs_boxing: b.order_item?.needs_boxing ?? true,
                 order_item_id: b.order_item_id || null,
+                size: b.order_item?.size || null,
               })),
               ...extraBatchesForRate.map((eb) => ({
                 id: eb.id,
