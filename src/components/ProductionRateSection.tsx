@@ -276,7 +276,7 @@ export function ProductionRateSection({
                 <div className="flex items-center justify-between gap-4">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <p className="font-medium truncate">{group.product_name}</p>
+                      <p className="font-medium truncate">{group.product_name}{group.size ? ` - ${group.size}` : ''}</p>
                       <Badge variant="secondary" className="bg-muted text-muted-foreground">
                         <PackageX className="h-3 w-3 mr-1" />
                         No Boxing
@@ -323,9 +323,9 @@ export function ProductionRateSection({
 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <p className="font-medium truncate">{group.product_name}</p>
-                      <Badge variant="secondary">{group.product_sku}</Badge>
+                      <p className="font-medium truncate">{group.product_name}{group.size ? ` - ${group.size}` : ''}</p>
                     </div>
+                    <p className="text-xs text-muted-foreground">{group.product_sku}</p>
                     <p className="text-sm text-muted-foreground">
                       Total: {group.totalQty}
                       {group.unassignedQty > 0 && (
