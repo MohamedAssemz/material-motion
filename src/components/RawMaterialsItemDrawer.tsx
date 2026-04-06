@@ -9,13 +9,21 @@ import {
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { Send } from "lucide-react";
+import { Send, ArrowLeft, Search, ChevronRight, FileText } from "lucide-react";
 import { RawMaterialImageUpload } from "@/components/RawMaterialImageUpload";
 import { cn } from "@/lib/utils";
 
@@ -61,7 +69,8 @@ export function RawMaterialsItemDrawer({
   const [newImages, setNewImages] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [selectedItemId, setSelectedItemId] = useState<string | null>(null); // null = "All Items"
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const canEdit = hasRole("admin");
 
@@ -69,6 +78,7 @@ export function RawMaterialsItemDrawer({
     if (open) {
       fetchVersions();
       setSelectedItemId(null);
+      setSearchQuery("");
       setNewContent("");
       setNewImages([]);
     }
@@ -112,28 +122,36 @@ export function RawMaterialsItemDrawer({
     }
   };
 
-  const filteredVersions = useMemo(() => {
-    if (selectedItemId === null) {
-      // "All Items" - show everything
-      return versions;
-    }
-    return versions.filter((v) => v.order_item_id === selectedItemId);
-  }, [versions, selectedItemId]);
-
-  // Count versions per item for badge indicators
-  const itemVersionCounts = useMemo(() => {
-    const counts = new Map<string, number>();
+  // Group versions by item
+  const versionsByItem = useMemo(() => {
+    const map = new Map<string, RawMaterialVersion[]>();
     versions.forEach((v) => {
       if (v.order_item_id) {
-        counts.set(v.order_item_id, (counts.get(v.order_item_id) || 0) + 1);
+        const existing = map.get(v.order_item_id) || [];
+        existing.push(v);
+        map.set(v.order_item_id, existing);
       }
     });
-    return counts;
+    return map;
   }, [versions]);
 
-  const legacyVersions = useMemo(() => {
-    return versions.filter((v) => !v.order_item_id);
-  }, [versions]);
+  const legacyVersions = useMemo(() => versions.filter((v) => !v.order_item_id), [versions]);
+
+  const filteredItems = useMemo(() => {
+    if (!searchQuery.trim()) return orderItems;
+    const q = searchQuery.toLowerCase();
+    return orderItems.filter(
+      (item) =>
+        item.product_name.toLowerCase().includes(q) ||
+        item.sku.toLowerCase().includes(q) ||
+        (item.size && item.size.toLowerCase().includes(q))
+    );
+  }, [orderItems, searchQuery]);
+
+  const selectedItemVersions = useMemo(() => {
+    if (!selectedItemId) return [];
+    return versions.filter((v) => v.order_item_id === selectedItemId);
+  }, [versions, selectedItemId]);
 
   const handleSave = async () => {
     if ((!newContent.trim() && newImages.length === 0) || !user || !selectedItemId) return;
@@ -180,63 +198,150 @@ export function RawMaterialsItemDrawer({
     return item.size ? `${item.product_name} - ${item.size}` : item.product_name;
   };
 
-  const getItemForVersion = (orderItemId: string | null) => {
-    if (!orderItemId) return null;
-    return orderItems.find((i) => i.id === orderItemId);
+  const selectItem = (itemId: string) => {
+    setSelectedItemId(itemId);
+    setNewContent("");
+    setNewImages([]);
   };
 
-  return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-lg flex flex-col">
-        <SheetHeader>
-          <SheetTitle>Raw Materials - {orderNumber}</SheetTitle>
-        </SheetHeader>
+  // ── List View ──
+  const renderListView = () => (
+    <div className="flex flex-col flex-1 min-h-0">
+      {/* Search */}
+      <div className="relative py-3">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Search items by name or SKU..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-9 h-9"
+        />
+      </div>
 
-        {/* Tab bar */}
-        <div className="border-b -mx-6 px-6">
-          <ScrollArea className="w-full">
-            <div className="flex gap-1 pb-2 pt-1 overflow-x-auto">
-              <Button
-                variant={selectedItemId === null ? "default" : "ghost"}
-                size="sm"
-                className="shrink-0 text-xs h-8"
-                onClick={() => {
-                  setSelectedItemId(null);
-                  setNewContent("");
-                  setNewImages([]);
-                }}
+      <ScrollArea className="flex-1 -mx-6 px-6">
+        <div className="space-y-2 pb-4">
+          {filteredItems.map((item) => {
+            const itemVersions = versionsByItem.get(item.id);
+            const count = itemVersions?.length || 0;
+            const latest = itemVersions?.[0];
+            const snippet = latest?.content
+              ? latest.content.length > 60
+                ? latest.content.slice(0, 60) + "…"
+                : latest.content
+              : null;
+
+            return (
+              <button
+                key={item.id}
+                onClick={() => selectItem(item.id)}
+                className="w-full text-left rounded-lg border bg-card p-3 hover:bg-accent/50 transition-colors group"
               >
-                All Items
-                {legacyVersions.length > 0 && (
-                  <Badge variant="secondary" className="ml-1 h-4 px-1 text-[10px]">
-                    {legacyVersions.length}
-                  </Badge>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-sm truncate">
+                        {getItemLabel(item)}
+                      </span>
+                      {count > 0 && (
+                        <Badge variant="secondary" className="shrink-0 text-[10px] h-5">
+                          {count} {count === 1 ? "update" : "updates"}
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5">{item.sku}</p>
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0 group-hover:text-foreground transition-colors" />
+                </div>
+                {snippet ? (
+                  <p className="text-xs text-muted-foreground mt-1.5 line-clamp-1">
+                    Latest: "{snippet}"
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground/60 mt-1.5 italic">
+                    No raw materials yet
+                  </p>
                 )}
-              </Button>
-              {orderItems.map((item) => (
-                <Button
-                  key={item.id}
-                  variant={selectedItemId === item.id ? "default" : "ghost"}
-                  size="sm"
-                  className="shrink-0 text-xs h-8"
-                  onClick={() => {
-                    setSelectedItemId(item.id);
-                    setNewContent("");
-                    setNewImages([]);
-                  }}
-                >
-                  {getItemLabel(item)}
-                  {itemVersionCounts.has(item.id) && (
-                    <span className="ml-1 w-1.5 h-1.5 rounded-full bg-primary inline-block" />
+              </button>
+            );
+          })}
+
+          {filteredItems.length === 0 && (
+            <p className="text-center text-sm text-muted-foreground py-6">No items match your search</p>
+          )}
+
+          {/* Legacy order-level notes */}
+          {legacyVersions.length > 0 && !searchQuery.trim() && (
+            <div className="pt-4 border-t mt-4">
+              <div className="flex items-center gap-2 mb-2">
+                <FileText className="h-4 w-4 text-muted-foreground" />
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  Order-level notes
+                </span>
+              </div>
+              {legacyVersions.map((version) => (
+                <div key={version.id} className="rounded-lg border bg-muted/50 p-3 mb-2">
+                  <div className="flex items-baseline gap-2 flex-wrap">
+                    <span className="text-xs font-medium">
+                      {version.profile?.full_name || version.profile?.email || "Unknown"}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground">
+                      {formatTimestamp(version.created_at)}
+                    </span>
+                  </div>
+                  {version.content && (
+                    <p className="text-xs mt-1 line-clamp-2">{version.content}</p>
                   )}
-                </Button>
+                  {version.images.length > 0 && (
+                    <p className="text-[10px] text-muted-foreground mt-1">
+                      {version.images.length} image(s)
+                    </p>
+                  )}
+                </div>
               ))}
             </div>
-          </ScrollArea>
+          )}
+        </div>
+      </ScrollArea>
+    </div>
+  );
+
+  // ── Detail View ──
+  const renderDetailView = () => {
+    const selectedItem = orderItems.find((i) => i.id === selectedItemId);
+    if (!selectedItem) return null;
+
+    return (
+      <div className="flex flex-col flex-1 min-h-0">
+        {/* Navigation bar */}
+        <div className="flex items-center gap-2 py-2 border-b -mx-6 px-6">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="shrink-0 h-8 px-2"
+            onClick={() => setSelectedItemId(null)}
+          >
+            <ArrowLeft className="h-4 w-4 mr-1" />
+            Back
+          </Button>
+          <Select
+            value={selectedItemId || ""}
+            onValueChange={(val) => selectItem(val)}
+          >
+            <SelectTrigger className="h-8 text-xs flex-1 min-w-0">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {orderItems.map((item) => (
+                <SelectItem key={item.id} value={item.id} className="text-xs">
+                  {getItemLabel(item)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
-        {/* Post form - only on individual item tabs */}
-        {canEdit && selectedItemId && (
+        {/* Post form */}
+        {canEdit && (
           <div className="space-y-3 py-3 border-b">
             <Textarea
               placeholder="Enter raw material details for this item..."
@@ -249,15 +354,9 @@ export function RawMaterialsItemDrawer({
                 }
               }}
             />
-            <RawMaterialImageUpload
-              images={newImages}
-              onChange={setNewImages}
-              compact
-            />
+            <RawMaterialImageUpload images={newImages} onChange={setNewImages} compact />
             <div className="flex justify-between items-center">
-              <span className="text-xs text-muted-foreground">
-                Press ⌘+Enter to submit
-              </span>
+              <span className="text-xs text-muted-foreground">Press ⌘+Enter to submit</span>
               <Button
                 onClick={handleSave}
                 disabled={(!newContent.trim() && newImages.length === 0) || submitting}
@@ -272,102 +371,100 @@ export function RawMaterialsItemDrawer({
 
         {/* Timeline */}
         <ScrollArea className="flex-1 -mx-6 px-6">
-          {loading ? (
-            <div className="space-y-4 py-4">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="flex gap-3">
-                  <Skeleton className="h-8 w-8 rounded-full" />
-                  <div className="flex-1 space-y-2">
-                    <Skeleton className="h-4 w-24" />
-                    <Skeleton className="h-3 w-32" />
-                    <Skeleton className="h-16 w-full" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : filteredVersions.length === 0 ? (
+          {selectedItemVersions.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               <p>No raw material records yet</p>
-              {selectedItemId && <p className="text-sm">Add the first version for this item</p>}
+              <p className="text-sm">Add the first version for this item</p>
             </div>
           ) : (
             <div className="relative py-4">
               <div className="absolute left-4 top-8 bottom-4 w-px bg-border" />
               <div className="space-y-6">
-                {filteredVersions.map((version, index) => {
-                  const itemInfo = getItemForVersion(version.order_item_id);
-                  return (
-                    <div key={version.id} className="relative flex gap-3">
-                      <div className="relative z-10">
-                        <Avatar className="h-8 w-8 border-2 border-background">
-                          <AvatarFallback
-                            className={
-                              index === 0 ? "bg-primary text-primary-foreground" : "bg-muted"
-                            }
-                          >
-                            {getInitials(version.profile?.full_name, version.profile?.email)}
-                          </AvatarFallback>
-                        </Avatar>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-baseline gap-2 flex-wrap">
-                          <span className="font-medium text-sm">
-                            {version.profile?.full_name || version.profile?.email || "Unknown User"}
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            {formatTimestamp(version.created_at)}
-                          </span>
-                        </div>
-                        {/* Show item label when in "All Items" view */}
-                        {selectedItemId === null && itemInfo && (
-                          <Badge variant="outline" className="mt-0.5 text-[10px] h-5">
-                            {getItemLabel(itemInfo)}
-                          </Badge>
-                        )}
-                        {selectedItemId === null && !version.order_item_id && (
-                          <Badge variant="secondary" className="mt-0.5 text-[10px] h-5">
-                            Order-level note
-                          </Badge>
-                        )}
-                        <div
-                          className={cn(
-                            "mt-1 p-3 rounded-lg text-sm",
-                            index === 0
-                              ? "bg-primary/10 border border-primary/20"
-                              : "bg-muted"
-                          )}
+                {selectedItemVersions.map((version, index) => (
+                  <div key={version.id} className="relative flex gap-3">
+                    <div className="relative z-10">
+                      <Avatar className="h-8 w-8 border-2 border-background">
+                        <AvatarFallback
+                          className={index === 0 ? "bg-primary text-primary-foreground" : "bg-muted"}
                         >
-                          {version.content && (
-                            <p className="whitespace-pre-wrap break-words">{version.content}</p>
-                          )}
-                          {version.images && version.images.length > 0 && (
-                            <div className={`grid grid-cols-2 gap-2 ${version.content ? "mt-2" : ""}`}>
-                              {version.images.map((url, imgIdx) => (
-                                <a
-                                  key={imgIdx}
-                                  href={url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="block rounded overflow-hidden border hover:opacity-80 transition-opacity"
-                                >
-                                  <img
-                                    src={url}
-                                    alt={`RM image ${imgIdx + 1}`}
-                                    className="w-full h-20 object-cover"
-                                  />
-                                </a>
-                              ))}
-                            </div>
-                          )}
-                        </div>
+                          {getInitials(version.profile?.full_name, version.profile?.email)}
+                        </AvatarFallback>
+                      </Avatar>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-baseline gap-2 flex-wrap">
+                        <span className="font-medium text-sm">
+                          {version.profile?.full_name || version.profile?.email || "Unknown User"}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {formatTimestamp(version.created_at)}
+                        </span>
+                      </div>
+                      <div
+                        className={cn(
+                          "mt-1 p-3 rounded-lg text-sm",
+                          index === 0 ? "bg-primary/10 border border-primary/20" : "bg-muted"
+                        )}
+                      >
+                        {version.content && (
+                          <p className="whitespace-pre-wrap break-words">{version.content}</p>
+                        )}
+                        {version.images.length > 0 && (
+                          <div className={`grid grid-cols-2 gap-2 ${version.content ? "mt-2" : ""}`}>
+                            {version.images.map((url, imgIdx) => (
+                              <a
+                                key={imgIdx}
+                                href={url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="block rounded overflow-hidden border hover:opacity-80 transition-opacity"
+                              >
+                                <img
+                                  src={url}
+                                  alt={`RM image ${imgIdx + 1}`}
+                                  className="w-full h-20 object-cover"
+                                />
+                              </a>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
-                  );
-                })}
+                  </div>
+                ))}
               </div>
             </div>
           )}
         </ScrollArea>
+      </div>
+    );
+  };
+
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent className="w-full sm:max-w-lg flex flex-col">
+        <SheetHeader>
+          <SheetTitle>Raw Materials - {orderNumber}</SheetTitle>
+        </SheetHeader>
+
+        {loading ? (
+          <div className="space-y-4 py-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="flex gap-3">
+                <Skeleton className="h-8 w-8 rounded-full" />
+                <div className="flex-1 space-y-2">
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-3 w-32" />
+                  <Skeleton className="h-16 w-full" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : selectedItemId ? (
+          renderDetailView()
+        ) : (
+          renderListView()
+        )}
       </SheetContent>
     </Sheet>
   );
