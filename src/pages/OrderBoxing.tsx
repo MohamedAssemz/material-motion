@@ -1207,13 +1207,7 @@ export default function OrderBoxing() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">{t('boxing.ready_for_boxing')}</p>
-            <p className="text-2xl font-bold text-warning">{totalReadyForBoxing}</p>
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">{t('boxing.in_boxing_phase')}</p>
@@ -1222,20 +1216,20 @@ export default function OrderBoxing() {
         </Card>
         <Card>
           <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">{t('boxing.ready_for_shipment')}</p>
-            <p className="text-2xl font-bold text-green-600">{totalReadyForShipment}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">{t('boxing.total_kartonas')}</p>
-            <p className="text-2xl font-bold text-purple-600">{shipments.length}</p>
+            <p className="text-2xl font-bold">{shipments.length}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">{t('boxing.total_shipped')}</p>
-            <p className="text-2xl font-bold text-green-600">{totalShipped}</p>
+            <p className="text-sm text-muted-foreground">{t('phase.moved_to_next')}</p>
+            <p className="text-2xl font-bold text-primary">{(() => { const shippedBatchesQty = batches.filter(b => b.current_state === 'shipped' && b.from_extra_state !== 'extra_boxing' && !b.is_special && b.order_item?.needs_boxing !== false).reduce((s, b) => s + b.quantity, 0); const extraRateQty = extraBatchesForRate.reduce((s, b) => s + b.quantity, 0); const retrievedQty = retrievedFromExtraBatches.reduce((s, b) => s + b.quantity, 0); return shippedBatchesQty + extraRateQty + retrievedQty; })()}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-sm text-muted-foreground">{t('phase.total_produced')}</p>
+            <p className="text-2xl font-bold text-green-600">{(() => { const shippedBatchesQty = batches.filter(b => b.current_state === 'shipped' && b.from_extra_state !== 'extra_boxing' && !b.is_special && b.order_item?.needs_boxing !== false).reduce((s, b) => s + b.quantity, 0); const extraRateQty = extraBatchesForRate.reduce((s, b) => s + b.quantity, 0); const addedExtraQty = addedToExtraItems.reduce((s, i) => s + i.quantity, 0); return shippedBatchesQty + extraRateQty + addedExtraQty; })()}</p>
           </CardContent>
         </Card>
       </div>
@@ -1572,31 +1566,6 @@ export default function OrderBoxing() {
 
         <TabsContent value="shipments" className="space-y-4">
           {/* Numeric Summary */}
-          {(() => {
-            const shippedBatchesQty = batches.filter(b => b.current_state === 'shipped' && b.from_extra_state !== 'extra_boxing' && !b.is_special && b.order_item?.needs_boxing !== false).reduce((s, b) => s + b.quantity, 0);
-            const extraRateQty = extraBatchesForRate.reduce((s, b) => s + b.quantity, 0);
-            const addedExtraQty = addedToExtraItems.reduce((s, i) => s + i.quantity, 0);
-            const retrievedQty = retrievedFromExtraBatches.reduce((s, b) => s + b.quantity, 0);
-            if (shippedBatchesQty + extraRateQty + addedExtraQty + retrievedQty === 0) return null;
-            return (
-              <div className="grid grid-cols-2 gap-4">
-                <Card>
-                  <CardContent className="p-4 text-center">
-                    <p className="text-sm text-muted-foreground">{t('phase.total_produced')}</p>
-                    <p className="text-2xl font-bold">{shippedBatchesQty + extraRateQty + addedExtraQty}</p>
-                    <p className="text-xs text-muted-foreground">{t('phase.next_phase_plus_extra')}</p>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="p-4 text-center">
-                    <p className="text-sm text-muted-foreground">{t('phase.moved_to_next')}</p>
-                    <p className="text-2xl font-bold text-primary">{shippedBatchesQty + extraRateQty + retrievedQty}</p>
-                    <p className="text-xs text-muted-foreground">{t('phase.processed_plus_retrieved')}</p>
-                  </CardContent>
-                </Card>
-              </div>
-            );
-          })()}
 
           {/* Production Rate Section - for shipped batches that were processed in boxing */}
           <ProductionRateSection

@@ -847,23 +847,11 @@ export default function OrderFinishing() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">{t('finishing.ready_for_finishing')}</p>
-            <p className="text-2xl font-bold text-warning">{totalReadyForFinishing}</p>
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">{t('finishing.in_finishing')}</p>
             <p className="text-2xl font-bold text-primary">{totalInFinishing}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">{t('phase.boxes_waiting')}</p>
-            <p className="text-2xl font-bold">{readyBoxGroups.length}</p>
           </CardContent>
         </Card>
         <Card>
@@ -874,8 +862,14 @@ export default function OrderFinishing() {
         </Card>
         <Card>
           <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">{t('phase.completed')}</p>
-            <p className="text-2xl font-bold text-green-600">{totalCompleted}</p>
+            <p className="text-sm text-muted-foreground">{t('phase.moved_to_next')}</p>
+            <p className="text-2xl font-bold text-primary">{processedBatchesForRate.reduce((s, b) => s + b.quantity, 0) + retrievedFromExtraBatches.reduce((s, b) => s + b.quantity, 0)}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-sm text-muted-foreground">{t('phase.total_produced')}</p>
+            <p className="text-2xl font-bold text-green-600">{processedBatchesForRate.reduce((s, b) => s + b.quantity, 0) + totalAddedToExtra}</p>
           </CardContent>
         </Card>
       </div>
@@ -1109,25 +1103,6 @@ export default function OrderFinishing() {
         </TabsContent>
 
         <TabsContent value="completed" className="space-y-6">
-          {/* Numeric Summary */}
-          {(processedBatchesForRate.length > 0 || retrievedFromExtraBatches.length > 0 || addedToExtraItems.length > 0) && (
-            <div className="grid grid-cols-2 gap-4">
-              <Card>
-                <CardContent className="p-4 text-center">
-                  <p className="text-sm text-muted-foreground">{t('phase.total_produced')}</p>
-                  <p className="text-2xl font-bold">{processedBatchesForRate.reduce((s, b) => s + b.quantity, 0) + totalAddedToExtra}</p>
-                  <p className="text-xs text-muted-foreground">{t('phase.next_phase_plus_extra')}</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-4 text-center">
-                  <p className="text-sm text-muted-foreground">{t('phase.moved_to_next')}</p>
-                  <p className="text-2xl font-bold text-primary">{processedBatchesForRate.reduce((s, b) => s + b.quantity, 0) + retrievedFromExtraBatches.reduce((s, b) => s + b.quantity, 0)}</p>
-                  <p className="text-xs text-muted-foreground">{t('phase.processed_plus_retrieved')}</p>
-                </CardContent>
-              </Card>
-            </div>
-          )}
 
           {/* Production Rate Section */}
           <ProductionRateSection
