@@ -949,6 +949,7 @@ export type Database = {
           id: string
           images: Json | null
           order_id: string
+          order_item_id: string | null
           version_number: number
         }
         Insert: {
@@ -958,6 +959,7 @@ export type Database = {
           id?: string
           images?: Json | null
           order_id: string
+          order_item_id?: string | null
           version_number?: number
         }
         Update: {
@@ -967,6 +969,7 @@ export type Database = {
           id?: string
           images?: Json | null
           order_id?: string
+          order_item_id?: string | null
           version_number?: number
         }
         Relationships: [

@@ -28,7 +28,7 @@ import {
   Truck,
   Package,
 } from "lucide-react";
-import { RawMaterialImageUpload } from "@/components/RawMaterialImageUpload";
+
 import { CountrySelect } from "@/components/catalog/CountrySelect";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -64,7 +64,7 @@ const orderSchema = z.object({
   notes: z.string().trim().max(500, "Notes must be less than 500 characters").optional(),
   priority: z.enum(["low", "normal", "high"]),
   shipping_type: z.enum(["domestic", "international"]),
-  raw_materials: z.string().optional(),
+  
 });
 
 export default function OrderCreate() {
@@ -84,8 +84,8 @@ export default function OrderCreate() {
   const [shippingType, setShippingType] = useState<"domestic" | "international">("domestic");
   const [country, setCountry] = useState("");
   const [estimatedFulfillment, setEstimatedFulfillment] = useState<Date | undefined>();
-  const [rawMaterials, setRawMaterials] = useState("");
-  const [rawMaterialImages, setRawMaterialImages] = useState<string[]>([]);
+
+
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const [customerOpen, setCustomerOpen] = useState(false);
   const [eftOpen, setEftOpen] = useState(false);
@@ -205,7 +205,6 @@ export default function OrderCreate() {
         notes,
         priority,
         shipping_type: shippingType,
-        raw_materials: rawMaterials,
       });
       if (!validation.success) {
         toast({
@@ -268,16 +267,8 @@ export default function OrderCreate() {
 
       if (orderError) throw orderError;
 
-      // Save raw materials version if provided
-      if (rawMaterials.trim() || rawMaterialImages.length > 0) {
-        await supabase.from("raw_material_versions").insert({
-          order_id: order.id,
-          version_number: 1,
-          content: rawMaterials.trim(),
-          images: rawMaterialImages,
-          created_by: user?.id,
-        });
-      }
+
+
 
       // Create order items: one per product+size combination
       let totalBatchQuantity = 0;
@@ -570,22 +561,8 @@ export default function OrderCreate() {
                   placeholder={t('order.select_country')}
                 />
               </div>
-              <div>
-                <Label htmlFor="raw_materials">{t('order.raw_materials')}</Label>
-                <Textarea
-                  id="raw_materials"
-                  value={rawMaterials}
-                  onChange={(e) => setRawMaterials(e.target.value)}
-                  placeholder={t('order.raw_materials_placeholder')}
-                  rows={3}
-                />
-                <div className="mt-2">
-                  <RawMaterialImageUpload
-                    images={rawMaterialImages}
-                    onChange={setRawMaterialImages}
-                  />
-                </div>
-              </div>
+
+
             </CardContent>
           </Card>
 

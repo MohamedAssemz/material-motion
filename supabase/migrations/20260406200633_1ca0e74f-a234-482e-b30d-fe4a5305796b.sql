@@ -1,0 +1,1 @@
+ALTER TABLE public.raw_material_versions ADD COLUMN order_item_id uuid;
