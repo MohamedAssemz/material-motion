@@ -26,7 +26,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { RawMaterialsDrawer } from "@/components/RawMaterialsDrawer";
+import { RawMaterialsItemDrawer } from "@/components/RawMaterialsItemDrawer";
 
 import { ShipmentDialog } from "@/components/ShipmentDialog";
 import { ExtraInventoryDialog } from "@/components/ExtraInventoryDialog";
@@ -1272,11 +1272,17 @@ export default function OrderDetail() {
       )}
 
       {/* Dialogs */}
-      <RawMaterialsDrawer
+      <RawMaterialsItemDrawer
         open={rawMaterialsOpen}
         onOpenChange={setRawMaterialsOpen}
         orderId={id!}
         orderNumber={order?.order_number || ""}
+        orderItems={orderItems.map((oi) => ({
+          id: oi.id,
+          product_name: language === "ar" && oi.product.name_ar ? oi.product.name_ar : oi.product.name_en,
+          sku: oi.product.sku,
+          size: oi.size || null,
+        }))}
       />
       <ShipmentDialog
         open={shipmentDialogOpen}
