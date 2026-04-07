@@ -17,7 +17,8 @@ import type { DateRange } from 'react-day-picker';
 
 interface Order {
   id: string; order_number: string; reference_number: string | null; created_at: string; status: string;
-  manufacturing_count: number; extra_manufacturing_count: number;
+  manufacturing_count: number; waiting_count: number; working_count: number;
+  extra_manufacturing_count: number;
   total_units: number; shipped_count: number;
   _phaseCompleted: boolean;
 }
