@@ -140,9 +140,10 @@ export default function Orders() {
       const ordersWithStatus = [];
 
       for (const order of ordersData || []) {
-        const { data: batches } = await (
-          supabase.from("order_batches").select("current_state, quantity").eq("order_id", order.id) as any
-        ).eq("is_terminated", false);
+        const { data: batches } = await supabase
+          .from("order_batches")
+          .select("current_state, quantity")
+          .eq("order_id", order.id);
 
         const batchTotalCount = batches?.reduce((sum, b) => sum + b.quantity, 0) || 0;
         const shippedCount =
@@ -155,7 +156,7 @@ export default function Orders() {
         let computed_status: OrderStatus = "pending";
         if (order.status === "cancelled") {
           computed_status = "cancelled";
-        } else if (order.status === "completed" || (unitCount > 0 && shippedCount + (extraCountsByOrder.get(order.id) || 0) >= unitCount)) {
+        } else if (order.status === "completed" || (unitCount > 0 && shippedCount >= unitCount)) {
           computed_status = "completed";
         } else if (order.status === "in_progress") {
           computed_status = "in_progress";
