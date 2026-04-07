@@ -814,6 +814,7 @@ export const translations: Record<string, TranslationEntry> = {
   "phase.no_completed_yet":   { en: "No completed items yet", ar: "لا توجد عناصر مكتملة بعد" },
   "phase.total_produced":     { en: "Total Produced",        ar: "إجمالي الإنتاج" },
   "phase.moved_to_next":      { en: "Moved to Next Phase",   ar: "نُقل للمرحلة التالية" },
+  "phase.shipped":            { en: "Shipped",               ar: "تم الشحن" },
   "phase.next_phase_plus_extra": { en: "Next phase + extra",  ar: "المرحلة التالية + إضافي" },
   "phase.processed_plus_retrieved": { en: "Processed + retrieved", ar: "معالج + مسترجع" },
   "phase.active":             { en: "Active",               ar: "نشط" },
