@@ -17,7 +17,8 @@ import type { DateRange } from 'react-day-picker';
 
 interface Order {
   id: string; order_number: string; reference_number: string | null; created_at: string; status: string;
-  manufacturing_count: number; extra_manufacturing_count: number;
+  manufacturing_count: number; waiting_count: number; working_count: number;
+  extra_manufacturing_count: number;
   total_units: number; shipped_count: number;
   _phaseCompleted: boolean;
 }
@@ -48,7 +49,7 @@ export default function QueueManufacturing() {
 
   const fetchOrders = async () => {
     try {
-      const { data: orderBatchesData, error: batchError } = await supabase.from('order_batches').select('order_id, current_state, quantity');
+      const { data: orderBatchesData, error: batchError } = await supabase.from('order_batches').select('order_id, current_state, quantity, eta');
       if (batchError) throw batchError;
       const { data: extraBatchesData, error: extraError } = await supabase.from('extra_batches').select('order_id, current_state, quantity').eq('current_state', 'extra_manufacturing').eq('inventory_state', 'RESERVED').not('order_id', 'is', null);
       if (extraError) throw extraError;
@@ -83,10 +84,16 @@ export default function QueueManufacturing() {
         const hasPast = orderHasPastBatches.has(order.id);
         const phaseCompleted = !hasActive && hasPast;
 
+        const mfgBatches = orderBatches.filter((b: any) => b.current_state === 'in_manufacturing');
+        const waitingCount = mfgBatches.filter((b: any) => !b.eta).reduce((s: number, b: any) => s + b.quantity, 0);
+        const workingCount = mfgBatches.filter((b: any) => !!b.eta).reduce((s: number, b: any) => s + b.quantity, 0);
+
         return {
           id: order.id, order_number: order.order_number, reference_number: order.reference_number,
           created_at: order.created_at, status: order.status,
-          manufacturing_count: orderBatches.filter((b: any) => b.current_state === 'in_manufacturing').reduce((s: number, b: any) => s + b.quantity, 0),
+          manufacturing_count: mfgBatches.reduce((s: number, b: any) => s + b.quantity, 0),
+          waiting_count: waitingCount,
+          working_count: workingCount,
           extra_manufacturing_count: extraBatches.reduce((s: number, b: any) => s + b.quantity, 0),
           total_units: totalUnits, shipped_count: shippedCount,
           _phaseCompleted: phaseCompleted, _hasActive: hasActive,
@@ -129,7 +136,8 @@ export default function QueueManufacturing() {
         <TableRow>
           <TableHead>{t('queue.order_number')}</TableHead>
           <TableHead>{t('queue.reference')}</TableHead>
-          <TableHead>{t('queue.in_manufacturing')}</TableHead>
+          <TableHead>{t('phase.waiting')}</TableHead>
+          <TableHead>{t('phase.in_progress')}</TableHead>
           <TableHead>{t('queue.extra_items')}</TableHead>
           <TableHead>{t('queue.created_date')}</TableHead>
         </TableRow>
@@ -139,8 +147,9 @@ export default function QueueManufacturing() {
           <TableRow key={order.id} className="cursor-pointer hover:bg-muted/50" onClick={() => navigate(`/orders/${order.id}/manufacturing`)}>
             <TableCell className="font-medium">{order.order_number}</TableCell>
             <TableCell className="text-muted-foreground">{order.reference_number || '—'}</TableCell>
-            <TableCell>{order.manufacturing_count > 0 && <Badge className="bg-blue-500">{order.manufacturing_count} {t('common.items')}</Badge>}</TableCell>
-            <TableCell>{order.extra_manufacturing_count > 0 && <Badge variant="outline" className="border-amber-500 text-amber-600"><Package className="h-3 w-3 mr-1" />{order.extra_manufacturing_count} {t('phase.extra').toLowerCase()}</Badge>}</TableCell>
+            <TableCell>{order.waiting_count > 0 && <Badge variant="secondary">{order.waiting_count}</Badge>}</TableCell>
+            <TableCell>{order.working_count > 0 && <Badge className="bg-primary text-primary-foreground">{order.working_count}</Badge>}</TableCell>
+            <TableCell>{order.extra_manufacturing_count > 0 && <Badge variant="outline" className="border-amber-500 text-amber-600"><Package className="h-3 w-3 mr-1" />{order.extra_manufacturing_count}</Badge>}</TableCell>
             <TableCell>{format(new Date(order.created_at), 'PPP')}</TableCell>
           </TableRow>
         ))}
