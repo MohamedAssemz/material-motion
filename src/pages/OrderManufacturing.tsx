@@ -1,5 +1,4 @@
 import { useEffect, useState, useMemo } from "react";
-import { useOrderItemProgress } from "@/hooks/useOrderItemProgress";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -13,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { format } from "date-fns";
+import { format, formatDistanceToNow, isPast } from "date-fns";
 import {
   ArrowLeft,
   Factory,
@@ -23,6 +22,8 @@ import {
   Search,
   CheckCircle,
   Package,
+  Clock,
+  Play,
 } from "lucide-react";
 import { ProductionRateSection } from "@/components/ProductionRateSection";
 import { RetrievedFromExtraSection } from "@/components/RetrievedFromExtraSection";
@@ -33,6 +34,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { MoveToExtraDialog } from "@/components/MoveToExtraDialog";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { normalizeBoxCode } from "@/lib/boxUtils";
+import { LeadTimeDialog } from "@/components/LeadTimeDialog";
 
 interface Batch {
   id: string;
@@ -83,7 +85,7 @@ interface ProductGroup {
   size?: string | null;
   needs_packing: boolean;
   needs_boxing: boolean;
-  inManufacturing: number;
+  totalQty: number;
   batches: Batch[];
   order_item_ids: string[];
 }
@@ -109,8 +111,13 @@ export default function OrderManufacturing() {
   const [extraCount, setExtraCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
-  // Selection & action states
-  const [productSelections, setProductSelections] = useState<Map<string, number>>(new Map());
+  // Selection states - separate for waiting and working sections
+  const [waitingSelections, setWaitingSelections] = useState<Map<string, number>>(new Map());
+  const [workingSelections, setWorkingSelections] = useState<Map<string, number>>(new Map());
+
+  // Lead time dialog
+  const [leadTimeDialogOpen, setLeadTimeDialogOpen] = useState(false);
+  const [startWorkingTarget, setStartWorkingTarget] = useState<{ groupKey: string; quantity: number } | null>(null);
 
   // Dialog states
   const [boxDialogOpen, setBoxDialogOpen] = useState(false);
@@ -130,7 +137,6 @@ export default function OrderManufacturing() {
 
   const canManage = hasRole("manufacturing_manager") || hasRole("admin");
   const isCancelled = order?.status === 'cancelled';
-  const { isInProgress, markInProgress } = useOrderItemProgress(id, 'manufacturing', user?.id);
 
   // completedBatches already excludes retrieved-from-extra items via from_extra_state filter
   // Also exclude special items that skipped manufacturing (initial_state is not in_manufacturing)
@@ -195,7 +201,6 @@ export default function OrderManufacturing() {
           )
           .eq("order_id", id)
           .in("current_state", ["in_manufacturing"]),
-        // Fetch completed items for this phase (moved to next phases)
         supabase
           .from("order_batches")
           .select(
@@ -222,7 +227,6 @@ export default function OrderManufacturing() {
       const allCompleted = (completedRes.data || []) as any[];
       const filteredCompleted = allCompleted.filter((b: any) => {
         if (['extra_manufacturing', 'extra_finishing', 'extra_packaging', 'extra_boxing'].includes(b.from_extra_state)) return false;
-        // Exclude special items that didn't start in manufacturing
         if (b.is_special && b.order_item?.initial_state !== 'in_manufacturing') return false;
         return true;
       });
@@ -246,7 +250,6 @@ export default function OrderManufacturing() {
 
       if (error) throw error;
 
-      // Group by product for display
       const productMap = new Map<
         string,
         { product_id: string; product_name: string; product_sku: string; quantity: number }
@@ -268,8 +271,6 @@ export default function OrderManufacturing() {
       });
       setAddedToExtraItems(Array.from(productMap.values()));
 
-      // Build production rate data from history quantities (not current extra_batch quantities)
-      // Group history records by extra_batch_id and sum their quantities
       const historyByBatch = new Map<string, number>();
       (data || []).forEach((record: any) => {
         if (record.extra_batch_id) {
@@ -278,7 +279,6 @@ export default function OrderManufacturing() {
       });
 
       if (extraBatchIds.size > 0) {
-        // Still fetch extra_batches for machine IDs only
         const { data: extraBatches } = await supabase
           .from("extra_batches")
           .select("id, product_id, manufacturing_machine_id, product:products(name_en, name_ar, sku, color_en, color_ar)")
@@ -314,7 +314,6 @@ export default function OrderManufacturing() {
 
       if (error) throw error;
 
-      // Fetch sizes from order_items for consuming_order_item_ids
       const orderItemIds = [...new Set((data || []).map((r: any) => r.consuming_order_item_id).filter(Boolean))];
       let sizeMap = new Map<string, string | null>();
       if (orderItemIds.length > 0) {
@@ -423,104 +422,160 @@ export default function OrderManufacturing() {
     }
   };
 
-  // Group batches by order_item_id to keep different sizes/colors/boxing as separate entries
-  const productGroups: ProductGroup[] = [];
-  const groupMap = new Map<string, ProductGroup>();
+  // Helper to build groups from batches
+  const buildGroups = (batchList: Batch[]): ProductGroup[] => {
+    const groupMap = new Map<string, ProductGroup>();
+    batchList.forEach((batch) => {
+      const needsBoxing = batch.order_item?.needs_boxing ?? true;
+      const groupKey = batch.order_item_id || `${batch.product_id}-fallback`;
+      if (!groupMap.has(groupKey)) {
+        groupMap.set(groupKey, {
+          groupKey,
+          product_id: batch.product_id,
+          product_name: batch.product?.name_en || "Unknown",
+          product_sku: batch.product?.sku || "N/A",
+          product_name_ar: batch.product?.name_ar,
+          product_color_en: batch.product?.color_en,
+          product_color_ar: batch.product?.color_ar,
+          size: batch.order_item?.size,
+          needs_packing: batch.product?.needs_packing ?? true,
+          needs_boxing: needsBoxing,
+          totalQty: 0,
+          batches: [],
+          order_item_ids: [],
+        });
+      }
+      const group = groupMap.get(groupKey)!;
+      group.batches.push(batch);
+      group.totalQty += batch.quantity;
+      if (batch.order_item_id && !group.order_item_ids.includes(batch.order_item_id)) {
+        group.order_item_ids.push(batch.order_item_id);
+      }
+    });
+    const groups: ProductGroup[] = [];
+    groupMap.forEach((g) => groups.push(g));
+    groups.sort((a, b) => a.product_name.localeCompare(b.product_name));
+    return groups;
+  };
 
-  batches.forEach((batch) => {
-    const needsBoxing = batch.order_item?.needs_boxing ?? true;
-    const groupKey = batch.order_item_id || `${batch.product_id}-fallback`;
+  // Split batches into waiting (eta=null) and working (eta set)
+  const waitingBatches = batches.filter(b => !b.eta);
+  const workingBatches = batches.filter(b => !!b.eta);
 
-    if (!groupMap.has(groupKey)) {
-      groupMap.set(groupKey, {
-        groupKey,
-        product_id: batch.product_id,
-        product_name: batch.product?.name_en || "Unknown",
-        product_sku: batch.product?.sku || "N/A",
-        product_name_ar: batch.product?.name_ar,
-        product_color_en: batch.product?.color_en,
-        product_color_ar: batch.product?.color_ar,
-        size: batch.order_item?.size,
-        needs_packing: batch.product?.needs_packing ?? true,
-        needs_boxing: needsBoxing,
-        inManufacturing: 0,
-        batches: [],
-        order_item_ids: [],
-      });
-    }
-    const group = groupMap.get(groupKey)!;
-    group.batches.push(batch);
-    group.inManufacturing += batch.quantity;
-    if (batch.order_item_id && !group.order_item_ids.includes(batch.order_item_id)) {
-      group.order_item_ids.push(batch.order_item_id);
-    }
-  });
+  const waitingGroups = buildGroups(waitingBatches);
+  const workingGroups = buildGroups(workingBatches);
 
-  groupMap.forEach((g) => productGroups.push(g));
-  productGroups.sort((a, b) => a.product_name.localeCompare(b.product_name));
+  // All in_manufacturing groups (for completed tab stats)
+  const allMfgGroups = buildGroups(batches);
 
-  // Group completed items by order_item_id
-  const completedGroups: ProductGroup[] = [];
-  const completedGroupMap = new Map<string, ProductGroup>();
-  completedBatches.forEach((batch) => {
-    const needsBoxing = batch.order_item?.needs_boxing ?? true;
-    const groupKey = batch.order_item_id || `${batch.product_id}-fallback`;
+  // Completed groups
+  const completedGroups = buildGroups(completedBatches);
 
-    if (!completedGroupMap.has(groupKey)) {
-      completedGroupMap.set(groupKey, {
-        groupKey,
-        product_id: batch.product_id,
-        product_name: batch.product?.name_en || "Unknown",
-        product_sku: batch.product?.sku || "N/A",
-        product_name_ar: batch.product?.name_ar,
-        product_color_en: batch.product?.color_en,
-        product_color_ar: batch.product?.color_ar,
-        size: batch.order_item?.size,
-        needs_packing: batch.product?.needs_packing ?? true,
-        needs_boxing: needsBoxing,
-        inManufacturing: 0,
-        batches: [],
-        order_item_ids: [],
-      });
-    }
-    const group = completedGroupMap.get(groupKey)!;
-    group.batches.push(batch);
-    group.inManufacturing += batch.quantity;
-    if (batch.order_item_id && !group.order_item_ids.includes(batch.order_item_id)) {
-      group.order_item_ids.push(batch.order_item_id);
-    }
-  });
-  completedGroupMap.forEach((g) => completedGroups.push(g));
-  completedGroups.sort((a, b) => a.product_name.localeCompare(b.product_name));
+  const totalWaiting = waitingGroups.reduce((sum, g) => sum + g.totalQty, 0);
+  const totalWorking = workingGroups.reduce((sum, g) => sum + g.totalQty, 0);
+  const totalInManufacturing = totalWaiting + totalWorking;
 
   const totalAddedToExtra = addedToExtraItems.reduce((sum, item) => sum + item.quantity, 0);
-  // totalCompleted includes items processed through manufacturing AND items moved to extra inventory
   const totalCompleted = completedGroups.reduce((sum, g) => g.batches.reduce((s, b) => s + b.quantity, 0) + sum, 0) + totalAddedToExtra;
-  const totalSelected = Array.from(productSelections.values()).reduce((a, b) => a + b, 0);
 
-  // Calculate how many selected items are from "in_manufacturing" state (eligible for move to extra)
-  const totalSelectedInManufacturing = Array.from(productSelections.entries()).reduce((sum, [groupKey, qty]) => {
-    const group = productGroups.find((g) => g.groupKey === groupKey);
-    if (!group) return sum;
-    return sum + Math.min(qty, group.inManufacturing);
-  }, 0);
+  const totalWaitingSelected = Array.from(waitingSelections.values()).reduce((a, b) => a + b, 0);
+  const totalWorkingSelected = Array.from(workingSelections.values()).reduce((a, b) => a + b, 0);
 
-  // Prepare selections for MoveToExtraDialog
-  const extraSelections = productGroups
-    .filter((g) => productSelections.get(g.groupKey) && productSelections.get(g.groupKey)! > 0)
+  // Start Working handler - opens lead time dialog
+  const handleStartWorking = (groupKey: string) => {
+    const qty = waitingSelections.get(groupKey) || 0;
+    if (qty <= 0) {
+      toast.error(t('phase.select_items_first'));
+      return;
+    }
+    setStartWorkingTarget({ groupKey, quantity: qty });
+    setLeadTimeDialogOpen(true);
+  };
+
+  // Confirm start working with lead time
+  const handleConfirmStartWorking = async (leadTimeDays: number, eta: Date) => {
+    if (!startWorkingTarget || !id) return;
+    const { groupKey, quantity } = startWorkingTarget;
+    const group = waitingGroups.find(g => g.groupKey === groupKey);
+    if (!group) return;
+
+    setSubmitting(true);
+    try {
+      let remaining = quantity;
+      // Sort batches by quantity ascending for splitting
+      const sortedBatches = [...group.batches].sort((a, b) => a.quantity - b.quantity);
+
+      for (const batch of sortedBatches) {
+        if (remaining <= 0) break;
+
+        if (batch.quantity <= remaining) {
+          // Update entire batch with ETA
+          await supabase
+            .from("order_batches")
+            .update({
+              eta: eta.toISOString(),
+              lead_time_days: leadTimeDays,
+            })
+            .eq("id", batch.id);
+          remaining -= batch.quantity;
+        } else {
+          // Split: update this batch to the selected qty with ETA
+          await supabase
+            .from("order_batches")
+            .update({
+              quantity: remaining,
+              eta: eta.toISOString(),
+              lead_time_days: leadTimeDays,
+            })
+            .eq("id", batch.id);
+
+          // Create remainder batch (no ETA)
+          const { data: qrCode } = await supabase.rpc("generate_batch_code");
+          await supabase.from("order_batches").insert({
+            order_id: id,
+            product_id: batch.product_id,
+            order_item_id: batch.order_item_id,
+            current_state: "in_manufacturing",
+            quantity: batch.quantity - remaining,
+            created_by: user?.id,
+            qr_code_data: qrCode || `B-${Math.random().toString(36).slice(2, 10).toUpperCase()}`,
+            manufacturing_machine_id: batch.manufacturing_machine_id,
+            production_date: batch.production_date,
+            from_extra_state: batch.from_extra_state,
+            is_special: batch.is_special || false,
+          });
+          remaining = 0;
+        }
+      }
+
+      toast.success(`Started working on ${quantity} units`);
+      setWaitingSelections(prev => {
+        const next = new Map(prev);
+        next.delete(groupKey);
+        return next;
+      });
+      fetchData();
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setSubmitting(false);
+      setStartWorkingTarget(null);
+    }
+  };
+
+  // Prepare selections for MoveToExtraDialog (only from working items)
+  const extraSelections = workingGroups
+    .filter((g) => workingSelections.get(g.groupKey) && workingSelections.get(g.groupKey)! > 0)
     .map((g) => {
-      const selectedQty = productSelections.get(g.groupKey) || 0;
-      // Only include batches that are in_manufacturing and calculate how much to take from them
-      const inMfgBatches = g.batches.filter((b) => b.current_state === "in_manufacturing");
-      const qtyFromInMfg = Math.min(selectedQty, g.inManufacturing);
+      const selectedQty = workingSelections.get(g.groupKey) || 0;
       return {
         groupKey: g.groupKey,
         product_id: g.product_id,
         product_name: g.product_name,
         product_sku: g.product_sku,
-        quantity: qtyFromInMfg,
+        quantity: Math.min(selectedQty, g.totalQty),
         order_item_ids: g.order_item_ids,
-        batches: inMfgBatches.map((b) => ({
+        batches: g.batches.map((b) => ({
           id: b.id,
           quantity: b.quantity,
           current_state: b.current_state,
@@ -531,15 +586,15 @@ export default function OrderManufacturing() {
     .filter((s) => s.quantity > 0);
 
   const handleOpenBoxDialog = () => {
-    if (totalSelected === 0) {
+    if (totalWorkingSelected === 0) {
       toast.error(t('phase.select_items_first'));
       return;
     }
     // Enforce single product per box
     const selectedProductIds = new Set(
-      Array.from(productSelections.entries())
+      Array.from(workingSelections.entries())
         .filter(([_, qty]) => qty > 0)
-        .map(([key]) => productGroups.find(g => g.groupKey === key)?.product_id)
+        .map(([key]) => workingGroups.find(g => g.groupKey === key)?.product_id)
         .filter(Boolean)
     );
     if (selectedProductIds.size > 1) {
@@ -555,12 +610,11 @@ export default function OrderManufacturing() {
   };
 
   const handleAssignToBox = async () => {
-    if (!selectedBox || totalSelected === 0) return;
+    if (!selectedBox || totalWorkingSelected === 0) return;
     setSubmitting(true);
     const machineId = selectedMachine;
 
     try {
-      // Get current box data for items_list
       const { data: boxData } = await supabase.from("boxes").select("items_list").eq("id", selectedBox.id).single();
 
       const currentItems = Array.isArray(boxData?.items_list) ? boxData.items_list : [];
@@ -575,16 +629,14 @@ export default function OrderManufacturing() {
         batch_type: string;
       }> = [];
 
-      // Process each order item selection (using order_item_id as key)
-      for (const [groupKey, quantity] of productSelections.entries()) {
+      for (const [groupKey, quantity] of workingSelections.entries()) {
         if (quantity <= 0) continue;
 
-        const group = productGroups.find((g) => g.groupKey === groupKey);
+        const group = workingGroups.find((g) => g.groupKey === groupKey);
         if (!group) continue;
 
         let remainingQty = quantity;
 
-        // Sort batches: prioritize those with machine assigned, then by quantity
         const sortedBatches = [...group.batches].sort((a, b) => {
           const aHasMachine = a.manufacturing_machine_id ? 0 : 1;
           const bHasMachine = b.manufacturing_machine_id ? 0 : 1;
@@ -599,8 +651,6 @@ export default function OrderManufacturing() {
           remainingQty -= useQty;
 
           if (useQty === batch.quantity) {
-            // Update entire batch - no ETA here, set when receiving
-            // Special items go directly to ready_for_boxing
             const nextState = batch.is_special ? "ready_for_boxing" : "ready_for_finishing";
             await supabase
               .from("order_batches")
@@ -609,10 +659,12 @@ export default function OrderManufacturing() {
                 box_id: selectedBox.id,
                 manufacturing_machine_id: machineId || batch.manufacturing_machine_id,
                 production_date: machineId ? new Date().toISOString().split('T')[0] : batch.production_date,
+                // Clear ETA when moving to next phase
+                eta: null,
+                lead_time_days: null,
               })
               .eq("id", batch.id);
 
-            // Add to items list
             newItems.push({
               product_id: group.product_id,
               product_name: group.product_name,
@@ -624,13 +676,9 @@ export default function OrderManufacturing() {
               batch_type: "ORDER",
             });
           } else {
-            // Split batch
             const { data: qrCode } = await supabase.rpc("generate_extra_batch_code");
 
-            // Create new batch with selected quantity - no ETA here
-            // Special items go directly to ready_for_boxing
             const splitNextState = batch.is_special ? "ready_for_boxing" : "ready_for_finishing";
-            // Inherit manufacturing_machine_id from parent batch or use selected
             const { data: newBatch } = await supabase
               .from("order_batches")
               .insert({
@@ -650,7 +698,6 @@ export default function OrderManufacturing() {
               .select("id")
               .single();
 
-            // Reduce original batch
             await supabase
               .from("order_batches")
               .update({
@@ -658,7 +705,6 @@ export default function OrderManufacturing() {
               })
               .eq("id", batch.id);
 
-            // Add to items list
             newItems.push({
               product_id: group.product_id,
               product_name: group.product_name,
@@ -673,7 +719,6 @@ export default function OrderManufacturing() {
         }
       }
 
-      // Update box with new items_list and content_type
       const updatedItems = [...currentItems, ...newItems];
       await supabase
         .from("boxes")
@@ -683,9 +728,9 @@ export default function OrderManufacturing() {
         })
         .eq("id", selectedBox.id);
 
-      toast.success(`Assigned ${totalSelected} items to ${selectedBox.box_code}`);
+      toast.success(`Assigned ${totalWorkingSelected} items to ${selectedBox.box_code}`);
       setBoxDialogOpen(false);
-      setProductSelections(new Map());
+      setWorkingSelections(new Map());
       fetchData();
     } catch (error: any) {
       toast.error(error.message);
@@ -715,7 +760,36 @@ export default function OrderManufacturing() {
     );
   }
 
-  const totalInManufacturing = productGroups.reduce((sum, g) => sum + g.inManufacturing, 0);
+  const renderGroupCard = (group: ProductGroup) => (
+    <div className="flex items-center justify-between">
+      <div className="flex-1">
+        <div className="flex items-center gap-2 flex-wrap">
+          <p className="font-medium">{group.product_name}</p>
+          {group.product_name_ar && (
+            <span className="text-sm text-muted-foreground">({group.product_name_ar})</span>
+          )}
+          {group.size && (
+            <Badge variant="outline" className="text-xs">{group.size}</Badge>
+          )}
+          {group.product_color_en && (
+            <Badge variant="outline" className="text-xs">{group.product_color_en}</Badge>
+          )}
+          {group.needs_boxing ? (
+            <Badge variant="outline" className="text-xs bg-primary/10">
+              {t('phase.needs_boxing')}
+            </Badge>
+          ) : (
+            <Badge variant="secondary" className="text-xs">
+              {t('phase.no_boxing')}
+            </Badge>
+          )}
+        </div>
+        <p className="text-sm text-muted-foreground">
+          {group.product_sku} · {group.needs_packing ? t('phase.needs_packing') : t('phase.no_packing')}
+        </p>
+      </div>
+    </div>
+  );
 
   return (
     <div className="p-6 space-y-6">
@@ -752,14 +826,14 @@ export default function OrderManufacturing() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">{t('phase.in_manufacturing')}</p>
-            <p className="text-2xl font-bold text-primary">{totalInManufacturing}</p>
+            <p className="text-sm text-muted-foreground">{t('phase.waiting')}</p>
+            <p className="text-2xl font-bold text-muted-foreground">{totalWaiting}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">{t('phase.products_label')}</p>
-            <p className="text-2xl font-bold">{productGroups.length}</p>
+            <p className="text-sm text-muted-foreground">{t('phase.in_progress')}</p>
+            <p className="text-2xl font-bold text-primary">{totalWorking}</p>
           </CardContent>
         </Card>
         <Card>
@@ -792,107 +866,153 @@ export default function OrderManufacturing() {
           <TabsTrigger value="completed">{t('phase.completed')} ({totalCompleted})</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="active" className="space-y-4">
-          {/* Action Buttons */}
-          {canManage && !isCancelled && (
-            <Card>
-              <CardContent className="p-4 flex flex-wrap items-center gap-3">
-                <div className="flex-1 text-sm text-muted-foreground">
-                  {totalSelected > 0
-                    ? `${totalSelected} ${t('phase.selected')}${totalSelectedInManufacturing > 0 ? ` (${totalSelectedInManufacturing} ${t('phase.in_manufacturing').toLowerCase()})` : ""}`
-                    : t('phase.select_quantities')}
-                </div>
-                <Button onClick={handleOpenBoxDialog} disabled={totalSelected === 0}>
-                  <Box className="h-4 w-4 mr-2" />
-                  {t('phase.assign_to_box')}
-                </Button>
-                <Button
-                  variant="secondary"
-                  onClick={() => setMoveToExtraDialogOpen(true)}
-                  disabled={totalSelectedInManufacturing === 0}
-                  title={t('phase.assign_to_extra')}
-                >
-                  <Package className="h-4 w-4 mr-2" />
-                  {t('phase.assign_to_extra')}
-                </Button>
-              </CardContent>
-            </Card>
-          )}
+        <TabsContent value="active" className="space-y-6">
 
-          {/* Products List */}
-          <div className="space-y-4">
-            {productGroups.length === 0 ? (
+          {/* === WAITING SECTION === */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Clock className="h-4 w-4 text-muted-foreground" />
+              <h3 className="font-semibold text-sm">{t('phase.waiting')} ({totalWaiting})</h3>
+            </div>
+
+            {waitingGroups.length === 0 ? (
               <Card>
-                <CardContent className="p-8 text-center text-muted-foreground">
-                  {t('phase.no_items_in_phase')}
+                <CardContent className="p-6 text-center text-muted-foreground text-sm">
+                  {t('phase.no_waiting_items')}
                 </CardContent>
               </Card>
             ) : (
-              productGroups.map((group) => {
-                const groupItemId = group.order_item_ids[0] || group.groupKey;
-                const itemInProgress = isInProgress(groupItemId);
-                return (
-                <Card key={group.groupKey} className={itemInProgress ? "border-green-500 dark:border-green-400" : ""}>
+              waitingGroups.map((group) => (
+                <Card key={group.groupKey}>
                   <CardContent className="p-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <p className="font-medium">{group.product_name}</p>
-                          {group.product_name_ar && (
-                            <span className="text-sm text-muted-foreground">({group.product_name_ar})</span>
-                          )}
-                          {group.size && (
-                            <Badge variant="outline" className="text-xs">{group.size}</Badge>
-                          )}
-                          {group.product_color_en && (
-                            <Badge variant="outline" className="text-xs">{group.product_color_en}</Badge>
-                          )}
-                          {group.needs_boxing ? (
-                            <Badge variant="outline" className="text-xs bg-primary/10">
-                              {t('phase.needs_boxing')}
-                            </Badge>
-                          ) : (
-                            <Badge variant="secondary" className="text-xs">
-                              {t('phase.no_boxing')}
-                            </Badge>
-                          )}
-                        </div>
-                        <p className="text-sm text-muted-foreground">
-                          {group.product_sku} · {group.needs_packing ? t('phase.needs_packing') : t('phase.no_packing')}
-                        </p>
+                    {renderGroupCard(group)}
+                    <div className="flex items-center justify-end gap-4 mt-3">
+                      <div className="text-center">
+                        <p className="text-xs text-muted-foreground">{t('phase.qty')}</p>
+                        <p className="text-lg font-semibold text-muted-foreground">{group.totalQty}</p>
                       </div>
-                      <div className="flex items-center gap-6">
-                        <div className="text-center">
-                          <p className="text-xs text-muted-foreground">{t('phase.in_mfg')}</p>
-                          <p className="text-lg font-semibold text-primary">{group.inManufacturing}</p>
-                        </div>
-                        {canManage && !isCancelled && (
+                      {canManage && !isCancelled && (
+                        <>
                           <div className="flex items-center gap-2">
                             <Label className="text-xs text-muted-foreground">{t('phase.select_label')}</Label>
                             <NumericInput
                               min={0}
-                              max={group.inManufacturing}
-                              value={productSelections.get(group.groupKey) || undefined}
+                              max={group.totalQty}
+                              value={waitingSelections.get(group.groupKey) || undefined}
                               onValueChange={(val) => {
-                                setProductSelections((prev) => new Map(prev).set(group.groupKey, val ?? 0));
+                                setWaitingSelections((prev) => new Map(prev).set(group.groupKey, val ?? 0));
                               }}
                               className="w-20 h-8"
                             />
                           </div>
-                        )}
-                        {canManage && !isCancelled && (
-                          itemInProgress ? (
-                            <Badge className="bg-green-600 text-white px-3 py-1.5">{t('phase.in_progress')}</Badge>
-                          ) : (
-                            <Button size="sm" variant="outline" onClick={() => markInProgress(groupItemId)}>
-                              {t('phase.start_working')}
-                            </Button>
-                          )
-                        )}
-                      </div>
+                          <Button
+                            size="sm"
+                            onClick={() => handleStartWorking(group.groupKey)}
+                            disabled={(waitingSelections.get(group.groupKey) || 0) <= 0 || submitting}
+                          >
+                            <Play className="h-3 w-3 mr-1" />
+                            {t('phase.start_working')}
+                          </Button>
+                        </>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
+              ))
+            )}
+          </div>
+
+          {/* === IN PROGRESS (WORKING) SECTION === */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Factory className="h-4 w-4 text-primary" />
+              <h3 className="font-semibold text-sm">{t('phase.in_progress')} ({totalWorking})</h3>
+            </div>
+
+            {/* Action Buttons for working items */}
+            {canManage && !isCancelled && totalWorking > 0 && (
+              <Card>
+                <CardContent className="p-4 flex flex-wrap items-center gap-3">
+                  <div className="flex-1 text-sm text-muted-foreground">
+                    {totalWorkingSelected > 0
+                      ? `${totalWorkingSelected} ${t('phase.selected')}`
+                      : t('phase.select_quantities')}
+                  </div>
+                  <Button onClick={handleOpenBoxDialog} disabled={totalWorkingSelected === 0}>
+                    <Box className="h-4 w-4 mr-2" />
+                    {t('phase.assign_to_box')}
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    onClick={() => setMoveToExtraDialogOpen(true)}
+                    disabled={totalWorkingSelected === 0}
+                    title={t('phase.assign_to_extra')}
+                  >
+                    <Package className="h-4 w-4 mr-2" />
+                    {t('phase.assign_to_extra')}
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
+            {workingGroups.length === 0 ? (
+              <Card>
+                <CardContent className="p-6 text-center text-muted-foreground text-sm">
+                  {t('phase.no_in_progress_items')}
+                </CardContent>
+              </Card>
+            ) : (
+              workingGroups.map((group) => {
+                // Check for late batches
+                const hasLate = group.batches.some(b => b.eta && isPast(new Date(b.eta)));
+                const earliestEta = group.batches
+                  .filter(b => b.eta)
+                  .map(b => new Date(b.eta!))
+                  .sort((a, b) => a.getTime() - b.getTime())[0];
+
+                return (
+                  <Card key={group.groupKey} className={hasLate ? "border-destructive" : "border-green-500 dark:border-green-400"}>
+                    <CardContent className="p-4">
+                      {renderGroupCard(group)}
+                      <div className="flex items-center justify-between mt-3">
+                        <div className="flex items-center gap-3">
+                          {earliestEta && (
+                            <div className="flex items-center gap-1.5">
+                              {hasLate ? (
+                                <AlertTriangle className="h-4 w-4 text-destructive" />
+                              ) : (
+                                <Clock className="h-4 w-4 text-muted-foreground" />
+                              )}
+                              <span className={`text-xs ${hasLate ? 'text-destructive font-medium' : 'text-muted-foreground'}`}>
+                                ETA: {format(earliestEta, 'PPP')}
+                                {hasLate ? ` (${t('phase.late')})` : ` (${formatDistanceToNow(earliestEta, { addSuffix: true })})`}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <div className="text-center">
+                            <p className="text-xs text-muted-foreground">{t('phase.qty')}</p>
+                            <p className="text-lg font-semibold text-primary">{group.totalQty}</p>
+                          </div>
+                          {canManage && !isCancelled && (
+                            <div className="flex items-center gap-2">
+                              <Label className="text-xs text-muted-foreground">{t('phase.select_label')}</Label>
+                              <NumericInput
+                                min={0}
+                                max={group.totalQty}
+                                value={workingSelections.get(group.groupKey) || undefined}
+                                onValueChange={(val) => {
+                                  setWorkingSelections((prev) => new Map(prev).set(group.groupKey, val ?? 0));
+                                }}
+                                className="w-20 h-8"
+                              />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
                 );
               })
             )}
@@ -902,7 +1022,6 @@ export default function OrderManufacturing() {
         <TabsContent value="extra" className="space-y-6">
           <ExtraItemsTab orderId={id!} phase="manufacturing" onRefresh={() => fetchData()} canManage={canManage && !isCancelled} onCountChange={setExtraCount} />
 
-          {/* Added to Extra Inventory from this Order */}
           {addedToExtraItems.length > 0 && (
             <div className="space-y-3">
               <div className="flex items-center gap-2 pb-2 border-b border-orange-200 dark:border-orange-900">
@@ -931,7 +1050,6 @@ export default function OrderManufacturing() {
 
         <TabsContent value="completed" className="space-y-6">
 
-          {/* Production Rate Section */}
           <ProductionRateSection
             batches={[
               ...processedBatchesForRate.map((batch) => ({
@@ -977,6 +1095,18 @@ export default function OrderManufacturing() {
         </TabsContent>
       </Tabs>
 
+      {/* Lead Time Dialog for Start Working */}
+      <LeadTimeDialog
+        open={leadTimeDialogOpen}
+        onOpenChange={(open) => {
+          setLeadTimeDialogOpen(open);
+          if (!open) setStartWorkingTarget(null);
+        }}
+        onConfirm={handleConfirmStartWorking}
+        unitCount={startWorkingTarget?.quantity || 0}
+        nextState="in_manufacturing"
+      />
+
       {/* Box Assignment Dialog */}
       <Dialog open={boxDialogOpen} onOpenChange={setBoxDialogOpen}>
         <DialogContent className="max-w-md">
@@ -984,7 +1114,6 @@ export default function OrderManufacturing() {
             <DialogTitle>{t('phase.assign_to_box')}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            {/* Machine Selection */}
             <div>
               <Label>{t('manufacturing.machine_optional')}</Label>
               <div className="mt-2">
@@ -1059,7 +1188,7 @@ export default function OrderManufacturing() {
             </Button>
             <Button onClick={handleAssignToBox} disabled={!selectedBox || submitting}>
               {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              {t('phase.assign_items')} {totalSelected}
+              {t('phase.assign_items')} {totalWorkingSelected}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1072,9 +1201,9 @@ export default function OrderManufacturing() {
         orderId={id!}
         phase="in_manufacturing"
         selections={extraSelections}
-        totalQuantity={totalSelectedInManufacturing}
+        totalQuantity={totalWorkingSelected}
         onSuccess={() => {
-          setProductSelections(new Map());
+          setWorkingSelections(new Map());
           fetchData();
         }}
         userId={user?.id}

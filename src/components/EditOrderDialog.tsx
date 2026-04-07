@@ -161,36 +161,19 @@ export function EditOrderDialog({
   const fetchRemovableQuantities = async () => {
     const map: Record<string, number> = {};
 
-    // Get all progress entries for this order in manufacturing phase
-    const { data: progressData } = await supabase
-      .from("order_item_progress")
-      .select("order_item_id")
-      .eq("order_id", orderId)
-      .eq("phase", "manufacturing");
-
-    const startedItems = new Set(progressData?.map((p) => p.order_item_id) || []);
-
-    // Get manufacturing batch quantities per order item
+    // Get manufacturing batch quantities per order item, only WAITING batches (eta IS NULL)
     const { data: batchData } = await supabase
       .from("order_batches")
-      .select("order_item_id, quantity")
+      .select("order_item_id, quantity, eta")
       .eq("order_id", orderId)
       .eq("current_state", "in_manufacturing");
 
-    // Sum quantities per order_item_id
-    const mfgQtyMap: Record<string, number> = {};
-    for (const b of batchData || []) {
-      if (b.order_item_id) {
-        mfgQtyMap[b.order_item_id] = (mfgQtyMap[b.order_item_id] || 0) + b.quantity;
-      }
-    }
-
+    // Sum waiting (eta=null) quantities per order_item_id
     for (const oi of orderItems) {
-      if (startedItems.has(oi.id)) {
-        map[oi.id] = 0; // Work started, cannot remove any
-      } else {
-        map[oi.id] = mfgQtyMap[oi.id] || 0;
-      }
+      const waitingQty = (batchData || [])
+        .filter(b => b.order_item_id === oi.id && !b.eta)
+        .reduce((sum, b) => sum + b.quantity, 0);
+      map[oi.id] = waitingQty;
     }
 
     setRemovableMap(map);
@@ -288,31 +271,19 @@ export function EditOrderDialog({
   const revalidateConstraints = async (): Promise<boolean> => {
     if (orderStatus !== "in_progress") return true;
 
-    const { data: progressData } = await supabase
-      .from("order_item_progress")
-      .select("order_item_id")
-      .eq("order_id", orderId)
-      .eq("phase", "manufacturing");
-
-    const startedItems = new Set(progressData?.map((p) => p.order_item_id) || []);
-
     const { data: batchData } = await supabase
       .from("order_batches")
-      .select("order_item_id, quantity")
+      .select("order_item_id, quantity, eta")
       .eq("order_id", orderId)
       .eq("current_state", "in_manufacturing");
-
-    const mfgQtyMap: Record<string, number> = {};
-    for (const b of batchData || []) {
-      if (b.order_item_id) {
-        mfgQtyMap[b.order_item_id] = (mfgQtyMap[b.order_item_id] || 0) + b.quantity;
-      }
-    }
 
     for (const item of items) {
       if (item.isNew || !item.id) continue;
 
-      const removable = startedItems.has(item.id) ? 0 : (mfgQtyMap[item.id] || 0);
+      // Only waiting batches (eta=null) are removable
+      const removable = (batchData || [])
+        .filter(b => b.order_item_id === item.id && !b.eta)
+        .reduce((sum, b) => sum + b.quantity, 0);
 
       if (item.isDeleted) {
         if (removable < item.originalQuantity) {
