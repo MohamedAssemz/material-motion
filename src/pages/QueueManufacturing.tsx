@@ -136,7 +136,8 @@ export default function QueueManufacturing() {
         <TableRow>
           <TableHead>{t('queue.order_number')}</TableHead>
           <TableHead>{t('queue.reference')}</TableHead>
-          <TableHead>{t('queue.in_manufacturing')}</TableHead>
+          <TableHead>{t('phase.waiting')}</TableHead>
+          <TableHead>{t('phase.in_progress')}</TableHead>
           <TableHead>{t('queue.extra_items')}</TableHead>
           <TableHead>{t('queue.created_date')}</TableHead>
         </TableRow>
@@ -146,8 +147,9 @@ export default function QueueManufacturing() {
           <TableRow key={order.id} className="cursor-pointer hover:bg-muted/50" onClick={() => navigate(`/orders/${order.id}/manufacturing`)}>
             <TableCell className="font-medium">{order.order_number}</TableCell>
             <TableCell className="text-muted-foreground">{order.reference_number || '—'}</TableCell>
-            <TableCell>{order.manufacturing_count > 0 && <Badge className="bg-blue-500">{order.manufacturing_count} {t('common.items')}</Badge>}</TableCell>
-            <TableCell>{order.extra_manufacturing_count > 0 && <Badge variant="outline" className="border-amber-500 text-amber-600"><Package className="h-3 w-3 mr-1" />{order.extra_manufacturing_count} {t('phase.extra').toLowerCase()}</Badge>}</TableCell>
+            <TableCell>{order.waiting_count > 0 && <Badge variant="secondary">{order.waiting_count}</Badge>}</TableCell>
+            <TableCell>{order.working_count > 0 && <Badge className="bg-primary text-primary-foreground">{order.working_count}</Badge>}</TableCell>
+            <TableCell>{order.extra_manufacturing_count > 0 && <Badge variant="outline" className="border-amber-500 text-amber-600"><Package className="h-3 w-3 mr-1" />{order.extra_manufacturing_count}</Badge>}</TableCell>
             <TableCell>{format(new Date(order.created_at), 'PPP')}</TableCell>
           </TableRow>
         ))}
