@@ -372,18 +372,35 @@ export function EditOrderDialog({
             .eq("id", item.id!);
 
           if (isInProgress) {
-            const { data: codeData } = await supabase.rpc("generate_batch_code");
-            const { error } = await supabase.from("order_batches").insert({
-              order_id: orderId,
-              product_id: item.product_id,
-              order_item_id: item.id!,
-              current_state: "in_manufacturing",
-              quantity: delta,
-              created_by: user?.id,
-              qr_code_data: codeData || `B-${Math.random().toString(36).slice(2, 10).toUpperCase()}`,
-              is_special: item.is_special,
-            });
-            if (error) throw error;
+            // Try to merge into existing waiting batch (eta IS NULL)
+            const { data: existingBatch } = await supabase
+              .from("order_batches")
+              .select("id, quantity")
+              .eq("order_item_id", item.id!)
+              .eq("current_state", "in_manufacturing")
+              .is("eta", null)
+              .limit(1)
+              .maybeSingle();
+
+            if (existingBatch) {
+              await supabase
+                .from("order_batches")
+                .update({ quantity: existingBatch.quantity + delta })
+                .eq("id", existingBatch.id);
+            } else {
+              const { data: codeData } = await supabase.rpc("generate_batch_code");
+              const { error } = await supabase.from("order_batches").insert({
+                order_id: orderId,
+                product_id: item.product_id,
+                order_item_id: item.id!,
+                current_state: "in_manufacturing",
+                quantity: delta,
+                created_by: user?.id,
+                qr_code_data: codeData || `B-${Math.random().toString(36).slice(2, 10).toUpperCase()}`,
+                is_special: item.is_special,
+              });
+              if (error) throw error;
+            }
           }
         } else {
           // Decrease: check box occupancy first
@@ -448,22 +465,28 @@ export function EditOrderDialog({
         }
       }
 
-      // Log activity
+      // Log activity with per-item details
       const logEftChanged = (eft ? eft.toISOString() : null) !== currentEft;
-      const itemsAdded = items.filter(i => i.isNew && !i.isDeleted).length;
-      const itemsDeleted = items.filter(i => i.isDeleted && !i.isNew).length;
-      const itemsQtyChanged = items.filter(i => !i.isNew && !i.isDeleted && i.id && i.quantity !== i.originalQuantity).length;
+      const changes: Array<Record<string, any>> = [];
 
-      if (user) {
+      for (const item of items) {
+        if (item.isNew && !item.isDeleted) {
+          changes.push({ type: "added", product: item.productName, sku: item.productSku, size: item.size, quantity: item.quantity });
+        } else if (item.isDeleted && !item.isNew) {
+          changes.push({ type: "deleted", product: item.productName, sku: item.productSku, size: item.size, quantity: item.originalQuantity });
+        } else if (!item.isNew && !item.isDeleted && item.id && item.quantity !== item.originalQuantity) {
+          changes.push({ type: "qty_changed", product: item.productName, sku: item.productSku, size: item.size, from: item.originalQuantity, to: item.quantity, delta: item.quantity - item.originalQuantity });
+        }
+      }
+
+      if (user && (logEftChanged || changes.length > 0)) {
         await supabase.from("order_activity_logs").insert({
           order_id: orderId,
           action: "edited",
           performed_by: user.id,
           details: {
             eft_changed: logEftChanged,
-            items_added: itemsAdded || undefined,
-            items_deleted: itemsDeleted || undefined,
-            items_qty_changed: itemsQtyChanged || undefined,
+            changes,
           },
         });
       }

@@ -56,7 +56,7 @@ export function OrderActivityLog({ orderId }: OrderActivityLogProps) {
         .from("order_activity_logs")
         .select("id, action, details, created_at, performed_by")
         .eq("order_id", orderId)
-        .order("created_at", { ascending: true });
+        .order("created_at", { ascending: false });
 
       if (error) throw error;
 
@@ -95,34 +95,51 @@ export function OrderActivityLog({ orderId }: OrderActivityLogProps) {
     return log.profile?.full_name || log.profile?.email || "Unknown";
   };
 
-  const getDetailText = (log: ActivityLog): string | null => {
-    if (!log.details) return null;
+  const getDetailLines = (log: ActivityLog): string[] => {
+    if (!log.details) return [];
 
     if (log.action === "edited") {
-      const changes: string[] = [];
-      if (log.details.eft_changed) changes.push("EFT updated");
-      if (log.details.items_added) changes.push(`${log.details.items_added} item(s) added`);
-      if (log.details.items_deleted) changes.push(`${log.details.items_deleted} item(s) deleted`);
-      if (log.details.items_qty_changed) changes.push(`${log.details.items_qty_changed} item(s) qty changed`);
-      return changes.length > 0 ? changes.join(", ") : null;
+      const lines: string[] = [];
+      if (log.details.eft_changed) lines.push("EFT updated");
+
+      // New per-item changes format
+      if (Array.isArray(log.details.changes)) {
+        for (const c of log.details.changes) {
+          const sizeLabel = c.size ? ` (${c.size})` : "";
+          if (c.type === "added") {
+            lines.push(`Added: ${c.product}${sizeLabel} × ${c.quantity}`);
+          } else if (c.type === "deleted") {
+            lines.push(`Deleted: ${c.product}${sizeLabel} × ${c.quantity}`);
+          } else if (c.type === "qty_changed") {
+            const sign = c.delta > 0 ? "+" : "";
+            lines.push(`${c.product}${sizeLabel}: ${c.from} → ${c.to} (${sign}${c.delta})`);
+          }
+        }
+      } else {
+        // Legacy format fallback
+        if (log.details.items_added) lines.push(`${log.details.items_added} item(s) added`);
+        if (log.details.items_deleted) lines.push(`${log.details.items_deleted} item(s) deleted`);
+        if (log.details.items_qty_changed) lines.push(`${log.details.items_qty_changed} item(s) qty changed`);
+      }
+      return lines;
     }
 
     if (log.action === "shipment_created" && log.details.shipment_code) {
-      return `Shipment: ${log.details.shipment_code}`;
+      return [`Shipment: ${log.details.shipment_code}`];
     }
 
     if (log.action === "reserved_extra" && log.details.total_reserved) {
-      return `${log.details.total_reserved} units reserved`;
+      return [`${log.details.total_reserved} units reserved`];
     }
 
     if (log.action === "committed_extra") {
       const parts: string[] = [];
       if (log.details.total_released) parts.push(`${log.details.total_released} released`);
       if (log.details.total_requeued) parts.push(`${log.details.total_requeued} requeued`);
-      return parts.length > 0 ? parts.join(", ") : null;
+      return parts;
     }
 
-    return null;
+    return [];
   };
 
   if (loading) {
@@ -185,7 +202,7 @@ export function OrderActivityLog({ orderId }: OrderActivityLogProps) {
               color: "text-muted-foreground",
             };
             const Icon = config.icon;
-            const detailText = getDetailText(log);
+            const detailLines = getDetailLines(log);
             const isLast = index === logs.length - 1;
 
             return (
@@ -206,8 +223,12 @@ export function OrderActivityLog({ orderId }: OrderActivityLogProps) {
                   <p className="text-xs text-muted-foreground">
                     by {getPerformerName(log)} · {formatDistanceToNow(new Date(log.created_at), { addSuffix: true })}
                   </p>
-                  {detailText && (
-                    <p className="text-xs text-muted-foreground mt-0.5">{detailText}</p>
+                  {detailLines.length > 0 && (
+                    <div className="mt-0.5 space-y-0.5">
+                      {detailLines.map((line, i) => (
+                        <p key={i} className="text-xs text-muted-foreground">{line}</p>
+                      ))}
+                    </div>
                   )}
                 </div>
               </div>
