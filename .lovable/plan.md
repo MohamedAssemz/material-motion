@@ -1,88 +1,43 @@
 
 
-# Split Manufacturing Batches: "Start Working" with Sub-Quantity and ETA
+# Improve Activity Log Details and Edit Order Batch Logic
 
 ## Overview
-Currently, manufacturing batches sit in `in_manufacturing` as a single block. The user wants to split work: select a sub-quantity to actively work on (with an ETA), while the rest remains waiting. This mirrors how finishing receives boxes from `ready_for_finishing` → `in_finishing` with lead time.
-
-## Approach: Two Sub-States Within Manufacturing
-
-Instead of adding a new state to the 9-state machine (which would ripple through the entire codebase), we split the manufacturing phase into two conceptual modes using a **boolean flag** on the batch:
-
-- **Waiting** batches: `in_manufacturing` with `eta = NULL` and `lead_time_days = NULL` (current default)
-- **Working** batches: `in_manufacturing` with `eta` and `lead_time_days` set (started working)
-
-This avoids changing the state machine, all downstream phases, transitions, triggers, and RLS policies.
-
-### Manufacturing Page Flow (Revised)
-
-```text
-┌─────────────────────────────────────────────┐
-│ Process Tab                                  │
-├──────────────────────────────────────────────┤
-│ ┌─ Waiting ─────────────────────────────┐    │
-│ │ Product A - S    Qty: 80              │    │
-│ │ [Select: ___] [Start Working]         │    │
-│ └───────────────────────────────────────┘    │
-│ ┌─ In Progress (Working) ───────────────┐    │
-│ │ Product A - S    Qty: 20   ETA: 3 days│    │
-│ │ [Select: ___] [Assign to Box] [Extra] │    │
-│ └───────────────────────────────────────┘    │
-└─────────────────────────────────────────────┘
-```
-
-**User flow:**
-1. User sees **Waiting** items (no ETA set)
-2. Selects a sub-quantity → clicks "Start Working" → enters lead time (days) → batch splits: selected qty gets ETA, remainder stays waiting
-3. **Working** items (ETA set) can then be selected to assign to box / move to extra
-4. Only working items can be moved to box or extra
-
-### Edit Order Constraint
-When reducing quantities, the system checks how many units are still "waiting" (no ETA). Only those can be reduced. Units with ETA set are considered "started" and locked.
+Three changes: (1) enrich the activity log to show specific item names and quantity deltas, (2) reverse timeline order to newest-first, (3) when increasing/decreasing quantity on edit, merge into existing `in_manufacturing` waiting batches instead of always creating new ones.
 
 ## Changes
 
-### 1. `src/pages/OrderManufacturing.tsx`
-- Split the Process tab into two sections: **Waiting** (batches where `eta IS NULL`) and **In Progress** (batches where `eta IS NOT NULL`)
-- **Waiting section**: Each product group shows quantity + numeric input + "Start Working" button
-- Clicking "Start Working" opens a dialog asking for lead time (days, 1-30) similar to finishing's accept dialog
-- On confirm: split the batch — selected qty gets `eta` and `lead_time_days` set, remainder stays as-is
-- **In Progress section**: Shows groups with ETA countdown/late indicator (reuse existing ETA display pattern from finishing)
-- "Assign to Box" and "Move to Extra" buttons only operate on the In Progress section
-- Update stats cards: show Waiting count, In Progress count, Completed count
-- Remove the old `order_item_progress` "Start Working" button (replaced by this quantity-based flow)
+### 1. `src/components/EditOrderDialog.tsx` — Richer activity log details + batch merge logic
 
-### 2. `src/components/EditOrderDialog.tsx`
-- Update `fetchRemovableQuantities()`: instead of checking `order_item_progress` for the binary "started" flag, sum batch quantities where `eta IS NULL AND current_state = 'in_manufacturing'` — those are the removable (waiting) units
-- Remove the `order_item_progress` check for manufacturing phase — it's now replaced by the ETA-based approach
-
-### 3. `src/components/StartOrderDialog.tsx`
-- No changes needed — it just starts the order, doesn't set ETAs on batches
-
-### 4. `src/pages/QueueManufacturing.tsx`
-- Optionally add "waiting" vs "in progress" counts to the queue list view
-
-### 5. Stats and display helpers
-- Add late-item detection for manufacturing (batches where `eta < now()` and still `in_manufacturing`)
-- Reuse the existing ETA/late pattern from finishing/packaging phases
-
-## Technical Details
-
-### No database migration needed
-The `order_batches` table already has `eta` and `lead_time_days` columns. We just start using them in the manufacturing phase.
-
-### No state machine changes
-The state remains `in_manufacturing`. The distinction is purely based on whether `eta` is set.
-
-### Batch splitting on "Start Working"
-When user selects qty X from a batch of Y:
-- If X = Y: update batch in-place with `eta` and `lead_time_days`
-- If X < Y: update batch to qty X with ETA, insert new batch with qty Y-X (no ETA)
-
-### Edit order constraint change
+**Activity log details (lines ~451-468):** Replace the current summary counts with an array of per-item change records:
+```ts
+details: {
+  eft_changed: logEftChanged,
+  changes: [
+    // For each added item:
+    { type: "added", product: "Product Name", sku: "SKU", size: "M", quantity: 50 },
+    // For each deleted item:
+    { type: "deleted", product: "Product Name", sku: "SKU", size: "S", quantity: 30 },
+    // For each qty change:
+    { type: "qty_changed", product: "Product Name", sku: "SKU", size: "L", from: 100, to: 80, delta: -20 },
+  ]
+}
 ```
-removable_qty = SUM(quantity) WHERE order_item_id = ? 
-                AND current_state = 'in_manufacturing' 
-                AND eta IS NULL
-```
+
+**Batch increase logic (lines ~374-387):** Instead of always inserting a new batch, first look for an existing `in_manufacturing` batch with `eta IS NULL` for the same `order_item_id`. If found, update its quantity. Only create a new batch if none exists.
+
+**Batch decrease logic (lines ~483-510):** Already correct (reduces waiting batches). No change needed.
+
+### 2. `src/components/OrderActivityLog.tsx` — Display item-level details + newest-first
+
+**Sort order (line 59):** Change `ascending: true` to `ascending: false`.
+
+**`getDetailText` for "edited" action (lines 101-107):** Parse the new `details.changes` array and render each change as a line item, e.g.:
+- "Added: Product A (M) × 50"
+- "Deleted: Product B (S) × 30"  
+- "Product C (L): 100 → 80 (−20)"
+
+Render these as a list of `<p>` elements instead of a single string, so each change gets its own line.
+
+### No database or migration changes needed — the `details` column is already JSONB.
 
