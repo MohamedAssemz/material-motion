@@ -1,58 +1,23 @@
 
 
-# Redesign Raw Materials Drawer for 10-20+ Order Items
+# Add Raw Materials Excel Export to Drawer
 
-## Problem
-The current horizontal tab bar becomes unusable with 10-20 order items — tabs overflow and are hard to navigate.
-
-## Approach: Searchable Dropdown + Item List View
-
-Replace the horizontal tab bar with two navigation modes:
-
-### Default view ("All Items")
-A **compact card list** showing each order item with its latest raw material status (has entries or not), acting as a dashboard. Clicking an item card opens that item's detail view inline.
-
-### Item detail view
-When an item is selected (via the list or a **searchable select dropdown** at the top), the drawer shows that item's timeline + post form. A back button returns to the list.
-
-```text
-┌─────────────────────────────────────────┐
-│  Raw Materials - ORD-00123              │
-├─────────────────────────────────────────┤
-│  [← Back to list]   [▼ Jump to item…]  │  ← searchable dropdown for quick jump
-├─────────────────────────────────────────┤
-│  Product A - S                          │
-│  ┌─ Post new version ───────────────┐   │
-│  │ [textarea]           [Post]      │   │
-│  └──────────────────────────────────┘   │
-│  Timeline...                            │
-└─────────────────────────────────────────┘
-```
-
-### List view (default):
-```text
-┌─────────────────────────────────────────┐
-│  Raw Materials - ORD-00123              │
-├─────────────────────────────────────────┤
-│  🔍 Search items...                     │
-├─────────────────────────────────────────┤
-│  ┌─ Product A - S ──────── 3 updates ─┐ │
-│  │  Latest: "Updated fabric..."  →    │ │
-│  ├─ Product B - M ──────── No entries ┤ │
-│  │  No raw materials yet         →    │ │
-│  ├─ Product C - L ──────── 1 update ──┤ │
-│  │  Latest: "Initial specs..."   →    │ │
-│  └────────────────────────────────────┘ │
-│  (legacy order-level notes at bottom)   │
-└─────────────────────────────────────────┘
-```
+## Overview
+Add an "Export" button in the Raw Materials drawer header that generates an XLSX file listing all order items with their raw material entries (text content, author, date, image URLs).
 
 ## Changes
 
 ### File: `src/components/RawMaterialsItemDrawer.tsx`
-- Replace horizontal tab bar with a **two-mode view** (list vs detail)
-- **List mode** (default): Scrollable list of all order items as clickable cards, each showing product name + size, SKU, version count, and a snippet of the latest entry. Include a text filter/search input at top to filter items by name/SKU.
-- **Detail mode**: Shows when an item is selected. Includes a back button to return to the list, a searchable select dropdown (using existing `Select` or combobox) for quick jumping between items, the post form (admin), and the timeline.
-- Legacy order-level notes shown as a separate section at the bottom of the list view.
-- No other files need changes — the props interface stays the same.
+- Add a `Download` icon button next to the drawer title (or in the header area)
+- On click, use the `xlsx` library (already available via the packing invoice generator) to build a workbook:
+  - **Sheet: "Raw Materials"**
+  - Columns: `Product Name`, `SKU`, `Size`, `Version #`, `Content`, `Images (URLs)`, `Updated By`, `Date`
+  - One row per version entry, grouped by order item
+  - Items with no entries get a single row with "No raw materials" in the Content column
+- Download the file as `Raw Materials - {orderNumber}.xlsx`
+
+### Dependencies
+- Uses `exceljs` (already in project from `packingInvoiceGenerator.ts`)
+
+### No database or schema changes needed — purely frontend export of already-fetched data.
 
