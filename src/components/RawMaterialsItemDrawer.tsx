@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { Send, ArrowLeft, Search, ChevronRight, FileText } from "lucide-react";
+import { Send, ArrowLeft, Search, ChevronRight, FileText, Download } from "lucide-react";
 import { RawMaterialImageUpload } from "@/components/RawMaterialImageUpload";
 import { cn } from "@/lib/utils";
 
@@ -192,6 +192,85 @@ export function RawMaterialsItemDrawer({
 
   const formatTimestamp = (dateString: string) => {
     return format(new Date(dateString), "MMM d, yyyy 'at' h:mm a");
+  };
+
+  const handleExportExcel = async () => {
+    try {
+      const ExcelJS = (await import("exceljs")).default;
+      const workbook = new ExcelJS.Workbook();
+      const sheet = workbook.addWorksheet("Raw Materials");
+
+      sheet.columns = [
+        { header: "Product Name", key: "product", width: 30 },
+        { header: "SKU", key: "sku", width: 18 },
+        { header: "Size", key: "size", width: 10 },
+        { header: "Version #", key: "version", width: 10 },
+        { header: "Content", key: "content", width: 50 },
+        { header: "Images (URLs)", key: "images", width: 40 },
+        { header: "Updated By", key: "updatedBy", width: 20 },
+        { header: "Date", key: "date", width: 22 },
+      ];
+
+      const headerRow = sheet.getRow(1);
+      headerRow.font = { bold: true };
+      headerRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE2E8F0" } };
+
+      for (const item of orderItems) {
+        const itemVersions = versionsByItem.get(item.id);
+        if (!itemVersions || itemVersions.length === 0) {
+          sheet.addRow({
+            product: getItemLabel(item),
+            sku: item.sku,
+            size: item.size || "",
+            version: "",
+            content: "No raw materials",
+            images: "",
+            updatedBy: "",
+            date: "",
+          });
+        } else {
+          for (const v of itemVersions) {
+            sheet.addRow({
+              product: getItemLabel(item),
+              sku: item.sku,
+              size: item.size || "",
+              version: v.version_number,
+              content: v.content || "",
+              images: v.images.join(", "),
+              updatedBy: v.profile?.full_name || v.profile?.email || "Unknown",
+              date: formatTimestamp(v.created_at),
+            });
+          }
+        }
+      }
+
+      // Legacy order-level notes
+      for (const v of legacyVersions) {
+        sheet.addRow({
+          product: "(Order-level note)",
+          sku: "",
+          size: "",
+          version: v.version_number,
+          content: v.content || "",
+          images: v.images.join(", "),
+          updatedBy: v.profile?.full_name || v.profile?.email || "Unknown",
+          date: formatTimestamp(v.created_at),
+        });
+      }
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Raw Materials - ${orderNumber}.xlsx`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("Excel exported successfully");
+    } catch (error) {
+      console.error("Export error:", error);
+      toast.error("Failed to export Excel");
+    }
   };
 
   const getItemLabel = (item: OrderItemInfo) => {
@@ -443,8 +522,18 @@ export function RawMaterialsItemDrawer({
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-full sm:max-w-lg flex flex-col">
-        <SheetHeader>
+        <SheetHeader className="flex flex-row items-center justify-between">
           <SheetTitle>Raw Materials - {orderNumber}</SheetTitle>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 gap-1.5"
+            onClick={handleExportExcel}
+            disabled={loading}
+          >
+            <Download className="h-4 w-4" />
+            Export
+          </Button>
         </SheetHeader>
 
         {loading ? (
