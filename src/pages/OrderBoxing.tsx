@@ -1217,7 +1217,7 @@ export default function OrderBoxing() {
         </Card>
         <Card>
           <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">{t('phase.moved_to_next')}</p>
+            <p className="text-sm text-muted-foreground">{t('phase.shipped')}</p>
             <p className="text-2xl font-bold text-primary">{(() => { const shippedBatchesQty = batches.filter(b => b.current_state === 'shipped' && b.from_extra_state !== 'extra_boxing' && !b.is_special && b.order_item?.needs_boxing !== false).reduce((s, b) => s + b.quantity, 0); const extraRateQty = extraBatchesForRate.reduce((s, b) => s + b.quantity, 0); const retrievedQty = retrievedFromExtraBatches.reduce((s, b) => s + b.quantity, 0); return shippedBatchesQty + extraRateQty + retrievedQty; })()}</p>
           </CardContent>
         </Card>
@@ -1521,11 +1521,6 @@ export default function OrderBoxing() {
                             ) : (
                               <Badge variant="secondary" className="text-xs">
                                 Not Boxed
-                              </Badge>
-                            )}
-                            {group.batches.some(b => b.from_extra_state === 'extra_boxing') && (
-                              <Badge className="text-xs bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300 border-purple-300 dark:border-purple-700">
-                                From Extra
                               </Badge>
                             )}
                           </div>
