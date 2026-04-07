@@ -1,23 +1,35 @@
 
 
-# Add Raw Materials Excel Export to Drawer
+# Fix Orders Page Units Counter
 
-## Overview
-Add an "Export" button in the Raw Materials drawer header that generates an XLSX file listing all order items with their raw material entries (text content, author, date, image URLs).
+## Problem
+Two bugs in the Orders page units counter:
 
-## Changes
+1. **Broken batch query**: The `fetchOrders` function filters by `.eq("is_terminated", false)` (line 145), but `is_terminated` does not exist in the `order_batches` schema. This causes the query to return no results, making `shipped_count` always 0 — hence all orders show `0/X` in the Units column.
 
-### File: `src/components/RawMaterialsItemDrawer.tsx`
-- Add a `Download` icon button next to the drawer title (or in the header area)
-- On click, use the `xlsx` library (already available via the packing invoice generator) to build a workbook:
-  - **Sheet: "Raw Materials"**
-  - Columns: `Product Name`, `SKU`, `Size`, `Version #`, `Content`, `Images (URLs)`, `Updated By`, `Date`
-  - One row per version entry, grouped by order item
-  - Items with no entries get a single row with "No raw materials" in the Content column
-- Download the file as `Raw Materials - {orderNumber}.xlsx`
+2. **Completion status conflation**: The `computed_status` on line 158 marks an order as "completed" when `shippedCount + extraCount >= unitCount`. This means orders where most items were moved to extra inventory (not actually shipped) appear as "Fulfilled" prematurely.
 
-### Dependencies
-- Uses `exceljs` (already in project from `packingInvoiceGenerator.ts`)
+## Fix
 
-### No database or schema changes needed — purely frontend export of already-fetched data.
+### File: `src/pages/Orders.tsx`
+
+1. **Remove `is_terminated` filter** from the batch query (lines 143-145). Just query `order_batches` normally:
+   ```ts
+   const { data: batches } = await supabase
+     .from("order_batches")
+     .select("current_state, quantity")
+     .eq("order_id", order.id);
+   ```
+
+2. **Fix computed_status logic** — only count shipped items for fulfillment, not `deducted_to_extra`:
+   ```ts
+   } else if (order.status === "completed" || (unitCount > 0 && shippedCount >= unitCount)) {
+     computed_status = "completed";
+   }
+   ```
+
+3. **Update Units column display** to show shipped count properly (already correct logic at line 619, just broken by the query issue).
+
+### Also clean up `src/pages/OrderBoxing.tsx`
+Remove the `is_terminated` and `terminated_reason` fields from the batch update (line 852-855) since these columns don't exist in the schema.
 
