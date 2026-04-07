@@ -479,7 +479,7 @@ export function EditOrderDialog({
     }
   };
 
-  // Only delete batches in in_manufacturing state
+  // Only delete batches in in_manufacturing state that are WAITING (eta IS NULL)
   const deleteManufacturingBatches = async (orderItemId: string, amount: number) => {
     let remaining = amount;
 
@@ -488,6 +488,7 @@ export function EditOrderDialog({
       .select("id, quantity")
       .eq("order_item_id", orderItemId)
       .eq("current_state", "in_manufacturing")
+      .is("eta", null)
       .order("quantity", { ascending: true });
 
     if (!batches) return;
