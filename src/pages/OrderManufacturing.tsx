@@ -985,42 +985,47 @@ export default function OrderManufacturing() {
 
                 return (
                   <Card key={group.groupKey} className={hasLate ? "border-destructive" : "border-green-500 dark:border-green-400"}>
-                    <CardContent className="p-4">
-                      {renderGroupCard(group)}
-                      <div className="flex items-center justify-between mt-3">
-                        <div className="flex items-center gap-3">
-                          {earliestEta && (
-                            <div className="flex items-center gap-1.5">
-                              {hasLate ? (
-                                <AlertTriangle className="h-4 w-4 text-destructive" />
-                              ) : (
-                                <Clock className="h-4 w-4 text-muted-foreground" />
-                              )}
-                              <span className={`text-xs ${hasLate ? 'text-destructive font-medium' : 'text-muted-foreground'}`}>
-                                ETA: {format(earliestEta, 'PPP')}
+                    <CardContent className="p-3">
+                      <div className="flex items-center justify-between gap-4 flex-wrap">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="font-medium truncate">{group.product_name}</p>
+                            {group.size && <Badge variant="outline" className="text-xs">{group.size}</Badge>}
+                            {group.product_color_en && (
+                              <Badge variant="outline" className="text-xs">{group.product_color_en}</Badge>
+                            )}
+                            {group.needs_boxing ? (
+                              <Badge variant="outline" className="text-xs bg-primary/10">{t('phase.needs_boxing')}</Badge>
+                            ) : (
+                              <Badge variant="secondary" className="text-xs">{t('phase.no_boxing')}</Badge>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <p className="text-xs text-muted-foreground truncate">{group.product_sku}</p>
+                            {earliestEta && (
+                              <span className={`text-xs flex items-center gap-1 ${hasLate ? 'text-destructive font-medium' : 'text-muted-foreground'}`}>
+                                {hasLate ? <AlertTriangle className="h-3 w-3" /> : <Clock className="h-3 w-3" />}
+                                ETA: {format(earliestEta, 'PP')}
                                 {hasLate ? ` (${t('phase.late')})` : ` (${formatDistanceToNow(earliestEta, { addSuffix: true })})`}
                               </span>
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-4">
-                          <div className="text-center">
-                            <p className="text-xs text-muted-foreground">{t('phase.qty')}</p>
-                            <p className="text-lg font-semibold text-primary">{group.totalQty}</p>
+                            )}
                           </div>
+                        </div>
+                        <div className="flex items-center gap-3 shrink-0">
+                          <span className="text-sm font-semibold text-primary tabular-nums">
+                            {t('phase.qty')}: {group.totalQty}
+                          </span>
                           {canManage && !isCancelled && (
-                            <div className="flex items-center gap-2">
-                              <Label className="text-xs text-muted-foreground">{t('phase.select_label')}</Label>
-                              <NumericInput
-                                min={0}
-                                max={group.totalQty}
-                                value={workingSelections.get(group.groupKey) || undefined}
-                                onValueChange={(val) => {
-                                  setWorkingSelections((prev) => new Map(prev).set(group.groupKey, val ?? 0));
-                                }}
-                                className="w-20 h-8"
-                              />
-                            </div>
+                            <NumericInput
+                              min={0}
+                              max={group.totalQty}
+                              value={workingSelections.get(group.groupKey) || undefined}
+                              onValueChange={(val) => {
+                                setWorkingSelections((prev) => new Map(prev).set(group.groupKey, val ?? 0));
+                              }}
+                              placeholder={t('phase.select_label')}
+                              className="w-20 h-8"
+                            />
                           )}
                         </div>
                       </div>
