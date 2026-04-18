@@ -884,17 +884,29 @@ export default function OrderManufacturing() {
             ) : (
               waitingGroups.map((group) => (
                 <Card key={group.groupKey}>
-                  <CardContent className="p-4">
-                    {renderGroupCard(group)}
-                    <div className="flex items-center justify-end gap-4 mt-3">
-                      <div className="text-center">
-                        <p className="text-xs text-muted-foreground">{t('phase.qty')}</p>
-                        <p className="text-lg font-semibold text-muted-foreground">{group.totalQty}</p>
+                  <CardContent className="p-3">
+                    <div className="flex items-center justify-between gap-4 flex-wrap">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="font-medium truncate">{group.product_name}</p>
+                          {group.size && <Badge variant="outline" className="text-xs">{group.size}</Badge>}
+                          {group.product_color_en && (
+                            <Badge variant="outline" className="text-xs">{group.product_color_en}</Badge>
+                          )}
+                          {group.needs_boxing ? (
+                            <Badge variant="outline" className="text-xs bg-primary/10">{t('phase.needs_boxing')}</Badge>
+                          ) : (
+                            <Badge variant="secondary" className="text-xs">{t('phase.no_boxing')}</Badge>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground truncate">{group.product_sku}</p>
                       </div>
-                      {canManage && !isCancelled && (
-                        <>
-                          <div className="flex items-center gap-2">
-                            <Label className="text-xs text-muted-foreground">{t('phase.select_label')}</Label>
+                      <div className="flex items-center gap-3 shrink-0">
+                        <span className="text-sm font-semibold text-muted-foreground tabular-nums">
+                          {t('phase.qty')}: {group.totalQty}
+                        </span>
+                        {canManage && !isCancelled && (
+                          <>
                             <NumericInput
                               min={0}
                               max={group.totalQty}
@@ -902,19 +914,20 @@ export default function OrderManufacturing() {
                               onValueChange={(val) => {
                                 setWaitingSelections((prev) => new Map(prev).set(group.groupKey, val ?? 0));
                               }}
+                              placeholder={t('phase.select_label')}
                               className="w-20 h-8"
                             />
-                          </div>
-                          <Button
-                            size="sm"
-                            onClick={() => handleStartWorking(group.groupKey)}
-                            disabled={(waitingSelections.get(group.groupKey) || 0) <= 0 || submitting}
-                          >
-                            <Play className="h-3 w-3 mr-1" />
-                            {t('phase.start_working')}
-                          </Button>
-                        </>
-                      )}
+                            <Button
+                              size="sm"
+                              onClick={() => handleStartWorking(group.groupKey)}
+                              disabled={(waitingSelections.get(group.groupKey) || 0) <= 0 || submitting}
+                            >
+                              <Play className="h-3 w-3 mr-1" />
+                              {t('phase.start_working')}
+                            </Button>
+                          </>
+                        )}
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
