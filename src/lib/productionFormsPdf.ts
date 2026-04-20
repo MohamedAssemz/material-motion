@@ -332,7 +332,9 @@ export type DeliveryOrderRow = {
 };
 
 export type DeliveryOrderData = {
-  shipmentCode: string;
+  invoiceNumber: string;
+  deliveryOrderNumber: string;
+  vehicleNumber: string;
   orderNumber: string;
   customer: string;
   deliveryLocation: string;
@@ -357,16 +359,18 @@ export function generateDeliveryOrderPDF(data: DeliveryOrderData): void {
     doc.line(x + lw, y + 1, x + w, y + 1);
   };
 
-  labelVal("Invoice No.:", data.shipmentCode, MARGIN, y0, PAGE_W / 2 - 4);
+  labelVal("Invoice No.:", data.invoiceNumber, MARGIN, y0, PAGE_W / 2 - 4);
   labelVal("Date:", fmtDate(data.date), PAGE_W / 2, y0, PAGE_W - MARGIN);
-  labelVal("Order No.:", data.orderNumber, MARGIN, y0 + 8, PAGE_W / 2 - 4);
-  labelVal("To:", data.customer, PAGE_W / 2, y0 + 8, PAGE_W - MARGIN);
-  labelVal("Delivery Location:", data.deliveryLocation, MARGIN, y0 + 16, PAGE_W - MARGIN);
+  labelVal("Delivery Order No.:", data.deliveryOrderNumber, MARGIN, y0 + 8, PAGE_W / 2 - 4);
+  labelVal("Order No.:", data.orderNumber, PAGE_W / 2, y0 + 8, PAGE_W - MARGIN);
+  labelVal("Vehicle No.:", data.vehicleNumber, MARGIN, y0 + 16, PAGE_W / 2 - 4);
+  labelVal("To:", data.customer, PAGE_W / 2, y0 + 16, PAGE_W - MARGIN);
+  labelVal("Delivery Location:", data.deliveryLocation, MARGIN, y0 + 24, PAGE_W - MARGIN);
 
   const total = data.rows.reduce((s, r) => s + r.quantity, 0);
 
   autoTable(doc, {
-    startY: y0 + 24,
+    startY: y0 + 32,
     head: [["#", "Description", "Lot No.", "Unit", "Quantity"]],
     body: [
       ...data.rows.map((r, i) => [i + 1, r.description, r.lot, r.unit, r.quantity]),
@@ -383,13 +387,59 @@ export function generateDeliveryOrderPDF(data: DeliveryOrderData): void {
     margin: { left: MARGIN, right: MARGIN },
   });
 
-  const sigY = PAGE_H - MARGIN - 30;
+  // Acknowledgement block after table
+  const finalY = (doc as any).lastAutoTable?.finalY ?? y0 + 60;
+  let ay = finalY + 8;
+  doc.setFont("helvetica", "normal");
   doc.setFontSize(10);
-  doc.text("Delivered by: ____________________", MARGIN, sigY);
-  doc.text("Received by: ____________________", PAGE_W - MARGIN, sigY, { align: "right" });
+  doc.text("I have received the above-mentioned goods after inspection and acceptance", MARGIN, ay);
+  ensureAmiri(doc);
+  doc.setFont("Amiri", "normal");
+  doc.setFontSize(11);
+  doc.text("لقد استلمت البضاعة المذكورة اعلاه بعد المعاينة والقبول", PAGE_W - MARGIN, ay + 6, { align: "right" });
+  doc.setFont("helvetica", "normal");
+
+  ay += 14;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  doc.text("Receiver", MARGIN, ay);
+  ensureAmiri(doc);
+  doc.setFont("Amiri", "normal");
+  doc.text("المستلم", MARGIN + 28, ay);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+
+  ay += 8;
+  doc.text("Name", MARGIN, ay);
+  ensureAmiri(doc);
+  doc.setFont("Amiri", "normal");
+  doc.text("اسم", MARGIN + 14, ay);
+  doc.setFont("helvetica", "normal");
+  doc.text(": ........................................................................", MARGIN + 24, ay);
+
+  ay += 8;
+  doc.text("Signature", MARGIN, ay);
+  ensureAmiri(doc);
+  doc.setFont("Amiri", "normal");
+  doc.text("التوقيع", MARGIN + 22, ay);
+  doc.setFont("helvetica", "normal");
+  doc.text(": ........................................................................", MARGIN + 36, ay);
+
+  ay += 12;
+  doc.setFont("helvetica", "bold");
+  doc.text("Accounts Department", MARGIN, ay);
+  ensureAmiri(doc);
+  doc.setFont("Amiri", "normal");
+  doc.text("قسم الحسابات", MARGIN + 48, ay);
+  doc.setFont("helvetica", "bold");
+  doc.text("Approved", PAGE_W - MARGIN - 40, ay);
+  ensureAmiri(doc);
+  doc.setFont("Amiri", "normal");
+  doc.text("معتمد", PAGE_W - MARGIN - 18, ay);
+  doc.setFont("helvetica", "normal");
 
   drawFooter(doc, "02/01/01/06");
-  downloadDoc(doc, `06_DO_${data.shipmentCode}.pdf`);
+  downloadDoc(doc, `06_DO_${data.deliveryOrderNumber}.pdf`);
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
