@@ -28,6 +28,7 @@ import {
   Plane,
   Truck,
   Package,
+  ImageOff,
 } from "lucide-react";
 
 import { CountrySelect } from "@/components/catalog/CountrySelect";
@@ -41,7 +42,9 @@ interface Product {
   id: string;
   sku: string;
   name_en: string;
+  name_ar?: string | null;
   sizes: string[] | null;
+  main_image_url?: string | null;
 }
 
 interface Customer {
@@ -59,6 +62,19 @@ interface OrderItem {
   initial_state: string;
 }
 
+function ProductThumb({ url, size = "md" }: { url?: string | null; size?: "sm" | "md" }) {
+  const dim = size === "sm" ? "h-7 w-7" : "h-9 w-9";
+  return (
+    <div className={cn(dim, "shrink-0 rounded-md border bg-muted overflow-hidden flex items-center justify-center")}>
+      {url ? (
+        <img src={url} alt="" className="h-full w-full object-cover" loading="lazy" />
+      ) : (
+        <ImageOff className="h-3.5 w-3.5 text-muted-foreground" />
+      )}
+    </div>
+  );
+}
+
 const orderSchema = z.object({
   order_number: z.string().trim().min(1, "Order number is required").max(50, "Order number too long"),
   reference_number: z.string().trim().max(50, "Reference number too long").optional(),
@@ -70,7 +86,7 @@ const orderSchema = z.object({
 
 export default function OrderCreate() {
   const { user, hasRole } = useAuth();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [products, setProducts] = useState<Product[]>([]);
@@ -103,15 +119,17 @@ export default function OrderCreate() {
 
   const fetchData = async () => {
     try {
-      const [productsRes, customersRes, productCustomersRes] = await Promise.all([
-        supabase.from("products").select("id, sku, name_en, sizes").order("sku"),
+      const [productsRes, customersRes, productCustomersRes, productImagesRes] = await Promise.all([
+        supabase.from("products").select("id, sku, name_en, name_ar, sizes").order("name_en"),
         supabase.from("customers").select("id, name, code, is_domestic").order("name"),
         supabase.from("product_customers").select("product_id, customer_id"),
+        supabase.from("product_images").select("product_id, image_url, is_main, sort_order"),
       ]);
 
       if (productsRes.error) throw productsRes.error;
       if (customersRes.error) throw customersRes.error;
       if (productCustomersRes.error) throw productCustomersRes.error;
+      if (productImagesRes.error) throw productImagesRes.error;
 
       const customerProductMap = new Map<string, Set<string>>();
       (productCustomersRes.data || []).forEach((pc: any) => {
@@ -121,7 +139,28 @@ export default function OrderCreate() {
         customerProductMap.get(pc.customer_id)!.add(pc.product_id);
       });
 
-      setProducts(productsRes.data || []);
+      // Build main image map: prefer is_main, then lowest sort_order
+      const imageMap = new Map<string, string>();
+      const grouped = new Map<string, any[]>();
+      (productImagesRes.data || []).forEach((img: any) => {
+        if (!grouped.has(img.product_id)) grouped.set(img.product_id, []);
+        grouped.get(img.product_id)!.push(img);
+      });
+      grouped.forEach((imgs, pid) => {
+        const sorted = [...imgs].sort((a, b) => {
+          if (a.is_main && !b.is_main) return -1;
+          if (!a.is_main && b.is_main) return 1;
+          return (a.sort_order ?? 0) - (b.sort_order ?? 0);
+        });
+        if (sorted[0]?.image_url) imageMap.set(pid, sorted[0].image_url);
+      });
+
+      const productsWithImages = (productsRes.data || []).map((p: any) => ({
+        ...p,
+        main_image_url: imageMap.get(p.id) || null,
+      }));
+
+      setProducts(productsWithImages);
       setCustomers(customersRes.data || []);
       setCustomerProductMapping(customerProductMap);
     } catch (error: any) {
@@ -609,10 +648,20 @@ export default function OrderCreate() {
                         <Label className="text-xs text-muted-foreground mb-1 block">{t('order.product')} *</Label>
                       <Popover open={productPopoverOpen[index] || false} onOpenChange={(open) => setProductPopoverOpen(prev => ({ ...prev, [index]: open }))}>
                           <PopoverTrigger asChild>
-                            <Button variant="outline" role="combobox" className="w-full justify-between h-9 text-sm">
-                              {selectedProduct
-                                ? <span className="truncate"><span className="font-mono">{selectedProduct.sku}</span> — {selectedProduct.name_en}</span>
-                                : <span className="text-muted-foreground">{t('order.select_product')}</span>}
+                            <Button variant="outline" role="combobox" className="w-full justify-between h-auto min-h-9 py-1.5 text-sm">
+                              {selectedProduct ? (
+                                <span className="flex items-center gap-2 min-w-0 flex-1">
+                                  <ProductThumb url={selectedProduct.main_image_url} size="sm" />
+                                  <span className="flex flex-col items-start min-w-0 flex-1 text-start">
+                                    <span className="truncate w-full">
+                                      {(language === 'ar' && selectedProduct.name_ar) ? selectedProduct.name_ar : selectedProduct.name_en}
+                                    </span>
+                                    <span className="text-xs text-muted-foreground font-mono truncate w-full">{selectedProduct.sku}</span>
+                                  </span>
+                                </span>
+                              ) : (
+                                <span className="text-muted-foreground">{t('order.select_product')}</span>
+                              )}
                               <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-50" />
                             </Button>
                           </PopoverTrigger>
@@ -630,35 +679,47 @@ export default function OrderCreate() {
                                     if (suggestedProducts.length > 0) {
                                       return (
                                         <CommandGroup heading={t('order.suggested_for_customer')}>
-                                          {suggestedProducts.map((product) => (
-                                            <CommandItem
-                                              key={`suggested-${product.id}`}
-                                              value={`suggested-${product.sku} ${product.name_en}`}
-                                              onSelect={() => { updateItem(index, { product_id: product.id }); setProductPopoverOpen(prev => ({ ...prev, [index]: false })); }}
-                                            >
-                                              <Check className={cn("mr-2 h-4 w-4", item.product_id === product.id ? "opacity-100" : "opacity-0")} />
-                                              <span className="font-mono mr-2">{product.sku}</span>
-                                              <span className="text-muted-foreground">{product.name_en}</span>
-                                              <Badge variant="secondary" className="ms-2 text-xs">{t('order.suggested')}</Badge>
-                                            </CommandItem>
-                                          ))}
+                                          {suggestedProducts.map((product) => {
+                                            const displayName = (language === 'ar' && product.name_ar) ? product.name_ar : product.name_en;
+                                            return (
+                                              <CommandItem
+                                                key={`suggested-${product.id}`}
+                                                value={`suggested-${product.sku} ${product.name_en} ${product.name_ar || ''}`}
+                                                onSelect={() => { updateItem(index, { product_id: product.id }); setProductPopoverOpen(prev => ({ ...prev, [index]: false })); }}
+                                              >
+                                                <Check className={cn("mr-2 h-4 w-4 shrink-0", item.product_id === product.id ? "opacity-100" : "opacity-0")} />
+                                                <ProductThumb url={product.main_image_url} size="md" />
+                                                <div className="flex flex-col min-w-0 flex-1 ms-2">
+                                                  <span className="truncate text-sm">{displayName}</span>
+                                                  <span className="truncate text-xs text-muted-foreground font-mono">{product.sku}</span>
+                                                </div>
+                                                <Badge variant="secondary" className="ms-2 text-xs shrink-0">{t('order.suggested')}</Badge>
+                                              </CommandItem>
+                                            );
+                                          })}
                                         </CommandGroup>
                                       );
                                     }
                                     return null;
                                   })()}
                                 <CommandGroup heading={selectedCustomerId ? t('order.all_products') : undefined}>
-                                  {products.map((product) => (
-                                    <CommandItem
-                                      key={product.id}
-                                      value={`${product.sku} ${product.name_en}`}
-                                      onSelect={() => { updateItem(index, { product_id: product.id }); setProductPopoverOpen(prev => ({ ...prev, [index]: false })); }}
-                                    >
-                                      <Check className={cn("mr-2 h-4 w-4", item.product_id === product.id ? "opacity-100" : "opacity-0")} />
-                                      <span className="font-mono mr-2">{product.sku}</span>
-                                      <span className="text-muted-foreground">{product.name_en}</span>
-                                    </CommandItem>
-                                  ))}
+                                  {products.map((product) => {
+                                    const displayName = (language === 'ar' && product.name_ar) ? product.name_ar : product.name_en;
+                                    return (
+                                      <CommandItem
+                                        key={product.id}
+                                        value={`${product.sku} ${product.name_en} ${product.name_ar || ''}`}
+                                        onSelect={() => { updateItem(index, { product_id: product.id }); setProductPopoverOpen(prev => ({ ...prev, [index]: false })); }}
+                                      >
+                                        <Check className={cn("mr-2 h-4 w-4 shrink-0", item.product_id === product.id ? "opacity-100" : "opacity-0")} />
+                                        <ProductThumb url={product.main_image_url} size="md" />
+                                        <div className="flex flex-col min-w-0 flex-1 ms-2">
+                                          <span className="truncate text-sm">{displayName}</span>
+                                          <span className="truncate text-xs text-muted-foreground font-mono">{product.sku}</span>
+                                        </div>
+                                      </CommandItem>
+                                    );
+                                  })}
                                 </CommandGroup>
                               </CommandList>
                             </Command>
