@@ -41,7 +41,9 @@ interface Product {
   id: string;
   sku: string;
   name_en: string;
+  name_ar?: string | null;
   sizes: string[] | null;
+  main_image_url?: string | null;
 }
 
 interface Customer {
