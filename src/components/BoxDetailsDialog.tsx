@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { logAudit } from '@/lib/auditLog';
 import {
   Dialog,
   DialogContent,
@@ -227,6 +228,16 @@ export function BoxDetailsDialog({
       await supabase.from(table).update({ items_list: [] }).eq('id', boxId);
 
       toast({ title: t('toast.success'), description: t('box_details.box_emptied') });
+      logAudit({
+        action: "box.force_emptied",
+        entity_type: boxType === 'order' ? "box" : "extra_box",
+        entity_id: boxCode,
+        module: "boxes",
+        metadata: {
+          box_code: boxCode,
+          batch_count: boxType === 'order' ? orderBatches.length : extraBatches.length,
+        },
+      });
       fetchBatchDetails();
       onRefresh?.();
     } catch (error: any) {

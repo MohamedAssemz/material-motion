@@ -1334,6 +1334,8 @@ export const translations: Record<string, TranslationEntry> = {
   "audit.action.user.created":                        { en: "User Created", ar: "تم إنشاء المستخدم" },
   "audit.action.user.role_changed":                   { en: "User Role Changed", ar: "تم تغيير دور المستخدم" },
   "audit.action.user.deleted":                        { en: "User Deleted", ar: "تم حذف المستخدم" },
+  "audit.action.user.email_updated":                  { en: "User Email Updated", ar: "تم تحديث بريد المستخدم" },
+  "audit.action.user.password_updated":               { en: "User Password Updated", ar: "تم تحديث كلمة مرور المستخدم" },
   "audit.action.product.created":                     { en: "Product Created", ar: "تم إنشاء المنتج" },
   "audit.action.product.updated":                     { en: "Product Updated", ar: "تم تحديث المنتج" },
   "audit.action.product.deleted":                     { en: "Product Deleted", ar: "تم حذف المنتج" },

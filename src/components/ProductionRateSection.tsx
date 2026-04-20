@@ -12,6 +12,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { logAudit } from "@/lib/auditLog";
 
 interface Machine {
   id: string;
@@ -232,6 +233,26 @@ export function ProductionRateSection({
       }
 
       toast.success("Machine assigned successfully");
+      const machineName = machines.find((m) => m.id === machineId)?.name ?? null;
+      const sampleBatch = batches.find((b) => group.unassignedBatchIds.includes(b.id));
+      logAudit({
+        action: "batch.machine_assigned",
+        entity_type: "batch",
+        entity_id: group.groupKey,
+        module: machineType === "manufacturing" ? "manufacturing"
+          : machineType === "finishing" ? "finishing"
+          : machineType === "packaging" ? "packaging" : "boxing",
+        order_id: (sampleBatch as any)?.order_id ?? null,
+        metadata: {
+          machine_id: machineId,
+          machine_name: machineName,
+          machine_type: machineType,
+          quantity: requestedQty,
+          production_date: dateStr,
+          product_name: group.product_name,
+          product_sku: group.product_sku,
+        },
+      });
       setSelectedMachines((prev) => {
         const m = new Map(prev);
         m.delete(group.groupKey);

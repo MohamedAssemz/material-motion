@@ -25,6 +25,7 @@ import { BoxLookupScanDialog } from "@/components/BoxLookupScanDialog";
 import { useBoxScanner } from "@/hooks/useBoxScanner";
 import { TablePagination } from "@/components/TablePagination";
 import { cn } from "@/lib/utils";
+import { logAudit } from "@/lib/auditLog";
 
 interface OrderBoxData {
   id: string;
@@ -526,6 +527,12 @@ export default function Boxes() {
         if (error) throw error;
       }
       toast({ title: t("toast.success"), description: `${t("toast.created_successfully")} (${newBoxCount})` });
+      logAudit({
+        action: "box.created",
+        entity_type: "box",
+        module: "boxes",
+        metadata: { count: newBoxCount, type: "ORDER" },
+      });
       setDialogOpen(false);
       setNewBoxCount(1);
       fetchBoxes();
@@ -545,6 +552,12 @@ export default function Boxes() {
         if (error) throw error;
       }
       toast({ title: t("toast.success"), description: `${t("toast.created_successfully")} (${newExtraBoxCount})` });
+      logAudit({
+        action: "box.created",
+        entity_type: "extra_box",
+        module: "boxes",
+        metadata: { count: newExtraBoxCount, type: "EXTRA", storehouse: newExtraStorehouse },
+      });
       setExtraDialogOpen(false);
       setNewExtraBoxCount(1);
       setNewExtraStorehouse(1);

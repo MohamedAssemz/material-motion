@@ -9,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useLanguage } from '@/contexts/LanguageContext';
 import type { Database } from '@/integrations/supabase/types';
+import { logAudit } from '@/lib/auditLog';
 
 type AppRole = Database['public']['Enums']['app_role'];
 
@@ -67,6 +68,13 @@ export function CreateUserDialog({ open, onOpenChange, onSuccess }: CreateUserDi
       if (!response.ok || data.error) throw new Error(data.error || 'Failed to create user');
 
       toast({ title: t('toast.success'), description: t('admin.user_created') });
+      logAudit({
+        action: "user.created",
+        entity_type: "user",
+        entity_id: data?.user?.id ?? formData.email,
+        module: "admin",
+        metadata: { email: formData.email, full_name: formData.fullName, primary_role: formData.primaryRole },
+      });
       setFormData({ email: '', password: '', fullName: '', primaryRole: 'manufacturing_manager' });
       onSuccess();
       onOpenChange(false);

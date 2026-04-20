@@ -7,6 +7,7 @@ import { Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { logAudit } from '@/lib/auditLog';
 
 interface DeleteUserDialogProps {
   open: boolean;
@@ -33,6 +34,13 @@ export function DeleteUserDialog({ open, onOpenChange, onSuccess, user }: Delete
       const data = await response.json();
       if (!response.ok || data.error) throw new Error(data.error || 'Failed to delete user');
       toast({ title: t('toast.success'), description: t('admin.user_deleted') });
+      logAudit({
+        action: "user.deleted",
+        entity_type: "user",
+        entity_id: user.id,
+        module: "admin",
+        metadata: { email: user.email, full_name: user.full_name },
+      });
       onSuccess();
       onOpenChange(false);
     } catch (error: any) {

@@ -27,6 +27,7 @@ import { ArrowLeft, Plus, Package, Loader2, Box, Search, Trash2 } from "lucide-r
 import { format } from "date-fns";
 import { TablePagination } from "@/components/TablePagination";
 import { ExtraBoxSelectionDialog } from "@/components/ExtraBoxSelectionDialog";
+import { logAudit } from "@/lib/auditLog";
 
 interface Product {
   id: string;
@@ -242,6 +243,18 @@ export default function ExtraInventory() {
         });
         if (error) throw error;
         toast({ title: t("toast.success"), description: t("toast.created_successfully") });
+        logAudit({
+          action: "extra_batch.created",
+          entity_type: "extra_batch",
+          module: "extra_inventory",
+          metadata: {
+            product_id: formData.product_id,
+            quantity: formData.quantity,
+            current_state: formData.current_state,
+            box_id: formData.box_id,
+            size: formData.size || null,
+          },
+        });
       }
 
       setDialogOpen(false);
@@ -301,6 +314,13 @@ export default function ExtraInventory() {
           .eq("id", selectedBatchForBox);
         if (batchError) throw batchError;
         toast({ title: t("toast.success"), description: t("toast.updated_successfully") });
+        logAudit({
+          action: "extra_batch.assigned_to_box",
+          entity_type: "extra_batch",
+          entity_id: selectedBatchForBox,
+          module: "extra_inventory",
+          metadata: { box_id: boxId, quantity: batch.quantity, product_id: batch.product_id },
+        });
       }
 
       setSelectedBatchForBox(null);
@@ -344,6 +364,18 @@ export default function ExtraInventory() {
       if (error) throw error;
 
       toast({ title: t("toast.deleted_successfully") });
+      logAudit({
+        action: batch.inventory_state === "RESERVED" ? "extra_batch.force_unreserved" : "extra_batch.deleted",
+        entity_type: "extra_batch",
+        entity_id: batch.id,
+        module: "extra_inventory",
+        metadata: {
+          product_id: batch.product_id,
+          quantity: batch.quantity,
+          inventory_state: batch.inventory_state,
+          current_state: batch.current_state,
+        },
+      });
       fetchData();
     } catch (error: any) {
       toast({ title: t("toast.error"), description: error.message, variant: "destructive" });
