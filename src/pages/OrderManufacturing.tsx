@@ -550,6 +550,20 @@ export default function OrderManufacturing() {
       }
 
       toast.success(`Started working on ${quantity} units`);
+      logAudit({
+        action: "batch.start_working",
+        entity_type: "batch",
+        entity_id: groupKey,
+        module: "manufacturing",
+        order_id: id,
+        metadata: {
+          product_name: group.product_name,
+          product_sku: group.product_sku,
+          quantity,
+          lead_time_days: leadTimeDays,
+          eta: eta.toISOString(),
+        },
+      });
       setWaitingSelections(prev => {
         const next = new Map(prev);
         next.delete(groupKey);
