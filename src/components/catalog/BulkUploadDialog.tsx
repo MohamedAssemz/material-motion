@@ -10,6 +10,7 @@ import { SIZE_OPTIONS } from '@/lib/catalogConstants';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import ExcelJS from 'exceljs';
+import { logAudit } from '@/lib/auditLog';
 
 interface BulkUploadDialogProps {
   open: boolean;
@@ -351,6 +352,17 @@ export function BulkUploadDialog({ open, onOpenChange, brands, onSuccess }: Bulk
 
       const created = inserted?.length ?? 0;
       setResult({ created, skipped: parsedData.totalRows - created, warnings: parsedData.warnings });
+      logAudit({
+        action: "product.bulk_uploaded",
+        entity_type: "product",
+        module: "catalog",
+        metadata: {
+          created,
+          skipped: parsedData.totalRows - created,
+          total_rows: parsedData.totalRows,
+          new_brands: newBrandNames.size,
+        },
+      });
       setParsedData(null);
       onSuccess();
     } catch (err: any) {

@@ -14,6 +14,7 @@ import { useDynamicSizes } from '@/lib/catalogConstants';
 import { ProductImageUpload } from './ProductImageUpload';
 import { CountrySelect } from './CountrySelect';
 import { SearchableSelect } from '@/components/ui/searchable-select';
+import { logAudit } from '@/lib/auditLog';
 
 // Categories selector with search
 function CategoriesSelector({ 
@@ -343,6 +344,18 @@ export function ProductFormDialog({
       toast({
         title: t('toast.success'),
         description: product?.id ? t('catalog.product_updated') : t('catalog.product_created'),
+      });
+      logAudit({
+        action: product?.id ? "product.updated" : "product.created",
+        entity_type: "product",
+        entity_id: productId,
+        module: "catalog",
+        metadata: {
+          sku: productData.sku,
+          name_en: productData.name_en,
+          name_ar: productData.name_ar,
+          brand_id: productData.brand_id,
+        },
       });
 
       onSuccess();

@@ -23,6 +23,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { updateExtraBoxItemsList } from "@/lib/extraInventoryOperations";
 import { normalizeBoxCode } from "@/lib/boxUtils";
+import { logAudit } from "@/lib/auditLog";
 
 interface ExtraBatch {
   id: string;
@@ -409,6 +410,14 @@ export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true, onC
       }
 
       toast.success(`Moved ${totalSelected} items to Ready for Shipment`);
+      logAudit({
+        action: "extra_inventory.injected",
+        entity_type: "order",
+        entity_id: orderId,
+        module: "extra_inventory",
+        order_id: orderId,
+        metadata: { phase, total_quantity: totalSelected, target: "ready_for_shipment" },
+      });
       setProductSelections(new Map());
       fetchExtraBatches();
       onRefresh?.();
@@ -492,6 +501,14 @@ export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true, onC
 
       const stateLabel = directState.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
       toast.success(`Moved ${totalSelected} items directly to ${stateLabel}`);
+      logAudit({
+        action: "extra_inventory.moved_directly",
+        entity_type: "order",
+        entity_id: orderId,
+        module: "extra_inventory",
+        order_id: orderId,
+        metadata: { phase, total_quantity: totalSelected, target_state: directState },
+      });
       setProductSelections(new Map());
       fetchExtraBatches();
       onRefresh?.();
@@ -628,6 +645,14 @@ export function ExtraItemsTab({ orderId, phase, onRefresh, canManage = true, onC
         .eq("id", selectedBox.id);
 
       toast.success(`Assigned ${totalSelected} extra items to ${selectedBox.box_code}`);
+      logAudit({
+        action: "extra_inventory.assigned_to_box",
+        entity_type: "box",
+        entity_id: selectedBox.box_code,
+        module: "extra_inventory",
+        order_id: orderId,
+        metadata: { phase, box_code: selectedBox.box_code, total_quantity: totalSelected },
+      });
       setBoxDialogOpen(false);
       setProductSelections(new Map());
       fetchExtraBatches();

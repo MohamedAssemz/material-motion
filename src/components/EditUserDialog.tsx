@@ -8,6 +8,7 @@ import { Loader2, Eye, EyeOff, UserCog } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { logAudit } from '@/lib/auditLog';
 
 interface EditUserDialogProps {
   open: boolean;
@@ -38,6 +39,13 @@ export function EditUserDialog({ open, onOpenChange, onSuccess, user }: EditUser
       const data = await response.json();
       if (!response.ok || data.error) throw new Error(data.error || 'Failed to update email');
       toast({ title: t('toast.success'), description: t('admin.email_updated') });
+      logAudit({
+        action: "user.email_updated",
+        entity_type: "user",
+        entity_id: user.id,
+        module: "admin",
+        metadata: { previous_email: user.email, new_email: email },
+      });
       setEmail('');
       onSuccess();
       onOpenChange(false);
@@ -69,6 +77,13 @@ export function EditUserDialog({ open, onOpenChange, onSuccess, user }: EditUser
         return;
       }
       toast({ title: t('toast.success'), description: t('admin.password_updated') });
+      logAudit({
+        action: "user.password_updated",
+        entity_type: "user",
+        entity_id: user.id,
+        module: "admin",
+        metadata: { email: user.email },
+      });
       setPassword('');
       onSuccess();
       onOpenChange(false);

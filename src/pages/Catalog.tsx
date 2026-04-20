@@ -24,6 +24,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
+import { logAudit } from "@/lib/auditLog";
 import { Package, Plus, Search, Loader2, Tag, Palette, X, Upload, BarChart3, Settings2, Users } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { ProductCard } from "@/components/catalog/ProductCard";
@@ -317,6 +318,13 @@ export default function Catalog() {
       toast({
         title: t("catalog.product_deleted"),
         description: `${productToDelete.name_en} ${t("catalog.deleted_success")}`,
+      });
+      logAudit({
+        action: "product.deleted",
+        entity_type: "product",
+        entity_id: productToDelete.id,
+        module: "catalog",
+        metadata: { sku: productToDelete.sku, name_en: productToDelete.name_en },
       });
 
       fetchData();
