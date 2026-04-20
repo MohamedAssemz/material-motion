@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { logAudit } from "@/lib/auditLog";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -485,6 +486,17 @@ export function EditOrderDialog({
           action: "edited",
           performed_by: user.id,
           details: {
+            eft_changed: logEftChanged,
+            changes,
+          },
+        });
+        logAudit({
+          action: "order.edited",
+          entity_type: "order",
+          entity_id: orderId,
+          module: "orders",
+          order_id: orderId,
+          metadata: {
             eft_changed: logEftChanged,
             changes,
           },

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { supabase } from "@/integrations/supabase/client";
+import { logAudit } from "@/lib/auditLog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
@@ -356,6 +357,18 @@ export default function OrderCreate() {
         action: "created",
         performed_by: user?.id,
         details: { total_items: items.filter(i => i.product_id).length, total_units: totalBatchQuantity },
+      });
+      logAudit({
+        action: "order.created",
+        entity_type: "order",
+        entity_id: order.id,
+        module: "orders",
+        order_id: order.id,
+        metadata: {
+          order_number: orderNumber,
+          total_items: items.filter(i => i.product_id).length,
+          total_units: totalBatchQuantity,
+        },
       });
 
       toast({

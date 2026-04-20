@@ -1292,5 +1292,16 @@ export const translations: Record<string, TranslationEntry> = {
   "orders.commit_success":      { en: "Extra inventory committed successfully", ar: "تم تثبيت المخزون الإضافي بنجاح" },
   "orders.commit_released":     { en: "released back to stock", ar: "تمت إعادتها إلى المخزون" },
   "orders.commit_requeued":     { en: "sent to manufacturing", ar: "أُرسلت إلى التصنيع" },
+
+  // Timeline Logs (audit)
+  "timeline.logs":              { en: "Timeline Logs",       ar: "سجل الأحداث" },
+  "timeline.logs_desc":         { en: "Full audit trail of all actions on this order", ar: "سجل تدقيق كامل لجميع الإجراءات على هذا الطلب" },
+  "timeline.search_placeholder":{ en: "Search events...",    ar: "ابحث عن الأحداث..." },
+  "timeline.all":               { en: "All",                  ar: "الكل" },
+  "timeline.no_events":         { en: "No events recorded yet", ar: "لا توجد أحداث مسجلة بعد" },
+  "timeline.by":                { en: "by",                   ar: "بواسطة" },
+  "timeline.system":            { en: "System",               ar: "النظام" },
+  "timeline.details":           { en: "Details",              ar: "تفاصيل" },
+  "timeline.load_more":         { en: "Load more",            ar: "تحميل المزيد" },
 };
 

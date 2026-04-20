@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { logAudit } from "@/lib/auditLog";
 import {
   Dialog,
   DialogContent,
@@ -142,6 +143,13 @@ export function StartOrderDialog({
           order_id: orderId,
           action: "started",
           performed_by: user.id,
+        });
+        logAudit({
+          action: "order.started",
+          entity_type: "order",
+          entity_id: orderId,
+          module: "orders",
+          order_id: orderId,
         });
       }
 

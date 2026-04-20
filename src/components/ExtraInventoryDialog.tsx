@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { logAudit } from '@/lib/auditLog';
 import { useAuth } from '@/contexts/AuthContext';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -555,6 +556,14 @@ export function ExtraInventoryDialog({
           action: "reserved_extra",
           performed_by: currentUser.id,
           details: { total_reserved: totalSelected, phase },
+        });
+        logAudit({
+          action: "extra_inventory.reserved",
+          entity_type: "order",
+          entity_id: orderId,
+          module: "extra_inventory",
+          order_id: orderId,
+          metadata: { total_reserved: totalSelected, phase },
         });
       }
 

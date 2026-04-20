@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { logAudit } from '@/lib/auditLog';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   Dialog,
@@ -182,6 +183,18 @@ export function ShipmentDialog({
           action: "shipment_created",
           performed_by: user.id,
           details: { shipment_code: shipmentCode, total_qty: totalQty },
+        });
+        logAudit({
+          action: "shipment.created",
+          entity_type: "shipment",
+          entity_id: shipment.id,
+          module: "shipments",
+          order_id: orderId,
+          metadata: {
+            shipment_code: shipmentCode,
+            total_qty: totalQty,
+            item_count: selectedProducts.filter((p) => p.selected_quantity > 0).length,
+          },
         });
       }
 
