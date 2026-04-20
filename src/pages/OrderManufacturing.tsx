@@ -1255,6 +1255,22 @@ export default function OrderManufacturing() {
         selections={extraSelections}
         totalQuantity={totalWorkingSelected}
         onSuccess={() => {
+          logAudit({
+            action: "batch.moved_to_extra",
+            entity_type: "order",
+            entity_id: id,
+            module: "manufacturing",
+            order_id: id,
+            metadata: {
+              from_state: "in_manufacturing",
+              total_quantity: totalWorkingSelected,
+              items: extraSelections.map((s) => ({
+                product_name: s.product_name,
+                product_sku: s.product_sku,
+                quantity: s.quantity,
+              })),
+            },
+          });
           setWorkingSelections(new Map());
           fetchData();
         }}
