@@ -744,6 +744,25 @@ export default function OrderManufacturing() {
         .eq("id", selectedBox.id);
 
       toast.success(`Assigned ${totalWorkingSelected} items to ${selectedBox.box_code}`);
+      logAudit({
+        action: "batch.assigned_to_box",
+        entity_type: "box",
+        entity_id: selectedBox.box_code,
+        module: "manufacturing",
+        order_id: id,
+        metadata: {
+          box_code: selectedBox.box_code,
+          total_quantity: totalWorkingSelected,
+          from_state: "in_manufacturing",
+          to_state: "ready_for_finishing",
+          machine_id: machineId ?? null,
+          items: newItems.map((i) => ({
+            product_name: i.product_name,
+            product_sku: i.product_sku,
+            quantity: i.quantity,
+          })),
+        },
+      });
       setBoxDialogOpen(false);
       setWorkingSelections(new Map());
       fetchData();
