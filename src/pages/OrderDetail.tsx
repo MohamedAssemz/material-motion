@@ -60,7 +60,7 @@ import {
   History,
 } from "lucide-react";
 import { EditOrderDialog } from "@/components/EditOrderDialog";
-import { OrderActivityLog } from "@/components/OrderActivityLog";
+
 import { OrderTimelineLogsDrawer } from "@/components/OrderTimelineLogsDrawer";
 import { logAudit } from "@/lib/auditLog";
 import { generatePackingInvoice } from "@/lib/packingInvoiceGenerator";
@@ -1296,10 +1296,6 @@ export default function OrderDetail() {
         </CardContent>
       </Card>
 
-      {/* Activity Log - Admin only */}
-      {hasRole('admin') && (
-        <OrderActivityLog orderId={id!} />
-      )}
 
       {/* Dialogs */}
       <RawMaterialsItemDrawer
