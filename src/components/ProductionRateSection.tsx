@@ -240,7 +240,7 @@ export function ProductionRateSection({
         entity_type: "batch",
         entity_id: group.groupKey,
         module: machineType === "manufacturing" ? "manufacturing"
-          : machineType === "finishes" ? "finishing"
+          : machineType === "finishing" ? "finishing"
           : machineType === "packaging" ? "packaging" : "boxing",
         order_id: (sampleBatch as any)?.order_id ?? null,
         metadata: {
