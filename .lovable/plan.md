@@ -1,119 +1,102 @@
 
 
-# Global Audit Logs System
+# Production Forms Generator — Replace Exports Tab
 
-## Overview
-Add a project-wide `audit_logs` table that captures every meaningful write across modules, plus a reusable `logAudit()` helper, integration calls at all key write points, and a "Timeline Logs" drawer launched from the Production Timeline card on the Order Details page.
+Replace the 3 placeholder cards in the Exports tab with **6 production-form generators** that mirror the uploaded Miracle Medical Industries paper templates pixel-for-pixel as printable PDFs.
 
-The existing `order_activity_logs` table keeps working for the order-scoped activity card; `audit_logs` is the new global, cross-module trail (orders, batches, boxes, shipments, extra inventory, users, catalog, machines, etc.).
+## 1. UI — `ExportsTab.tsx` rewrite
 
-## 1. Database — new `audit_logs` table
+Six cards in a responsive grid, each opens a modal selector → generates a PDF download. Cards:
 
-Columns:
-- `id` uuid PK, default `gen_random_uuid()`
-- `created_at` timestamptz default `now()`
-- `user_id` uuid (nullable — system actions)
-- `user_name` text (denormalized snapshot for fast display)
-- `user_email` text (snapshot)
-- `action` text NOT NULL — short slug, e.g. `order.created`, `batch.assigned_to_box`, `shipment.sealed`
-- `entity_type` text NOT NULL — `order` | `order_item` | `batch` | `extra_batch` | `box` | `extra_box` | `shipment` | `user` | `product` | `machine`
-- `entity_id` text — UUID or code of the affected entity
-- `module` text NOT NULL — `orders` | `manufacturing` | `finishing` | `packaging` | `boxing` | `shipments` | `extra_inventory` | `boxes` | `catalog` | `admin`
-- `order_id` uuid (nullable, indexed) — fast lookup for the order timeline drawer
-- `metadata` jsonb default `'{}'`
+| # | Title (EN/AR) | Trigger inputs | Data source |
+|---|---|---|---|
+| 01 | Weekly Production Plan / خطة الإنتاج الأسبوعية | Date range (week from→to) | `order_batches` grouped by product, day-of-week machine-assigned counts |
+| 02 | Production Order Form / امر الإنتاج | Pick an order | `orders` + `order_items` (product name, qty, remarks=size/special) |
+| 04 | Accepted Items Identification Tag / علامة تعريف المنتجات المقبولة | Pick a box (BOX-XXXX) | `boxes.items_list` + parent `order` (work order, delivery date) |
+| 05 | Hold Items Identification Tag / بطاقة تعريف المنتجات المحجوزة | Pick order + product, free-text reason + extra info | Manual fill (user-typed) + product/order metadata |
+| 06 | Delivery Order / امر التوصيل | Pick a shipment (SHP-XXXX) | `shipments` + linked `order_batches` → product description, lot (qr_code), unit, qty |
+| 07 | Release Order Form / طلب الإصدار | Pick an order or shipment | `order_batches` rows (description, unit, qty, lot, notes) |
 
-Indexes: `(order_id, created_at desc)`, `(entity_type, entity_id)`, `(created_at desc)`, `(module, created_at desc)`.
+Each card: icon + bilingual title + 1-line description + "Generate" button. Removed: Orders Export / Production Report / Inventory Snapshot placeholders.
 
-RLS:
-- SELECT: any authenticated user (true) — matches existing `order_activity_logs` pattern.
-- INSERT: admin OR any phase manager (matches existing log policies).
-- No UPDATE / DELETE policies → immutable.
+## 2. Modals — one per report
 
-## 2. Helper — `src/lib/auditLog.ts`
+Reusable shadcn `Dialog`. Inputs vary:
+- **Date range**: shadcn `Calendar` popover (from + to, defaults to current week Sat→Thu).
+- **Order picker**: searchable combobox listing `ORD-XXXXX — customer name`.
+- **Box picker**: searchable combobox listing active `BOX-XXXX` codes with product preview.
+- **Shipment picker**: searchable combobox listing `SHP-XXXX` with order number.
+- **Hold Tag** modal extends the order picker with: product select (from order_items), `Reason` select (Under Inspection / Under Repair / Rejected), `Additional Information` textarea.
+
+Each modal has a "Generate PDF" button → fetches the data → passes to the PDF generator → downloads file named `<report-code>_<reference>_<YYYYMMDD>.pdf` (e.g. `02_PO_ORD-00042_20260420.pdf`).
+
+## 3. PDF generator — `src/lib/productionFormsPdf.ts`
+
+Use **jsPDF + jspdf-autotable** (lightweight, already common; install if missing). One file exporting six functions:
 
 ```ts
-type AuditEntry = {
-  action: string;
-  entity_type: string;
-  entity_id?: string | null;
-  module: string;
-  order_id?: string | null;
-  metadata?: Record<string, any>;
-};
-
-export async function logAudit(entry: AuditEntry): Promise<void>
+generateWeeklyProductionPlanPDF(data)
+generateProductionOrderPDF(data)
+generateAcceptedItemsTagPDF(data)
+generateHoldItemsTagPDF(data)
+generateDeliveryOrderPDF(data)
+generateReleaseOrderPDF(data)
 ```
 
-Behavior:
-- Resolves `user_id`/`user_name`/`user_email` from `supabase.auth.getUser()` + cached profile (in-memory cache to avoid extra queries).
-- Fire-and-forget: wraps insert in try/catch, never throws, never awaits-block the caller's UI.
-- Exported convenience: `logAuditBatch(entries: AuditEntry[])` for bulk operations.
+Shared helpers:
+- `drawHeader(doc)` — Miracle logo (left, ~30mm wide) + "Miracle Medical Industries" title in a bordered cell.
+- `drawFooter(doc, refNo, revNo)` — bottom-left bordered table `Ref. no. | Page 1 of 1 | Rev. no.` matching uploaded forms (`02/01/01/01` … `02/01/01/07`).
+- Bilingual labels: every label rendered as `English العربية` pairs using a font that supports Arabic. Use **Amiri** (Google Font, free, Arabic-friendly) loaded via `doc.addFont` from a base64 `.ttf` placed in `src/assets/fonts/`. Fall back to Helvetica for Latin.
+- Page size: A4 portrait, 15mm margins, matching paper proportions.
 
-## 3. Integration points (call sites)
+**Logo asset**: copy the existing Miracle logo from the uploaded PDFs (`page_1_image_1_v2.jpg`) into `src/assets/miracle-logo.png` and embed as base64.
 
-Add `logAudit(...)` calls (non-blocking) at these existing write sites — no logic changes, just one extra line each:
+Each generator builds a layout that visually matches its source PDF (table positions, signature lines, headings). Tables built with `autoTable` for clean borders matching the templates.
 
-| Module | File | Action slug |
-|---|---|---|
-| Orders | `OrderCreate.tsx` | `order.created` |
-| Orders | `StartOrderDialog.tsx` | `order.started` |
-| Orders | `EditOrderDialog.tsx` | `order.edited` (with item-level changes in metadata) |
-| Orders | `OrderDetail.tsx` (cancel) | `order.cancelled` |
-| Orders | `OrderDetail.tsx` (commit extra) | `extra_inventory.committed` |
-| Manufacturing | `OrderManufacturing.tsx` | `batch.start_working`, `batch.assigned_to_box`, `batch.moved_to_extra` |
-| Finishing | `OrderFinishing.tsx` | `batch.received`, `batch.assigned_to_box`, `batch.moved_to_next`, `batch.moved_to_extra` |
-| Packaging | `OrderPackaging.tsx` | same pattern |
-| Boxing | `OrderBoxing.tsx` | `batch.received`, `batch.moved_to_ready_for_shipment`, `batch.moved_to_extra` |
-| Shipments | `ShipmentDialog.tsx` | `shipment.created` |
-| Boxing | `OrderBoxing.tsx` (create cartona) | `shipment.created` (+ reprint = `shipment.reprinted`) |
-| Extra inventory | `ExtraInventoryDialog.tsx` | `extra_inventory.reserved` |
-| Extra inventory | `ExtraItemsTab.tsx` | `extra_inventory.injected`, `extra_inventory.assigned_to_box`, `extra_inventory.moved_directly` |
-| Extra inventory | `ExtraInventory.tsx` | `extra_batch.created`, `extra_batch.assigned_to_box`, `extra_batch.deleted`, `extra_batch.force_unreserved` |
-| Boxes | `Boxes.tsx` / box utilities | `box.created`, `box.force_emptied`, `box.deleted` |
-| Machine assign | `ProductionRateSection.tsx` | `batch.machine_assigned` |
-| Admin | `Admin.tsx`, `CreateUserDialog.tsx`, `EditUserDialog.tsx`, `DeleteUserDialog.tsx` | `user.created`, `user.role_changed`, `user.deleted` |
-| Catalog | `ProductFormDialog.tsx`, `BulkUploadDialog.tsx` | `product.created`, `product.updated`, `product.deleted`, `product.bulk_uploaded` |
+## 4. Data fetchers
 
-Each call passes `order_id` when applicable so the order drawer can filter cleanly.
+Each modal's "Generate" handler calls a small fetcher that returns the typed payload:
 
-Metadata examples:
-- `batch.assigned_to_box`: `{ box_code, product_id, product_name, quantity, from_state, to_state }`
-- `shipment.created`: `{ shipment_code, total_units, item_count }`
-- `extra_inventory.reserved`: `{ total_reserved, by_product: [...] }`
-- `order.edited`: reuse the `changes[]` array already built in `EditOrderDialog`
+- **Weekly plan**: `order_batches` with `production_date` BETWEEN week range → group by `product_id` → for each product, sum quantities per weekday column. Include `order.order_number` as Work Order No.
+- **Production order**: `orders.order_number` + joined `order_items(product, quantity, size, is_special, initial_state)`. Remarks = special tag / size.
+- **Accepted Tag**: `boxes` row → `items_list` (already a JSON summary) → take linked order via batches in box → fill product name, work order, delivery date (`orders.estimated_fulfillment_time`), quantity, source = "Production", lot = `box_code`.
+- **Hold Tag**: pure form input + `orders` + `products` lookup; nothing persisted (no DB write).
+- **Delivery order**: `shipments` row + `order_batches` where `shipment_id = X` joined to `products` → table rows: description, lot=`qr_code_data`, unit="pcs", quantity, total. Header: invoice no = `shipment_code`, To = customer, Delivery Location = `orders.country`.
+- **Release order**: `order_batches` for selected order → rows: description, unit, quantity, lot, notes (state).
 
-## 4. UI — Timeline Logs drawer
+## 5. Translations
 
-**New file:** `src/components/OrderTimelineLogsDrawer.tsx`
-- Uses existing `Sheet` component (right-side, RTL-aware).
-- Props: `{ open, onOpenChange, orderId }`.
-- Fetches `audit_logs` filtered by `order_id`, sorted `created_at desc`.
-- Renders a vertical timeline (icon circle + connecting line, same visual language as `OrderActivityLog.tsx`).
-- Each entry shows:
-  - Icon + colored dot keyed by `module`
-  - Action label (human-readable map: `batch.assigned_to_box` → "Assigned to box BOX-0042")
-  - `by {user_name} · {relative time}` with absolute timestamp tooltip
-  - Module badge
-  - Expandable metadata block (collapsed by default) showing key/value pairs
-- Real-time: subscribe to `postgres_changes` on `audit_logs` filtered by `order_id` to append new entries live.
-- Search/filter bar: free-text + module multi-select chips.
+Add to `src/lib/translations.ts`:
+- `reports.forms.weekly_plan`, `reports.forms.production_order`, `reports.forms.accepted_tag`, `reports.forms.hold_tag`, `reports.forms.delivery_order`, `reports.forms.release_order` (EN + AR).
+- Modal labels: pick order, pick box, pick shipment, date from/to, reason, additional info, generate, cancel.
 
-**Trigger button:** In `src/pages/OrderDetail.tsx`, add a "Timeline Logs" button (with `History` icon from lucide-react) at the top-right of the Production Timeline card header. Bilingual via `t('timeline.logs')`.
+## 6. Audit
 
-**Translations** (`src/lib/translations.ts`): add `timeline.logs` ("Timeline Logs" / "سجل الأحداث") and action label keys.
+Each successful PDF generation fires `logAudit({ action: "report.generated", entity_type: "report", entity_id: reportCode, module: "reports", order_id?, metadata: { report: "production_order", reference: "ORD-00042" } })` so report exports show up in the global audit log and (when `order_id` is set) the order's Timeline Logs drawer.
 
-## 5. Constraints respected
+## 7. Files
 
-- **Never blocks**: `logAudit` is fire-and-forget (`.then().catch()`, not awaited in critical paths).
-- **No flow changes**: only additive calls; existing `order_activity_logs` writes remain untouched.
-- **Lightweight**: single insert per action, indexed lookups, RLS leverages existing `has_role` function (no recursion).
-- **Immutable**: no UPDATE/DELETE RLS → tamper-resistant audit trail.
+**New**
+- `src/components/reports/forms/WeeklyPlanDialog.tsx`
+- `src/components/reports/forms/ProductionOrderDialog.tsx`
+- `src/components/reports/forms/AcceptedTagDialog.tsx`
+- `src/components/reports/forms/HoldTagDialog.tsx`
+- `src/components/reports/forms/DeliveryOrderDialog.tsx`
+- `src/components/reports/forms/ReleaseOrderDialog.tsx`
+- `src/lib/productionFormsPdf.ts` (six generators + shared header/footer/logo helpers)
+- `src/assets/miracle-logo.png` (extracted from uploaded PDFs)
+- `src/assets/fonts/Amiri-Regular.ttf` (Arabic-capable font, base64-loaded)
 
-## Technical details (for reference)
+**Modified**
+- `src/components/reports/ExportsTab.tsx` — replace 3 placeholder cards with 6 active generator cards.
+- `src/lib/translations.ts` — add form titles, modal labels, button strings.
+- `package.json` — add `jspdf` + `jspdf-autotable` if not already present.
 
-- Order drawer query: `select * from audit_logs where order_id = $1 order by created_at desc limit 200` (paginated "Load more" beyond 200).
-- User snapshot fields denormalized so deleted/renamed users still display correctly historically.
-- Action slug convention: `<entity>.<verb_past>` — easy to grep, easy to map to icons/labels.
-- Realtime channel name: `audit-logs-${orderId}` to avoid cross-order noise.
-- A future global `/audit` admin page can reuse the same drawer component — out of scope for this task but the schema supports it.
+## Technical notes
+
+- All forms render in **portrait A4**; bilingual labels use right-to-left text via `doc.text(arabic, x, y, { align: "right" })` while English stays left/center, mirroring the uploaded templates.
+- Ref-no codes per template are hard-coded constants (`02/01/01/01` through `02/01/01/07`), Rev. no. constant `01`.
+- The Weekly Plan's day columns map to Sat–Thu (Egyptian work week, matching the uploaded template).
+- All fetchers cap rows reasonably (Weekly Plan: top 30 products in week; Delivery/Release: all batches in shipment/order — paginate to extra pages if >15 rows).
+- No new DB tables or migrations needed.
 
