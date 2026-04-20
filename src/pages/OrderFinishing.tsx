@@ -23,6 +23,7 @@ import { ProductionRateSection } from "@/components/ProductionRateSection";
 import { RetrievedFromExtraSection } from "@/components/RetrievedFromExtraSection";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { normalizeBoxCode } from "@/lib/boxUtils";
+import { logAudit } from "@/lib/auditLog";
 
 interface Batch {
   id: string;
@@ -626,6 +627,19 @@ export default function OrderFinishing() {
         .in("id", boxIds);
 
       toast.success(`Accepted ${selectedBoxes.size} box(es) into finishing`);
+      logAudit({
+        action: "batch.received",
+        entity_type: "order",
+        entity_id: id,
+        module: "finishing",
+        order_id: id,
+        metadata: {
+          box_count: selectedBoxes.size,
+          batch_count: batchIds.length,
+          to_state: "in_finishing",
+          lead_time_days: parseInt(etaDays) || 1,
+        },
+      });
       setSelectedBoxes(new Set());
       setAcceptDialogOpen(false);
       fetchData();
@@ -786,6 +800,24 @@ export default function OrderFinishing() {
         .eq("id", selectedBox.id);
 
       toast.success(`Assigned ${totalSelected} items to ${selectedBox.box_code}`);
+      logAudit({
+        action: "batch.assigned_to_box",
+        entity_type: "box",
+        entity_id: selectedBox.box_code,
+        module: "finishing",
+        order_id: id,
+        metadata: {
+          box_code: selectedBox.box_code,
+          total_quantity: totalSelected,
+          from_state: "in_finishing",
+          machine_id: machineId ?? null,
+          items: newItems.map((i) => ({
+            product_name: i.product_name,
+            product_sku: i.product_sku,
+            quantity: i.quantity,
+          })),
+        },
+      });
       setBoxAssignDialogOpen(false);
       setProductSelections(new Map());
       fetchData();
@@ -1291,6 +1323,22 @@ export default function OrderFinishing() {
         selections={extraSelections}
         totalQuantity={totalSelected}
         onSuccess={() => {
+          logAudit({
+            action: "batch.moved_to_extra",
+            entity_type: "order",
+            entity_id: id,
+            module: "finishing",
+            order_id: id,
+            metadata: {
+              from_state: "in_finishing",
+              total_quantity: totalSelected,
+              items: extraSelections.map((s) => ({
+                product_name: s.product_name,
+                product_sku: s.product_sku,
+                quantity: s.quantity,
+              })),
+            },
+          });
           setProductSelections(new Map());
           fetchData();
         }}

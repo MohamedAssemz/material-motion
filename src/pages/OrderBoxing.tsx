@@ -24,6 +24,7 @@ import { RetrievedFromExtraSection } from '@/components/RetrievedFromExtraSectio
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { format } from "date-fns";
+import { logAudit } from "@/lib/auditLog";
 
 interface Batch {
   id: string;
@@ -612,6 +613,19 @@ export default function OrderBoxing() {
       const shipmentCount = batchesToShipment.reduce((sum, b) => sum + b.quantity, 0);
 
       toast.success(`Routed ${boxingCount} to Processing, ${shipmentCount} directly to Ready for Shipment`);
+      logAudit({
+        action: "batch.received",
+        entity_type: "order",
+        entity_id: id,
+        module: "boxing",
+        order_id: id,
+        metadata: {
+          box_count: selectedBoxes.size,
+          to_processing: boxingCount,
+          to_ready_for_shipment: shipmentCount,
+          lead_time_days: parseInt(etaDays) || 1,
+        },
+      });
       setSelectedBoxes(new Set());
       setAcceptDialogOpen(false);
       fetchData();
@@ -761,6 +775,14 @@ export default function OrderBoxing() {
 
       if (movedCount > 0) {
         toast.success(`Moved ${movedCount} items to Ready for Shipment`);
+        logAudit({
+          action: "batch.moved_to_ready_for_shipment",
+          entity_type: "order",
+          entity_id: id,
+          module: "boxing",
+          order_id: id,
+          metadata: { quantity: movedCount, from_state: "in_boxing" },
+        });
       } else {
         toast.warning("No items were moved");
       }
@@ -924,6 +946,22 @@ export default function OrderBoxing() {
       }
 
       toast.success(`Created Cartona ${shipment.shipment_code} with ${shippedCount} items`);
+      logAudit({
+        action: "shipment.created",
+        entity_type: "shipment",
+        entity_id: shipment.shipment_code,
+        module: "shipments",
+        order_id: id,
+        metadata: {
+          shipment_code: shipment.shipment_code,
+          total_units: shippedCount,
+          length_cm: shipmentLength || null,
+          width_cm: shipmentWidth || null,
+          height_cm: shipmentHeight || null,
+          weight_kg: shipmentWeight || null,
+          notes: shipmentNotes || null,
+        },
+      });
 
       // Capture print data BEFORE clearing state (so print is always correct)
       const printItems = Array.from(readyForShipmentSelections.entries())
@@ -1879,6 +1917,22 @@ export default function OrderBoxing() {
         selections={extraSelections}
         totalQuantity={totalSelected}
         onSuccess={() => {
+          logAudit({
+            action: "batch.moved_to_extra",
+            entity_type: "order",
+            entity_id: id,
+            module: "boxing",
+            order_id: id,
+            metadata: {
+              from_state: "in_boxing",
+              total_quantity: totalSelected,
+              items: extraSelections.map((s) => ({
+                product_name: s.product_name,
+                product_sku: s.product_sku,
+                quantity: s.quantity,
+              })),
+            },
+          });
           setProductSelections(new Map());
           fetchData();
         }}
