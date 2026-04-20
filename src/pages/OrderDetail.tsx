@@ -57,9 +57,12 @@ import {
   ChevronDown,
   Pencil,
   Download,
+  History,
 } from "lucide-react";
 import { EditOrderDialog } from "@/components/EditOrderDialog";
 import { OrderActivityLog } from "@/components/OrderActivityLog";
+import { OrderTimelineLogsDrawer } from "@/components/OrderTimelineLogsDrawer";
+import { logAudit } from "@/lib/auditLog";
 import { generatePackingInvoice } from "@/lib/packingInvoiceGenerator";
 import {
   getNextState,
@@ -510,6 +513,14 @@ export default function OrderDetail() {
         performed_by: user.id,
         details: { total_released: result.total_released, total_requeued: result.total_requeued },
       });
+      logAudit({
+        action: "extra_inventory.committed",
+        entity_type: "order",
+        entity_id: id,
+        module: "extra_inventory",
+        order_id: id,
+        metadata: { total_released: result.total_released, total_requeued: result.total_requeued },
+      });
 
       toast.success(`${t("orders.commit_success")}: ${result.total_released} ${t("orders.commit_released")}, ${result.total_requeued} ${t("orders.commit_requeued")}`);
       setCommitDialogOpen(false);
@@ -545,6 +556,13 @@ export default function OrderDetail() {
           order_id: id,
           action: "cancelled",
           performed_by: user.id,
+        });
+        logAudit({
+          action: "order.cancelled",
+          entity_type: "order",
+          entity_id: id,
+          module: "orders",
+          order_id: id,
         });
       }
 
@@ -1007,11 +1025,22 @@ export default function OrderDetail() {
       {/* Production Timeline - Only show after order starts */}
       {!isPendingOrder && (
       <Card>
-        <CardHeader>
-          <CardTitle>
-            {t("orders.production_timeline")}
-          </CardTitle>
-          <CardDescription>{t("orders.track_progress")}</CardDescription>
+        <CardHeader className="flex flex-row items-start justify-between gap-4">
+          <div>
+            <CardTitle>
+              {t("orders.production_timeline")}
+            </CardTitle>
+            <CardDescription>{t("orders.track_progress")}</CardDescription>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setTimelineLogsOpen(true)}
+            className="shrink-0"
+          >
+            <History className="h-4 w-4 me-2" />
+            {t("timeline.logs")}
+          </Button>
         </CardHeader>
         <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
