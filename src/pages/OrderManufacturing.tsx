@@ -35,6 +35,7 @@ import { MoveToExtraDialog } from "@/components/MoveToExtraDialog";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { normalizeBoxCode } from "@/lib/boxUtils";
 import { LeadTimeDialog } from "@/components/LeadTimeDialog";
+import { logAudit } from "@/lib/auditLog";
 
 interface Batch {
   id: string;
@@ -549,6 +550,20 @@ export default function OrderManufacturing() {
       }
 
       toast.success(`Started working on ${quantity} units`);
+      logAudit({
+        action: "batch.start_working",
+        entity_type: "batch",
+        entity_id: groupKey,
+        module: "manufacturing",
+        order_id: id,
+        metadata: {
+          product_name: group.product_name,
+          product_sku: group.product_sku,
+          quantity,
+          lead_time_days: leadTimeDays,
+          eta: eta.toISOString(),
+        },
+      });
       setWaitingSelections(prev => {
         const next = new Map(prev);
         next.delete(groupKey);
@@ -729,6 +744,25 @@ export default function OrderManufacturing() {
         .eq("id", selectedBox.id);
 
       toast.success(`Assigned ${totalWorkingSelected} items to ${selectedBox.box_code}`);
+      logAudit({
+        action: "batch.assigned_to_box",
+        entity_type: "box",
+        entity_id: selectedBox.box_code,
+        module: "manufacturing",
+        order_id: id,
+        metadata: {
+          box_code: selectedBox.box_code,
+          total_quantity: totalWorkingSelected,
+          from_state: "in_manufacturing",
+          to_state: "ready_for_finishing",
+          machine_id: machineId ?? null,
+          items: newItems.map((i) => ({
+            product_name: i.product_name,
+            product_sku: i.product_sku,
+            quantity: i.quantity,
+          })),
+        },
+      });
       setBoxDialogOpen(false);
       setWorkingSelections(new Map());
       fetchData();
@@ -1221,6 +1255,22 @@ export default function OrderManufacturing() {
         selections={extraSelections}
         totalQuantity={totalWorkingSelected}
         onSuccess={() => {
+          logAudit({
+            action: "batch.moved_to_extra",
+            entity_type: "order",
+            entity_id: id,
+            module: "manufacturing",
+            order_id: id,
+            metadata: {
+              from_state: "in_manufacturing",
+              total_quantity: totalWorkingSelected,
+              items: extraSelections.map((s) => ({
+                product_name: s.product_name,
+                product_sku: s.product_sku,
+                quantity: s.quantity,
+              })),
+            },
+          });
           setWorkingSelections(new Map());
           fetchData();
         }}
