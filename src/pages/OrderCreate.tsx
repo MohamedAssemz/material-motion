@@ -28,6 +28,7 @@ import {
   Plane,
   Truck,
   Package,
+  ImageOff,
 } from "lucide-react";
 
 import { CountrySelect } from "@/components/catalog/CountrySelect";
