@@ -357,6 +357,18 @@ export default function OrderCreate() {
         performed_by: user?.id,
         details: { total_items: items.filter(i => i.product_id).length, total_units: totalBatchQuantity },
       });
+      logAudit({
+        action: "order.created",
+        entity_type: "order",
+        entity_id: order.id,
+        module: "orders",
+        order_id: order.id,
+        metadata: {
+          order_number: orderNumber,
+          total_items: items.filter(i => i.product_id).length,
+          total_units: totalBatchQuantity,
+        },
+      });
 
       toast({
         title: "Success",

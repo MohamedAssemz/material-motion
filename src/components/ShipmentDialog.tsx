@@ -183,6 +183,18 @@ export function ShipmentDialog({
           performed_by: user.id,
           details: { shipment_code: shipmentCode, total_qty: totalQty },
         });
+        logAudit({
+          action: "shipment.created",
+          entity_type: "shipment",
+          entity_id: shipment.id,
+          module: "shipments",
+          order_id: orderId,
+          metadata: {
+            shipment_code: shipmentCode,
+            total_qty: totalQty,
+            item_count: selectedProducts.filter((p) => p.selected_quantity > 0).length,
+          },
+        });
       }
 
       toast.success(`Shipment ${shipmentCode} created with ${totalQty} items`);

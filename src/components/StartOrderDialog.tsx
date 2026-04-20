@@ -143,6 +143,13 @@ export function StartOrderDialog({
           action: "started",
           performed_by: user.id,
         });
+        logAudit({
+          action: "order.started",
+          entity_type: "order",
+          entity_id: orderId,
+          module: "orders",
+          order_id: orderId,
+        });
       }
 
       toast.success('Order started successfully');

@@ -489,6 +489,17 @@ export function EditOrderDialog({
             changes,
           },
         });
+        logAudit({
+          action: "order.edited",
+          entity_type: "order",
+          entity_id: orderId,
+          module: "orders",
+          order_id: orderId,
+          metadata: {
+            eft_changed: logEftChanged,
+            changes,
+          },
+        });
       }
 
       toast.success(t("toast.success"));
