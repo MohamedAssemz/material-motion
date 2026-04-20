@@ -35,6 +35,7 @@ import { MoveToExtraDialog } from "@/components/MoveToExtraDialog";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { normalizeBoxCode } from "@/lib/boxUtils";
 import { LeadTimeDialog } from "@/components/LeadTimeDialog";
+import { logAudit } from "@/lib/auditLog";
 
 interface Batch {
   id: string;
