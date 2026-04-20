@@ -233,7 +233,7 @@ export function OrderTimelineLogsDrawer({
                 {t("timeline.all")}
               </button>
               {modulesPresent.map((m) => {
-                const style = MODULE_STYLES[m];
+                const moduleLabel = t(`audit.module.${m}` as any) || m;
                 const active = moduleFilter === m;
                 return (
                   <button
@@ -246,7 +246,7 @@ export function OrderTimelineLogsDrawer({
                         : "bg-background hover:bg-muted"
                     }`}
                   >
-                    {style?.label ?? m}
+                    {moduleLabel}
                   </button>
                 );
               })}
@@ -276,8 +276,15 @@ export function OrderTimelineLogsDrawer({
               <TooltipProvider delayDuration={200}>
                 <div className="relative">
                   {filtered.map((log, index) => {
-                    const moduleStyle =
-                      MODULE_STYLES[log.module] ?? MODULE_STYLES.orders;
+                    const moduleColor =
+                      MODULE_COLORS[log.module] ?? MODULE_COLORS.orders;
+                    const moduleLabel = t(`audit.module.${log.module}` as any) || log.module;
+                    const actionKey = `audit.action.${log.action}`;
+                    const translatedAction = t(actionKey as any);
+                    const actionLabel =
+                      translatedAction && translatedAction !== actionKey
+                        ? translatedAction
+                        : fallbackHumanize(log.action);
                     const Icon = ACTION_ICONS[log.action] ?? Activity;
                     const isLast = index === filtered.length - 1;
                     const hasMeta =
@@ -290,17 +297,17 @@ export function OrderTimelineLogsDrawer({
                           <div className="absolute start-4 top-8 bottom-0 w-px bg-border" />
                         )}
                         <div
-                          className={`shrink-0 h-8 w-8 rounded-full border bg-background flex items-center justify-center ${moduleStyle.color}`}
+                          className={`shrink-0 h-8 w-8 rounded-full border bg-background flex items-center justify-center ${moduleColor}`}
                         >
                           <Icon className="h-3.5 w-3.5" />
                         </div>
                         <div className={`flex-1 ${isLast ? "" : "pb-5"}`}>
                           <div className="flex items-start justify-between gap-2 flex-wrap">
                             <p className="text-sm font-medium">
-                              {humanizeAction(log.action)}
+                              {actionLabel}
                             </p>
                             <Badge variant="secondary" className="text-[10px]">
-                              {moduleStyle.label}
+                              {moduleLabel}
                             </Badge>
                           </div>
                           <Tooltip>
