@@ -359,8 +359,9 @@ export default function Dashboard() {
 
   const pipelineData = useMemo(() => {
     if (!data) return [];
-    return Object.entries(PHASE_LABELS).map(([key, label]) => ({
-      name: label,
+    const mainPhases = ["in_manufacturing", "in_finishing", "in_packaging", "in_boxing"];
+    return mainPhases.map((key) => ({
+      name: PHASE_LABELS[key],
       value: data.batchesByState[key] || 0,
       fill: PHASE_COLORS[key],
     }));
