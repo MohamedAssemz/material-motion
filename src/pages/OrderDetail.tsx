@@ -172,6 +172,7 @@ export default function OrderDetail() {
   const [commitSummary, setCommitSummary] = useState<Array<{ product_id: string; order_item_id: string; reserved: number; consumed: number; unretrieved: number; productName: string; productSku: string }>>([]);
   const [commitDialogOpen, setCommitDialogOpen] = useState(false);
   const [commitLoading, setCommitLoading] = useState(false);
+  const [timelineLogsOpen, setTimelineLogsOpen] = useState(false);
   const [reservedExtraCounts, setReservedExtraCounts] = useState<Record<string, number>>({});
   const [addedToExtraCounts, setAddedToExtraCounts] = useState<Record<string, number>>({});
   const [retrievedFromExtraCounts, setRetrievedFromExtraCounts] = useState<Record<string, number>>({});
