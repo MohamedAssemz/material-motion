@@ -1423,6 +1423,14 @@ export default function OrderDetail() {
         currentEft={order.estimated_fulfillment_time}
         onSaved={fetchOrder}
       />
+
+      {id && (
+        <OrderTimelineLogsDrawer
+          open={timelineLogsOpen}
+          onOpenChange={setTimelineLogsOpen}
+          orderId={id}
+        />
+      )}
     </div>
   );
 }
