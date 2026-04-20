@@ -62,6 +62,19 @@ interface OrderItem {
   initial_state: string;
 }
 
+function ProductThumb({ url, size = "md" }: { url?: string | null; size?: "sm" | "md" }) {
+  const dim = size === "sm" ? "h-7 w-7" : "h-9 w-9";
+  return (
+    <div className={cn(dim, "shrink-0 rounded-md border bg-muted overflow-hidden flex items-center justify-center")}>
+      {url ? (
+        <img src={url} alt="" className="h-full w-full object-cover" loading="lazy" />
+      ) : (
+        <ImageOff className="h-3.5 w-3.5 text-muted-foreground" />
+      )}
+    </div>
+  );
+}
+
 const orderSchema = z.object({
   order_number: z.string().trim().min(1, "Order number is required").max(50, "Order number too long"),
   reference_number: z.string().trim().max(50, "Reference number too long").optional(),
