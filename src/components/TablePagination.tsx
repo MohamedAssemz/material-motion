@@ -21,9 +21,9 @@ export function TablePagination({
   pageSize = 10,
   onPageChange,
 }: TablePaginationProps) {
-  const totalPages = Math.ceil(totalItems / pageSize);
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
 
-  if (totalPages <= 1) return null;
+  if (totalItems === 0) return null;
 
   const getVisiblePages = () => {
     const pages: (number | 'ellipsis')[] = [];
