@@ -92,6 +92,10 @@ export default function Catalog() {
   const [selectedBrand, setSelectedBrand] = useState<string>("all");
   const [selectedSize, setSelectedSize] = useState<string>("all");
   const [selectedCountry, setSelectedCountry] = useState<string>("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 12;
+
+  useEffect(() => { setCurrentPage(1); }, [searchTerm, selectedCategory, selectedBrand, selectedSize, selectedCountry]);
 
   // Dialogs
   const [productFormOpen, setProductFormOpen] = useState(false);
@@ -537,19 +541,22 @@ export default function Catalog() {
           </p>
         </Card>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-          {filteredProducts.map((product) => (
-            <ProductCard
-              key={product.id}
-              product={product}
-              onClick={() => handleProductClick(product)}
-              onView={() => handleViewProduct(product)}
-              onDelete={() => handleDeleteClick(product)}
-              onDuplicate={() => handleDuplicateProduct(product)}
-              showMenu={canManage}
-            />
-          ))}
-        </div>
+        <>
+          <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+            {filteredProducts.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE).map((product) => (
+              <ProductCard
+                key={product.id}
+                product={product}
+                onClick={() => handleProductClick(product)}
+                onView={() => handleViewProduct(product)}
+                onDelete={() => handleDeleteClick(product)}
+                onDuplicate={() => handleDuplicateProduct(product)}
+                showMenu={canManage}
+              />
+            ))}
+          </div>
+          <TablePagination currentPage={currentPage} totalItems={filteredProducts.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />
+        </>
       )}
 
       {/* Category List Dialog */}
