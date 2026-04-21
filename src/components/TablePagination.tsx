@@ -18,7 +18,7 @@ interface TablePaginationProps {
 export function TablePagination({
   currentPage,
   totalItems,
-  pageSize = 25,
+  pageSize = 10,
   onPageChange,
 }: TablePaginationProps) {
   const totalPages = Math.ceil(totalItems / pageSize);

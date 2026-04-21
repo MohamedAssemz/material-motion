@@ -86,7 +86,7 @@ export default function ExtraInventory() {
   const [deletingBatchId, setDeletingBatchId] = useState<string | null>(null);
   const [batchToDelete, setBatchToDelete] = useState<ExtraBatch | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const PAGE_SIZE = 25;
+  const PAGE_SIZE = 10;
 
   const [searchQuery, setSearchQuery] = useState("");
   const [stateFilter, setStateFilter] = useState("all");
