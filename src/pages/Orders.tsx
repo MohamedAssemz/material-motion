@@ -78,7 +78,7 @@ export default function Orders() {
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
   const [showFilters, setShowFilters] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const PAGE_SIZE = 25;
+  const PAGE_SIZE = 10;
 
   useEffect(() => {
     fetchOrders();

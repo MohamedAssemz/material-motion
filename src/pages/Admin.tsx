@@ -16,6 +16,7 @@ import { EditUserDialog } from "@/components/EditUserDialog";
 import { DeleteUserDialog } from "@/components/DeleteUserDialog";
 import type { Database } from "@/integrations/supabase/types";
 import { cn } from "@/lib/utils";
+import { TablePagination } from "@/components/TablePagination";
 
 type AppRole = Database["public"]["Enums"]["app_role"];
 
@@ -51,6 +52,8 @@ export default function Admin() {
   const [users, setUsers] = useState<UserWithRoles[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingRole, setUpdatingRole] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 10;
 
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -211,7 +214,7 @@ export default function Admin() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {users.map((user) => {
+              {users.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE).map((user) => {
                 const isCurrentUser = user.id === currentUser?.id;
                 const additionalRoles = user.roles.filter((r) => r !== user.primary_role);
                 const availableToAdd = AVAILABLE_ROLES.filter((r) => !user.roles.includes(r.value));
@@ -338,6 +341,9 @@ export default function Admin() {
               })}
             </TableBody>
           </Table>
+          <div className="px-4 pb-4">
+            <TablePagination currentPage={currentPage} totalItems={users.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />
+          </div>
         </Card>
       </div>
 

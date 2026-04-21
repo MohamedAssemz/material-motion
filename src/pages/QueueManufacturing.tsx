@@ -10,6 +10,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { TablePagination } from '@/components/TablePagination';
 import { format } from 'date-fns';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { cn } from '@/lib/utils';
@@ -36,6 +37,11 @@ export default function QueueManufacturing() {
   const [activeTab, setActiveTab] = useState<TabStatus>('active');
   const [searchTerm, setSearchTerm] = useState('');
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
+  const [activePage, setActivePage] = useState(1);
+  const [completedPage, setCompletedPage] = useState(1);
+  const PAGE_SIZE = 10;
+
+  useEffect(() => { setActivePage(1); setCompletedPage(1); }, [searchTerm, dateRange]);
 
   useEffect(() => {
     fetchOrders();
@@ -130,32 +136,38 @@ export default function QueueManufacturing() {
       : format(dateRange.from, 'dd/MM/yyyy')
     : t('queue.filter_by_date');
 
-  const renderTable = (ordersList: Order[]) => (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>{t('queue.order_number')}</TableHead>
-          <TableHead>{t('queue.reference')}</TableHead>
-          <TableHead>{t('phase.waiting')}</TableHead>
-          <TableHead>{t('phase.in_progress')}</TableHead>
-          <TableHead>{t('queue.extra_items')}</TableHead>
-          <TableHead>{t('queue.created_date')}</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {ordersList.map((order) => (
-          <TableRow key={order.id} className="cursor-pointer hover:bg-muted/50" onClick={() => navigate(`/orders/${order.id}/manufacturing`)}>
-            <TableCell className="font-medium">{order.order_number}</TableCell>
-            <TableCell className="text-muted-foreground">{order.reference_number || '—'}</TableCell>
-            <TableCell>{order.waiting_count > 0 && <Badge variant="secondary">{order.waiting_count}</Badge>}</TableCell>
-            <TableCell>{order.working_count > 0 && <Badge className="bg-primary text-primary-foreground">{order.working_count}</Badge>}</TableCell>
-            <TableCell>{order.extra_manufacturing_count > 0 && <Badge variant="outline" className="border-amber-500 text-amber-600"><Package className="h-3 w-3 mr-1" />{order.extra_manufacturing_count}</Badge>}</TableCell>
-            <TableCell>{format(new Date(order.created_at), 'PPP')}</TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
-  );
+  const renderTable = (ordersList: Order[], page: number, onPageChange: (p: number) => void) => {
+    const paged = ordersList.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+    return (
+      <>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>{t('queue.order_number')}</TableHead>
+              <TableHead>{t('queue.reference')}</TableHead>
+              <TableHead>{t('phase.waiting')}</TableHead>
+              <TableHead>{t('phase.in_progress')}</TableHead>
+              <TableHead>{t('queue.extra_items')}</TableHead>
+              <TableHead>{t('queue.created_date')}</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {paged.map((order) => (
+              <TableRow key={order.id} className="cursor-pointer hover:bg-muted/50" onClick={() => navigate(`/orders/${order.id}/manufacturing`)}>
+                <TableCell className="font-medium">{order.order_number}</TableCell>
+                <TableCell className="text-muted-foreground">{order.reference_number || '—'}</TableCell>
+                <TableCell>{order.waiting_count > 0 && <Badge variant="secondary">{order.waiting_count}</Badge>}</TableCell>
+                <TableCell>{order.working_count > 0 && <Badge className="bg-primary text-primary-foreground">{order.working_count}</Badge>}</TableCell>
+                <TableCell>{order.extra_manufacturing_count > 0 && <Badge variant="outline" className="border-amber-500 text-amber-600"><Package className="h-3 w-3 mr-1" />{order.extra_manufacturing_count}</Badge>}</TableCell>
+                <TableCell>{format(new Date(order.created_at), 'PPP')}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+        <TablePagination currentPage={page} totalItems={ordersList.length} pageSize={PAGE_SIZE} onPageChange={onPageChange} />
+      </>
+    );
+  };
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -192,14 +204,14 @@ export default function QueueManufacturing() {
           <Card><CardContent className="pt-6">
             {loading ? <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div></div>
             : filteredActive.length === 0 ? <div className="text-center py-8 text-muted-foreground">{t('queue.no_active_orders')}</div>
-            : renderTable(filteredActive)}
+            : renderTable(filteredActive, activePage, setActivePage)}
           </CardContent></Card>
         </TabsContent>
         <TabsContent value="completed">
           <Card><CardContent className="pt-6">
             {loading ? <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div></div>
             : filteredCompleted.length === 0 ? <div className="text-center py-8 text-muted-foreground">{t('queue.no_completed_orders')}</div>
-            : renderTable(filteredCompleted)}
+            : renderTable(filteredCompleted, completedPage, setCompletedPage)}
           </CardContent></Card>
         </TabsContent>
       </Tabs>

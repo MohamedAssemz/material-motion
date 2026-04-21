@@ -95,7 +95,7 @@ export default function Boxes() {
   const [cartonWeight, setCartonWeight] = useState("");
   const [orderPage, setOrderPage] = useState(1);
   const [extraPage, setExtraPage] = useState(1);
-  const PAGE_SIZE = 25;
+  const PAGE_SIZE = 10;
 
   const [orderSearch, setOrderSearch] = useState("");
   const [orderStatusFilter, setOrderStatusFilter] = useState("all");
