@@ -562,8 +562,9 @@ export default function ExtraInventory() {
                   </div>
                 </form>
               </DialogContent>
-            </Dialog>
-          )}
+              </Dialog>
+            )}
+          </div>
         </div>
       </header>
 
