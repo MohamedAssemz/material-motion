@@ -35,6 +35,7 @@ import { BrandListDialog } from "@/components/catalog/BrandListDialog";
 import { BulkUploadDialog } from "@/components/catalog/BulkUploadDialog";
 import { CountrySelect } from "@/components/catalog/CountrySelect";
 import { useDynamicSizes } from "@/lib/catalogConstants";
+import { TablePagination } from "@/components/TablePagination";
 
 interface Category {
   id: string;

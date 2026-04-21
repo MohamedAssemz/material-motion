@@ -15,6 +15,7 @@ import { ArrowLeft, Plus, Users, Loader2, Search, MoreVertical, Pencil, Trash2 }
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { getCountryByCode } from '@/lib/countries';
+import { TablePagination } from '@/components/TablePagination';
 
 interface Customer {
   id: string;
@@ -45,6 +46,10 @@ export default function Customers() {
   const [searchQuery, setSearchQuery] = useState('');
   const [form, setForm] = useState<CustomerForm>(emptyForm);
   const [submitting, setSubmitting] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 10;
+
+  useEffect(() => { setCurrentPage(1); }, [searchQuery]);
 
   useEffect(() => {
     fetchCustomers();
@@ -207,53 +212,56 @@ export default function Customers() {
                 {customers.length === 0 ? 'No customers yet. Add your first customer.' : 'No matching customers found.'}
               </p>
             ) : (
-              <div className="space-y-3">
-                {filteredCustomers.map(customer => (
-                  <div key={customer.id} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div>
-                      <p className="font-medium">{customer.name}</p>
-                      <div className="flex items-center gap-2 mt-1">
-                        {customer.code && (
-                          <span className="text-sm text-muted-foreground font-mono">{customer.code}</span>
-                        )}
-                        {customer.country && (() => {
-                          const info = getCountryByCode(customer.country);
-                          return (
-                            <span className="text-sm text-muted-foreground">
-                              • {info ? `${info.flag} ${info.name}` : customer.country}
-                            </span>
-                          );
-                        })()}
+              <>
+                <div className="space-y-3">
+                  {filteredCustomers.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE).map(customer => (
+                    <div key={customer.id} className="flex items-center justify-between p-4 border rounded-lg">
+                      <div>
+                        <p className="font-medium">{customer.name}</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          {customer.code && (
+                            <span className="text-sm text-muted-foreground font-mono">{customer.code}</span>
+                          )}
+                          {customer.country && (() => {
+                            const info = getCountryByCode(customer.country);
+                            return (
+                              <span className="text-sm text-muted-foreground">
+                                • {info ? `${info.flag} ${info.name}` : customer.country}
+                              </span>
+                            );
+                          })()}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant={customer.is_domestic ? 'secondary' : 'outline'}>
+                          {customer.is_domestic ? 'Domestic' : 'International'}
+                        </Badge>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => openEditDialog(customer)}>
+                              <Pencil className="h-4 w-4 mr-2" />
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="text-destructive focus:text-destructive"
+                              onClick={() => setDeleteCustomer(customer)}
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Badge variant={customer.is_domestic ? 'secondary' : 'outline'}>
-                        {customer.is_domestic ? 'Domestic' : 'International'}
-                      </Badge>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => openEditDialog(customer)}>
-                            <Pencil className="h-4 w-4 mr-2" />
-                            Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="text-destructive focus:text-destructive"
-                            onClick={() => setDeleteCustomer(customer)}
-                          >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+                <TablePagination currentPage={currentPage} totalItems={filteredCustomers.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />
+              </>
             )}
           </CardContent>
         </Card>
