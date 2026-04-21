@@ -43,6 +43,8 @@ export default function QueueBoxing() {
   const [completedPage, setCompletedPage] = useState(1);
   const PAGE_SIZE = 10;
 
+  useEffect(() => { setActivePage(1); setCompletedPage(1); }, [searchTerm, dateRange, statusFilter]);
+
   useEffect(() => {
     fetchOrders();
     const channel = supabase.channel('boxing-queue')
