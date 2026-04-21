@@ -23,7 +23,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Plus, Package, Loader2, Box, Search, Trash2 } from "lucide-react";
+import { ArrowLeft, Plus, Package, Loader2, Box, Search, Trash2, Settings } from "lucide-react";
 import { format } from "date-fns";
 import { TablePagination } from "@/components/TablePagination";
 import { ExtraBoxSelectionDialog } from "@/components/ExtraBoxSelectionDialog";
@@ -423,14 +423,19 @@ export default function ExtraInventory() {
             </div>
           </div>
 
-          {canManage && (
-            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-              <DialogTrigger asChild>
-                <Button>
-                  <Plus className="mr-2 h-4 w-4" />
-                  {t("extra.add_batch")}
-                </Button>
-              </DialogTrigger>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => navigate("/extra-inventory/settings")}>
+              <Settings className="mr-2 h-4 w-4" />
+              {t("warehouse_settings.button")}
+            </Button>
+            {canManage && (
+              <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button>
+                    <Plus className="mr-2 h-4 w-4" />
+                    {t("extra.add_batch")}
+                  </Button>
+                </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
                   <DialogTitle>{t("extra.create_batch")}</DialogTitle>
