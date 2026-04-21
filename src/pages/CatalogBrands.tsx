@@ -13,6 +13,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useToast } from '@/hooks/use-toast';
 import { Plus, Edit, Trash2, Loader2, Tag, Upload, X } from 'lucide-react';
 import { format } from 'date-fns';
+import { TablePagination } from '@/components/TablePagination';
 
 interface Brand {
   id: string;
@@ -39,6 +40,8 @@ export default function CatalogBrands() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 10;
 
   const canManage = hasRole('admin');
 
@@ -329,7 +332,7 @@ export default function CatalogBrands() {
                   </TableCell>
                 </TableRow>
               ) : (
-                brands.map((brand) => (
+                brands.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE).map((brand) => (
                   <TableRow key={brand.id}>
                     <TableCell>
                       <Avatar className="h-10 w-10">
@@ -373,6 +376,7 @@ export default function CatalogBrands() {
               )}
             </TableBody>
           </Table>
+          <TablePagination currentPage={currentPage} totalItems={brands.length} pageSize={PAGE_SIZE} onPageChange={setCurrentPage} />
         </CardContent>
       </Card>
 
