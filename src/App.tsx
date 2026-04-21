@@ -16,6 +16,7 @@ import Customers from "./pages/Customers";
 import Machines from "./pages/Machines";
 import Boxes from "./pages/Boxes";
 import ExtraInventory from "./pages/ExtraInventory";
+import WarehouseSettings from "./pages/WarehouseSettings";
 import Admin from "./pages/Admin";
 import Analytics from "./pages/Analytics";
 import Reports from "./pages/Reports";
@@ -65,6 +66,7 @@ const App = () => (
             <Route path="/queues/packaging" element={<ProtectedPage><QueuePackaging /></ProtectedPage>} />
             <Route path="/queues/boxing" element={<ProtectedPage><QueueBoxing /></ProtectedPage>} />
             <Route path="/extra-inventory" element={<ProtectedPage><ExtraInventory /></ProtectedPage>} />
+            <Route path="/extra-inventory/settings" element={<ProtectedPage><WarehouseSettings /></ProtectedPage>} />
             <Route path="/boxes" element={<ProtectedPage><Boxes /></ProtectedPage>} />
             <Route path="/machines" element={<ProtectedRoute requiredRole="admin"><AppLayout><Machines /></AppLayout></ProtectedRoute>} />
             <Route path="/customers" element={<ProtectedRoute requiredRole="admin"><AppLayout><Customers /></AppLayout></ProtectedRoute>} />
