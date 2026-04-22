@@ -1,84 +1,111 @@
 
 
-# Reconcile order quantities with shipped reality
+# Two-part plan: deletion safety + Extra Inventory Analysis page
 
-## Problem
-When a client shrinks their order mid-production, the user moves the surplus to Extra Inventory and ships the new (smaller) amount. But `order_items.quantity` still reflects the original request, so ISO reports / printed order docs (which read `order_items.quantity`) overstate what was actually shipped. The user needs to lower the order item quantity by exactly the amount that was deducted to extra — without touching batches, extra inventory, or shipment records.
+## Part 1 — Answer: Can deleting the order item break extra-inventory logic?
 
-## The key insight
-`order_items.deducted_to_extra` already counts every unit moved from this order's batches into the extra pool (incremented in `move_order_batches_to_extra`, decremented in `commit_extra_inventory`). It is the exact, authoritative budget for "units physically removed from this order". Reducing `quantity` by ≤ `deducted_to_extra` is a pure paperwork correction — nothing else changes.
+**Short answer: No, because the system already prevents that deletion.**
 
-## Logic — how the cap is computed
+Walkthrough of your scenario (item qty = 100, 50 moved to extra, 50 still waiting in manufacturing):
 
-For an existing order item in an `in_progress` order, the **minimum quantity** the admin can set becomes:
+- `EditOrderDialog.canDeleteItem` only enables delete when **all 100 units sit in waiting (eta IS NULL) manufacturing batches**. With 50 already moved to extra, `removable = 50 < originalQuantity = 100` → **the Delete button is disabled**.
+- `revalidateConstraints` re-checks this server-side at save time, so a stale UI can't bypass it.
+- This is by design: units in `extra_batches` are physically detached from the order. `commit_extra_inventory` and `extra_batch_history` rely on `order_items.id` and `deducted_to_extra` to reconcile reserved/consumed/released amounts. Deleting the order item would orphan those references and corrupt the extras' provenance and audit history.
 
-```text
-min_qty = max(1, original_qty - waiting_in_manufacturing - deducted_to_extra)
-```
+**What the user CAN do** (already supported by the recently-shipped paperwork-reduction flow):
+- Reduce the item's quantity from 100 → 50 (paperwork-only, decrements `deducted_to_extra`). This aligns ISO documents with the shipped reality, leaves the 50 extras safely in the pool, and preserves all audit links.
+- Only when `deducted_to_extra` returns to 0 AND no batches exist outside "waiting manufacturing" can the item itself be deleted.
 
-- `waiting_in_manufacturing` (existing): batches still in `in_manufacturing` with `eta IS NULL` → can be deleted.
-- `deducted_to_extra` (new): units already moved to Extra → reduce on paper only.
+**Conclusion: no code change needed for Part 1.** The invariant is already enforced.
 
-The reduction amount `D = original_qty - new_qty` is split:
+---
 
-1. **Paperwork portion** = `min(D, deducted_to_extra)` → just decrement `order_items.deducted_to_extra` by that amount and lower `order_items.quantity`. No batches, no extra inventory touched.
-2. **Waiting portion** = remaining `D` → existing logic deletes waiting manufacturing batches (unchanged).
+## Part 2 — Extra Inventory Analysis page
 
-Order is taken paperwork-first so we never destroy live work when surplus already covers the cut.
+### Goal
+A new page reachable from the Extra Inventory page via an **"Analysis"** button, showing per-product stock health vs. each product's `minimum_quantity`, sorted by the most critical first.
 
-## Why this is safe (invariants preserved)
+### Route & navigation
+- New route: `/extra-inventory/analysis` registered in `src/App.tsx` (protected, same as the parent page).
+- Add an **Analysis** button in the Extra Inventory header (next to the existing "Settings" button), navigating to the new page. Uses a `BarChart3` (or similar) Lucide icon.
 
-- **Extra inventory untouched.** Units moved to Extra stay AVAILABLE in the extra pool — they were physically detached from the order the moment they were moved. We're only correcting the order document.
-- **`commit_extra_inventory` still works.** It only iterates `extra_batches` with `inventory_state = 'RESERVED'` for this order. Available extras and the paperwork decrement don't interact with it.
-- **Shipment / ISO totals.** Shipped quantities are derived from `order_batches`/`shipments`, not from `order_items.quantity`. Lowering `quantity` aligns the printed/ISO order doc with what was actually shipped.
-- **Progress metrics (waiting/in-progress/done counts per phase) are batch-derived** — unaffected.
-- **Deletion rule unchanged.** A whole item can still only be deleted if 100% sits in waiting manufacturing batches. Deducted-to-extra units stay in Extra; deleting the item would orphan accounting, so we forbid it (as today).
-- **Audit trail.** Every reduction is logged in `order_activity_logs` with a new `paperwork_only` flag and the deducted-portion amount, so ISO auditors can trace the change.
-- **No DB schema changes.** `deducted_to_extra` already exists; we only update its value.
+### Data source
 
-## Edge cases handled
+Single page-load fetch (no realtime needed, but we'll subscribe to `extra_batches` changes so the table refreshes if stock moves):
 
-- New `deducted_to_extra` value is clamped to `≥ 0` (mirrors `commit_extra_inventory`).
-- Re-validation on save re-reads `order_items.deducted_to_extra` and waiting batches (server-side check) so two admins editing concurrently can't over-reduce.
-- If a customer later increases the qty back up, existing "increase" branch creates a new manufacturing batch — `deducted_to_extra` is left alone (those extras are still in the pool and unrelated to the new ask).
-- Pending orders: no extras can exist yet, so behavior is identical to today.
+1. `products` → `id, sku, name_en, name_ar, minimum_quantity, sizes`.
+2. `extra_batches` filtered to `inventory_state = 'AVAILABLE'` → `product_id, size, quantity`.
+   - Only AVAILABLE batches count as "in stock". RESERVED batches are earmarked for an order and are NOT free inventory.
+   - All four `current_state` values (`extra_manufacturing` / `_finishing` / `_packaging` / `_boxing`) are summed — they are all surplus stock regardless of which phase they sit in.
 
-## UI changes (`EditOrderDialog.tsx`)
+### Aggregation (client-side)
 
-- `fetchRemovableQuantities` also fetches each item's `deducted_to_extra` and stores it.
-- New tooltip beside the qty input on items where `deducted_to_extra > 0`:
-  > "X units already moved to Extra Inventory — you may reduce the order quantity by up to X without affecting production."
-- The qty input's `min` becomes `max(1, originalQty − waiting − deductedToExtra)`.
-- Deletion rule unchanged (still requires full coverage by waiting batches alone).
+For each product:
+- `available = Σ quantity of AVAILABLE extra_batches for that product` (across all sizes & phases).
+- `sizeBreakdown = [{ size, quantity, percentageOfTotal }]` sorted by quantity desc. `size = null` is shown as "—" / "بدون مقاس".
+- `minimum = product.minimum_quantity` (default 0 already in schema).
+- `delta = available − minimum` (used for sorting; smaller/more-negative = more critical).
+- `status` = one of:
+  - **red** — `available <= minimum`
+  - **yellow** — `minimum < available <= minimum * 1.10` (i.e., available is ≤ 10% above minimum)
+  - **normal** — `available > minimum * 1.10`
+  - Edge case: `minimum = 0` → product is always **normal** (no threshold to breach). Surfaced in the same table; `delta = available` so they sink to the bottom of the critical sort.
 
-## Save flow changes (`handleSave`)
+Products that have a `minimum_quantity > 0` but **zero** available batches are still shown (they are the most critical). Products with `minimum = 0` AND `available = 0` are hidden (nothing to report).
 
-For each existing item with `delta < 0`:
+### UI / layout
 
-```text
-D = |delta|
-paperwork = min(D, deducted_to_extra)
-fromWaiting = D - paperwork
+Header bar mirrors the Extra Inventory page (back arrow → `/extra-inventory`, title, subtitle).
 
-if paperwork > 0:
-    order_items.deducted_to_extra -= paperwork   (clamped ≥ 0)
-if fromWaiting > 0:
-    deleteManufacturingBatches(item_id, fromWaiting)   (existing helper)
-order_items.quantity = new_qty
-```
+**Filters row** above the table:
+- Search by product name / SKU.
+- Status filter: All / Red / Yellow / Normal.
 
-The existing box-occupancy guard runs only when `fromWaiting > 0` (paperwork-only reductions never touch boxes).
+**Summary cards** (3 cards): count of products in each status (red, yellow, normal).
 
-## Activity log
+**Table** using shadcn `Table` with the following columns:
+- **Expand chevron** (per row).
+- **Product** — name (language-aware, per existing convention) + SKU subtitle.
+- **Available** — total quantity, badge styled by status color.
+- **Minimum** — `product.minimum_quantity`.
+- **Delta** — `available − minimum`, signed, colored.
+- **Status** — pill: Red / Yellow / Normal (translated).
 
-Each qty change records: `{ from, to, delta, paperwork_portion, batch_portion }` so the log clearly distinguishes "shrunk to match shipment" from "production work cancelled".
+Row background tint:
+- Red: `bg-destructive/10` with `border-l-4 border-destructive`.
+- Yellow: `bg-yellow-500/10` with `border-l-4 border-yellow-500`.
+- Normal: default.
 
-## Files
+**Sort order**: ascending by `delta` (most critical first). Stable secondary sort by product name.
 
-**Modified**
-- `src/components/EditOrderDialog.tsx` — fetch `deducted_to_extra`, expand `getMinQuantity`, split the decrease in `handleSave`, add tooltip, extend activity-log payload, extend re-validation.
-- `src/lib/translations.ts` — new keys: `orders.deducted_to_extra_hint`, `orders.paperwork_reduction`.
+**Expanded row** (on chevron click):
+- A nested mini-table showing each size with: size label, quantity, contribution % (of this product's available total), and a thin progress bar.
+- If product has only one size or no size variants, just show "—" with the full quantity.
+
+### Pagination
+Reuse `TablePagination` (PAGE_SIZE = 15) — the analysis is product-scoped so the row count stays manageable.
+
+### Permissions
+Read-only, available to all authenticated users (RLS on `extra_batches` and `products` already allows SELECT for everyone).
+
+### Translations (`src/lib/translations.ts`)
+New keys (EN/AR) under an `extra_analysis.` namespace:
+- `extra_analysis.title`, `extra_analysis.subtitle`, `extra_analysis.button`
+- `extra_analysis.col.product`, `.col.available`, `.col.minimum`, `.col.delta`, `.col.status`
+- `extra_analysis.status.red`, `.status.yellow`, `.status.normal`
+- `extra_analysis.size_breakdown`, `extra_analysis.no_size`
+- `extra_analysis.summary.critical`, `.summary.warning`, `.summary.healthy`
+- `extra_analysis.empty_state`
+
+### Files
 
 **New**
-- None. No DB migrations, no RPC changes.
+- `src/pages/ExtraInventoryAnalysis.tsx` — full page (fetch, aggregate, filter, render).
+
+**Modified**
+- `src/App.tsx` — register `/extra-inventory/analysis` route.
+- `src/pages/ExtraInventory.tsx` — add "Analysis" button in header beside "Settings".
+- `src/lib/translations.ts` — add translation keys listed above.
+
+**No DB migrations, no RPC changes, no schema changes.**
 
