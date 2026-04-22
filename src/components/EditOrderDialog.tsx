@@ -660,6 +660,7 @@ export function EditOrderDialog({
                 const idx = items.indexOf(item);
                 const minQty = getMinQuantity(item);
                 const deletable = canDeleteItem(item);
+                const deductedHere = item.id ? (deductedMap[item.id] ?? 0) : 0;
                 return (
                   <div
                     key={item.id || `new-${idx}`}
@@ -686,6 +687,20 @@ export function EditOrderDialog({
                         )}
                       </div>
                     </div>
+                    {deductedHere > 0 && (
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Info className="h-4 w-4 text-primary cursor-help shrink-0" />
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">
+                            <p className="text-xs">
+                              {t("orders.deducted_to_extra_hint").replace(/\{count\}/g, String(deductedHere))}
+                            </p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    )}
                     <NumericInput
                       value={item.quantity}
                       onValueChange={(val) => handleQtyChange(idx, val)}
