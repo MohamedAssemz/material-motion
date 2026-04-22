@@ -335,11 +335,14 @@ export function EditOrderDialog({
     setSaving(true);
     try {
       // Re-validate constraints before proceeding
-      const valid = await revalidateConstraints();
-      if (!valid) {
+      const { ok, deducted: freshDeducted } = await revalidateConstraints();
+      if (!ok) {
         setSaving(false);
         return;
       }
+
+      // Track per-item paperwork (extra-deduction) portion of any decrease, for activity log.
+      const paperworkPortions: Record<string, number> = {};
 
       // 1. Update EFT
       const eftChanged =
@@ -432,33 +435,44 @@ export function EditOrderDialog({
             }
           }
         } else {
-          // Decrease: check box occupancy first
+          // Decrease — split into paperwork (already in Extra) + waiting-batch deletion.
           const decreaseAmount = Math.abs(delta);
+          const availableDeducted = freshDeducted[item.id!] ?? 0;
+          const paperwork = Math.min(decreaseAmount, availableDeducted);
+          const fromWaiting = decreaseAmount - paperwork;
+          if (paperwork > 0) paperworkPortions[item.id!] = paperwork;
 
-          const { data: boxedBatches } = await supabase
-            .from("order_batches")
-            .select("id")
-            .eq("order_item_id", item.id!)
-            .not("box_id", "is", null)
-            .limit(1);
+          // Box-occupancy guard only matters when we actually delete batches.
+          if (fromWaiting > 0) {
+            const { data: boxedBatches } = await supabase
+              .from("order_batches")
+              .select("id")
+              .eq("order_item_id", item.id!)
+              .not("box_id", "is", null)
+              .limit(1);
 
-          if (boxedBatches && boxedBatches.length > 0) {
-            setBoxWarningMessage(
-              `${item.productName}${item.size ? ` (${item.size})` : ""}: ${t("orders.boxes_must_be_emptied")}`
-            );
-            setBoxWarningOpen(true);
-            setSaving(false);
-            return;
+            if (boxedBatches && boxedBatches.length > 0) {
+              setBoxWarningMessage(
+                `${item.productName}${item.size ? ` (${item.size})` : ""}: ${t("orders.boxes_must_be_emptied")}`
+              );
+              setBoxWarningOpen(true);
+              setSaving(false);
+              return;
+            }
+
+            if (isInProgress) {
+              await deleteManufacturingBatches(item.id!, fromWaiting);
+            }
           }
 
-          // Delete batches only from in_manufacturing state
-          if (isInProgress) {
-            await deleteManufacturingBatches(item.id!, decreaseAmount);
+          // Apply paperwork-only reduction to deducted_to_extra (clamped >= 0).
+          const updatePayload: Record<string, any> = { quantity: item.quantity };
+          if (paperwork > 0) {
+            updatePayload.deducted_to_extra = Math.max(0, availableDeducted - paperwork);
           }
-
           await supabase
             .from("order_items")
-            .update({ quantity: item.quantity })
+            .update(updatePayload)
             .eq("id", item.id!);
         }
       }
@@ -504,7 +518,20 @@ export function EditOrderDialog({
         } else if (item.isDeleted && !item.isNew) {
           changes.push({ type: "deleted", product: item.productName, sku: item.productSku, size: item.size, quantity: item.originalQuantity });
         } else if (!item.isNew && !item.isDeleted && item.id && item.quantity !== item.originalQuantity) {
-          changes.push({ type: "qty_changed", product: item.productName, sku: item.productSku, size: item.size, from: item.originalQuantity, to: item.quantity, delta: item.quantity - item.originalQuantity });
+          const delta = item.quantity - item.originalQuantity;
+          const paperwork = paperworkPortions[item.id] ?? 0;
+          const batchPortion = delta < 0 ? Math.abs(delta) - paperwork : 0;
+          changes.push({
+            type: "qty_changed",
+            product: item.productName,
+            sku: item.productSku,
+            size: item.size,
+            from: item.originalQuantity,
+            to: item.quantity,
+            delta,
+            paperwork_portion: paperwork,
+            batch_portion: batchPortion,
+          });
         }
       }
 
