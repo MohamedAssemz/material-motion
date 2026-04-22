@@ -29,7 +29,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { CalendarIcon, Plus, Trash2, Lock } from "lucide-react";
+import { CalendarIcon, Plus, Trash2, Lock, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface OrderItem {
@@ -111,6 +111,8 @@ export function EditOrderDialog({
 
   // Removable quantities per item (only for in_progress orders)
   const [removableMap, setRemovableMap] = useState<Record<string, number>>({});
+  // Already-moved-to-extra quantities per item (paperwork-only reductions allowed)
+  const [deductedMap, setDeductedMap] = useState<Record<string, number>>({});
 
   // New item form state
   const [addingItem, setAddingItem] = useState(false);
@@ -144,6 +146,7 @@ export function EditOrderDialog({
       setNewSize(null);
       setNewQty(1);
       setRemovableMap({});
+      setDeductedMap({});
       fetchProducts();
       if (orderStatus === "in_progress") {
         fetchRemovableQuantities();
@@ -161,6 +164,7 @@ export function EditOrderDialog({
 
   const fetchRemovableQuantities = async () => {
     const map: Record<string, number> = {};
+    const dMap: Record<string, number> = {};
 
     // Get manufacturing batch quantities per order item, only WAITING batches (eta IS NULL)
     const { data: batchData } = await supabase
@@ -169,15 +173,24 @@ export function EditOrderDialog({
       .eq("order_id", orderId)
       .eq("current_state", "in_manufacturing");
 
+    // Get deducted_to_extra per order item
+    const { data: itemRows } = await supabase
+      .from("order_items")
+      .select("id, deducted_to_extra")
+      .eq("order_id", orderId);
+
     // Sum waiting (eta=null) quantities per order_item_id
     for (const oi of orderItems) {
       const waitingQty = (batchData || [])
         .filter(b => b.order_item_id === oi.id && !b.eta)
         .reduce((sum, b) => sum + b.quantity, 0);
       map[oi.id] = waitingQty;
+      const row = (itemRows || []).find((r: any) => r.id === oi.id);
+      dMap[oi.id] = Math.max(0, (row as any)?.deducted_to_extra || 0);
     }
 
     setRemovableMap(map);
+    setDeductedMap(dMap);
   };
 
   const getProductSizes = (productId: string): string[] => {
@@ -189,14 +202,16 @@ export function EditOrderDialog({
     if (item.isNew || !item.id) return 1;
     if (orderStatus !== "in_progress") return 1;
     const removable = removableMap[item.id] ?? 0;
-    return Math.max(1, item.originalQuantity - removable);
+    const deducted = deductedMap[item.id] ?? 0;
+    return Math.max(1, item.originalQuantity - removable - deducted);
   };
 
   const canDeleteItem = (item: EditableItem): boolean => {
     if (item.isNew) return true;
     if (!item.id) return true;
     if (orderStatus !== "in_progress") return true;
-    // Can only delete if ALL quantity is removable (in manufacturing and not started)
+    // Can only delete if ALL quantity is removable from waiting manufacturing batches.
+    // Deducted-to-extra units stay in Extra and can't be reclaimed by deletion.
     const removable = removableMap[item.id] ?? 0;
     return removable >= item.originalQuantity;
   };
