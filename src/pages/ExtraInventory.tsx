@@ -23,7 +23,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Plus, Package, Loader2, Box, Search, Trash2, Settings } from "lucide-react";
+import { ArrowLeft, Plus, Package, Loader2, Box, Search, Trash2, Settings, BarChart3 } from "lucide-react";
 import { format } from "date-fns";
 import { TablePagination } from "@/components/TablePagination";
 import { ExtraBoxSelectionDialog } from "@/components/ExtraBoxSelectionDialog";
@@ -423,6 +423,10 @@ export default function ExtraInventory() {
           </div>
 
           <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => navigate("/extra-inventory/analysis")}>
+              <BarChart3 className="mr-2 h-4 w-4" />
+              {t("extra_analysis.button")}
+            </Button>
             <Button variant="outline" onClick={() => navigate("/extra-inventory/settings")}>
               <Settings className="mr-2 h-4 w-4" />
               {t("warehouse_settings.button")}
