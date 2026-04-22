@@ -211,6 +211,12 @@ export function ProductDetailDialog({
                 </div>
               </div>
 
+              <div>
+                <h4 className="text-sm font-medium text-muted-foreground mb-1">{t('catalog.minimum_quantity')}</h4>
+                <span className="text-sm font-medium">{product.minimum_quantity ?? 0}</span>
+                <p className="text-xs text-muted-foreground mt-0.5">{t('catalog.minimum_quantity_helper')}</p>
+              </div>
+
               {product.categories && product.categories.length > 0 && (
                 <div>
                   <h4 className="text-sm font-medium text-muted-foreground mb-2">{t('catalog.categories')}</h4>
