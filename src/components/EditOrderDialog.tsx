@@ -203,7 +203,13 @@ export function EditOrderDialog({
     if (orderStatus !== "in_progress") return 1;
     const removable = removableMap[item.id] ?? 0;
     const deducted = deductedMap[item.id] ?? 0;
-    return Math.max(1, item.originalQuantity - removable - deducted);
+    // If the line can be deleted outright (all units still waiting), keep the
+    // >=1 floor so users use Delete instead. Otherwise allow paperwork-zero so
+    // a fully-cancelled customer line can be mirrored without orphaning the
+    // surplus units already parked in Extra Inventory.
+    const canDelete = removable >= item.originalQuantity;
+    const floor = canDelete ? 1 : 0;
+    return Math.max(floor, item.originalQuantity - removable - deducted);
   };
 
   const canDeleteItem = (item: EditableItem): boolean => {
