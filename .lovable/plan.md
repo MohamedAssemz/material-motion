@@ -1,102 +1,78 @@
 
 
-# Production Forms Generator — Replace Exports Tab
+# Three improvements: minimum stock, size column fix, dynamic storehouses
 
-Replace the 3 placeholder cards in the Exports tab with **6 production-form generators** that mirror the uploaded Miracle Medical Industries paper templates pixel-for-pixel as printable PDFs.
+## 1. Minimum Quantity attribute on catalog items (informational)
 
-## 1. UI — `ExportsTab.tsx` rewrite
+**Schema**
+- Migration: `ALTER TABLE products ADD COLUMN minimum_quantity integer NOT NULL DEFAULT 0;`
 
-Six cards in a responsive grid, each opens a modal selector → generates a PDF download. Cards:
+**UI — `src/components/catalog/ProductFormDialog.tsx`**
+- Add `minimum_quantity` to `ProductFormData` and `initialFormData` (default `0`).
+- Add a `NumericInput` field labelled "Minimum Quantity / الحد الأدنى للكمية" with helper text "Informational only — does not affect production logic" / "للعرض فقط — لا يؤثر على منطق الإنتاج".
+- Include in insert/update payloads. Load when editing/duplicating.
 
-| # | Title (EN/AR) | Trigger inputs | Data source |
-|---|---|---|---|
-| 01 | Weekly Production Plan / خطة الإنتاج الأسبوعية | Date range (week from→to) | `order_batches` grouped by product, day-of-week machine-assigned counts |
-| 02 | Production Order Form / امر الإنتاج | Pick an order | `orders` + `order_items` (product name, qty, remarks=size/special) |
-| 04 | Accepted Items Identification Tag / علامة تعريف المنتجات المقبولة | Pick a box (BOX-XXXX) | `boxes.items_list` + parent `order` (work order, delivery date) |
-| 05 | Hold Items Identification Tag / بطاقة تعريف المنتجات المحجوزة | Pick order + product, free-text reason + extra info | Manual fill (user-typed) + product/order metadata |
-| 06 | Delivery Order / امر التوصيل | Pick a shipment (SHP-XXXX) | `shipments` + linked `order_batches` → product description, lot (qr_code), unit, qty |
-| 07 | Release Order Form / طلب الإصدار | Pick an order or shipment | `order_batches` rows (description, unit, qty, lot, notes) |
+**Display — `src/components/catalog/ProductDetailDialog.tsx`**
+- Show "Minimum Quantity: N" inside the product attributes section so admins can see the threshold (read-only).
 
-Each card: icon + bilingual title + 1-line description + "Generate" button. Removed: Orders Export / Production Report / Inventory Snapshot placeholders.
+**Translations — `src/lib/translations.ts`**
+- Add `catalog.minimum_quantity`, `catalog.minimum_quantity_helper`.
 
-## 2. Modals — one per report
+No business logic changes — just stored and displayed.
 
-Reusable shadcn `Dialog`. Inputs vary:
-- **Date range**: shadcn `Calendar` popover (from + to, defaults to current week Sat→Thu).
-- **Order picker**: searchable combobox listing `ORD-XXXXX — customer name`.
-- **Box picker**: searchable combobox listing active `BOX-XXXX` codes with product preview.
-- **Shipment picker**: searchable combobox listing `SHP-XXXX` with order number.
-- **Hold Tag** modal extends the order picker with: product select (from order_items), `Reason` select (Under Inspection / Under Repair / Rejected), `Additional Information` textarea.
+## 2. Fix size column in Extra Inventory ("—" + "common.size" header)
 
-Each modal has a "Generate PDF" button → fetches the data → passes to the PDF generator → downloads file named `<report-code>_<reference>_<YYYYMMDD>.pdf` (e.g. `02_PO_ORD-00042_20260420.pdf`).
+**Two distinct issues, both fixed:**
 
-## 3. PDF generator — `src/lib/productionFormsPdf.ts`
-
-Use **jsPDF + jspdf-autotable** (lightweight, already common; install if missing). One file exporting six functions:
-
-```ts
-generateWeeklyProductionPlanPDF(data)
-generateProductionOrderPDF(data)
-generateAcceptedItemsTagPDF(data)
-generateHoldItemsTagPDF(data)
-generateDeliveryOrderPDF(data)
-generateReleaseOrderPDF(data)
+a. **Missing translation key** — `common.size` is referenced in `src/pages/ExtraInventory.tsx` (lines 468 & 723) but doesn't exist in `translations.ts`. Add to `src/lib/translations.ts`:
 ```
+"common.size": { en: "Size", ar: "المقاس" }
+```
+This fixes the literal "common.size" header text shown in both EN and AR.
 
-Shared helpers:
-- `drawHeader(doc)` — Miracle logo (left, ~30mm wide) + "Miracle Medical Industries" title in a bordered cell.
-- `drawFooter(doc, refNo, revNo)` — bottom-left bordered table `Ref. no. | Page 1 of 1 | Rev. no.` matching uploaded forms (`02/01/01/01` … `02/01/01/07`).
-- Bilingual labels: every label rendered as `English العربية` pairs using a font that supports Arabic. Use **Amiri** (Google Font, free, Arabic-friendly) loaded via `doc.addFont` from a base64 `.ttf` placed in `src/assets/fonts/`. Fall back to Helvetica for Latin.
-- Page size: A4 portrait, 15mm margins, matching paper proportions.
+b. **Dash showing for batches that have a size** — DB confirms several `extra_batches` rows have `size = ''` (empty string, not null). The current renderer does `batch.size ? <Badge> : —` and an empty string is falsy so it shows "—". Fix in `src/pages/ExtraInventory.tsx` line 763:
+```tsx
+{batch.size && batch.size.trim() ? <Badge variant="outline">{batch.size}</Badge> : <span className="text-muted-foreground text-xs">—</span>}
+```
+Plus a one-time data-cleanup migration to backfill the missing sizes by joining each affected `extra_batch` to its origin `order_item.size` (via the most recent `extra_batch_history.source_order_item_id` for that batch). For rows where no source order_item can be found, leave as null. This corrects the historical rows displayed in the screenshot.
 
-**Logo asset**: copy the existing Miracle logo from the uploaded PDFs (`page_1_image_1_v2.jpg`) into `src/assets/miracle-logo.png` and embed as base64.
+## 3. Dynamic storehouses everywhere (bug: new storehouses don't appear in selectors)
 
-Each generator builds a layout that visually matches its source PDF (table positions, signature lines, headings). Tables built with `autoTable` for clean borders matching the templates.
+The `storehouses` table exists and the Warehouse Settings page writes to it, but every dropdown still hard-codes Storehouse 1 / Storehouse 2 from translation keys. Replace with dynamic fetches.
 
-## 4. Data fetchers
+**New shared hook — `src/hooks/useStorehouses.ts`**
+- Fetches `storehouses` ordered by `sort_order`, subscribes to realtime changes, exposes `{ storehouses, loading, getName(id) }`.
 
-Each modal's "Generate" handler calls a small fetcher that returns the typed payload:
+**Files to update — replace hard-coded `<SelectItem value="1">`/`"2"` and `t("warehouse.storehouse_1")`/`_2` lookups with the dynamic list / `getName(id)`:**
 
-- **Weekly plan**: `order_batches` with `production_date` BETWEEN week range → group by `product_id` → for each product, sum quantities per weekday column. Include `order.order_number` as Work Order No.
-- **Production order**: `orders.order_number` + joined `order_items(product, quantity, size, is_special, initial_state)`. Remarks = special tag / size.
-- **Accepted Tag**: `boxes` row → `items_list` (already a JSON summary) → take linked order via batches in box → fill product name, work order, delivery date (`orders.estimated_fulfillment_time`), quantity, source = "Production", lot = `box_code`.
-- **Hold Tag**: pure form input + `orders` + `products` lookup; nothing persisted (no DB write).
-- **Delivery order**: `shipments` row + `order_batches` where `shipment_id = X` joined to `products` → table rows: description, lot=`qr_code_data`, unit="pcs", quantity, total. Header: invoice no = `shipment_code`, To = customer, Delivery Location = `orders.country`.
-- **Release order**: `order_batches` for selected order → rows: description, unit, quantity, lot, notes (state).
+- `src/pages/Boxes.tsx`
+  - Create-Extra-Boxes dialog (lines ~921–931) → map over `storehouses`.
+  - Per-row storehouse `<Select>` in extra-boxes table (lines ~1230–1234) → map over `storehouses`.
+  - Storehouse summary cards (currently hard-coded "Storehouse 1 Empty / Storehouse 2 Empty") → render one card per storehouse from the dynamic list.
+  - `emptyExtraBoxesS1` / `emptyExtraBoxesS2` derived state → replaced by `groupBy(storehouse_id)`.
 
-## 5. Translations
+- `src/pages/ExtraInventory.tsx`
+  - Storehouse filter `<Select>` (lines ~680–684) → dynamic options.
+  - Per-row badge (line ~772) → `getName(batch.storehouse)`.
+  - Storehouse summary cards (lines ~599–615) → render one card per storehouse instead of hard-coded two.
 
-Add to `src/lib/translations.ts`:
-- `reports.forms.weekly_plan`, `reports.forms.production_order`, `reports.forms.accepted_tag`, `reports.forms.hold_tag`, `reports.forms.delivery_order`, `reports.forms.release_order` (EN + AR).
-- Modal labels: pick order, pick box, pick shipment, date from/to, reason, additional info, generate, cancel.
+- `src/pages/WarehouseSettings.tsx` — already dynamic, no change beyond confirming the realtime hook reflects edits.
 
-## 6. Audit
+**Why the user's bug happened:** `Boxes.tsx` create-extra-box dialog only renders `<SelectItem value="1">` and `<SelectItem value="2">`, so any storehouse with `id ≥ 3` is invisible. Switching to a `.map()` over the fetched `storehouses` fixes it everywhere consistently.
 
-Each successful PDF generation fires `logAudit({ action: "report.generated", entity_type: "report", entity_id: reportCode, module: "reports", order_id?, metadata: { report: "production_order", reference: "ORD-00042" } })` so report exports show up in the global audit log and (when `order_id` is set) the order's Timeline Logs drawer.
+**Translations — `src/lib/translations.ts`**
+- Keep `warehouse.storehouse` (label) but the per-storehouse names now come from the DB (`storehouses.name`), so `warehouse.storehouse_1` / `_2` / `_1_empty` / `_2_empty` / `_1_batches` / `_2_batches` keys are no longer used and can be removed once all references are migrated. Add generic `warehouse.empty_boxes` and `warehouse.available_units` for the dynamic cards.
 
-## 7. Files
+## Files
 
 **New**
-- `src/components/reports/forms/WeeklyPlanDialog.tsx`
-- `src/components/reports/forms/ProductionOrderDialog.tsx`
-- `src/components/reports/forms/AcceptedTagDialog.tsx`
-- `src/components/reports/forms/HoldTagDialog.tsx`
-- `src/components/reports/forms/DeliveryOrderDialog.tsx`
-- `src/components/reports/forms/ReleaseOrderDialog.tsx`
-- `src/lib/productionFormsPdf.ts` (six generators + shared header/footer/logo helpers)
-- `src/assets/miracle-logo.png` (extracted from uploaded PDFs)
-- `src/assets/fonts/Amiri-Regular.ttf` (Arabic-capable font, base64-loaded)
+- `src/hooks/useStorehouses.ts`
+- Migration: add `products.minimum_quantity` + backfill `extra_batches.size` from `extra_batch_history`.
 
 **Modified**
-- `src/components/reports/ExportsTab.tsx` — replace 3 placeholder cards with 6 active generator cards.
-- `src/lib/translations.ts` — add form titles, modal labels, button strings.
-- `package.json` — add `jspdf` + `jspdf-autotable` if not already present.
-
-## Technical notes
-
-- All forms render in **portrait A4**; bilingual labels use right-to-left text via `doc.text(arabic, x, y, { align: "right" })` while English stays left/center, mirroring the uploaded templates.
-- Ref-no codes per template are hard-coded constants (`02/01/01/01` through `02/01/01/07`), Rev. no. constant `01`.
-- The Weekly Plan's day columns map to Sat–Thu (Egyptian work week, matching the uploaded template).
-- All fetchers cap rows reasonably (Weekly Plan: top 30 products in week; Delivery/Release: all batches in shipment/order — paginate to extra pages if >15 rows).
-- No new DB tables or migrations needed.
+- `src/components/catalog/ProductFormDialog.tsx`
+- `src/components/catalog/ProductDetailDialog.tsx`
+- `src/pages/ExtraInventory.tsx`
+- `src/pages/Boxes.tsx`
+- `src/lib/translations.ts`
 
