@@ -927,8 +927,9 @@ export default function Boxes() {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="1">{t("warehouse.storehouse_1")}</SelectItem>
-                            <SelectItem value="2">{t("warehouse.storehouse_2")}</SelectItem>
+                            {storehouses.map((sh) => (
+                              <SelectItem key={sh.id} value={String(sh.id)}>{sh.name}</SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                       </div>
@@ -1098,28 +1099,26 @@ export default function Boxes() {
           {/* Extra Boxes Tab */}
           <TabsContent value="extra" className="space-y-6">
             <div className="grid gap-4 md:grid-cols-4">
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-muted-foreground">{t("warehouse.storehouse_1_empty")}</p>
-                      <p className="text-2xl font-bold text-green-600">{emptyExtraBoxesS1.length}</p>
-                    </div>
-                    <Box className="h-8 w-8 text-green-600 opacity-50" />
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-muted-foreground">{t("warehouse.storehouse_2_empty")}</p>
-                      <p className="text-2xl font-bold text-blue-600">{emptyExtraBoxesS2.length}</p>
-                    </div>
-                    <Box className="h-8 w-8 text-blue-600 opacity-50" />
-                  </div>
-                </CardContent>
-              </Card>
+              {storehouses.map((sh, idx) => {
+                const emptyList = emptyExtraBoxesByStorehouse(sh.id);
+                const palette = ["text-green-600", "text-blue-600", "text-purple-600", "text-cyan-600", "text-pink-600"];
+                const colorClass = palette[idx % palette.length];
+                return (
+                  <Card key={sh.id}>
+                    <CardContent className="pt-6">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm text-muted-foreground">
+                            {sh.name} — {t("warehouse.empty_boxes_in")}
+                          </p>
+                          <p className={`text-2xl font-bold ${colorClass}`}>{emptyList.length}</p>
+                        </div>
+                        <Box className={`h-8 w-8 ${colorClass} opacity-50`} />
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
               <Card>
                 <CardContent className="pt-6">
                   <div className="flex items-center justify-between">
@@ -1217,7 +1216,7 @@ export default function Boxes() {
                                       .update({ storehouse: newSh } as any)
                                       .eq("id", box.id);
                                     if (error) throw error;
-                                    toast({ title: t("toast.success"), description: `${box.box_code} → ${t(`warehouse.storehouse_${newSh}`)}` });
+                                    toast({ title: t("toast.success"), description: `${box.box_code} → ${getStorehouseName(newSh)}` });
                                     fetchBoxes();
                                   } catch (err: any) {
                                     toast({ title: t("toast.error"), description: err.message, variant: "destructive" });
@@ -1231,8 +1230,9 @@ export default function Boxes() {
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  <SelectItem value="1">{t("warehouse.storehouse_1")}</SelectItem>
-                                  <SelectItem value="2">{t("warehouse.storehouse_2")}</SelectItem>
+                                  {storehouses.map((sh) => (
+                                    <SelectItem key={sh.id} value={String(sh.id)}>{sh.name}</SelectItem>
+                                  ))}
                                 </SelectContent>
                               </Select>
                             </TableCell>
