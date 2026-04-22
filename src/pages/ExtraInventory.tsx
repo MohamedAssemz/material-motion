@@ -593,30 +593,28 @@ export default function ExtraInventory() {
               </div>
             </CardContent>
           </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">{t("warehouse.storehouse_1_batches")}</p>
-                  <p className="text-2xl font-bold text-blue-600">{storehouse1Units}</p>
-                  <p className="text-xs text-muted-foreground">{storehouse1Available.length} {t("extra.available_batches").toLowerCase()}</p>
-                </div>
-                <Package className="h-8 w-8 text-blue-600 opacity-50" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">{t("warehouse.storehouse_2_batches")}</p>
-                  <p className="text-2xl font-bold text-purple-600">{storehouse2Units}</p>
-                  <p className="text-xs text-muted-foreground">{storehouse2Available.length} {t("extra.available_batches").toLowerCase()}</p>
-                </div>
-                <Package className="h-8 w-8 text-purple-600 opacity-50" />
-              </div>
-            </CardContent>
-          </Card>
+          {storehouses.map((sh, idx) => {
+            const list = availableByStorehouse(sh.id);
+            const units = list.reduce((sum, b) => sum + b.quantity, 0);
+            const palette = ["text-blue-600", "text-purple-600", "text-cyan-600", "text-pink-600", "text-amber-600"];
+            const colorClass = palette[idx % palette.length];
+            return (
+              <Card key={sh.id}>
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">{sh.name}</p>
+                      <p className={`text-2xl font-bold ${colorClass}`}>{units}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {list.length} {t("extra.available_batches").toLowerCase()}
+                      </p>
+                    </div>
+                    <Package className={`h-8 w-8 ${colorClass} opacity-50`} />
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
           <Card>
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
@@ -678,8 +676,9 @@ export default function ExtraInventory() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">{t("warehouse.storehouse")}</SelectItem>
-                    <SelectItem value="1">{t("warehouse.storehouse_1")}</SelectItem>
-                    <SelectItem value="2">{t("warehouse.storehouse_2")}</SelectItem>
+                    {storehouses.map((sh) => (
+                      <SelectItem key={sh.id} value={String(sh.id)}>{sh.name}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -759,7 +758,7 @@ export default function ExtraInventory() {
                           </div>
                         </TableCell>
                         <TableCell>
-                          {batch.size ? (
+                          {batch.size && batch.size.trim() ? (
                             <Badge variant="outline">{batch.size}</Badge>
                           ) : (
                             <span className="text-muted-foreground text-xs">—</span>
@@ -768,7 +767,7 @@ export default function ExtraInventory() {
                         <TableCell className="font-bold">{batch.quantity}</TableCell>
                         <TableCell>
                           <Badge variant="outline">
-                            {batch.storehouse === 2 ? t("warehouse.storehouse_2") : t("warehouse.storehouse_1")}
+                            {getStorehouseName(batch.storehouse ?? 1)}
                           </Badge>
                         </TableCell>
                         <TableCell>
