@@ -247,7 +247,7 @@ export const translations: Record<string, TranslationEntry> = {
   "orders.boxes_must_be_emptied_title": { en: "Boxes Must Be Emptied", ar: "يجب إفراغ الصناديق" },
   "orders.deleted_items":       { en: "Deleted items (click restore to undo)", ar: "العناصر المحذوفة (اضغط استعادة للتراجع)" },
   "orders.restore":             { en: "Restore",              ar: "استعادة" },
-  "orders.deducted_to_extra_hint": { en: "{count} units already moved to Extra Inventory. You may reduce this order item by up to {count} without affecting production — this only updates the order document to match what was actually shipped.", ar: "تم نقل {count} وحدة بالفعل إلى المخزون الإضافي. يمكنك تقليل هذا العنصر بحد أقصى {count} دون التأثير على الإنتاج — هذا يُحدّث مستند الطلب فقط ليطابق ما تم شحنه فعلياً." },
+  "orders.deducted_to_extra_hint": { en: "{count} units already moved to Extra Inventory. You may reduce this order item by up to {count} (or all the way to 0 to mirror a fully-cancelled line) without affecting production — this only updates the order document to match what was actually shipped. The surplus stays safely in Extra Inventory.", ar: "تم نقل {count} وحدة بالفعل إلى المخزون الإضافي. يمكنك تقليل هذا العنصر بحد أقصى {count} (أو حتى 0 لمحاكاة بند ملغى بالكامل) دون التأثير على الإنتاج — هذا يُحدّث مستند الطلب فقط ليطابق ما تم شحنه فعلياً. تبقى الكميات الفائضة بأمان في المخزون الإضافي." },
   "orders.paperwork_reduction_note": { en: "Paperwork-only adjustment (matches shipped reality)", ar: "تعديل ورقي فقط (مطابقة لما تم شحنه)" },
   "orders.select_product":      { en: "Select product...",    ar: "اختر منتج..." },
   "orders.select_size":         { en: "Select size",          ar: "اختر المقاس" },
