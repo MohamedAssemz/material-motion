@@ -623,6 +623,20 @@ export function ProductFormDialog({
                   />
                 </div>
 
+                {/* Minimum Quantity (informational) */}
+                <div className="p-3 rounded-lg border">
+                  <Label htmlFor="minimum_quantity" className="font-medium">{t('catalog.minimum_quantity')}</Label>
+                  <p className="text-xs text-muted-foreground mb-2">{t('catalog.minimum_quantity_helper')}</p>
+                  <NumericInput
+                    id="minimum_quantity"
+                    min={0}
+                    value={formData.minimum_quantity}
+                    onValueChange={(val) => setFormData(prev => ({ ...prev, minimum_quantity: val ?? 0 }))}
+                    placeholder="0"
+                    className="max-w-[160px]"
+                  />
+                </div>
+
                 {/* Categories */}
                 <CategoriesSelector
                   categories={categories}
