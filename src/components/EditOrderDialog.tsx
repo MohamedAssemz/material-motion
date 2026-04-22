@@ -537,6 +537,7 @@ export function EditOrderDialog({
             delta,
             paperwork_portion: paperwork,
             batch_portion: batchPortion,
+            zeroed: item.quantity === 0,
           });
         }
       }
