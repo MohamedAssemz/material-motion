@@ -910,6 +910,7 @@ export type Database = {
           description_ar: string | null
           description_en: string | null
           id: string
+          minimum_quantity: number
           name_ar: string | null
           name_en: string
           needs_packing: boolean | null
@@ -925,6 +926,7 @@ export type Database = {
           description_ar?: string | null
           description_en?: string | null
           id?: string
+          minimum_quantity?: number
           name_ar?: string | null
           name_en: string
           needs_packing?: boolean | null
@@ -940,6 +942,7 @@ export type Database = {
           description_ar?: string | null
           description_en?: string | null
           id?: string
+          minimum_quantity?: number
           name_ar?: string | null
           name_en?: string
           needs_packing?: boolean | null

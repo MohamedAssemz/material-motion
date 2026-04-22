@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { NumericInput } from '@/components/ui/numeric-input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
@@ -114,6 +115,7 @@ export interface ProductFormData {
   brand_id: string;
   country: string;
   needs_packing: boolean;
+  minimum_quantity: number;
   category_ids: string[];
   customer_ids: string[];
   images: ProductImage[];
@@ -140,6 +142,7 @@ const initialFormData: ProductFormData = {
   brand_id: '',
   country: '',
   needs_packing: true,
+  minimum_quantity: 0,
   category_ids: [],
   customer_ids: [],
   images: [],
@@ -272,6 +275,7 @@ export function ProductFormDialog({
         brand_id: formData.brand_id || null,
         country: formData.country.trim() || null,
         needs_packing: formData.needs_packing,
+        minimum_quantity: formData.minimum_quantity ?? 0,
       };
 
       let productId = formData.id;
@@ -617,6 +621,20 @@ export function ProductFormDialog({
                     id="needs_packing"
                     checked={formData.needs_packing}
                     onCheckedChange={(checked) => setFormData(prev => ({ ...prev, needs_packing: checked }))}
+                  />
+                </div>
+
+                {/* Minimum Quantity (informational) */}
+                <div className="p-3 rounded-lg border">
+                  <Label htmlFor="minimum_quantity" className="font-medium">{t('catalog.minimum_quantity')}</Label>
+                  <p className="text-xs text-muted-foreground mb-2">{t('catalog.minimum_quantity_helper')}</p>
+                  <NumericInput
+                    id="minimum_quantity"
+                    min={0}
+                    value={formData.minimum_quantity}
+                    onValueChange={(val) => setFormData(prev => ({ ...prev, minimum_quantity: val ?? 0 }))}
+                    placeholder="0"
+                    className="max-w-[160px]"
                   />
                 </div>
 

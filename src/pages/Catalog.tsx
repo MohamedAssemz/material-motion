@@ -263,6 +263,7 @@ export default function Catalog() {
       brand_id: product.brand_id || "",
       country: product.country || "",
       needs_packing: product.needs_packing ?? true,
+      minimum_quantity: (product as any).minimum_quantity ?? 0,
       category_ids: categoryIds,
       customer_ids: customerIds,
       images,
