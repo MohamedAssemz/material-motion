@@ -23,6 +23,7 @@ interface ProductPotentialCustomer {
 interface ExtendedProductData extends ProductCardData {
   potential_customers?: ProductPotentialCustomer[];
   created_at?: string | null;
+  minimum_quantity?: number | null;
 }
 
 interface ProductDetailDialogProps {
