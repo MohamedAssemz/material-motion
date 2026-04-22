@@ -28,6 +28,7 @@ import { format } from "date-fns";
 import { TablePagination } from "@/components/TablePagination";
 import { ExtraBoxSelectionDialog } from "@/components/ExtraBoxSelectionDialog";
 import { logAudit } from "@/lib/auditLog";
+import { useStorehouses } from "@/hooks/useStorehouses";
 
 interface Product {
   id: string;
@@ -67,6 +68,7 @@ export default function ExtraInventory() {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { storehouses, getName: getStorehouseName } = useStorehouses();
   const [batches, setBatches] = useState<ExtraBatch[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -398,10 +400,7 @@ export default function ExtraInventory() {
   const availableBatches = batches.filter((b) => b.inventory_state === "AVAILABLE");
   const reservedBatches = batches.filter((b) => b.inventory_state === "RESERVED");
   const totalAvailable = availableBatches.reduce((sum, b) => sum + b.quantity, 0);
-  const storehouse1Available = availableBatches.filter((b) => b.storehouse === 1);
-  const storehouse2Available = availableBatches.filter((b) => b.storehouse === 2);
-  const storehouse1Units = storehouse1Available.reduce((sum, b) => sum + b.quantity, 0);
-  const storehouse2Units = storehouse2Available.reduce((sum, b) => sum + b.quantity, 0);
+  const availableByStorehouse = (id: number) => availableBatches.filter((b) => b.storehouse === id);
 
   if (loading) {
     return (
