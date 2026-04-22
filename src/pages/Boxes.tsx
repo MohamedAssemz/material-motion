@@ -26,6 +26,7 @@ import { useBoxScanner } from "@/hooks/useBoxScanner";
 import { TablePagination } from "@/components/TablePagination";
 import { cn } from "@/lib/utils";
 import { logAudit } from "@/lib/auditLog";
+import { useStorehouses } from "@/hooks/useStorehouses";
 
 interface OrderBoxData {
   id: string;
@@ -57,6 +58,7 @@ export default function Boxes() {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { storehouses, getName: getStorehouseName } = useStorehouses();
   const [orderBoxes, setOrderBoxes] = useState<OrderBoxData[]>([]);
   const [extraBoxes, setExtraBoxes] = useState<ExtraBoxData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -658,8 +660,8 @@ export default function Boxes() {
   const occupiedOrderBoxes = orderBoxes.filter((b) => b.batch_count > 0);
   const inactiveOrderBoxes = orderBoxes.filter((b) => !b.is_active);
   const emptyExtraBoxes = extraBoxes.filter((b) => b.batch_count === 0 && b.is_active);
-  const emptyExtraBoxesS1 = emptyExtraBoxes.filter((b) => b.storehouse === 1);
-  const emptyExtraBoxesS2 = emptyExtraBoxes.filter((b) => b.storehouse === 2);
+  const emptyExtraBoxesByStorehouse = (id: number) =>
+    emptyExtraBoxes.filter((b) => b.storehouse === id);
   const occupiedExtraBoxes = extraBoxes.filter((b) => b.batch_count > 0);
   const inactiveExtraBoxes = extraBoxes.filter((b) => !b.is_active);
 
