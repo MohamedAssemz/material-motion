@@ -1206,25 +1206,15 @@ export type Database = {
         }
         Returns: boolean
       }
-      move_order_batches_to_extra:
-        | {
-            Args: {
-              p_phase: string
-              p_selections: Json
-              p_target_box_id: string
-              p_user_id: string
-            }
-            Returns: Json
-          }
-        | {
-            Args: {
-              p_phase: string
-              p_selections: Json
-              p_target_box_id: string
-              p_user_id: string
-            }
-            Returns: Json
-          }
+      move_order_batches_to_extra: {
+        Args: {
+          p_phase: string
+          p_selections: Json
+          p_target_box_id: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
     }
     Enums: {
       app_role:
