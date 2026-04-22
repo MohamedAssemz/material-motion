@@ -173,13 +173,13 @@ export function EditOrderDialog({
       .eq("order_id", orderId)
       .eq("current_state", "in_manufacturing");
 
-    // Get deducted_to_extra per order item
+    // Get fresh quantity + deducted_to_extra per order item — parent props can be stale
+    // (e.g. after a partially-applied save), so always trust the DB here.
     const { data: itemRows } = await supabase
       .from("order_items")
-      .select("id, deducted_to_extra")
+      .select("id, quantity, deducted_to_extra")
       .eq("order_id", orderId);
 
-    // Sum waiting (eta=null) quantities per order_item_id
     for (const oi of orderItems) {
       const waitingQty = (batchData || [])
         .filter(b => b.order_item_id === oi.id && !b.eta)
@@ -191,6 +191,26 @@ export function EditOrderDialog({
 
     setRemovableMap(map);
     setDeductedMap(dMap);
+
+    // Reconcile stale prop quantities with the fresh DB values so the floor
+    // calculation in getMinQuantity isn't anchored to an obsolete originalQuantity.
+    if (itemRows && itemRows.length > 0) {
+      setItems(prev => prev.map(it => {
+        if (!it.id || it.isNew) return it;
+        const row = (itemRows as any[]).find(r => r.id === it.id);
+        if (!row) return it;
+        const freshQty = row.quantity as number;
+        if (freshQty === it.originalQuantity) return it;
+        // Adopt the DB value as the new baseline; if the user hadn't edited
+        // the field yet, also reset the editable quantity to match.
+        const userEdited = it.quantity !== it.originalQuantity;
+        return {
+          ...it,
+          originalQuantity: freshQty,
+          quantity: userEdited ? it.quantity : freshQty,
+        };
+      }));
+    }
   };
 
   const getProductSizes = (productId: string): string[] => {
