@@ -283,9 +283,11 @@ export function EditOrderDialog({
     setNewNeedsBoxing(true);
   };
 
-  // Re-validate removable quantities server-side before save
-  const revalidateConstraints = async (): Promise<boolean> => {
-    if (orderStatus !== "in_progress") return true;
+  // Re-validate removable quantities server-side before save.
+  // Returns the latest deducted_to_extra map so handleSave uses fresh values.
+  const revalidateConstraints = async (): Promise<{ ok: boolean; deducted: Record<string, number> }> => {
+    const emptyDeducted: Record<string, number> = {};
+    if (orderStatus !== "in_progress") return { ok: true, deducted: emptyDeducted };
 
     const { data: batchData } = await supabase
       .from("order_batches")
@@ -293,29 +295,40 @@ export function EditOrderDialog({
       .eq("order_id", orderId)
       .eq("current_state", "in_manufacturing");
 
+    const { data: itemRows } = await supabase
+      .from("order_items")
+      .select("id, deducted_to_extra")
+      .eq("order_id", orderId);
+
+    const freshDeducted: Record<string, number> = {};
+    for (const r of (itemRows || []) as any[]) {
+      freshDeducted[r.id] = Math.max(0, r.deducted_to_extra || 0);
+    }
+
     for (const item of items) {
       if (item.isNew || !item.id) continue;
 
-      // Only waiting batches (eta=null) are removable
       const removable = (batchData || [])
         .filter(b => b.order_item_id === item.id && !b.eta)
         .reduce((sum, b) => sum + b.quantity, 0);
+      const deducted = freshDeducted[item.id] ?? 0;
 
       if (item.isDeleted) {
+        // Deletion still requires full coverage by waiting batches alone — extras stay in pool.
         if (removable < item.originalQuantity) {
           toast.error(`${item.productName}: ${language === "ar" ? "لا يمكن حذف هذا المنتج - تم بدء العمل عليه" : "Cannot delete - work has started on this item"}`);
-          return false;
+          return { ok: false, deducted: freshDeducted };
         }
       } else if (item.quantity < item.originalQuantity) {
         const decreaseAmount = item.originalQuantity - item.quantity;
-        if (decreaseAmount > removable) {
+        if (decreaseAmount > removable + deducted) {
           toast.error(`${item.productName}: ${language === "ar" ? "لا يمكن تقليل الكمية بهذا المقدار - تم بدء العمل" : "Cannot decrease by this amount - work has progressed"}`);
-          return false;
+          return { ok: false, deducted: freshDeducted };
         }
       }
     }
 
-    return true;
+    return { ok: true, deducted: freshDeducted };
   };
 
   const handleSave = async () => {
