@@ -29,7 +29,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { CalendarIcon, Plus, Trash2, Lock } from "lucide-react";
+import { CalendarIcon, Plus, Trash2, Lock, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface OrderItem {
@@ -111,6 +111,8 @@ export function EditOrderDialog({
 
   // Removable quantities per item (only for in_progress orders)
   const [removableMap, setRemovableMap] = useState<Record<string, number>>({});
+  // Already-moved-to-extra quantities per item (paperwork-only reductions allowed)
+  const [deductedMap, setDeductedMap] = useState<Record<string, number>>({});
 
   // New item form state
   const [addingItem, setAddingItem] = useState(false);
@@ -144,6 +146,7 @@ export function EditOrderDialog({
       setNewSize(null);
       setNewQty(1);
       setRemovableMap({});
+      setDeductedMap({});
       fetchProducts();
       if (orderStatus === "in_progress") {
         fetchRemovableQuantities();
@@ -161,6 +164,7 @@ export function EditOrderDialog({
 
   const fetchRemovableQuantities = async () => {
     const map: Record<string, number> = {};
+    const dMap: Record<string, number> = {};
 
     // Get manufacturing batch quantities per order item, only WAITING batches (eta IS NULL)
     const { data: batchData } = await supabase
@@ -169,15 +173,24 @@ export function EditOrderDialog({
       .eq("order_id", orderId)
       .eq("current_state", "in_manufacturing");
 
+    // Get deducted_to_extra per order item
+    const { data: itemRows } = await supabase
+      .from("order_items")
+      .select("id, deducted_to_extra")
+      .eq("order_id", orderId);
+
     // Sum waiting (eta=null) quantities per order_item_id
     for (const oi of orderItems) {
       const waitingQty = (batchData || [])
         .filter(b => b.order_item_id === oi.id && !b.eta)
         .reduce((sum, b) => sum + b.quantity, 0);
       map[oi.id] = waitingQty;
+      const row = (itemRows || []).find((r: any) => r.id === oi.id);
+      dMap[oi.id] = Math.max(0, (row as any)?.deducted_to_extra || 0);
     }
 
     setRemovableMap(map);
+    setDeductedMap(dMap);
   };
 
   const getProductSizes = (productId: string): string[] => {
@@ -189,14 +202,16 @@ export function EditOrderDialog({
     if (item.isNew || !item.id) return 1;
     if (orderStatus !== "in_progress") return 1;
     const removable = removableMap[item.id] ?? 0;
-    return Math.max(1, item.originalQuantity - removable);
+    const deducted = deductedMap[item.id] ?? 0;
+    return Math.max(1, item.originalQuantity - removable - deducted);
   };
 
   const canDeleteItem = (item: EditableItem): boolean => {
     if (item.isNew) return true;
     if (!item.id) return true;
     if (orderStatus !== "in_progress") return true;
-    // Can only delete if ALL quantity is removable (in manufacturing and not started)
+    // Can only delete if ALL quantity is removable from waiting manufacturing batches.
+    // Deducted-to-extra units stay in Extra and can't be reclaimed by deletion.
     const removable = removableMap[item.id] ?? 0;
     return removable >= item.originalQuantity;
   };
@@ -268,9 +283,11 @@ export function EditOrderDialog({
     setNewNeedsBoxing(true);
   };
 
-  // Re-validate removable quantities server-side before save
-  const revalidateConstraints = async (): Promise<boolean> => {
-    if (orderStatus !== "in_progress") return true;
+  // Re-validate removable quantities server-side before save.
+  // Returns the latest deducted_to_extra map so handleSave uses fresh values.
+  const revalidateConstraints = async (): Promise<{ ok: boolean; deducted: Record<string, number> }> => {
+    const emptyDeducted: Record<string, number> = {};
+    if (orderStatus !== "in_progress") return { ok: true, deducted: emptyDeducted };
 
     const { data: batchData } = await supabase
       .from("order_batches")
@@ -278,40 +295,54 @@ export function EditOrderDialog({
       .eq("order_id", orderId)
       .eq("current_state", "in_manufacturing");
 
+    const { data: itemRows } = await supabase
+      .from("order_items")
+      .select("id, deducted_to_extra")
+      .eq("order_id", orderId);
+
+    const freshDeducted: Record<string, number> = {};
+    for (const r of (itemRows || []) as any[]) {
+      freshDeducted[r.id] = Math.max(0, r.deducted_to_extra || 0);
+    }
+
     for (const item of items) {
       if (item.isNew || !item.id) continue;
 
-      // Only waiting batches (eta=null) are removable
       const removable = (batchData || [])
         .filter(b => b.order_item_id === item.id && !b.eta)
         .reduce((sum, b) => sum + b.quantity, 0);
+      const deducted = freshDeducted[item.id] ?? 0;
 
       if (item.isDeleted) {
+        // Deletion still requires full coverage by waiting batches alone — extras stay in pool.
         if (removable < item.originalQuantity) {
           toast.error(`${item.productName}: ${language === "ar" ? "لا يمكن حذف هذا المنتج - تم بدء العمل عليه" : "Cannot delete - work has started on this item"}`);
-          return false;
+          return { ok: false, deducted: freshDeducted };
         }
       } else if (item.quantity < item.originalQuantity) {
         const decreaseAmount = item.originalQuantity - item.quantity;
-        if (decreaseAmount > removable) {
+        if (decreaseAmount > removable + deducted) {
           toast.error(`${item.productName}: ${language === "ar" ? "لا يمكن تقليل الكمية بهذا المقدار - تم بدء العمل" : "Cannot decrease by this amount - work has progressed"}`);
-          return false;
+          return { ok: false, deducted: freshDeducted };
         }
       }
     }
 
-    return true;
+    return { ok: true, deducted: freshDeducted };
   };
 
   const handleSave = async () => {
     setSaving(true);
     try {
       // Re-validate constraints before proceeding
-      const valid = await revalidateConstraints();
-      if (!valid) {
+      const { ok, deducted: freshDeducted } = await revalidateConstraints();
+      if (!ok) {
         setSaving(false);
         return;
       }
+
+      // Track per-item paperwork (extra-deduction) portion of any decrease, for activity log.
+      const paperworkPortions: Record<string, number> = {};
 
       // 1. Update EFT
       const eftChanged =
@@ -404,33 +435,44 @@ export function EditOrderDialog({
             }
           }
         } else {
-          // Decrease: check box occupancy first
+          // Decrease — split into paperwork (already in Extra) + waiting-batch deletion.
           const decreaseAmount = Math.abs(delta);
+          const availableDeducted = freshDeducted[item.id!] ?? 0;
+          const paperwork = Math.min(decreaseAmount, availableDeducted);
+          const fromWaiting = decreaseAmount - paperwork;
+          if (paperwork > 0) paperworkPortions[item.id!] = paperwork;
 
-          const { data: boxedBatches } = await supabase
-            .from("order_batches")
-            .select("id")
-            .eq("order_item_id", item.id!)
-            .not("box_id", "is", null)
-            .limit(1);
+          // Box-occupancy guard only matters when we actually delete batches.
+          if (fromWaiting > 0) {
+            const { data: boxedBatches } = await supabase
+              .from("order_batches")
+              .select("id")
+              .eq("order_item_id", item.id!)
+              .not("box_id", "is", null)
+              .limit(1);
 
-          if (boxedBatches && boxedBatches.length > 0) {
-            setBoxWarningMessage(
-              `${item.productName}${item.size ? ` (${item.size})` : ""}: ${t("orders.boxes_must_be_emptied")}`
-            );
-            setBoxWarningOpen(true);
-            setSaving(false);
-            return;
+            if (boxedBatches && boxedBatches.length > 0) {
+              setBoxWarningMessage(
+                `${item.productName}${item.size ? ` (${item.size})` : ""}: ${t("orders.boxes_must_be_emptied")}`
+              );
+              setBoxWarningOpen(true);
+              setSaving(false);
+              return;
+            }
+
+            if (isInProgress) {
+              await deleteManufacturingBatches(item.id!, fromWaiting);
+            }
           }
 
-          // Delete batches only from in_manufacturing state
-          if (isInProgress) {
-            await deleteManufacturingBatches(item.id!, decreaseAmount);
+          // Apply paperwork-only reduction to deducted_to_extra (clamped >= 0).
+          const updatePayload: Record<string, any> = { quantity: item.quantity };
+          if (paperwork > 0) {
+            updatePayload.deducted_to_extra = Math.max(0, availableDeducted - paperwork);
           }
-
           await supabase
             .from("order_items")
-            .update({ quantity: item.quantity })
+            .update(updatePayload)
             .eq("id", item.id!);
         }
       }
@@ -476,7 +518,20 @@ export function EditOrderDialog({
         } else if (item.isDeleted && !item.isNew) {
           changes.push({ type: "deleted", product: item.productName, sku: item.productSku, size: item.size, quantity: item.originalQuantity });
         } else if (!item.isNew && !item.isDeleted && item.id && item.quantity !== item.originalQuantity) {
-          changes.push({ type: "qty_changed", product: item.productName, sku: item.productSku, size: item.size, from: item.originalQuantity, to: item.quantity, delta: item.quantity - item.originalQuantity });
+          const delta = item.quantity - item.originalQuantity;
+          const paperwork = paperworkPortions[item.id] ?? 0;
+          const batchPortion = delta < 0 ? Math.abs(delta) - paperwork : 0;
+          changes.push({
+            type: "qty_changed",
+            product: item.productName,
+            sku: item.productSku,
+            size: item.size,
+            from: item.originalQuantity,
+            to: item.quantity,
+            delta,
+            paperwork_portion: paperwork,
+            batch_portion: batchPortion,
+          });
         }
       }
 
@@ -605,6 +660,7 @@ export function EditOrderDialog({
                 const idx = items.indexOf(item);
                 const minQty = getMinQuantity(item);
                 const deletable = canDeleteItem(item);
+                const deductedHere = item.id ? (deductedMap[item.id] ?? 0) : 0;
                 return (
                   <div
                     key={item.id || `new-${idx}`}
@@ -631,6 +687,20 @@ export function EditOrderDialog({
                         )}
                       </div>
                     </div>
+                    {deductedHere > 0 && (
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Info className="h-4 w-4 text-primary cursor-help shrink-0" />
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">
+                            <p className="text-xs">
+                              {t("orders.deducted_to_extra_hint").replace(/\{count\}/g, String(deductedHere))}
+                            </p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    )}
                     <NumericInput
                       value={item.quantity}
                       onValueChange={(val) => handleQtyChange(idx, val)}
