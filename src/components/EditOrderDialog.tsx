@@ -383,18 +383,27 @@ export function EditOrderDialog({
         }
 
         // Delete all batches for this item
-        await supabase.from("order_batches").delete().eq("order_item_id", item.id!);
+        {
+          const { error: delBatchErr } = await supabase.from("order_batches").delete().eq("order_item_id", item.id!);
+          if (delBatchErr) throw delBatchErr;
+        }
 
         // Release reserved extra batches
-        await supabase
-          .from("extra_batches")
-          .update({ inventory_state: "AVAILABLE", order_id: null, order_item_id: null })
-          .eq("order_id", orderId)
-          .eq("order_item_id", item.id!)
-          .eq("inventory_state", "RESERVED");
+        {
+          const { error: relErr } = await supabase
+            .from("extra_batches")
+            .update({ inventory_state: "AVAILABLE", order_id: null, order_item_id: null })
+            .eq("order_id", orderId)
+            .eq("order_item_id", item.id!)
+            .eq("inventory_state", "RESERVED");
+          if (relErr) throw relErr;
+        }
 
         // Delete the order item
-        await supabase.from("order_items").delete().eq("id", item.id!);
+        {
+          const { error: delItemErr } = await supabase.from("order_items").delete().eq("id", item.id!);
+          if (delItemErr) throw delItemErr;
+        }
       }
 
       // 3. Process quantity changes on existing items
@@ -476,10 +485,11 @@ export function EditOrderDialog({
           if (paperwork > 0) {
             updatePayload.deducted_to_extra = Math.max(0, availableDeducted - paperwork);
           }
-          await supabase
+          const { error: updItemErr } = await supabase
             .from("order_items")
             .update(updatePayload)
             .eq("id", item.id!);
+          if (updItemErr) throw updItemErr;
         }
       }
 
