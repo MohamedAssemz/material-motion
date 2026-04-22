@@ -114,6 +114,7 @@ export interface ProductFormData {
   brand_id: string;
   country: string;
   needs_packing: boolean;
+  minimum_quantity: number;
   category_ids: string[];
   customer_ids: string[];
   images: ProductImage[];
@@ -140,6 +141,7 @@ const initialFormData: ProductFormData = {
   brand_id: '',
   country: '',
   needs_packing: true,
+  minimum_quantity: 0,
   category_ids: [],
   customer_ids: [],
   images: [],
@@ -272,6 +274,7 @@ export function ProductFormDialog({
         brand_id: formData.brand_id || null,
         country: formData.country.trim() || null,
         needs_packing: formData.needs_packing,
+        minimum_quantity: formData.minimum_quantity ?? 0,
       };
 
       let productId = formData.id;
