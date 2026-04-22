@@ -105,10 +105,6 @@ export default function ExtraInventoryAnalysis() {
         const agg = totals.get(p.id as string);
         const available = agg?.total ?? 0;
         const minimum = (p.minimum_quantity as number) ?? 0;
-
-        // Hide products with no minimum threshold AND no stock — nothing to report.
-        if (minimum <= 0 && available <= 0) continue;
-
         const sizes: SizeRow[] = [];
         if (agg) {
           for (const [sizeKey, qty] of agg.sizes.entries()) {
