@@ -422,16 +422,6 @@ export default function Boxes() {
       });
       setOrderBoxes(orderBoxesMapped);
 
-      const { data: extraBoxesData, error: extraBoxesError } = await supabase
-        .from("extra_boxes")
-        .select("*")
-        .order("box_code");
-      if (extraBoxesError) throw extraBoxesError;
-      const extraBoxIds = extraBoxesData?.map((b) => b.id) || [];
-      const { data: extraBatchesData } = await supabase
-        .from("extra_batches")
-        .select("box_id, quantity, current_state")
-        .in("box_id", extraBoxIds);
       const extraBatchStats = new Map<string, { count: number; total: number; state: string | null }>();
       extraBatchesData?.forEach((batch) => {
         if (batch.box_id) {
