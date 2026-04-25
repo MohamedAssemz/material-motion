@@ -353,38 +353,49 @@ export default function Boxes() {
 
   useEffect(() => {
     fetchBoxes();
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const debouncedRefetch = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => fetchBoxes(), 500);
+    };
     const channel = supabase
       .channel("boxes-changes")
-      .on("postgres_changes", { event: "*", schema: "public", table: "boxes" }, () => {
-        fetchBoxes();
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "extra_boxes" }, () => {
-        fetchBoxes();
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "order_batches" }, () => {
-        fetchBoxes();
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "extra_batches" }, () => {
-        fetchBoxes();
-      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "boxes" }, debouncedRefetch)
+      .on("postgres_changes", { event: "*", schema: "public", table: "extra_boxes" }, debouncedRefetch)
+      .on("postgres_changes", { event: "*", schema: "public", table: "order_batches" }, debouncedRefetch)
+      .on("postgres_changes", { event: "*", schema: "public", table: "extra_batches" }, debouncedRefetch)
       .subscribe();
     return () => {
+      if (timer) clearTimeout(timer);
       supabase.removeChannel(channel);
     };
   }, []);
 
   const fetchBoxes = async () => {
     try {
-      const { data: orderBoxesData, error: orderBoxesError } = await supabase
-        .from("boxes")
-        .select("*")
-        .order("box_code");
-      if (orderBoxesError) throw orderBoxesError;
+      const [orderBoxesRes, extraBoxesRes] = await Promise.all([
+        supabase.from("boxes").select("*").order("box_code"),
+        supabase.from("extra_boxes").select("*").order("box_code"),
+      ]);
+      if (orderBoxesRes.error) throw orderBoxesRes.error;
+      if (extraBoxesRes.error) throw extraBoxesRes.error;
+      const orderBoxesData = orderBoxesRes.data;
+      const extraBoxesData = extraBoxesRes.data;
+
       const orderBoxIds = orderBoxesData?.map((b) => b.id) || [];
-      const { data: orderBatchesData } = await supabase
-        .from("order_batches")
-        .select("box_id, quantity, current_state")
-        .in("box_id", orderBoxIds);
+      const extraBoxIds = extraBoxesData?.map((b) => b.id) || [];
+
+      const [orderBatchesRes, extraBatchesRes] = await Promise.all([
+        orderBoxIds.length
+          ? supabase.from("order_batches").select("box_id, quantity, current_state").in("box_id", orderBoxIds)
+          : Promise.resolve({ data: [] as any[] }),
+        extraBoxIds.length
+          ? supabase.from("extra_batches").select("box_id, quantity, current_state").in("box_id", extraBoxIds)
+          : Promise.resolve({ data: [] as any[] }),
+      ]);
+      const orderBatchesData = orderBatchesRes.data;
+      const extraBatchesData = extraBatchesRes.data;
+
       const orderBatchStats = new Map<string, { count: number; total: number; state: string | null }>();
       orderBatchesData?.forEach((batch) => {
         if (batch.box_id) {
@@ -411,16 +422,6 @@ export default function Boxes() {
       });
       setOrderBoxes(orderBoxesMapped);
 
-      const { data: extraBoxesData, error: extraBoxesError } = await supabase
-        .from("extra_boxes")
-        .select("*")
-        .order("box_code");
-      if (extraBoxesError) throw extraBoxesError;
-      const extraBoxIds = extraBoxesData?.map((b) => b.id) || [];
-      const { data: extraBatchesData } = await supabase
-        .from("extra_batches")
-        .select("box_id, quantity, current_state")
-        .in("box_id", extraBoxIds);
       const extraBatchStats = new Map<string, { count: number; total: number; state: string | null }>();
       extraBatchesData?.forEach((batch) => {
         if (batch.box_id) {

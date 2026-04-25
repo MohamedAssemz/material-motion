@@ -127,13 +127,17 @@ export default function ExtraInventory() {
 
   useEffect(() => {
     fetchData();
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const debouncedRefetch = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => fetchData(), 500);
+    };
     const channel = supabase
       .channel("extra-batches")
-      .on("postgres_changes", { event: "*", schema: "public", table: "extra_batches" }, () => {
-        fetchData();
-      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "extra_batches" }, debouncedRefetch)
       .subscribe();
     return () => {
+      if (timer) clearTimeout(timer);
       supabase.removeChannel(channel);
     };
   }, []);
