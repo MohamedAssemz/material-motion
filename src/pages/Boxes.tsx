@@ -373,16 +373,29 @@ export default function Boxes() {
 
   const fetchBoxes = async () => {
     try {
-      const { data: orderBoxesData, error: orderBoxesError } = await supabase
-        .from("boxes")
-        .select("*")
-        .order("box_code");
-      if (orderBoxesError) throw orderBoxesError;
+      const [orderBoxesRes, extraBoxesRes] = await Promise.all([
+        supabase.from("boxes").select("*").order("box_code"),
+        supabase.from("extra_boxes").select("*").order("box_code"),
+      ]);
+      if (orderBoxesRes.error) throw orderBoxesRes.error;
+      if (extraBoxesRes.error) throw extraBoxesRes.error;
+      const orderBoxesData = orderBoxesRes.data;
+      const extraBoxesData = extraBoxesRes.data;
+
       const orderBoxIds = orderBoxesData?.map((b) => b.id) || [];
-      const { data: orderBatchesData } = await supabase
-        .from("order_batches")
-        .select("box_id, quantity, current_state")
-        .in("box_id", orderBoxIds);
+      const extraBoxIds = extraBoxesData?.map((b) => b.id) || [];
+
+      const [orderBatchesRes, extraBatchesRes] = await Promise.all([
+        orderBoxIds.length
+          ? supabase.from("order_batches").select("box_id, quantity, current_state").in("box_id", orderBoxIds)
+          : Promise.resolve({ data: [] as any[] }),
+        extraBoxIds.length
+          ? supabase.from("extra_batches").select("box_id, quantity, current_state").in("box_id", extraBoxIds)
+          : Promise.resolve({ data: [] as any[] }),
+      ]);
+      const orderBatchesData = orderBatchesRes.data;
+      const extraBatchesData = extraBatchesRes.data;
+
       const orderBatchStats = new Map<string, { count: number; total: number; state: string | null }>();
       orderBatchesData?.forEach((batch) => {
         if (batch.box_id) {
