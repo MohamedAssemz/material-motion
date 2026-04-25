@@ -353,22 +353,20 @@ export default function Boxes() {
 
   useEffect(() => {
     fetchBoxes();
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const debouncedRefetch = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => fetchBoxes(), 500);
+    };
     const channel = supabase
       .channel("boxes-changes")
-      .on("postgres_changes", { event: "*", schema: "public", table: "boxes" }, () => {
-        fetchBoxes();
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "extra_boxes" }, () => {
-        fetchBoxes();
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "order_batches" }, () => {
-        fetchBoxes();
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "extra_batches" }, () => {
-        fetchBoxes();
-      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "boxes" }, debouncedRefetch)
+      .on("postgres_changes", { event: "*", schema: "public", table: "extra_boxes" }, debouncedRefetch)
+      .on("postgres_changes", { event: "*", schema: "public", table: "order_batches" }, debouncedRefetch)
+      .on("postgres_changes", { event: "*", schema: "public", table: "extra_batches" }, debouncedRefetch)
       .subscribe();
     return () => {
+      if (timer) clearTimeout(timer);
       supabase.removeChannel(channel);
     };
   }, []);
