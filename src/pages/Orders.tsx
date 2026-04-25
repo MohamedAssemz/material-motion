@@ -83,17 +83,20 @@ export default function Orders() {
   useEffect(() => {
     fetchOrders();
 
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const debouncedRefetch = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => fetchOrders(), 400);
+    };
+
     const channel = supabase
       .channel("orders-list")
-      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => {
-        fetchOrders();
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "order_batches" }, () => {
-        fetchOrders();
-      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, debouncedRefetch)
+      .on("postgres_changes", { event: "*", schema: "public", table: "order_batches" }, debouncedRefetch)
       .subscribe();
 
     return () => {
+      if (timer) clearTimeout(timer);
       supabase.removeChannel(channel);
     };
   }, []);
@@ -107,21 +110,32 @@ export default function Orders() {
 
       if (error) throw error;
 
-      const { data: itemsData } = await supabase
-        .from("order_items")
-        .select("id, order_id, quantity, deducted_to_extra, product:products(name_en, sku)")
-        .in("order_id", ordersData?.map((o) => o.id) || []);
+      const orderIds = ordersData?.map((o) => o.id) || [];
+
+      // Fetch items, batches, and profiles in parallel — single query each
+      const creatorIds = ordersData?.map((o) => o.created_by).filter(Boolean) || [];
+      const [itemsRes, batchesRes, profilesRes] = await Promise.all([
+        supabase
+          .from("order_items")
+          .select("id, order_id, quantity, deducted_to_extra, product:products(name_en, sku)")
+          .in("order_id", orderIds),
+        supabase
+          .from("order_batches")
+          .select("order_id, current_state, quantity")
+          .in("order_id", orderIds),
+        creatorIds.length > 0
+          ? supabase.from("profiles").select("id, full_name, email").in("id", creatorIds)
+          : Promise.resolve({ data: [] as any[] }),
+      ]);
 
       const itemsMap = new Map<string, OrderItem[]>();
       const orderUnitCounts = new Map<string, number>();
       const extraCountsByOrder = new Map<string, number>();
-      (itemsData || []).forEach((item: any) => {
+      (itemsRes.data || []).forEach((item: any) => {
         const existing = itemsMap.get(item.order_id) || [];
         existing.push(item);
         itemsMap.set(item.order_id, existing);
-
         orderUnitCounts.set(item.order_id, (orderUnitCounts.get(item.order_id) || 0) + item.quantity);
-
         extraCountsByOrder.set(
           item.order_id,
           (extraCountsByOrder.get(item.order_id) || 0) + (item.deducted_to_extra || 0),
@@ -129,29 +143,19 @@ export default function Orders() {
       });
       setOrderItems(itemsMap);
 
-      const creatorIds = ordersData?.map((o) => o.created_by).filter(Boolean) || [];
-      const { data: profilesData } = await supabase
-        .from("profiles")
-        .select("id, full_name, email")
-        .in("id", creatorIds);
+      // Aggregate batches per order in one pass
+      const shippedByOrder = new Map<string, number>();
+      (batchesRes.data || []).forEach((b: any) => {
+        if (b.current_state === "shipped") {
+          shippedByOrder.set(b.order_id, (shippedByOrder.get(b.order_id) || 0) + b.quantity);
+        }
+      });
 
-      const profilesMap = new Map(profilesData?.map((p) => [p.id, p]) || []);
+      const profilesMap = new Map((profilesRes.data || []).map((p: any) => [p.id, p]));
 
-      const ordersWithStatus = [];
-
-      for (const order of ordersData || []) {
-        const { data: batches } = await supabase
-          .from("order_batches")
-          .select("current_state, quantity")
-          .eq("order_id", order.id);
-
-        const batchTotalCount = batches?.reduce((sum, b) => sum + b.quantity, 0) || 0;
-        const shippedCount =
-          batches?.filter((b) => b.current_state === "shipped").reduce((sum, b) => sum + b.quantity, 0) || 0;
-        const inProgressCount =
-          batches?.filter((b) => b.current_state !== "shipped").reduce((sum, b) => sum + b.quantity, 0) || 0;
-
+      const ordersWithStatus = (ordersData || []).map((order: any) => {
         const unitCount = orderUnitCounts.get(order.id) || 0;
+        const shippedCount = shippedByOrder.get(order.id) || 0;
 
         let computed_status: OrderStatus = "pending";
         if (order.status === "cancelled") {
@@ -162,15 +166,15 @@ export default function Orders() {
           computed_status = "in_progress";
         }
 
-        ordersWithStatus.push({
+        return {
           ...order,
           profiles: order.created_by ? profilesMap.get(order.created_by) : null,
           unit_count: unitCount,
           shipped_count: shippedCount,
           computed_status,
           extra_count: extraCountsByOrder.get(order.id) || 0,
-        });
-      }
+        };
+      });
 
       setOrders(ordersWithStatus);
     } catch (error) {
